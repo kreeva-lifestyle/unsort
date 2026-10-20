@@ -36,6 +36,14 @@
 //   step            (admin/manager/operator)  -> process one queue item
 //   pause           (admin/manager/operator)  -> status := paused
 //   resume          (admin/manager/operator)  -> status := running
+//   stop            (admin/manager/operator)  -> status := done (a paused run you no longer want)
+//
+// Several runs can go at once (MAX_ACTIVE_RUNS per person). A business already
+// on the buyer list never comes back, whatever its web address or the status
+// staff gave it: buyer_same_business() matches the domain, the business part
+// of it (uk.kalkifashion.com = kalkifashion.com, sareesbazaar.com =
+// sareesbazaar.in) and the email / Instagram / phone — when a site is queued,
+// before it is read, after a redirect, and once more before it is saved.
 
 // deno-lint-ignore-file no-explicit-any
 
@@ -54,11 +62,15 @@ const json = (body: unknown, req: Request, status = 200) =>
 const fail = (status: number, error: string, req: Request, details?: string, extra: Record<string, unknown> = {}) => json({ ok: false, error, details, ...extra }, req, status);
 
 // ── Caps (server-side, the client cannot raise them) ────────────────────────
-const RUNS_PER_USER_PER_DAY = 5;
-const MAX_QUERIES_PER_RUN = 120;      // search API calls
-const MAX_PAGES_PER_RUN = 400;        // candidate sites read
-const SEED_QUERIES = 8;               // queries written for the seed
-const HOP_QUERIES = 3;                // queries written for an accepted lead
+const RUNS_PER_USER_PER_DAY = 10;
+const MAX_ACTIVE_RUNS = 3;            // runs one person can have going at the same time
+const ACTIVE_MS = 5 * 60_000;         // a 'running' run with no step for this long was left by a closed tab
+const MAX_QUERIES_PER_RUN = 150;      // search API calls
+const MAX_PAGES_PER_RUN = 600;        // candidate sites read
+const MAX_DEPTH = 4;                  // hops: lookalikes of lookalikes …
+const DEFAULT_DEPTH = 3;
+const SEED_QUERIES = 12;              // queries written for the seed
+const HOP_QUERIES = 4;                // queries written for an accepted lead
 const RESULTS_PER_QUERY = 10;
 const MIN_ACCEPT_SCORE = 55;          // the "worth contacting" band edge in JUDGE_SYSTEM
 const PAGE_BYTES = 350_000;
@@ -318,12 +330,17 @@ async function loadSearchCfg(): Promise<SearchCfg | null> {
 
 // Every failure here throws a message starting with "search" — the step
 // handler pauses the run on those rather than blaming the current site.
-async function webSearch(cfg: SearchCfg, q: string): Promise<Hit[]> {
+// Two runs searching at once can trip Brave's 1-request-a-second limit: a
+// 429 is retried twice after a short wait before the run is paused.
+async function webSearch(cfg: SearchCfg, q: string, attempt = 0): Promise<Hit[]> {
   const r = await fetch(`https://api.search.brave.com/res/v1/web/search?${new URLSearchParams({ q, count: String(RESULTS_PER_QUERY * 2), search_lang: 'en', safesearch: 'off', text_decorations: 'false' })}`, {
     headers: { accept: 'application/json', 'x-subscription-token': cfg.key }, signal: AbortSignal.timeout(FETCH_MS),
   });
   if (r.status === 401 || r.status === 403) throw new Error('search_key_rejected');
-  if (r.status === 429) throw new Error('search_rate_limited');
+  if (r.status === 429) {
+    if (attempt < 2) { await r.body?.cancel().catch(() => {}); await new Promise(res => setTimeout(res, 1500 * (attempt + 1))); return webSearch(cfg, q, attempt + 1); }
+    throw new Error('search_rate_limited');
+  }
   if (!r.ok) throw new Error(`search ${r.status}`);
   const d = await r.json();
   return (d?.web?.results || []).map((x: any) => ({ url: String(x.url || ''), title: String(x.title || ''), snippet: String(x.description || '') }));
@@ -419,6 +436,16 @@ const chosen = (v: unknown, allowed: string[]): string | null => {
 };
 
 // ── Queue helpers ───────────────────────────────────────────────────────────
+interface Known { domain: string; name: string | null; status: string }
+const STATUS_WORD: Record<string, string> = { contacted: 'Contacted', replied: 'Replied', customer: 'Customer', rejected: 'Not a fit' };
+// The earliest lead that is the same business as these domains / contacts
+// (see the header), or null.
+async function sameBusiness(domains: string[], c: { email?: string | null; instagram?: string | null; phones?: (string | null)[] } = {}): Promise<Known | null> {
+  const r = await rest('rpc/buyer_same_business', { method: 'POST', body: JSON.stringify({ p_domains: uniq(domains), p_email: c.email ?? null, p_instagram: c.instagram ?? null, p_phones: (c.phones || []).filter(Boolean) }) });
+  return (Array.isArray(r) ? r[0] : r) ?? null;
+}
+const knownNote = (k: Known) => `already on your list${k.domain ? ` as ${k.domain}` : ''}${STATUS_WORD[k.status] ? ` (${STATUS_WORD[k.status]})` : ''}`;
+
 async function enqueue(runId: string, hits: Hit[], hop: number, parent: string, query: string, seedDomain: string): Promise<number> {
   const rows: any[] = []; const seen = new Set<string>();
   for (const h of hits) {
@@ -431,17 +458,21 @@ async function enqueue(runId: string, hits: Hit[], hop: number, parent: string, 
     rows.push({ run_id: runId, domain: d, url: `${u.protocol}//${u.host}/`, hop, parent_domain: parent, via_query: clip(query, 120), state: 'pending', note: null });
   }
   if (!rows.length) return 0;
-  // Known leads from earlier runs are not re-read: they go straight to 'skipped'.
-  // (domains passed publicHttpUrl, so they are [a-z0-9.-] and safe to quote.)
-  const known: { domain: string }[] = await rest(`buyer_leads?select=domain&domain=in.(${rows.map(r => `"${r.domain}"`).join(',')})`);
-  const knownSet = new Set(known.map(k => k.domain));
-  for (const r of rows) if (knownSet.has(r.domain)) { r.state = 'skipped'; r.note = 'already a lead'; }
+  // A business already on the list (any address, any status) is not re-read:
+  // it goes straight to 'skipped'. One lookup per site, all at once.
+  const known = await Promise.all(rows.map(r => sameBusiness([r.domain])));
+  rows.forEach((r, i) => { const k = known[i]; if (k) { r.state = 'skipped'; r.note = clip(knownNote(k), 200); } });
   // on_conflict=run_id,domain + ignore-duplicates: a domain surfaced by two
   // queries stays at the hop it was first seen.
   const ins = await fetch(`${SB_URL}/rest/v1/buyer_queue?on_conflict=run_id,domain`, { method: 'POST', headers: { ...svcHeaders, prefer: 'resolution=ignore-duplicates,return=representation' }, body: JSON.stringify(rows) });
   if (!ins.ok) throw new Error(`db ${ins.status} buyer_queue: ${(await ins.text().catch(() => '')).slice(0, 160)}`);
   const inserted = await ins.json().catch(() => []);
   return (inserted as any[]).filter(r => r.state === 'pending').length;
+}
+
+// A status that cannot be read counts as running: the step carries on rather than stopping on a blip.
+async function runStatus(runId: string): Promise<string | null> {
+  try { return (await rest(`buyer_runs?id=eq.${runId}&select=status`))?.[0]?.status ?? null; } catch { return 'running'; }
 }
 
 // Runs the queries for one node (skipping the first `skip`, already run on a
@@ -455,6 +486,9 @@ async function expand(run: any, cfg: SearchCfg, queries: string[], hop: number, 
   let monthUsed = await monthUsage();
   for (let i = skip; i < queries.length; i++) {
     if (queriesUsed >= MAX_QUERIES_PER_RUN) break;
+    // Paused or stopped from another screen while this step searches: stop
+    // here, the searches left wait for Resume (they are kept by the caller).
+    if (await runStatus(run.id) !== 'running') return { added, used, monthUsed, error: new Error('search_halted') };
     let taken: number | null;
     try { taken = await reserveSearch(); } catch (e) { return { added, used, monthUsed, error: e }; }
     if (taken === null) return { added, used, monthUsed: MONTHLY_SEARCH_CAP, error: new Error('search_monthly_cap') };
@@ -486,10 +520,17 @@ async function claimNext(runId: string): Promise<any | null> {
 }
 
 // ── Actions ─────────────────────────────────────────────────────────────────
+// Runs this person has going right now (a step in the last ACTIVE_MS).
+async function activeRuns(userId: string, except = ''): Promise<number> {
+  const since = new Date(Date.now() - ACTIVE_MS).toISOString();
+  const rows: { id: string }[] = await rest(`buyer_runs?select=id&created_by=eq.${userId}&status=eq.running&updated_at=gte.${encodeURIComponent(since)}`);
+  return rows.filter(r => r.id !== except).length;
+}
+
 async function start(who: { id: string; role: string }, body: any, req: Request): Promise<Response> {
   const seed = publicHttpUrl(str(body.seed_url, 500));
   if (!seed) return fail(400, 'Enter the buyer\'s website, e.g. www.theirshop.com', req);
-  const maxDepth = Math.min(3, Math.max(1, Number(body.max_depth) || 2));
+  const maxDepth = Math.min(MAX_DEPTH, Math.max(1, Number(body.max_depth) || DEFAULT_DEPTH));
   const maxLeads = Math.min(500, Math.max(10, Number(body.max_leads) || 150));
   const cfg = await loadSearchCfg();
   if (!cfg) return fail(400, 'No Brave Search API key yet — an admin adds one below', req);
@@ -498,6 +539,7 @@ async function start(who: { id: string; role: string }, body: any, req: Request)
   const since = new Date(Date.now() - 86_400_000).toISOString();
   const recent = await rest(`buyer_runs?select=id&created_by=eq.${who.id}&created_at=gte.${since}`);
   if (recent.length >= RUNS_PER_USER_PER_DAY) return fail(429, `Daily limit reached — ${RUNS_PER_USER_PER_DAY} runs per person per day`, req);
+  if (await activeRuns(who.id) >= MAX_ACTIVE_RUNS) return fail(429, `${MAX_ACTIVE_RUNS} runs are already going — pause or stop one first`, req);
   const page = await readPage(seed);
   if (!page) return fail(400, 'That website could not be read — check the address, or try its home page', req);
   const seedDomain = page.domain;
@@ -538,9 +580,23 @@ async function step(who: { id: string }, body: any, req: Request): Promise<Respo
   // run were counted as they ran; `usedNow` is only for the note.
   const pause = async (e: unknown, usedNow = 0) => {
     const m = String((e as Error)?.message || e);
+    // Someone paused, resumed or stopped the run while this step worked: it
+    // keeps the status they gave it (a Stop must never come back as Paused).
+    // The client loop follows the status it reads here: still running → keep
+    // stepping; paused or done → stop. Unreadable → step again, which reads it.
+    const halted = async () => {
+      const now = (await rest(`buyer_runs?id=eq.${runId}&select=*`).catch(() => null))?.[0];
+      return json({ ok: true, ...(now ? { run: now } : {}), done: !!now && now.status !== 'running' && now.status !== 'paused', search_usage: usage() }, req);
+    };
+    if (m === 'search_halted') return halted();
     const friendly = /^search/.test(m) ? searchErrorText(e) : m.slice(0, 300);
-    const run = await bump(runId, { status: 'paused', error: friendly, note: `${friendly}${usedNow ? ` (${usedNow} searches done)` : ''}` });
-    return json({ ok: false, error: friendly, run, search_usage: usage() }, req, 502);
+    // Only a run that is still running becomes paused (one conditional write,
+    // so a Stop landing a moment earlier is never overwritten).
+    const rows = await rest(`buyer_runs?id=eq.${runId}&status=eq.running`, { method: 'PATCH', prefer: 'return=representation', body: JSON.stringify({ status: 'paused', last_error: friendly, step_note: clip(`${friendly}${usedNow ? ` (${usedNow} searches done)` : ''}`, 300), updated_at: new Date().toISOString() }) }).catch(() => undefined);
+    // The write itself failed: the client stops its loop and shows Resume.
+    if (rows === undefined) return json({ ok: false, error: friendly, search_usage: usage() }, req, 502);
+    if (!rows?.length) return halted();
+    return json({ ok: false, error: friendly, run: rows[0], search_usage: usage() }, req, 502);
   };
   // The month is already spent: pause before claiming anything.
   if (monthUsed >= MONTHLY_SEARCH_CAP) { await rest(`buyer_queue?id=eq.${item.id}`, { method: 'PATCH', body: JSON.stringify({ claimed_at: null }) }); return pause(new Error('search_monthly_cap')); }
@@ -568,6 +624,13 @@ async function step(who: { id: string }, body: any, req: Request): Promise<Respo
       await setItem('accepted', `${resumeLead.score} — ${resumeLead.reason}`);
       return reply(await bump(runId, { note: `${item.domain}: searches finished — ${r.added} more to check` }), { result: 'lead', score: resumeLead.score, added: r.added });
     }
+    // It may have joined the list since it was queued (another run, or the
+    // same business under another address in this run).
+    const known0 = await sameBusiness([item.domain]);
+    if (known0) {
+      await setItem('skipped', knownNote(known0));
+      return reply(await bump(runId, { note: `${item.domain}: ${knownNote(known0)}` }), { result: 'known', same_as: known0.domain });
+    }
     const target = publicHttpUrl(item.url);
     const page0 = target ? await readPage(target) : null;
     if (!page0) {
@@ -579,6 +642,12 @@ async function step(who: { id: string }, body: any, req: Request): Promise<Respo
     if (page0.domain !== item.domain && (page0.domain === run0.seed_domain || isBlocked(page0.domain))) {
       await setItem('skipped', `redirects to ${page0.domain}`);
       return reply(await bump(runId, { pages: 1, note: `${item.domain}: forwards to ${page0.domain}` }), { result: 'unreachable' });
+    }
+    // sareesbazaar.com forwards to sareesbazaar.in: the address it lands on counts.
+    const known1 = page0.domain !== item.domain ? await sameBusiness([page0.domain]) : null;
+    if (known1) {
+      await setItem('skipped', `forwards to ${page0.domain} — ${knownNote(known1)}`);
+      return reply(await bump(runId, { pages: 1, note: `${item.domain}: ${knownNote(known1)}` }), { result: 'known', same_as: known1.domain });
     }
     const page = await withContactPage(page0);
     const seedP = run0.profile || {};
@@ -597,14 +666,26 @@ async function step(who: { id: string }, body: any, req: Request): Promise<Respo
       instagram: chosen(v.instagram, page.contacts.instagram), facebook: chosen(v.facebook, page.contacts.facebook),
       first_run_id: runId, found_by: who.id, updated_at: new Date().toISOString(),
     };
+    // Same email / Instagram / phone as a business on the list (a sister brand,
+    // a second shop name): not a new buyer.
+    const known2 = await sameBusiness([page.domain, item.domain], { email: lead.email, instagram: lead.instagram, phones: [lead.phone, lead.whatsapp] });
+    if (known2) {
+      await setItem('skipped', `${score} — ${knownNote(known2)}`);
+      return reply(await bump(runId, { pages: 1, note: `${lead.name || page.domain}: ${knownNote(known2)}` }), { result: 'known', score, same_as: known2.domain }, modelUsage);
+    }
     // ignore-duplicates: a domain that became a lead in a parallel step keeps its first record.
     const ins = await fetch(`${SB_URL}/rest/v1/buyer_leads?on_conflict=domain`, { method: 'POST', headers: { ...svcHeaders, prefer: 'resolution=ignore-duplicates,return=representation' }, body: JSON.stringify(lead) });
     if (!ins.ok) throw new Error(`db ${ins.status} buyer_leads: ${(await ins.text()).slice(0, 200)}`);
     const wrote = ((await ins.json().catch(() => [])) as any[]).length > 0;
+    // Another step saved this domain a moment ago: it is that lead, not a new one.
+    if (!wrote) {
+      await setItem('skipped', `${score} — already on your list`);
+      return reply(await bump(runId, { pages: 1, note: `${page.domain}: already on your list` }), { result: 'known', score, same_as: page.domain }, modelUsage);
+    }
     await setItem('accepted', `${score} — ${lead.reason}`);
     itemState = 'accepted';
     // The lead and the page are on the books BEFORE the hop searches run.
-    let run = await bump(runId, { pages: 1, leads: wrote ? 1 : 0 });
+    let run = await bump(runId, { pages: 1, leads: 1 });
     let added = 0;
     if (item.hop < run0.max_depth) {
       const qs = (Array.isArray(v.queries) ? v.queries : []).map((q: unknown) => str(q, 120)).filter(Boolean).slice(0, HOP_QUERIES);
@@ -640,7 +721,7 @@ Deno.serve(async (req) => {
   try {
     if (action === 'status') {
       const cfg = await loadSearchCfg();
-      return json({ ok: true, hasSearchKey: !!cfg, hasAiKey: !!(await getSecret('anthropic_api_key')), model: await getModel(), role: who.role, search_usage: usageInfo(await monthUsage()), caps: { runsPerDay: RUNS_PER_USER_PER_DAY, queriesPerRun: MAX_QUERIES_PER_RUN, pagesPerRun: MAX_PAGES_PER_RUN } }, req);
+      return json({ ok: true, hasSearchKey: !!cfg, hasAiKey: !!(await getSecret('anthropic_api_key')), model: await getModel(), role: who.role, search_usage: usageInfo(await monthUsage()), caps: { runsPerDay: RUNS_PER_USER_PER_DAY, queriesPerRun: MAX_QUERIES_PER_RUN, pagesPerRun: MAX_PAGES_PER_RUN, activeRuns: MAX_ACTIVE_RUNS, maxDepth: MAX_DEPTH } }, req);
     }
     if (action === 'set_search_key') {
       if (who.role !== 'admin') return fail(403, 'Only an admin can set the search API key', req);
@@ -657,13 +738,15 @@ Deno.serve(async (req) => {
     if (!CAN_RUN.includes(who.role)) return fail(403, 'Sign in as admin, manager or operator to find buyers', req);
     if (action === 'start') return await start(who, body, req);
     if (action === 'step') return await step(who, body, req);
-    if (action === 'pause' || action === 'resume') {
+    if (action === 'pause' || action === 'resume' || action === 'stop') {
       const runId = str(body?.run_id, 40);
       if (!/^[0-9a-f-]{36}$/.test(runId)) return fail(400, 'Missing run', req);
       const run = (await rest(`buyer_runs?id=eq.${runId}&select=id,status`))?.[0];
       if (!run) return fail(404, 'Run not found', req);
       if (run.status === 'done' || run.status === 'failed') return fail(400, 'That run has finished', req);
-      const updated = await bump(runId, { status: action === 'pause' ? 'paused' : 'running', note: action === 'pause' ? 'Paused' : 'Resumed', error: null });
+      if (action === 'resume' && await activeRuns(who.id, runId) >= MAX_ACTIVE_RUNS) return fail(429, `${MAX_ACTIVE_RUNS} runs are already going — pause or stop one first`, req);
+      const to = { pause: ['paused', 'Paused'], resume: ['running', 'Resumed'], stop: ['done', 'Stopped'] }[action];
+      const updated = await bump(runId, { status: to[0], note: to[1], error: null });
       return json({ ok: true, run: updated, search_usage: usageInfo(await monthUsage()) }, req);
     }
     return fail(400, 'Unknown action', req);

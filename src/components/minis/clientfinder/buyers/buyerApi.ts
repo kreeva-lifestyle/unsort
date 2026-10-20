@@ -16,11 +16,12 @@ export interface SpiderStatus {
   hasAiKey: boolean;
   model: string;
   role: string;
-  caps: { runsPerDay: number; queriesPerRun: number; pagesPerRun: number };
+  caps: { runsPerDay: number; queriesPerRun: number; pagesPerRun: number; activeRuns?: number; maxDepth?: number };
 }
 
-/** What one `step` did, shown in the live log under the progress card. */
-export interface StepItem { domain: string; hop: number; result: 'searched' | 'lead' | 'rejected' | 'unreachable' | 'failed'; score?: number; added?: number }
+/** What one `step` did, shown in the live log under the progress card.
+ *  'known': the same business is already on the buyer list (`same_as`). */
+export interface StepItem { domain: string; hop: number; result: 'searched' | 'lead' | 'rejected' | 'unreachable' | 'failed' | 'known'; score?: number; added?: number; same_as?: string }
 
 export interface SpiderResponse {
   ok: boolean;
