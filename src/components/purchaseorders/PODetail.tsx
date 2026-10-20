@@ -16,12 +16,13 @@ import POReceipts from './POReceipts';
 import POHeaderInfo from './POHeaderInfo';
 import PORailCard from './PORailCard';
 import POStageActions from './POStageActions';
+import { useLandedOrder } from './useLandedOrder';
 import { itemLabel } from './poItemLabel';
 import type { PurchaseOrder, PurchaseOrderItem, PurchaseOrderReceipt, AuditLog } from '../../types/database';
 
 const inr = (n: unknown) => Number(n || 0).toLocaleString('en-IN');
 
-export default function PODetail({ po, items, receipts, audit, names, statusColors, canManage, onClose, onChanged, onRetryActivity, onEdit, onDuplicate, onReceive, onPrint, onPendency, addToast }: {
+export default function PODetail({ po: livePo, items: liveItems, receipts: liveReceipts, audit, names, statusColors, canManage, onClose, onChanged, onRetryActivity, onEdit, onDuplicate, onReceive, onPrint, onPendency, addToast }: {
   po: PurchaseOrder;
   items: PurchaseOrderItem[];
   receipts: PurchaseOrderReceipt[];
@@ -44,6 +45,9 @@ export default function PODetail({ po, items, receipts, audit, names, statusColo
   addToast: (m: string, t?: string) => void;
 }) {
   const { ask, modalProps } = useConfirm();
+  // Everything below the rail shows the order as it was until the rail's light lands.
+  const { shown, land } = useLandedOrder({ po: livePo, items: liveItems, receipts: liveReceipts }, audit);
+  const { po, items, receipts } = shown;
   useModalLock();
   // One gate for every write on this sheet: a stage change and a receipt undo never overlap.
   const [busy, setBusy] = useState('');
@@ -91,7 +95,7 @@ export default function PODetail({ po, items, receipts, audit, names, statusColo
             calc(90vh - 190px) was taller than the mobile bottom sheet. */}
         <div style={{ padding: '16px 18px', overflowY: 'auto', WebkitOverflowScrolling: 'touch', flex: 1, minHeight: 0 }}>
           {/* The hero: title, status pill, the pipeline rail (the light travels when the order moves on), the latest event and who. */}
-          <PORailCard po={po} items={items} receipts={receipts} audit={audit} names={names} statusColors={statusColors} onLanded={() => landRef.current?.()} />
+          <PORailCard po={livePo} items={liveItems} shown={shown} audit={audit} names={names} statusColors={statusColors} onLanded={() => { land(); landRef.current?.(); }} />
           <POStageActions po={po} items={items} canManage={canManage} ask={ask} onChanged={onChanged} waitLanded={waitLanded} busy={busy} setBusy={setBusy} onReceive={onReceive} onCloseRemaining={() => setClosing(true)} addToast={addToast} />
           <POHeaderInfo po={po} costingSku={costingSku} names={names} />
 

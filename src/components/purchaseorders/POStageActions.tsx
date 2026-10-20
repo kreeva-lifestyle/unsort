@@ -79,7 +79,8 @@ export default function POStageActions({ po: livePo, items: liveItems, canManage
     <button type="button" onClick={() => run(step)} aria-busy={busy === step} style={{ ...look, ...S.btnLg, ...wait }}>{busy === step ? TEXT[step].busy : TEXT[step].idle}</button>
   );
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center', margin: '-2px 0 16px' }}>
+    // Keyed on the stage: the next steps mount fresh when it lands, none left fading back from the busy dim.
+    <div key={po.status} style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center', margin: '-2px 0 16px' }}>
       {canApprove && btn('approved', S.btnPrimary)}
       {canSend && btn('sent', S.btnGhost)}
       {canReceive && <button type="button" onClick={onReceive} style={{ ...(canApprove ? S.btnGhost : S.btnPrimary), ...S.btnLg, ...wait }}>{receiveLabel}</button>}

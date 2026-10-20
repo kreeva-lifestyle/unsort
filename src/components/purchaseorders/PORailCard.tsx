@@ -3,12 +3,12 @@
 // pipeline rail, and under a hairline the latest thing that happened to
 // the order with who did it — "Received 20 of 20 · 26 Sep, 03:40 pm" /
 // "Owner". When the order moves on, the pill and the caption hold the old
-// stage while the light travels and roll the moment it lands, together
-// with the stop's pulse.
-import { useEffect, useRef, useState } from 'react';
+// stage while the light travels (`shown`, from useLandedOrder) and roll the
+// moment it lands, together with the stop's pulse.
 import { fmtWhen } from '../../lib/humanize';
 import Roll from '../ui/Roll';
-import PORail, { railState, travels, TRAVEL_MS } from './PORail';
+import PORail, { railState } from './PORail';
+import type { OrderView } from './useLandedOrder';
 import { itemLabel } from './poItemLabel';
 import { fmtQty } from './poStats';
 import { PO_STATUS_LABELS } from '../../types/database';
@@ -48,28 +48,16 @@ export function latestEvent(po: PurchaseOrder, items: PurchaseOrderItem[], recei
   }
 }
 
-export default function PORailCard({ po, items, receipts, audit, names, statusColors, onLanded }: {
-  po: PurchaseOrder; items: PurchaseOrderItem[]; receipts: PurchaseOrderReceipt[];
+export default function PORailCard({ po, items, shown, audit, names, statusColors, onLanded }: {
+  /** The live order: the rail follows it (and travels when it moves on). */
+  po: PurchaseOrder; items: PurchaseOrderItem[];
+  /** The order as the rest of the card shows it — the old one until the rail lands. */
+  shown: OrderView;
   audit: AuditLog[] | null | 'error'; names: Record<string, string> | null;
   statusColors: Record<string, { bg: string; color: string }>;
   /** The new stage is on screen (the light landed, or nothing had to travel). */
   onLanded?: () => void;
 }) {
-  // `held` is the order as the pill and caption last showed it. While the
-  // rail's light travels to a new stop they keep showing it; the rail's
-  // landing (or a safety timeout) hands over to the live order.
-  const live = { po, items, receipts };
-  const [held, setHeld] = useState(live);
-  const liveRef = useRef(live); liveRef.current = live;
-  const fly = travels(railState(held.po, held.items, audit), railState(po, items, audit));
-  if (!fly && (held.po !== po || held.items !== items || held.receipts !== receipts)) setHeld(live);
-  useEffect(() => {
-    if (!fly) return;
-    const t = window.setTimeout(() => setHeld(liveRef.current), TRAVEL_MS + 700);
-    return () => window.clearTimeout(t);
-  }, [fly]);
-  const land = () => { setHeld(liveRef.current); onLanded?.(); };
-  const shown = fly ? held : live;
   const sc = statusColors[shown.po.status] || statusColors.draft;
   const state = railState(po, items, audit);
   const shownState = railState(shown.po, shown.items, audit);
@@ -86,11 +74,11 @@ export default function PORailCard({ po, items, receipts, audit, names, statusCo
         </div>
         <span className="po-card-pill" style={{ background: sc.bg, color: sc.color }}><i /><Roll text={PILL_LABEL[shown.po.status] || PO_STATUS_LABELS[shown.po.status] || shown.po.status} /></span>
       </div>
-      <PORail state={state} onLanded={land}
+      <PORail state={state} onLanded={onLanded}
         qty={got.got > 0 || shownState.stage === 3 ? got.text.replace(' of ', ' / ') : null} />
       <div className="po-card-cap">
         {/* A trail arriving only completes the caption (the Sent time): adopted silently, no roll. */}
-        <Roll text={ev.text} baseline={audit} />
+        <Roll text={ev.text} baseline={Array.isArray(audit) ? audit : 'none'} />
         <span className="who" title={ev.who || undefined}>{ev.who || (names === null && shown.po.created_by ? '…' : '')}</span>
       </div>
     </div>
