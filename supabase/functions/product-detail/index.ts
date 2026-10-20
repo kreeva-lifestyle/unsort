@@ -30,12 +30,55 @@ const fail = (status: number, error: string, req: Request, details?: string) => 
 const SB_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SB_SVC = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 const svcHeaders = { apikey: SB_SVC, authorization: `Bearer ${SB_SVC}` };
-// USD per million tokens (input / output) — the same table as listing-ai.
-const MODELS: Record<string, { in: number; out: number }> = { 'claude-haiku-4-5': { in: 1, out: 5 }, 'claude-sonnet-5': { in: 3, out: 15 }, 'claude-opus-4-8': { in: 5, out: 25 } };
-const DEFAULT_MODEL = 'claude-haiku-4-5';
+// Claude models — the same block in listing-ai, pricing-ai, product-detail and
+// buyer-spider. The owner picks the model and the effort in Settings → Listing
+// AI (app_secrets listing_ai_model / listing_ai_effort); a choice saved for an
+// older model moves to the same tier's current one.
+// USD per million tokens: input / output / cache read (cache write = 1.25 × input).
+// Haiku 5.5 costs 5× (input and output) once a prompt passes 100K tokens.
+const MODELS: Record<string, { in: number; out: number; read: number }> = {
+  'claude-haiku-5-5': { in: 0.1, out: 0.5, read: 0.01 },
+  'claude-sonnet-5-5': { in: 2, out: 10, read: 0.2 },
+  'claude-opus-5-5': { in: 4, out: 20, read: 0.2 },
+};
+const LEGACY_MODELS: Record<string, string> = { 'claude-haiku-4-5': 'claude-haiku-5-5', 'claude-sonnet-5': 'claude-sonnet-5-5', 'claude-opus-4-8': 'claude-opus-5-5' };
+const DEFAULT_MODEL = 'claude-haiku-5-5';
+// '' = the model's own default (medium on Haiku and Opus 5.5, high on Sonnet 5.5).
+const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
 interface Usage { input_tokens: number; output_tokens: number; cache_read_input_tokens: number; cache_creation_input_tokens: number }
-const estUsdOf = (model: string, u: Usage) => { const p = MODELS[model] || MODELS[DEFAULT_MODEL]; return Math.round(((u.input_tokens * p.in + u.cache_creation_input_tokens * p.in * 1.25 + u.cache_read_input_tokens * p.in * 0.1 + u.output_tokens * p.out) / 1e6) * 10000) / 10000; };
-async function getModel(): Promise<string> { const m = (await getSecret('listing_ai_model')) || ''; return MODELS[m] ? m : DEFAULT_MODEL; }
+const estUsdOf = (model: string, u: Usage): number => {
+  const p = MODELS[model] || MODELS[DEFAULT_MODEL];
+  const prompt = u.input_tokens + u.cache_read_input_tokens + u.cache_creation_input_tokens;
+  const k = model === 'claude-haiku-5-5' && prompt > 100_000 ? 5 : 1;
+  const usd = k * (u.input_tokens * p.in + u.cache_creation_input_tokens * p.in * 1.25 + u.cache_read_input_tokens * p.read + u.output_tokens * p.out) / 1e6;
+  return Math.round(usd * 10000) / 10000;
+};
+async function getModel(): Promise<string> {
+  const m = (await getSecret('listing_ai_model')) || '';
+  const id = LEGACY_MODELS[m] || m;
+  return MODELS[id] ? id : DEFAULT_MODEL;
+}
+async function getEffort(): Promise<string> {
+  const e = (await getSecret('listing_ai_effort')) || '';
+  return EFFORTS.includes(e) ? e : '';
+}
+/**
+ * One Messages API request. Thinking is left to the model (adaptive — these
+ * models reject turning it off; effort is the control). Opus and Sonnet get
+ * the server-side refusal fallback: if the model declines, the API re-runs
+ * the request on a suitable model in the same call (Haiku has none).
+ * Thinking also uses max_tokens, so callers leave room above the answer.
+ */
+function claudeRequest(apiKey: string, model: string, effort: string, body: Record<string, unknown>, betas: string[] = []): RequestInit {
+  const fallback = model !== 'claude-haiku-5-5';
+  const beta = [...betas, ...(fallback ? ['server-side-fallback-2026-07-01'] : [])];
+  const outputConfig = { ...((body.output_config as Record<string, unknown>) || {}), ...(effort ? { effort } : {}) };
+  return {
+    method: 'POST',
+    headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json', ...(beta.length ? { 'anthropic-beta': beta.join(',') } : {}) },
+    body: JSON.stringify({ model, ...body, ...(Object.keys(outputConfig).length ? { output_config: outputConfig } : {}), ...(fallback ? { fallbacks: 'default' } : {}) }),
+  };
+}
 
 async function caller(req: Request): Promise<{ id: string; role: string } | null> {
   const token = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
@@ -97,6 +140,24 @@ Rules:
 - The sheet is the truth for fabric names, includes, sizes, work type, neck, sleeves and closure — use its wording; the photos decide colour names, motifs, piping, lace and other details you can SEE. If the photos show something the sheet does not list, you may describe it; never contradict the sheet.
 - No prices, discounts, offers, delivery promises or links — those are added by the app. No markdown, no asterisks, no hashtags, no quotation marks inside values. British/Indian English.`;
 
+const strList = { type: 'array', items: { type: 'string' } };
+const DETAIL_SCHEMA = {
+  type: 'object',
+  properties: {
+    title: { type: 'string' },
+    titleEmoji: { type: 'string' },
+    intro: { type: 'string' },
+    sections: {
+      type: 'array',
+      items: { type: 'object', properties: { emoji: { type: 'string' }, name: { type: 'string' }, lines: strList }, required: ['emoji', 'name', 'lines'], additionalProperties: false },
+    },
+    setIncludes: strList,
+    highlights: strList,
+  },
+  required: ['title', 'titleEmoji', 'intro', 'sections', 'setIncludes', 'highlights'],
+  additionalProperties: false,
+};
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders(req) });
   if (req.method !== 'POST') return fail(405, 'POST only', req);
@@ -139,18 +200,23 @@ Deno.serve(async (req) => {
   const content: any[] = [{ type: 'text', text: `DESIGN CODE: ${code}\nBRAND: ${master?.tab === 'ARYA' ? 'ARYA' : master?.tab === 'DRESSTIVE' ? 'DRESSTIVE' : 'Arya Designs'}\n\nMASTER SHEET FACTS:\n${factsText}\n\n${images.length ? `PHOTOS (${images.length}) follow.` : 'No photos available — describe only what the facts support.'}` }];
   for (const im of images) content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: im.b64 } });
   const model = await getModel();
-  const r = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-    body: JSON.stringify({ model, max_tokens: 1500, system: [{ type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } }], messages: [{ role: 'user', content }, { role: 'assistant', content: '{"title":' }] }),
-  });
+  // The JSON shape is enforced by structured output (current models do not
+  // accept a pre-filled answer); max_tokens leaves room for thinking.
+  const r = await fetch('https://api.anthropic.com/v1/messages', claudeRequest(apiKey, model, await getEffort(), {
+    max_tokens: 8000,
+    system: [{ type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } }],
+    messages: [{ role: 'user', content }],
+    output_config: { format: { type: 'json_schema', schema: DETAIL_SCHEMA } },
+  }));
   const data = await r.json().catch(() => ({}));
   if (r.status === 401) return fail(400, 'The Anthropic API key was rejected — update it in Settings → Listing AI', req);
   if (r.status === 429) return fail(429, 'Anthropic rate limit hit — wait a minute and try again', req);
   if (r.status >= 400) return fail(502, String(data?.error?.message || `Anthropic API error (${r.status})`), req);
-  const text = '{"title":' + (data?.content || []).filter((b: { type: string }) => b.type === 'text').map((b: { text: string }) => b.text).join('').trim();
+  if (data?.stop_reason === 'refusal') return fail(502, 'The AI declined this design — try again', req);
+  if (data?.stop_reason === 'max_tokens') return fail(502, 'The AI answer was cut short — try again, or lower the effort in Settings → Listing AI', req);
+  const text = (data?.content || []).filter((b: { type: string }) => b.type === 'text').map((b: { text: string }) => b.text).join('').trim();
   let parsed: any = null;
-  try { parsed = JSON.parse(text.slice(0, text.lastIndexOf('}') + 1)); } catch { parsed = null; }
+  try { parsed = JSON.parse(text); } catch { parsed = null; }
   if (!parsed || typeof parsed !== 'object') return fail(502, 'The model returned nothing usable — try again', req, text.slice(0, 300));
 
   // Only strings of bounded length reach the client; asterisks would break

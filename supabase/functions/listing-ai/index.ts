@@ -273,16 +273,56 @@
 
 // deno-lint-ignore-file no-explicit-any
 
-// Whitelisted models + per-MTok USD pricing (cache write 1.25x in, read 0.1x).
-// Sonnet 5 has an intro price ($2/$10) through 2026-08-31 - we bill-estimate
-// at the sticker price so the shown cost is never an underestimate.
-const MODELS: Record<string, { in: number; out: number }> = {
-  'claude-haiku-4-5': { in: 1, out: 5 },
-  'claude-sonnet-5': { in: 3, out: 15 },
-  'claude-opus-4-8': { in: 5, out: 25 },
+// Claude models — the same block in listing-ai, pricing-ai, product-detail and
+// buyer-spider. The owner picks the model and the effort in Settings → Listing
+// AI (app_secrets listing_ai_model / listing_ai_effort); a choice saved for an
+// older model moves to the same tier's current one.
+// USD per million tokens: input / output / cache read (cache write = 1.25 × input).
+// Haiku 5.5 costs 5× (input and output) once a prompt passes 100K tokens.
+const MODELS: Record<string, { in: number; out: number; read: number }> = {
+  'claude-haiku-5-5': { in: 0.1, out: 0.5, read: 0.01 },
+  'claude-sonnet-5-5': { in: 2, out: 10, read: 0.2 },
+  'claude-opus-5-5': { in: 4, out: 20, read: 0.2 },
 };
-const DEFAULT_MODEL = 'claude-haiku-4-5'; // cheapest tier - owner's pick
-const SUGGEST_MODEL = 'claude-haiku-4-5'; // suggestions are canon-validated, cheap is safe
+const LEGACY_MODELS: Record<string, string> = { 'claude-haiku-4-5': 'claude-haiku-5-5', 'claude-sonnet-5': 'claude-sonnet-5-5', 'claude-opus-4-8': 'claude-opus-5-5' };
+const DEFAULT_MODEL = 'claude-haiku-5-5';
+// '' = the model's own default (medium on Haiku and Opus 5.5, high on Sonnet 5.5).
+const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
+interface Usage { input_tokens: number; output_tokens: number; cache_read_input_tokens: number; cache_creation_input_tokens: number }
+const estUsdOf = (model: string, u: Usage): number => {
+  const p = MODELS[model] || MODELS[DEFAULT_MODEL];
+  const prompt = u.input_tokens + u.cache_read_input_tokens + u.cache_creation_input_tokens;
+  const k = model === 'claude-haiku-5-5' && prompt > 100_000 ? 5 : 1;
+  const usd = k * (u.input_tokens * p.in + u.cache_creation_input_tokens * p.in * 1.25 + u.cache_read_input_tokens * p.read + u.output_tokens * p.out) / 1e6;
+  return Math.round(usd * 10000) / 10000;
+};
+async function getModel(): Promise<string> {
+  const m = (await getSecret('listing_ai_model')) || '';
+  const id = LEGACY_MODELS[m] || m;
+  return MODELS[id] ? id : DEFAULT_MODEL;
+}
+async function getEffort(): Promise<string> {
+  const e = (await getSecret('listing_ai_effort')) || '';
+  return EFFORTS.includes(e) ? e : '';
+}
+/**
+ * One Messages API request. Thinking is left to the model (adaptive — these
+ * models reject turning it off; effort is the control). Opus and Sonnet get
+ * the server-side refusal fallback: if the model declines, the API re-runs
+ * the request on a suitable model in the same call (Haiku has none).
+ * Thinking also uses max_tokens, so callers leave room above the answer.
+ */
+function claudeRequest(apiKey: string, model: string, effort: string, body: Record<string, unknown>, betas: string[] = []): RequestInit {
+  const fallback = model !== 'claude-haiku-5-5';
+  const beta = [...betas, ...(fallback ? ['server-side-fallback-2026-07-01'] : [])];
+  const outputConfig = { ...((body.output_config as Record<string, unknown>) || {}), ...(effort ? { effort } : {}) };
+  return {
+    method: 'POST',
+    headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json', ...(beta.length ? { 'anthropic-beta': beta.join(',') } : {}) },
+    body: JSON.stringify({ model, ...body, ...(Object.keys(outputConfig).length ? { output_config: outputConfig } : {}), ...(fallback ? { fallbacks: 'default' } : {}) }),
+  };
+}
+const SUGGEST_MODEL = 'claude-haiku-5-5'; // suggestions are canon-validated, cheap is safe
 const SKU_CAP = 5;
 // validate covers a whole run in ONE call (no AI, master read is cached).
 const VALIDATE_CAP = 60;
@@ -291,18 +331,10 @@ const VALIDATE_CAP = 60;
 // Keep in sync with MAX_CARD_ROWS in src/components/minis/vendorstudio/finalizeRateRows.ts.
 const RATECARD_CAP = 50;
 
-interface Usage { input_tokens: number; output_tokens: number; cache_read_input_tokens: number; cache_creation_input_tokens: number }
-
-const estUsdOf = (model: string, u: Usage): number => {
-  const p = MODELS[model] || MODELS[DEFAULT_MODEL];
-  const usd = (u.input_tokens * p.in + u.cache_creation_input_tokens * p.in * 1.25 + u.cache_read_input_tokens * p.in * 0.1 + u.output_tokens * p.out) / 1e6;
-  return Math.round(usd * 10000) / 10000;
-};
-
 // What the prompt cache saved vs paying full price for those tokens (~90%).
 const cacheSavedUsdOf = (model: string, u: Usage): number => {
   const p = MODELS[model] || MODELS[DEFAULT_MODEL];
-  return Math.round((u.cache_read_input_tokens * p.in * 0.9 / 1e6) * 10000) / 10000;
+  return Math.round((u.cache_read_input_tokens * (p.in - p.read) / 1e6) * 10000) / 10000;
 };
 
 const ALLOWED_ORIGINS = [
@@ -509,12 +541,6 @@ async function getSecret(key: string): Promise<string | null> {
   return rows?.[0]?.value ?? null;
 }
 
-// Active generation model: owner-picked via set_model, defaults to the
-// cheapest tier. Unknown/stale stored values fall back to the default.
-async function getModel(): Promise<string> {
-  const m = (await getSecret('listing_ai_model')) || '';
-  return MODELS[m] ? m : DEFAULT_MODEL;
-}
 
 async function setSecret(key: string, value: string): Promise<void> {
   const r = await fetch(`${SB_URL}/rest/v1/app_secrets`, {
@@ -1314,7 +1340,7 @@ Deno.serve(async (req) => {
       const role = await callerRole(req);
       if (!role) return fail(401, 'Sign in to DailyOffice first', req);
       const key = await getSecret('anthropic_api_key');
-      return json({ ok: true, hasKey: !!key, role, model: await getModel() }, req);
+      return json({ ok: true, hasKey: !!key, role, model: await getModel(), effort: await getEffort() }, req);
     }
 
     // Owner-facing model picker (Settings -> Listing AI). Whitelist only -
@@ -1322,10 +1348,19 @@ Deno.serve(async (req) => {
     if (action === 'set_model') {
       const role = await callerRole(req);
       if (role !== 'admin') return fail(403, 'Only an admin can change the model', req);
-      const model = String(body?.model || '').trim();
+      const raw = String(body?.model || '').trim();
+      const model = LEGACY_MODELS[raw] || raw;   // an app still showing the older names
       if (!MODELS[model]) return fail(400, 'Unknown model - pick one of the listed options', req);
       await setSecret('listing_ai_model', model);
       return json({ ok: true, model }, req);
+    }
+    if (action === 'set_effort') {
+      const role = await callerRole(req);
+      if (role !== 'admin') return fail(403, 'Only an admin can change the effort', req);
+      const effort = String(body?.effort || '').trim();
+      if (effort && !EFFORTS.includes(effort)) return fail(400, 'Unknown effort - pick one of the listed options', req);
+      await setSecret('listing_ai_effort', effort);
+      return json({ ok: true, effort }, req);
     }
 
     if (action === 'set_key') {
@@ -1968,15 +2003,13 @@ Deno.serve(async (req) => {
         ...history.map(h => ({ role: h.role, content: h.text })),
         { role: 'user', content: `COMPUTED DATA (exact, from code):\n${packLines.join('\n')}\n\nQUESTION: ${question}` },
       ];
-      const r = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-        body: JSON.stringify({ model, max_tokens: 1500, system: [{ type: 'text', text: sys, cache_control: { type: 'ephemeral' } }], messages }),
-      });
+      // max_tokens covers the model's thinking as well as the ~1,500-token answer.
+      const r = await fetch('https://api.anthropic.com/v1/messages', claudeRequest(apiKey, model, await getEffort(), { max_tokens: 8000, system: [{ type: 'text', text: sys, cache_control: { type: 'ephemeral' } }], messages }));
       const data = await r.json().catch(() => ({}));
       if (r.status === 401) return json({ ok: false, error: 'The Anthropic API key was rejected - update it in Settings -> Listing AI' }, req);
       if (r.status === 429) return json({ ok: false, error: 'Anthropic rate limit hit - wait a minute and try again' }, req);
       if (r.status >= 400) return json({ ok: false, error: String(data?.error?.message || `Anthropic API error (${r.status})`) }, req);
+      if (data?.stop_reason === 'refusal') return json({ ok: false, error: 'The AI declined to answer this question - try rephrasing it' }, req);
       const answer = (data?.content || []).filter((b: any) => b.type === 'text').map((b: any) => b.text).join('\n').trim();
       const u = data?.usage || {};
       const usage = { input_tokens: u.input_tokens || 0, output_tokens: u.output_tokens || 0, cache_read_input_tokens: u.cache_read_input_tokens || 0, cache_creation_input_tokens: u.cache_creation_input_tokens || 0 };
@@ -2140,23 +2173,20 @@ Deno.serve(async (req) => {
         required: ['suggestions'],
         additionalProperties: false,
       };
-      const r = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-        body: JSON.stringify({
-          // Always the cheapest tier: suggestions are canon-validated below,
-          // so a wrong guess can never become an invalid export.
-          model: SUGGEST_MODEL,
-          max_tokens: Math.min(8000, 300 + total * 30),
-          system: sys,
-          messages: [{ role: 'user', content: `${userText}\n\nOutput one suggestion object per master value (header, source, target). Empty target = no confident fit.` }],
-          output_config: { format: { type: 'json_schema', schema } },
-        }),
-      });
+      // Always the cheapest tier at low effort: suggestions are canon-validated
+      // below, so a wrong guess can never become an invalid export. The
+      // max_tokens headroom is for the model's thinking.
+      const r = await fetch('https://api.anthropic.com/v1/messages', claudeRequest(apiKey, SUGGEST_MODEL, 'low', {
+        max_tokens: Math.min(16000, 2000 + total * 30),
+        system: sys,
+        messages: [{ role: 'user', content: `${userText}\n\nOutput one suggestion object per master value (header, source, target). Empty target = no confident fit.` }],
+        output_config: { format: { type: 'json_schema', schema } },
+      }));
       const data = await r.json().catch(() => ({}));
       if (r.status === 401) return json({ ok: false, error: 'The Anthropic API key was rejected - update it in Settings -> Listing AI' }, req);
       if (r.status === 429) return json({ ok: false, error: 'Anthropic rate limit hit - wait a minute and try again' }, req);
       if (r.status >= 400) return json({ ok: false, error: String(data?.error?.message || `Anthropic API error (${r.status})`) }, req);
+      if (data?.stop_reason === 'refusal') return json({ ok: false, error: 'The AI declined to suggest values here - pick them by hand' }, req);
       const text = (data?.content || []).find((b: any) => b.type === 'text')?.text || '';
       let parsed: any = {};
       try {
@@ -2387,6 +2417,7 @@ Deno.serve(async (req) => {
       const aiValues: Record<string, Record<string, string>> = {};
       let usage: Usage = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 };
       const model = await getModel();
+      const effort = await getEffort();
       // Cache checkup: the client threads the previous chunk's message id so
       // the API can pinpoint WHY a cache miss happened (docs: cache-diagnostics).
       const prevMessageId = typeof body?.prevMessageId === 'string' && body.prevMessageId ? body.prevMessageId : null;
@@ -2409,20 +2440,16 @@ Deno.serve(async (req) => {
         content.push({ type: 'text', text: `Fill the template fields for each of the ${live.length} product(s) above. Run nonce ${nonce} - write wording unique to this run.` });
         const enumSet = pickEnumFields(schemaFields);
         const sysText = buildSystemPrefix(String(tpl.name || ''), String(tpl.marketplace || ''), schemaFields, taughtLines, enumSet);
-        const doCall = (strict: boolean) => fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'anthropic-beta': 'cache-diagnosis-2026-04-07', 'content-type': 'application/json' },
-          body: JSON.stringify({
-            model,
-            // Scale with schema WIDTH, not just SKU count - a 70-column
-            // template needs far more than a flat per-SKU budget.
-            max_tokens: Math.min(24000, 500 + live.length * Math.max(1600, 45 * schemaFields.length)),
-            system: [{ type: 'text', text: sysText, cache_control: { type: 'ephemeral' } }],
-            messages: [{ role: 'user', content: strict ? content : [...content, { type: 'text', text: 'Reply with ONLY the JSON object {"products":[{"sku":...,"fields":{...}}]} - no prose, no code fences.' }] }],
-            diagnostics: { previous_message_id: prevMessageId },
-            ...(strict ? { output_config: { format: { type: 'json_schema', schema: buildSchema(schemaFields, enumSet) } } } : {}),
-          }),
-        });
+        const doCall = (strict: boolean) => fetch('https://api.anthropic.com/v1/messages', claudeRequest(apiKey, model, effort, {
+          // Scale with schema WIDTH, not just SKU count - a 70-column
+          // template needs far more than a flat per-SKU budget. The extra
+          // 4,000 is room for the model's thinking before the JSON.
+          max_tokens: Math.min(32000, 4500 + live.length * Math.max(1600, 45 * schemaFields.length)),
+          system: [{ type: 'text', text: sysText, cache_control: { type: 'ephemeral' } }],
+          messages: [{ role: 'user', content: strict ? content : [...content, { type: 'text', text: 'Reply with ONLY the JSON object {"products":[{"sku":...,"fields":{...}}]} - no prose, no code fences.' }] }],
+          diagnostics: { previous_message_id: prevMessageId },
+          ...(strict ? { output_config: { format: { type: 'json_schema', schema: buildSchema(schemaFields, enumSet) } } } : {}),
+        }, ['cache-diagnosis-2026-04-07']));
         let r = await doCall(true);
         let data = await r.json().catch(() => ({}));
         if (r.status === 400 && /grammar|schema/i.test(String(data?.error?.message || ''))) {
@@ -2438,7 +2465,8 @@ Deno.serve(async (req) => {
           const msg = String(data?.error?.message || '');
           return json({ ok: false, error: /grammar|schema/i.test(msg) ? 'This template has too many locked dropdowns for one run - set fixed values or skip unused columns in Manage Templates' : (msg || `Anthropic API error (${r.status})`) }, req);
         }
-        if (data?.stop_reason === 'max_tokens') return json({ ok: false, error: 'The AI response was cut short - run fewer SKUs at a time' }, req);
+        if (data?.stop_reason === 'refusal') return json({ ok: false, error: 'The AI declined these products - try again, or run them in a smaller batch' }, req);
+        if (data?.stop_reason === 'max_tokens') return json({ ok: false, error: 'The AI response was cut short - run fewer SKUs at a time, or lower the effort in Settings -> Listing AI' }, req);
         const text = (data?.content || []).find((b: any) => b.type === 'text')?.text || '';
         try {
           const start = text.indexOf('{'), end = text.lastIndexOf('}');
