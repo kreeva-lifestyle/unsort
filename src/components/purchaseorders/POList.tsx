@@ -105,9 +105,10 @@ export default function POList(p: Props) {
                     <td style={{ ...S.tdStyle, textAlign: 'right' }}><span style={{ fontSize: 14, fontWeight: 700, fontFamily: T.mono, color: T.tx }}>₹{Number(po.grand_total || 0).toLocaleString('en-IN')}</span></td>
                     <td style={S.tdStyle}>
                       {/* The pipeline rail, silent: where this order stands; the share received when goods have arrived. */}
+                      {/* The share sits in a fixed slot, so every row's rail is the same length and the stops line up down the column. */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 4px' }}>
                         <div style={{ flex: 1 }}><PORail mini state={railState(po, po.purchase_order_items ?? [], null)} /></div>
-                        {(po.status === 'partially_received' || po.status === 'completed') && <span style={{ fontSize: 10, color: T.tx3, fontFamily: T.mono }}>{pr.pct}%</span>}
+                        <span style={{ width: 32, flexShrink: 0, textAlign: 'right', fontSize: 10, color: T.tx3, fontFamily: T.mono }}>{pr.received > 0 || po.status === 'completed' ? `${pr.pct}%` : ''}</span>
                       </div>
                     </td>
                     <td style={{ ...S.tdStyle, textAlign: 'center' }}><StatusPill status={po.status} sc={sc} /><PendingSince po={po} /></td>
@@ -151,7 +152,7 @@ export default function POList(p: Props) {
                   {(po.status === 'partially_received' || po.status === 'completed') && <><span>·</span><span style={{ color: pr.pct >= 100 ? T.gr : T.yl }}>{pr.pct}% received</span></>}
                   {pendingDays(po) !== null && <><span>·</span><PendingSince po={po} inline /></>}
                 </div>
-                <div style={{ margin: '10px 4px 2px' }}><PORail mini state={railState(po, po.purchase_order_items ?? [], null)} /></div>
+                <div style={{ margin: '10px 4px 0' }}><PORail mini state={railState(po, po.purchase_order_items ?? [], null)} /></div>
               </div>
             </SwipeRow>
           );
