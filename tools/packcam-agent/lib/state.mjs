@@ -11,7 +11,6 @@ import { log, readJson, writeJson } from './util.mjs';
 
 const KEEP_MS = 48 * 3600_000;          // finished jobs are forgotten after 2 days
 const CURSOR_LAG_MS = 2 * 60_000;
-const LATE_MS = 10_000;                 // a scan the server got this much after it was made came late
 const MAX_RECUTS = 3;
 
 /** Who scanned: one packer's next scan ends their own video, not a colleague's on the same camera. */
@@ -48,7 +47,7 @@ export function makeState(dataDir) {
    * server's cursor for a full page (taken as it is). `keepMs`: how long the
    * recording is kept (a clip is only cut again while it is there).
    */
-  function ingest(scans, nextCursor = null, keepMs = 0, now = Date.now()) {
+  function ingest(scans, nextCursor = null, keepMs = 0, now = Date.now(), postMs = 0) {
     const before = st.cursor;
     let added = 0; let newest = st.cursor ? Date.parse(st.cursor) + CURSOR_LAG_MS : 0;
     for (const sc of scans) {
@@ -69,14 +68,13 @@ export function makeState(dataDir) {
       const job = { id: sc.id, awb: sc.awb, courier: sc.courier ?? null, camera: String(sc.camera), scanned_at: sc.scanned_at, packer: packerOf(sc), extend, status: 'queued', attempts: 0, next_try: 0, rev: 1, sent: 0 };
       st.jobs[sc.id] = job;
       added++;
-      // Sent late: the packer's video before it may have been cut already,
-      // running on over this parcel. Cut that one again to end here.
-      if (sc.received_at && Date.parse(sc.received_at) - Date.parse(sc.scanned_at) > LATE_MS) {
-        const t = Date.parse(sc.scanned_at);
-        for (const j of Object.values(st.jobs)) {
-          if (j.id === job.id || j.camera !== job.camera || !samePacker(j, job)) continue;
-          if (Date.parse(j.scanned_at) < t && j.end && Date.parse(j.end) > t + 2000) recut(j, 'a scan sent late falls inside it', keepMs, now);
-        }
+      // Learnt of late (the phone or this PC was offline): the packer's
+      // video before it may have been cut already, running on over this
+      // parcel. Cut that one again to end here.
+      const t = Date.parse(sc.scanned_at);
+      for (const j of Object.values(st.jobs)) {
+        if (j.id === job.id || j.camera !== job.camera || !samePacker(j, job)) continue;
+        if (Date.parse(j.scanned_at) < t && j.end && Date.parse(j.end) > t + postMs + 2000) recut(j, 'a scan learnt of late falls inside it', keepMs, now);
       }
     }
     if (nextCursor) st.cursor = nextCursor;
@@ -145,7 +143,15 @@ export function makeState(dataDir) {
     for (const id of ids) {
       delete st.files[id];
       const j = st.jobs[id];
-      if (j && j.pc_path) { j.pc_path = null; if (!j.dropbox_path && !j.gdrive_file_id && j.status === 'done') j.status = 'removed'; mark(j); }
+      if (!j || !j.pc_path) continue;
+      j.pc_path = null;
+      // The cut file was that PC copy: nothing left to upload from.
+      if (j.file && !fs.existsSync(j.file)) {
+        j.file = null;
+        if (j.dropbox_path || j.gdrive_file_id) { if (j.status === 'uploading') j.status = 'done'; }
+        else j.status = 'removed';
+      }
+      mark(j);
     }
     if (ids.length) touch();
   }

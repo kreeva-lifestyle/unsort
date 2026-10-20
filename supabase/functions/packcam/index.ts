@@ -103,9 +103,10 @@ async function agentReport(body: any, req: Request): Promise<Response> {
 
 async function agentRemoved(body: any, req: Request): Promise<Response> {
   const ids = (Array.isArray(body?.scan_ids) ? body.scan_ids : []).map(String).filter((x: string) => UUID.test(x)).slice(0, 500);
-  if (ids.length) {
-    const now = new Date().toISOString();
-    const inIds = `scan_id=in.(${ids.join(',')})`;
+  const now = new Date().toISOString();
+  // 100 ids per request keeps the URL far below the gateway's limit.
+  for (let i = 0; i < ids.length; i += 100) {
+    const inIds = `scan_id=in.(${ids.slice(i, i + 100).join(',')})`;
     // No copy left anywhere: no longer "Saved". Then the PC path goes on all.
     await rest(`packcam_clips?${inIds}&dropbox_path=is.null&gdrive_link=is.null&status=in.(done,failed,uploading)`, { method: 'PATCH', body: JSON.stringify({ status: 'removed', error: 'The video was moved or deleted from the office PC', updated_at: now }) });
     await rest(`packcam_clips?${inIds}&pc_path=not.is.null`, { method: 'PATCH', body: JSON.stringify({ pc_path: null, updated_at: now }) });

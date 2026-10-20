@@ -17,7 +17,7 @@ import HistoryStats from '../components/packtime/HistoryStats';
 import { useScanClips, ScanVideoButton } from '../components/packcam/ScanVideo';
 import { usePackcamLive, CamStatusLine } from '../components/packcam/ScanCamStatus';
 import RecentScans, { type ScanEntry } from '../components/packtime/RecentScans';
-import { sendScan, failedDbScans, persistFailed } from '../components/packtime/scanSend';
+import { sendScan, failedDbScans, persistFailed, cancelScan } from '../components/packtime/scanSend';
 import { beep, beepOk, beepErr } from '../components/packtime/beep';
 import type {
   Brand,
@@ -550,7 +550,8 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     const scanRow: PackTimeScanInsert = { id: scanId, session_id: sessionIdRef.current, awb: trimmed, courier, camera, brand: courierBrand, sheet_name: courierSheet, user_id: userIdRef.current };
     const row = [count, trimmed, timestamp, camera, courierBrand];
     const at = now.getTime();
-    sendScan(scanRow, at).then(({ error }) => {
+    sendScan(scanRow, at).then(({ error, cancelled }) => {
+      if (cancelled) return;
       if (error) {
         if (error.code === '23505') {
           // Duplicate AWB in DB — roll back local count and remove from recent scans
@@ -573,8 +574,9 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
         // double-counted dbFails and never sent the sheet row on retry success.)
         setDbFails(p => p + 1);
         setTimeout(() => {
-          sendScan(scanRow, at).then(({ error: e2 }) => {
-            if (!e2 || e2.code === '23505') {
+          sendScan(scanRow, at).then(({ error: e2, cancelled: undone }) => {
+            if (undone) setDbFails(p => Math.max(0, p - 1));
+            else if (!e2 || e2.code === '23505') {
               setDbFails(p => Math.max(0, p - 1));
               enqueueWrite([row], courierSheet);
               setPendingWrites(p => p + 1);
@@ -601,8 +603,9 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     persistFailed();
     if (pending.length === 0) return;
     for (const f of pending) {
-      sendScan(f.scanRow, f.at).then(({ error }) => {
-        if (!error || error.code === '23505') {
+      sendScan(f.scanRow, f.at).then(({ error, cancelled: undone }) => {
+        if (undone) setDbFails(p => Math.max(0, p - 1));
+        else if (!error || error.code === '23505') {
           setDbFails(p => Math.max(0, p - 1));
           enqueueWrite([f.sheetRow], f.sheetName);
           setPendingWrites(p => p + 1);
@@ -628,6 +631,8 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     if (writeQueue.length > 0) { addToast('Still syncing the last scan — try Undo again in a few seconds', 'error'); return; }
     const awb = lastScanned;
     const key = awb.toUpperCase();
+    const undoneId = recentScans.find(s => s.success && s.awb === awb)?.id;   // a send still to come is called off
+    if (undoneId && cancelScan(undoneId)) setDbFails(p => Math.max(0, p - 1));
     awbSetRef.current.delete(key);
     setRecentScans(p => p.filter(s => s.awb !== awb));
     setSessionCount(p => Math.max(0, p - 1));
@@ -639,8 +644,8 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     // Background delete from Google Sheet + Supabase DB
     getAuthHeaders().then(headers => fetch(EDGE_FN, { method: 'POST', headers, body: JSON.stringify({ action: 'delete', awb, sheetName: courierSheet }) })
       .then(r => r.json()).then(() => {})).catch(() => addToast(`Undo could not remove ${awb} from the sheet — delete that row by hand`, 'error'));
-    supabase.from('packtime_scans').delete().eq('awb', awb).eq('session_id', sessionIdRef.current).then(({ error: e }) => { if (e) addToast(`Undo failed for ${awb} — ${friendlyError(e)}`, 'error'); });
-  }, [lastScanned, courierSheet, focusInput, addToast]);
+    (undoneId ? supabase.from('packtime_scans').delete().eq('id', undoneId) : supabase.from('packtime_scans').delete().eq('awb', awb).eq('session_id', sessionIdRef.current)).then(({ error: e }) => { if (e) addToast(`Undo failed for ${awb} — ${friendlyError(e)}`, 'error'); });
+  }, [lastScanned, recentScans, courierSheet, focusInput, addToast]);
 
 
   // ── Fetch today's summary across all couriers ──────────────────────────────

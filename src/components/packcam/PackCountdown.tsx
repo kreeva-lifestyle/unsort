@@ -14,10 +14,13 @@ const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '
 const EXTEND_S = 30;
 const SHOW_EXTEND_AT = 20;   // seconds left
 const vibrate = (p: number | number[]) => { try { navigator.vibrate?.(p); } catch { /* not supported */ } };
+// Seconds added per scan id, outside the component: a countdown hidden for a
+// moment (a failed status check) comes back with the time still added.
+const added = new Map<string, number>();
 
 export default function PackCountdown({ awb, at, seconds, scanId, canExtend }: { awb: string; at: number; seconds: number; scanId?: string; canExtend: boolean }) {
   const [now, setNow] = useState(Date.now());
-  const [extra, setExtra] = useState(0);
+  const [extra, setExtra] = useState(() => (scanId && added.get(scanId)) || 0);
   const [adding, setAdding] = useState(false);
   const [err, setErr] = useState('');
   const total = seconds + extra;
@@ -46,7 +49,7 @@ export default function PackCountdown({ awb, at, seconds, scanId, canExtend }: {
       const { data, error } = await supabase.rpc('packtime_extend_scan', { p_scan: scanId, p_seconds: EXTEND_S });
       if (error) throw error;
       if (data == null) throw new Error('This scan is too old to add time');
-      setExtra(Number(data));
+      setExtra(Number(data)); added.set(scanId, Number(data));
       beep(900, 0.1);
     } catch (e) { setErr(friendlyError(e)); }
     finally { setAdding(false); }

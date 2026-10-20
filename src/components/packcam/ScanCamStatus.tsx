@@ -49,14 +49,18 @@ export function usePackcamLive(active: boolean, camera: string, awbs: string[]) 
   const [marks, setMarks] = useState<Record<string, ClipMark>>({});
   const awbRef = useRef<string[]>([]);
   awbRef.current = awbs.slice(0, 30);
-  // Last known on/off: with no internet the "off" line stays as it was.
+  // Last known on/off: with no internet the "off" line stays as it was. And
+  // the last good recording state, so one failed check does not drop the
+  // countdown (the PC records on regardless).
   const offRef = useRef<CamLive | null>(null);
+  const goodRef = useRef<CamLive | null>(null);
+  const unknown = (text: string): CamLive => offRef.current || (goodRef.current?.packSeconds ? { ...goodRef.current, tone: 'warn', text } : { tone: 'warn', text });
   useEffect(() => {
     if (!active) { setLive(null); setMarks({}); return; }
     let alive = true;
     const load = async () => {
       if (document.visibilityState !== 'visible') return;
-      if (!navigator.onLine) { setLive(offRef.current || PHONE_OFFLINE); return; }
+      if (!navigator.onLine) { setLive(unknown(PHONE_OFFLINE.text)); return; }
       try {
         const { settings, agent } = await loadSettings();
         if (!alive) return;
@@ -65,19 +69,20 @@ export function usePackcamLive(active: boolean, camera: string, awbs: string[]) 
           offRef.current = { tone: 'warn', off: true, text: `Pack Cam is switched off${since ? ` ${since}` : ''} — no packing videos are being recorded. If that is a mistake, ask an admin to switch it on in Settings → Pack Cam` };
           setLive(offRef.current); setMarks({}); return;
         }
-        offRef.current = null;
+        offRef.current = null; goodRef.current = null;
         const cam = (agent.cameras || []).find(c => String(c.number) === camera);
         const full = storageAlerts(agent)[0];
         const upload = uploadProblems(agent)[0];
         const packSeconds = packSecondsFor(settings, agent.version);
         const canExtend = atLeast(agent.version, 1, 4);
-        setLive(!agent.last_seen ? { tone: 'bad', text: 'Video PC not connected — no packing videos are being saved' }
+        const next: CamLive = !agent.last_seen ? { tone: 'bad', text: 'Video PC not connected — no packing videos are being saved' }
           : !agentOnline(agent) ? { tone: 'bad', text: `Video PC offline since ${timeOf(agent.last_seen)} — check the office PC is switched on (power cut?) and its internet / Wi-Fi works. Packing videos are not being saved` }
           : !cam ? { tone: 'warn', text: `Camera ${camera} is not set up in Pack Cam — no videos for these scans` }
           : !cam.ok ? { tone: 'bad', text: `Camera ${camera} not recording${cam.error ? `: ${cam.error}` : ''} — videos are not being saved` }
           : full ? { tone: full.level === 'full' ? 'bad' : 'warn', text: `Camera ${camera} recording · ${full.text}`, packSeconds, canExtend }
           : upload ? { tone: 'warn', text: `Camera ${camera} recording · ${upload} — videos are kept on the PC and sent again later`, packSeconds, canExtend }
-          : { tone: 'ok', text: `Camera ${camera} recording · packing videos are being saved`, packSeconds, canExtend });
+          : { tone: 'ok', text: `Camera ${camera} recording · packing videos are being saved`, packSeconds, canExtend };
+        goodRef.current = next; setLive(next);
         const list = awbRef.current;
         if (!list.length) { setMarks({}); return; }
         // Last 24 h rather than "since the session started": scanned_at is
@@ -93,7 +98,7 @@ export function usePackcamLive(active: boolean, camera: string, awbs: string[]) 
       } catch (e) {
         // Never leave an old "recording" line up when the status cannot be read.
         logSwallowed('packcam scan status', e);
-        if (alive) setLive(offRef.current || (navigator.onLine ? { tone: 'warn', text: 'Cannot check the video PC right now — check this phone\'s internet' } : PHONE_OFFLINE));
+        if (alive) setLive(unknown(navigator.onLine ? 'Cannot check the video PC right now — check this phone\'s internet' : PHONE_OFFLINE.text));
       }
     };
     load();

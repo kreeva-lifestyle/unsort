@@ -86,13 +86,13 @@ async function checkIn() {
     // Scans made just before recording was switched off still have footage:
     // take them on this first poll, then keep the cursor at "now" so turning
     // recording back on does not list the unrecorded scans as missing clips.
-    if (wasRecording) state.ingest(d.scans || [], d.next_cursor, keepMs());
+    if (wasRecording) state.ingest(d.scans || [], d.next_cursor, keepMs(), Date.now(), (Number(settings.post_roll_seconds) || 0) * 1000);
     wasRecording = false;
     if (state.st.cursor !== d.now) { state.st.cursor = d.now; state.touch(); }
     return;
   }
   wasRecording = true;
-  const added = state.ingest(d.scans || [], d.next_cursor, keepMs());
+  const added = state.ingest(d.scans || [], d.next_cursor, keepMs(), Date.now(), (Number(settings.post_roll_seconds) || 0) * 1000);
   if (added) log(`${added} new scan(s)`);
 }
 
