@@ -580,15 +580,23 @@ async function step(who: { id: string }, body: any, req: Request): Promise<Respo
   // run were counted as they ran; `usedNow` is only for the note.
   const pause = async (e: unknown, usedNow = 0) => {
     const m = String((e as Error)?.message || e);
-    // Someone paused or stopped the run while this step worked: it keeps the
-    // status they gave it (a Stop must never come back as Paused).
-    if (m === 'search_halted' || await runStatus(runId) !== 'running') {
-      const now = (await rest(`buyer_runs?id=eq.${runId}&select=*`).catch(() => null))?.[0] ?? run0;
-      return json({ ok: true, run: now, done: true, search_usage: usage() }, req);
-    }
+    // Someone paused, resumed or stopped the run while this step worked: it
+    // keeps the status they gave it (a Stop must never come back as Paused).
+    // The client loop follows the status it reads here: still running → keep
+    // stepping; paused or done → stop. Unreadable → step again, which reads it.
+    const halted = async () => {
+      const now = (await rest(`buyer_runs?id=eq.${runId}&select=*`).catch(() => null))?.[0];
+      return json({ ok: true, ...(now ? { run: now } : {}), done: !!now && now.status !== 'running' && now.status !== 'paused', search_usage: usage() }, req);
+    };
+    if (m === 'search_halted') return halted();
     const friendly = /^search/.test(m) ? searchErrorText(e) : m.slice(0, 300);
-    const run = await bump(runId, { status: 'paused', error: friendly, note: `${friendly}${usedNow ? ` (${usedNow} searches done)` : ''}` });
-    return json({ ok: false, error: friendly, run, search_usage: usage() }, req, 502);
+    // Only a run that is still running becomes paused (one conditional write,
+    // so a Stop landing a moment earlier is never overwritten).
+    const rows = await rest(`buyer_runs?id=eq.${runId}&status=eq.running`, { method: 'PATCH', prefer: 'return=representation', body: JSON.stringify({ status: 'paused', last_error: friendly, step_note: clip(`${friendly}${usedNow ? ` (${usedNow} searches done)` : ''}`, 300), updated_at: new Date().toISOString() }) }).catch(() => undefined);
+    // The write itself failed: the client stops its loop and shows Resume.
+    if (rows === undefined) return json({ ok: false, error: friendly, search_usage: usage() }, req, 502);
+    if (!rows?.length) return halted();
+    return json({ ok: false, error: friendly, run: rows[0], search_usage: usage() }, req, 502);
   };
   // The month is already spent: pause before claiming anything.
   if (monthUsed >= MONTHLY_SEARCH_CAP) { await rest(`buyer_queue?id=eq.${item.id}`, { method: 'PATCH', body: JSON.stringify({ claimed_at: null }) }); return pause(new Error('search_monthly_cap')); }
