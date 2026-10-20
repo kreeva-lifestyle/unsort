@@ -35,9 +35,21 @@ export async function loadSettings(): Promise<{ settings: PackcamSettings; agent
   };
 }
 
-export async function saveSettings(s: PackcamSettings) {
+async function saveSettings(s: PackcamSettings) {
   const { error } = await supabase.from('app_settings').upsert({ key: 'packcam', value: s, updated_at: new Date().toISOString() });
   if (error) throw error;
+}
+
+/**
+ * Change some settings and keep the rest as saved right now: the on/off
+ * switch, Test connection and the Storage form each own their own fields, so
+ * none of them puts back another's older values. Returns what was saved.
+ */
+export async function patchSettings(patch: Partial<PackcamSettings> | ((now: PackcamSettings) => Partial<PackcamSettings>)): Promise<PackcamSettings> {
+  const { settings } = await loadSettings();
+  const next = { ...settings, ...(typeof patch === 'function' ? patch(settings) : patch) };
+  await saveSettings(next);
+  return next;
 }
 
 /** Online = checked in within the last 3 minutes (it checks in every few seconds). */

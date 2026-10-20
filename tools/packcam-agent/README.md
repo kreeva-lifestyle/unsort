@@ -42,24 +42,26 @@ In short:
 
 1. In PowerShell: `winget install OpenJS.NodeJS.LTS` and `winget install Gyan.FFmpeg`,
    then restart the PC once.
-2. Download "PC program (zip)" (`PackCam-PC-Setup.zip`: this folder plus a ready
-   `config.json`, built from this folder on every deploy) and unzip it into
-   `C:\PackCam`, giving `C:\PackCam\agent`. (From the code: copy this folder and
-   copy `config.example.json` to `config.json`.)
-3. In DailyOffice → Settings → Pack Cam press **Create agent key** and paste it
-   into `"agent_key"` in `config.json`. If ffmpeg is not on PATH, set `"ffmpeg"`
-   to the full path, e.g. `C:/ffmpeg/bin/ffmpeg.exe`.
-4. Double-click `start.bat` and allow Node.js on **Private** networks when Windows
-   asks (so PC-stored clips play on office phones). Open <http://localhost:8765>
-   on the PC and check each camera says Recording.
-5. Right-click `install-startup.bat` → **Run as administrator**, once. It closes
+2. Download "PC program (zip)" (`PackCam-PC-Setup.zip`: this folder, built on
+   every deploy, with no `config.json` and no key) and unzip it into
+   `C:\PackCam`, giving `C:\PackCam\agent`. Without a `config.json` the agent
+   uses `config.example.json`; to change a setting (e.g. `"ffmpeg"` when ffmpeg is
+   not on PATH: `C:/ffmpeg/bin/ffmpeg.exe`) copy it to `config.json` and edit that.
+3. Double-click `start.bat` and allow Node.js on **Private** networks when Windows
+   asks (so PC-stored clips play on office phones). With no key yet, Notepad opens
+   `C:\PackCam\key.txt`: in DailyOffice → Settings → Pack Cam press **Create agent
+   key**, paste it on the empty line, save (Ctrl+S) and close Notepad. Pack Cam
+   starts by itself. Open <http://localhost:8765> on the PC and check each camera
+   says Recording.
+4. Right-click `install-startup.bat` → **Run as administrator**, once. It closes
    that window and from then on Pack Cam runs in the background with no window,
    starting by itself when Windows signs in (and right away). Set the PC to sign
    in automatically and never sleep.
-6. In Settings → Pack Cam → Cameras enter each camera's IP address and password
+5. In Settings → Pack Cam → Cameras enter each camera's IP address and password
    (Hikvision main stream: port 554, path `/Streaming/Channels/101`; behind an
-   NVR use the NVR's IP and `/Streaming/Channels/<channel>01`). Then in Storage
-   choose PC / Dropbox / Drive and their folders and turn recording on.
+   NVR use the NVR's IP and `/Streaming/Channels/<channel>01`) and press **Test
+   connection**. Then in Storage choose PC / Dropbox / Drive and their folders,
+   and turn Pack Cam on with the switch at the top of the page.
 
 ### Google Drive (optional)
 
@@ -82,6 +84,29 @@ nothing to set up on the PC.
 
 ## Camera tips
 
+* A wrong user name or password: after 2 refusals Pack Cam stops trying that
+  camera (cameras lock their login for ~30 minutes after repeated failures) and
+  says so in plain words. Fix it in Settings → Pack Cam → Cameras and press
+  **Test connection**: every camera is tried once and recording starts again.
+* Free space: the PC reports how much room is left on its disk, in the videos
+  folder, Dropbox and Google Drive (it asks Dropbox / Drive itself every 30
+  minutes — nothing extra on the server), with a rough number of days at the
+  current rate. Under 7 days or 5 GB shows as almost full, under 1 day or 1 GB
+  as full, on the Pack Cam page and on the PackStation scan screen.
+* Scans sent late by a phone that lost Wi-Fi keep their real scan time (the
+  phone sends how long each one waited), so their videos are still right.
+  If an earlier video was already cut over that time (it ran to the limit
+  while the scans were stuck on the phone), it is cut again to end at the
+  late scan, while its recording is still on the PC.
+* Two packers on one camera: each video runs from a packer's scan to that
+  same packer's next scan (not a colleague's), never past the limit.
+* Long parcels: in the last 20 seconds of the countdown the packer can press
+  **+30 s** (up to 10 minutes in all); the countdown beeps at 10 seconds left,
+  ticks through the last 5 and sounds when the video stops.
+* Dropbox / Drive show "Uploads failing" (not "Ready") while uploads fail.
+* Videos moved or deleted from the PC folder by hand are noticed within 10
+  minutes and show "Removed from PC" instead of "Saved" (a Dropbox / Drive copy
+  still plays). A folder whose drive is unplugged is not counted.
 * Keep the camera clocks and the PC clock on automatic time (NTP). The agent
   corrects the PC clock against the server, but a camera's on-screen time
   should match too.
@@ -97,8 +122,10 @@ nothing to set up on the PC.
 ## Updating
 
 Download **PC program (zip)** again (always the latest), double-click `stop.bat`,
-replace the files in `C:\PackCam\agent` with the new ones but keep your own
-`config.json` (it holds the agent key and settings), then right-click
+extract the zip to `C:\PackCam` again and choose **Replace** (the zip has no
+`config.json` and no key, so your settings and `C:\PackCam\key.txt` are kept;
+a key still in an older `config.json` is moved to `key.txt` on the first start),
+then right-click
 `install-startup.bat` → **Run as administrator** (it also moves a PC set up
 before 1.3.0 from the start.bat window to the background). Clips cut before the update are not changed.
 
@@ -115,7 +142,7 @@ PC: a second copy sees the web port taken and stops (`start-hidden.vbs` then
 waits and takes over when the other one stops). On every start the agent also
 stops ffmpeg recorders a crashed earlier copy may have left writing into its
 segments folder, so a camera is never recorded twice. A start that fails at
-once (no key in `config.json`, Node.js not found) is written to
+once (Node.js not found) is written to
 `startup-errors.log` next to the program and retried every minute. Only
 `install-startup.bat` needs administrator.
 
@@ -126,6 +153,7 @@ once (no key in `config.json`, Node.js not found) is written to
 | `segments/cam<N>/` | rolling recording, pruned automatically |
 | `clips/<date>/` | clips kept on the PC when no PC folder is set in Settings |
 | `state.json` | progress of every clip (safe to keep across restarts) |
+| `key.txt` | the agent key (re-read on every check-in: a new key needs no restart) |
 | `gdrive.json` | the Google Drive sign-in for this PC |
 | `logs/packcam.log` | log, rolls over at 5 MB |
 

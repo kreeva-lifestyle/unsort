@@ -5,8 +5,7 @@
 //   * every few seconds: check in with DailyOffice (settings, cameras, new
 //     scans), keep one recorder per camera running, report clips.
 //   * the worker: cut and upload, one step at a time.
-// Pack Cam never deletes a clip: the team clears old ones from the clips
-// folder, Dropbox or Drive themselves.
+// Pack Cam never deletes a clip (the team clears old ones themselves).
 import os from 'node:os';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -19,6 +18,10 @@ import { Recorder, stopOrphanRecorders } from './lib/recorder.mjs';
 import { dirBytes, prune } from './lib/segments.mjs';
 import { step } from './lib/worker.mjs';
 import { startServer } from './lib/server.mjs';
+import { ensureKey, readKey } from './lib/key.mjs';
+import { makeStorage } from './lib/storage.mjs';
+import { makeTester } from './lib/cameratest.mjs';
+import { makeRemovedReporter } from './lib/removed.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const cfg = loadConfig(process.argv[2] || path.join(here, 'config.json'));
@@ -27,12 +30,18 @@ const api = makeApi(cfg);
 const state = makeState(cfg.data_dir);
 const drive = makeDrive(cfg);
 const lanUrl = cfg.lan_url || `http://${lanAddress()}:${cfg.port}`;
+const storage = makeStorage(drive);
+const tester = makeTester(cfg, n => recorders.get(n));
+const reportRemoved = makeRemovedReporter(api, state);
 
 let settings = null; let dropbox = null; let playSecret = null; let offset = 0;
 let serverOk = false; let lastError = ''; let bufferBytes = 0; let wasRecording = false; let folderWarning = '';
 const recorders = new Map();          // camera number → Recorder
 
-const ctx = { cfg, state, drive, settings: () => settings, dropbox: () => dropbox, offset: () => offset, setFolderWarning: w => { folderWarning = w; } };
+// The last upload to each place: null = it worked; an Error = it failed.
+const uploads = { dropbox: undefined, gdrive: undefined };
+const uploadResult = (place, err) => { uploads[place] = err ? { error: String(err.message || err).slice(0, 200), at: Date.now() } : null; };
+const ctx = { cfg, state, drive, settings: () => settings, dropbox: () => dropbox, offset: () => offset, setFolderWarning: w => { folderWarning = w; }, uploadResult };
 
 function syncRecorders(cameras) {
   const want = new Map(cameras.map(c => [c.number, c]));
@@ -44,20 +53,26 @@ function syncRecorders(cameras) {
 
 function status() {
   const jobs = Object.values(state.st.jobs);
+  const pcFolder = (!folderWarning && (settings?.pc_folder || '').trim()) || path.join(cfg.data_dir, 'clips');
   return {
     version: VERSION, host: os.hostname(), os: `${os.platform()} ${os.release()}`, lan_url: lanUrl,
     enabled: !!settings?.enabled, disk: diskInfo(cfg.data_dir), buffer_gb: +(bufferBytes / 1e9).toFixed(1),
     cameras: [...recorders.values()].map(r => r.status()),
     queue: { waiting: jobs.filter(j => j.status === 'queued' || j.status === 'uploading').length, failed: jobs.filter(j => j.status === 'failed').length },
-    dropbox: settings?.targets?.dropbox ? (dropbox?.error ? { ok: false, error: dropbox.error } : { ok: !!dropbox?.access_token }) : null,
-    gdrive: settings?.targets?.gdrive ? drive.status() : null,
+    // "Ready" only while the last upload there worked (or none was tried yet).
+    dropbox: settings?.targets?.dropbox ? (dropbox?.error ? { ok: false, error: dropbox.error } : uploads.dropbox ? { ok: false, error: `Uploads failing: ${uploads.dropbox.error}` } : { ok: !!dropbox?.access_token }) : null,
+    gdrive: settings?.targets?.gdrive ? { ...drive.status(), upload_error: uploads.gdrive ? `Uploads failing: ${uploads.gdrive.error}` : null } : null,
     // Where clips really go: the fallback while the chosen folder cannot be used.
-    pc_folder: (!folderWarning && (settings?.pc_folder || '').trim()) || path.join(cfg.data_dir, 'clips'),
+    pc_folder: pcFolder,
+    storage: storage.status({ settings, dropboxToken: dropbox, jobs, pcFolder, dataDir: cfg.data_dir }),
+    tests: tester.tests,
     last_error: [lastError, folderWarning].filter(Boolean).join(' · ') || null,
   };
 }
 
 async function checkIn() {
+  // key.txt is read on every poll: a new key pasted there needs no restart.
+  cfg.agent_key = readKey(cfg.key_file) || cfg.agent_key;
   const t0 = Date.now();
   const d = await api.poll(state.st.cursor, status());
   // How far this PC's clock is from the server's (scan times are the server's).
@@ -66,17 +81,18 @@ async function checkIn() {
   settings = d.settings; dropbox = d.dropbox; playSecret = d.play_secret;
   const recording = settings.enabled && (d.cameras || []).length > 0;
   syncRecorders(recording ? d.cameras : []);
+  tester.run(settings.test_nonce || null, d.cameras || [], d.now).catch(e => log(`camera test: ${e.message}`));
   if (!recording) {
     // Scans made just before recording was switched off still have footage:
     // take them on this first poll, then keep the cursor at "now" so turning
     // recording back on does not list the unrecorded scans as missing clips.
-    if (wasRecording) state.ingest(d.scans || []);
+    if (wasRecording) state.ingest(d.scans || [], d.next_cursor, keepMs(), Date.now(), (Number(settings.post_roll_seconds) || 0) * 1000);
     wasRecording = false;
     if (state.st.cursor !== d.now) { state.st.cursor = d.now; state.touch(); }
     return;
   }
   wasRecording = true;
-  const added = state.ingest(d.scans || []);
+  const added = state.ingest(d.scans || [], d.next_cursor, keepMs(), Date.now(), (Number(settings.post_roll_seconds) || 0) * 1000);
   if (added) log(`${added} new scan(s)`);
 }
 
@@ -87,7 +103,9 @@ async function report() {
   state.reported(rows);
 }
 
-let lastForget = 0;
+// How long the raw recording is kept (a cut clip can only be cut again within it).
+const keepMs = () => Math.max(1, Number(settings?.buffer_hours) || 6) * 3600_000;
+
 function housekeeping(now) {
   // Keep `buffer_hours` of recording, but never a piece a waiting clip still
   // needs — unless the disk is nearly full.
@@ -95,7 +113,7 @@ function housekeeping(now) {
   const low = (diskInfo(cfg.data_dir).free_gb ?? 99) < 3;
   let before = now - (low ? 1 : Math.max(1, Number(s.buffer_hours) || 6)) * 3600_000;
   // A nearly full disk wins: recording must not stop for a clip still waiting.
-  if (!low) for (const j of state.pending()) if (j.status === 'queued') before = Math.min(before, Date.parse(j.scanned_at) - offset - (Number(s.pre_roll_seconds) || 0) * 1000 - 120_000);
+  if (!low) for (const j of state.pending()) if (j.status === 'queued' || j.recut) before = Math.min(before, Date.parse(j.scanned_at) - offset - (Number(s.pre_roll_seconds) || 0) * 1000 - 120_000);
   let total = 0;
   const segRoot = path.join(cfg.data_dir, 'segments');
   for (const d of fs.readdirSync(segRoot)) {
@@ -105,7 +123,7 @@ function housekeeping(now) {
   }
   bufferBytes = total;
   state.tidy(now);
-  if (now - lastForget > 3600_000) { lastForget = now; state.forgetRemoved(); }
+
 }
 
 async function checkInLoop() {
@@ -114,6 +132,7 @@ async function checkInLoop() {
     try {
       await checkIn();
       await report();
+      await reportRemoved(Date.now());
       serverOk = true;
       if (!/^Disk/.test(lastError)) lastError = '';
     } catch (e) {
@@ -175,5 +194,6 @@ await new Promise(resolve => {
   });
 });
 await stopOrphanRecorders(cfg);
+await ensureKey(cfg);
 checkInLoop();
 workLoop();

@@ -1,12 +1,12 @@
-// Pack Cam → Storage: recording on/off, where clips are saved (PC / Dropbox /
-// Google Drive — any combination), clip length and housekeeping.
+// Pack Cam → Storage: where clips are saved (PC / Dropbox / Google Drive —
+// any combination), clip length and housekeeping. On/off is the switch at the
+// top of Pack Cam (PackCamSwitch); this form saves only its own fields.
 import { useEffect, useRef, useState } from 'react';
 import { T, S } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
 import { numericKeyDown } from '../../../lib/numericInput';
-import Toggle from '../../ui/Toggle';
 import type { PackcamSettings } from '../../../types/packcam';
-import { saveSettings } from './packcamApi';
+import { patchSettings } from './packcamApi';
 
 const card: React.CSSProperties = { background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: 16, marginBottom: 12 };
 const head: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: T.tx, fontFamily: T.sora, marginBottom: 4 };
@@ -27,18 +27,23 @@ const NUMS: { k: 'max_clip_seconds' | 'pre_roll_seconds' | 'post_roll_seconds' |
   { k: 'buffer_hours', label: 'Raw recording kept on PC', min: 1, max: 72, unit: 'hours' },
 ];
 
+// The fields this form owns: saving never writes the on/off switch or a camera test.
+const OWN = ['targets', 'pc_folder', 'dropbox_folder', 'gdrive_folder_name', 'max_clip_seconds', 'pre_roll_seconds', 'post_roll_seconds', 'buffer_hours'] as const;
+type Own = Pick<PackcamSettings, typeof OWN[number]>;
+const own = (s: PackcamSettings): Own => Object.fromEntries(OWN.map(k => [k, s[k]])) as Own;
+
 export default function StoragePanel({ settings, onSaved, addToast }: { settings: PackcamSettings; onSaved: (s: PackcamSettings) => void; addToast: (m: string, t?: string) => void }) {
-  const [f, setF] = useState(settings);
+  const [f, setF] = useState<Own>(() => own(settings));
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
   // Follow the saved settings only when they really change (the page refreshes
   // every 30 s for the PC status) and never over edits not yet saved.
-  const synced = useRef(JSON.stringify(settings));
+  const synced = useRef(JSON.stringify(own(settings)));
   const dirty = JSON.stringify(f) !== synced.current;
   useEffect(() => {
-    const next = JSON.stringify(settings);
+    const next = JSON.stringify(own(settings));
     if (next === synced.current) return;
-    if (!dirty) setF(settings);
+    if (!dirty) setF(own(settings));
     synced.current = next;
   }, [settings]); // eslint-disable-line react-hooks/exhaustive-deps -- `dirty` is read at the moment the saved values change
 
@@ -57,18 +62,13 @@ export default function StoragePanel({ settings, onSaved, addToast }: { settings
     if (!f.gdrive_folder_name.trim() || /[\\]/.test(f.gdrive_folder_name)) { setErr('Google Drive folder: a name like PackCam, or Packing/Videos for a folder inside another'); return; }
     const clean = { ...f, pc_folder: pcFolder, dropbox_folder: f.dropbox_folder.trim().replace(/\/+$/, '') || '/PackCam', gdrive_folder_name: f.gdrive_folder_name.trim().replace(/^\/+|\/+$/g, '') };
     setSaving(true); setErr('');
-    try { await saveSettings(clean); setF(clean); synced.current = JSON.stringify(clean); onSaved(clean); addToast('Pack Cam settings saved', 'success'); }
+    try { const all = await patchSettings(clean); setF(clean); synced.current = JSON.stringify(own(all)); onSaved(all); addToast('Pack Cam settings saved', 'success'); }
     catch (e2) { setErr(friendlyError(e2)); addToast(friendlyError(e2), 'error'); }
     finally { setSaving(false); }
   };
 
   return (
     <form onSubmit={save}>
-      <div style={{ ...card, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-        <div><div style={head}>Record packing videos</div><div style={note}>{f.enabled ? 'On — every scan on a camera with an IP address gets a video.' : 'Off — the PC does not record.'}</div></div>
-        <Toggle on={f.enabled} onToggle={() => setF(p => ({ ...p, enabled: !p.enabled }))} label="Record packing videos" />
-      </div>
-
       <div style={card}>
         <div style={{ ...head, marginBottom: 10 }}>Save videos to</div>
         {TARGETS.map(t => (

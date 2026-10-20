@@ -2,7 +2,7 @@ import { defineConfig, Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import { readFileSync, readdirSync, statSync, writeFileSync } from 'fs'
 import { resolve } from 'path'
-import { strToU8, zipSync } from 'fflate'
+import { zipSync } from 'fflate'
 
 function swVersionStamp(): Plugin {
   return {
@@ -19,23 +19,23 @@ function swVersionStamp(): Plugin {
 
 // Settings → Pack Cam → "PC program (zip)": the office-PC agent
 // (tools/packcam-agent) zipped from the code on every build, so the download
-// is never out of date. config.json is config.example.json with a key
-// placeholder the agent recognises (it refuses to start until a real key is in).
+// is never out of date. No config.json and no key: the agent reads
+// config.example.json when config.json is missing, and keeps its key in
+// key.txt in its data folder — unzipping a new version over an old one never
+// touches either.
 const PACKCAM_ZIP = 'packcam/PackCam-PC-Setup.zip';
 function packcamZipBytes(): Uint8Array {
   const root = resolve(__dirname, 'tools/packcam-agent');
   const files: Record<string, Uint8Array> = {};
   const walk = (dir: string, rel: string) => {
     for (const name of readdirSync(dir).sort()) {
-      if (['test', 'node_modules', '.gitignore', 'config.json'].includes(name)) continue;
+      if (['test', 'node_modules', '.gitignore', 'config.json', 'key.txt'].includes(name)) continue;
       const full = resolve(dir, name);
       if (statSync(full).isDirectory()) walk(full, `${rel}${name}/`);
       else files[`agent/${rel}${name}`] = readFileSync(full);
     }
   };
   walk(root, '');
-  const config = { ...JSON.parse(readFileSync(resolve(root, 'config.example.json'), 'utf-8')), agent_key: 'PASTE-THE-KEY-HERE' };
-  files['agent/config.json'] = strToU8(JSON.stringify(config, null, 2).replace(/\n/g, '\r\n') + '\r\n');
   return zipSync(files, { level: 9 });
 }
 function packcamZip(): Plugin {

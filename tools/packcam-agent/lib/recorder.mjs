@@ -10,6 +10,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { cameraDir, listSegments } from './segments.mjs';
 import { log, SEGMENT_SECONDS } from './util.mjs';
+import { isAuthError, plainCameraError } from './cameraerrors.mjs';
+
+// A wrong password is not retried for ever: cameras lock their login for a
+// while after a few failures (Hikvision ~30 min), which would then also block
+// the correct password. After this many in a row the recorder waits for the
+// camera's settings to change or for "Test connection".
+const AUTH_TRIES = 2;
 
 export function rtspUrl(c) {
   const auth = c.username ? `${encodeURIComponent(c.username)}${c.password ? ':' + encodeURIComponent(c.password) : ''}@` : '';
@@ -49,6 +56,7 @@ export class Recorder {
     this.cfg = cfg; this.cam = cam; this.key = JSON.stringify(cam);
     this.dir = cameraDir(cfg.data_dir, cam.number);
     this.proc = null; this.stopped = false; this.backoff = 5000; this.lastError = ''; this.startedAt = 0;
+    this.authFails = 0; this.held = false; this.timer = null;
     this.start();
   }
   input() {
@@ -58,7 +66,8 @@ export class Recorder {
     return ['-rtsp_transport', 'tcp', '-timeout', '15000000', '-i', rtspUrl(this.cam)];
   }
   start() {
-    if (this.stopped) return;
+    this.timer = null;
+    if (this.stopped || this.held || this.proc) return;
     const args = ['-nostdin', '-hide_banner', '-loglevel', 'error', ...this.input(),
       '-map', '0:v:0', '-map', '0:a?', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '64k',
       '-f', 'segment', '-segment_time', String(SEGMENT_SECONDS), '-segment_format', 'mpegts',
@@ -76,15 +85,27 @@ export class Recorder {
       const msg = (err.trim().split('\n').pop() || `ffmpeg exited (${code})`).replace(/rtsp:\/\/[^@\s]*@/g, 'rtsp://***@');
       this.lastError = msg;
       // A run that lasted a while was healthy: start over with a short pause.
-      if (Date.now() - this.startedAt > 120_000) this.backoff = 5000;
+      if (Date.now() - this.startedAt > 120_000) { this.backoff = 5000; this.authFails = 0; }
+      if (isAuthError(msg) && ++this.authFails >= AUTH_TRIES) {
+        this.held = true;
+        log(`camera ${this.cam.number}: wrong user name or password — stopped trying so the camera does not lock its login`);
+        return;
+      }
       log(`camera ${this.cam.number}: ${msg} — restarting in ${this.backoff / 1000}s`);
-      setTimeout(() => this.start(), this.backoff);
+      this.timer = setTimeout(() => this.start(), this.backoff);
       this.backoff = Math.min(this.backoff * 2, 60_000);
     });
     log(`camera ${this.cam.number}: recording ${process.env[`PACKCAM_TEST_INPUT_${this.cam.number}`] ? '(test input)' : maskedUrl(this.cam)}`);
   }
+  /** "Test connection": try again now (after a wrong password stopped it). */
+  retry() {
+    if (this.stopped || this.proc) return;
+    clearTimeout(this.timer);
+    this.held = false; this.authFails = 0; this.backoff = 5000;
+    this.start();
+  }
   stop() {
-    this.stopped = true;
+    this.stopped = true; clearTimeout(this.timer);
     if (this.proc) { try { this.proc.kill('SIGINT'); } catch { /* gone */ } }
   }
   status() {
@@ -93,6 +114,9 @@ export class Recorder {
     let lastWrite = 0;
     if (last) { try { lastWrite = fs.statSync(last.file).mtimeMs; } catch { /* gone */ } }
     const ok = !!this.proc && Date.now() - lastWrite < 90_000;
-    return { number: this.cam.number, ok, last_segment_at: lastWrite ? new Date(lastWrite).toISOString() : null, error: ok ? null : (this.lastError || (this.proc ? 'No video received yet' : 'Not running')) };
+    const error = ok ? null
+      : this.held ? `${plainCameraError(this.lastError, this.cam)}. Pack Cam stopped trying so the camera does not lock its login — fix it, then press Test connection`
+      : this.lastError ? plainCameraError(this.lastError, this.cam) : (this.proc ? 'No video received yet' : 'Not running');
+    return { number: this.cam.number, ok, last_segment_at: lastWrite ? new Date(lastWrite).toISOString() : null, error };
   }
 }

@@ -1,7 +1,8 @@
 // Pack Cam: one packing video per PackStation scan, recorded by the agent on
 // the office PC (tools/packcam-agent). Re-exported from database.ts.
 
-export type PackcamClipStatus = 'queued' | 'cutting' | 'uploading' | 'done' | 'failed' | 'missing';
+// removed: the PC copy was moved or deleted by hand and no Dropbox / Drive copy is left.
+export type PackcamClipStatus = 'queued' | 'cutting' | 'uploading' | 'done' | 'failed' | 'missing' | 'removed';
 
 // ─── packcam_clips (18 cols) — written only by the packcam edge function ──
 // Pack Cam never deletes clips; the team clears old ones from the PC folder,
@@ -39,6 +40,10 @@ export interface PackcamSettings {
   pre_roll_seconds: number;
   post_roll_seconds: number;
   buffer_hours: number;
+  /** When Pack Cam was switched on/off (newest last, ~20 kept): explains "no video" for older scans. */
+  enabled_log?: { at: string; on: boolean; by?: string }[];
+  /** Settings → Cameras → Test connection: a new value (press time, ms) asks the PC to test every camera. */
+  test_nonce?: string;
 }
 
 export const PACKCAM_DEFAULTS: PackcamSettings = {
@@ -68,9 +73,17 @@ export interface PackcamAgentStatus {
   cameras?: { number: string; ok: boolean; last_segment_at: string | null; error: string | null }[];
   queue?: { waiting: number; failed: number };
   dropbox?: { ok: boolean; error?: string } | null;
-  gdrive?: { configured: boolean; connected: boolean; connected_at: string | null } | null;
+  /** upload_error (agent 1.4.0+): the last upload to Drive failed. */
+  gdrive?: { configured: boolean; connected: boolean; connected_at: string | null; upload_error?: string | null } | null;
   last_error?: string | null;
+  /** Agent 1.4.0+: room left where videos go (levels: ok · low < 7 days or 5 GB · full < 1 day or 1 GB). */
+  storage?: Partial<Record<PackcamPlace, PackcamSpace>> & { per_day_gb?: number };
+  /** Agent 1.4.0+: answers to Test connection, by camera number. */
+  tests?: Record<string, { nonce: string; ok: boolean; message: string; at?: string }>;
 }
+
+export type PackcamPlace = 'recording' | 'pc' | 'dropbox' | 'gdrive';
+export interface PackcamSpace { level: 'ok' | 'low' | 'full'; free_gb?: number | null; total_gb?: number | null; days?: number | null; checking?: boolean; error?: string }
 
 /** packcam play → where to watch a clip. */
 export interface PackcamPlay { url: string; source: 'dropbox' | 'gdrive' | 'pc'; external?: boolean; lan_only?: boolean }

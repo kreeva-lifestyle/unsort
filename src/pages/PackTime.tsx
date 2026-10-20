@@ -9,7 +9,7 @@ import { friendlyError } from '../lib/friendlyError';
 
 const EDGE_FN = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/packtime';
 
-import { T, S } from '../lib/theme';
+import { T, S, alpha } from '../lib/theme';
 import DateInput from '../components/ui/DateInput';
 import { SkeletonRows } from '../components/ui/Skeleton';
 import SwipeRow from '../components/ui/SwipeRow';
@@ -17,6 +17,8 @@ import HistoryStats from '../components/packtime/HistoryStats';
 import { useScanClips, ScanVideoButton } from '../components/packcam/ScanVideo';
 import { usePackcamLive, CamStatusLine } from '../components/packcam/ScanCamStatus';
 import RecentScans, { type ScanEntry } from '../components/packtime/RecentScans';
+import { sendScan, failedDbScans, persistFailed, cancelScan } from '../components/packtime/scanSend';
+import { beep, beepOk, beepErr } from '../components/packtime/beep';
 import type {
   Brand,
   PackTimeCourier,
@@ -32,33 +34,6 @@ import { logSwallowed } from '../lib/errorLogger';
 import { useModalLock } from '../hooks/useModalLock';
 
 // ── Beep ────────────────────────────────────────────────────────────────────────
-let audioCtx: AudioContext | null = null;
-
-// iOS Safari: AudioContext must be created/resumed from a user gesture.
-// resume() is async — by the time beep() plays, context may still be suspended.
-// Fix: warm it up on every touch so it's always "running" when beep() fires.
-if (typeof window !== 'undefined') {
-  const warmAudio = () => {
-    if (!audioCtx) audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-  };
-  document.addEventListener('touchstart', warmAudio, { passive: true });
-  document.addEventListener('click', warmAudio);
-}
-
-async function beep(freq: number, dur: number, type: OscillatorType = 'square') {
-  try {
-    if (!audioCtx) audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    if (audioCtx.state !== 'running') await audioCtx.resume();
-    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
-    o.connect(g); g.connect(audioCtx.destination);
-    o.type = type; o.frequency.value = freq; g.gain.value = 0.3;
-    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
-    o.start(audioCtx.currentTime); o.stop(audioCtx.currentTime + dur);
-  } catch {}
-}
-function beepOk() { beep(880, 0.12); setTimeout(() => beep(1100, 0.12), 100); }
-function beepErr() { beep(300, 0.3, 'sawtooth'); setTimeout(() => beep(200, 0.4, 'sawtooth'), 200); }
 
 // ── Timestamp helper ────────────────────────────────────────────────────────────
 function pad(n: number) { return n < 10 ? '0' + n : String(n); }
@@ -95,16 +70,6 @@ const notifyDropped = () => { droppedListeners.forEach(fn => { try { fn(); } cat
 function getDroppedBatches() { return droppedBatches; }
 function clearDroppedBatches() { droppedBatches.length = 0; notifyDropped(); }
 
-// Scans whose DB insert failed twice — parked here so the operator can retry
-// from the banner. Persisted to localStorage: module scope survives unmount
-// but NOT a refresh or an evicted PWA tab, which is exactly when a shop-floor
-// phone loses them.
-type FailedDbScan = { scanRow: PackTimeScanInsert; sheetRow: unknown[]; sheetName: string };
-const FAILED_KEY = 'packtime_failed_db_scans';
-const failedDbScans: FailedDbScan[] = (() => {
-  try { const raw = localStorage.getItem(FAILED_KEY); const arr = raw ? JSON.parse(raw) : []; return Array.isArray(arr) ? arr : []; } catch { return []; }
-})();
-const persistFailed = () => { try { localStorage.setItem(FAILED_KEY, JSON.stringify(failedDbScans.slice(0, 500))); } catch { /* quota */ } };
 
 async function flushQueue() {
   if (flushing || writeQueue.length === 0) return;
@@ -573,18 +538,20 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     awbSetRef.current.add(key);
     rowCountRef.current++;
     const count = rowCountRef.current;
-    const now = new Date();
+    const now = new Date(); const scanId = crypto.randomUUID();   // the id lets the packer add time to this scan's video
     const timestamp = formatTimestamp(now);
 
     setLastScanned(trimmed);
     setSessionCount(p => p + 1);
     setSheetTotal(p => p + 1);
-    setRecentScans(p => [{ awb: trimmed, time: now.toLocaleTimeString('en-IN'), success: true, pending: true, at: now.getTime() }, ...p].slice(0, 30));
+    setRecentScans(p => [{ awb: trimmed, time: now.toLocaleTimeString('en-IN'), success: true, pending: true, at: now.getTime(), id: scanId }, ...p].slice(0, 30));
 
     // Save to Supabase DB first, then Sheet
-    const scanRow: PackTimeScanInsert = { session_id: sessionIdRef.current, awb: trimmed, courier, camera, brand: courierBrand, sheet_name: courierSheet, user_id: userIdRef.current };
+    const scanRow: PackTimeScanInsert = { id: scanId, session_id: sessionIdRef.current, awb: trimmed, courier, camera, brand: courierBrand, sheet_name: courierSheet, user_id: userIdRef.current };
     const row = [count, trimmed, timestamp, camera, courierBrand];
-    supabase.from('packtime_scans').insert(scanRow).then(({ error }) => {
+    const at = now.getTime();
+    sendScan(scanRow, at).then(({ error, cancelled }) => {
+      if (cancelled) return;
       if (error) {
         if (error.code === '23505') {
           // Duplicate AWB in DB — roll back local count and remove from recent scans
@@ -607,13 +574,14 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
         // double-counted dbFails and never sent the sheet row on retry success.)
         setDbFails(p => p + 1);
         setTimeout(() => {
-          supabase.from('packtime_scans').insert(scanRow).then(({ error: e2 }) => {
-            if (!e2 || e2.code === '23505') {
+          sendScan(scanRow, at).then(({ error: e2, cancelled: undone }) => {
+            if (undone) setDbFails(p => Math.max(0, p - 1));
+            else if (!e2 || e2.code === '23505') {
               setDbFails(p => Math.max(0, p - 1));
               enqueueWrite([row], courierSheet);
               setPendingWrites(p => p + 1);
             } else {
-              failedDbScans.push({ scanRow, sheetRow: row, sheetName: courierSheet });
+              failedDbScans.push({ scanRow, sheetRow: row, sheetName: courierSheet, at });
               persistFailed();
             }
           });
@@ -635,8 +603,9 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     persistFailed();
     if (pending.length === 0) return;
     for (const f of pending) {
-      supabase.from('packtime_scans').insert(f.scanRow).then(({ error }) => {
-        if (!error || error.code === '23505') {
+      sendScan(f.scanRow, f.at).then(({ error, cancelled: undone }) => {
+        if (undone) setDbFails(p => Math.max(0, p - 1));
+        else if (!error || error.code === '23505') {
           setDbFails(p => Math.max(0, p - 1));
           enqueueWrite([f.sheetRow], f.sheetName);
           setPendingWrites(p => p + 1);
@@ -662,6 +631,8 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     if (writeQueue.length > 0) { addToast('Still syncing the last scan — try Undo again in a few seconds', 'error'); return; }
     const awb = lastScanned;
     const key = awb.toUpperCase();
+    const undoneId = recentScans.find(s => s.success && s.awb === awb)?.id;   // a send still to come is called off
+    if (undoneId && cancelScan(undoneId)) setDbFails(p => Math.max(0, p - 1));
     awbSetRef.current.delete(key);
     setRecentScans(p => p.filter(s => s.awb !== awb));
     setSessionCount(p => Math.max(0, p - 1));
@@ -673,8 +644,8 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     // Background delete from Google Sheet + Supabase DB
     getAuthHeaders().then(headers => fetch(EDGE_FN, { method: 'POST', headers, body: JSON.stringify({ action: 'delete', awb, sheetName: courierSheet }) })
       .then(r => r.json()).then(() => {})).catch(() => addToast(`Undo could not remove ${awb} from the sheet — delete that row by hand`, 'error'));
-    supabase.from('packtime_scans').delete().eq('awb', awb).eq('session_id', sessionIdRef.current).then(({ error: e }) => { if (e) addToast(`Undo failed for ${awb} — ${friendlyError(e)}`, 'error'); });
-  }, [lastScanned, courierSheet, focusInput, addToast]);
+    (undoneId ? supabase.from('packtime_scans').delete().eq('id', undoneId) : supabase.from('packtime_scans').delete().eq('awb', awb).eq('session_id', sessionIdRef.current)).then(({ error: e }) => { if (e) addToast(`Undo failed for ${awb} — ${friendlyError(e)}`, 'error'); });
+  }, [lastScanned, recentScans, courierSheet, focusInput, addToast]);
 
 
   // ── Fetch today's summary across all couriers ──────────────────────────────
@@ -698,7 +669,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     setHistoryLoading(true);
     // 'estimated' like every other pager — 'exact' forced a full count scan
     // of the app's largest table on every history view.
-    let query = supabase.from('packtime_scans').select('id, session_id, awb, courier, camera, sheet_name, scanned_at, user_id, brand', { count: 'estimated' })
+    let query = supabase.from('packtime_scans').select('id, session_id, awb, courier, camera, sheet_name, scanned_at, user_id, brand, received_at', { count: 'estimated' })
       .gte('scanned_at', new Date(historyDateFrom + 'T00:00:00').toISOString())
       .lte('scanned_at', new Date(historyDateTo + 'T23:59:59.999').toISOString());
     if (historySearch) query = query.ilike('awb', `%${historySearch.replace(/[%_]/g, '\\$&')}%`);
@@ -789,7 +760,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
 
   const dateStr = new Date().toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
   const totalPages = Math.ceil(historyTotal / historyPageSize);
-  const scanClips = useScanClips(showHistory ? historyData.map(r => r.id) : []);
+  const scanClips = useScanClips(showHistory ? historyData : []);
 
   const { live: camLive, markOf: clipMarkOf } = usePackcamLive(!!active && started && !showHistory, camera, successScans.map(s => s.awb));
 
@@ -874,7 +845,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
                   <td style={{ ...S.tdStyle, color: T.gr, fontWeight: 600 }}>{r.brand || '—'}</td>
                   <td style={{ ...S.tdStyle, fontFamily: T.mono, color: T.tx3, fontSize: 11 }}>{r.scanned_at ? new Date(r.scanned_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
                   <td style={{ ...S.tdStyle, width: 40, whiteSpace: 'nowrap' }}>
-                    <ScanVideoButton clip={scanClips[r.id]} />
+                    <ScanVideoButton v={scanClips[r.id]} />
                     <button type="button" onClick={() => setConfirmDeleteId(r.id)} style={{ padding: 0, border: 'none', background: 'none', cursor: 'pointer', opacity: 0.4, transition: 'opacity .15s' }} onMouseEnter={e => (e.currentTarget.style.opacity = '1')} onMouseLeave={e => (e.currentTarget.style.opacity = '0.4')} aria-label="Delete">
                       <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: T.re, strokeWidth: 1.8 }}><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>
                     </button>
@@ -904,7 +875,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
                 <div style={{ textAlign: 'right', flexShrink: 0 }}>
                   <div style={{ fontSize: 12, fontWeight: 600, color: T.gr }}>{r.brand || '—'}</div>
                   <div style={{ fontSize: 10, color: T.tx3, fontFamily: T.mono, marginTop: 2 }}>{r.scanned_at ? new Date(r.scanned_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}</div>
-                  {scanClips[r.id] && <div style={{ marginTop: 6 }}><ScanVideoButton clip={scanClips[r.id]} /></div>}
+                  {scanClips[r.id] && <div style={{ marginTop: 6 }}><ScanVideoButton v={scanClips[r.id]} /></div>}
                 </div>
               </div>
             </div>
@@ -1101,9 +1072,9 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
 
       {/* Offline indicator */}
       {isOffline && started && (
-        <div style={{ margin: '0 14px 8px', padding: '8px 12px', borderRadius: 6, background: 'oklch(0.78 0.18 75 / .08)', border: '1px solid oklch(0.78 0.18 75 / .2)', color: T.yl, fontSize: 10, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ width: 8, height: 8, borderRadius: '50%', background: T.yl, animation: 'subtlePulse 2s ease-in-out infinite' }} />
-          You're offline — scans are queued locally. They'll sync when connection returns.
+        <div style={{ margin: '0 0 10px', padding: '10px 12px', borderRadius: 8, background: alpha(T.re, 0.1), border: `1px solid ${T.re}`, color: T.re, fontSize: 12, lineHeight: 1.4, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: T.re, flexShrink: 0, animation: 'subtlePulse 2s ease-in-out infinite' }} />
+          <span>No internet on this phone — connect to Wi-Fi. Scans are kept here and sent with their real scan time once it is back (packing videos stay correct).</span>
         </div>
       )}
 

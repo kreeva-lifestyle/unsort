@@ -3,8 +3,8 @@
 ' stops it. It keeps Pack Cam running the way start.bat does, only hidden:
 ' check it from DailyOffice -> Settings -> Pack Cam, or http://localhost:8765.
 ' If Pack Cam is already running (a start.bat window), it waits and takes
-' over when that one stops. A start that fails at once (no key in
-' config.json, Node.js missing) is written to startup-errors.log in this
+' over when that one stops. A start that fails at once (Node.js
+' missing) is written to startup-errors.log in this
 ' folder and tried again every minute.
 Option Explicit
 Dim sh, fso, here, rc, began

@@ -60,6 +60,9 @@ export interface PackTimeScan {
   scanned_at: string | null;
   user_id: string | null;
   brand: string | null;
+  /** When the server got it (≠ scanned_at for a scan sent late from an offline phone). */
+  received_at?: string;
+  queued_ms?: number | null;
 }
 
 export type PackTimeScanInsert = {
@@ -72,6 +75,8 @@ export type PackTimeScanInsert = {
   scanned_at?: string | null;
   user_id?: string | null;
   brand?: string | null;
+  /** How long the scan waited on the phone before it was sent (ms): the server sets scanned_at = now − this. */
+  queued_ms?: number | null;
 };
 
 // ─── packtime_shortcuts (6 cols) ────────────────────────────────────────

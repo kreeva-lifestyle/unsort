@@ -6,10 +6,13 @@
 //     Settings → Pack Cam and only its sha-256 is stored
 //     (app_secrets.packcam_agent_token_hash).
 //       agent_poll   { cursor, status }  -> settings, cameras (with passwords),
-//                    new scans since cursor, a short-lived Dropbox access
+//                    new scans received since cursor, a short-lived Dropbox access
 //                    token (when Dropbox is on), play secret. Also stores the
 //                    agent's heartbeat (app_settings.packcam_agent).
 //       agent_report { clips } -> upserts clip rows.
+//       agent_removed { scan_ids } -> clips whose PC file was moved or deleted
+//                    by hand: pc_path cleared; with no Dropbox / Drive copy
+//                    left the clip becomes 'removed' (no longer "Saved").
 //   Pack Cam never deletes clips: the team clears old ones themselves.
 //   * signed-in staff (Authorization: Bearer <user JWT>):
 //       new_agent_key (admin) -> a fresh agent key, shown once.
@@ -25,7 +28,11 @@
 import { DEFAULT_SETTINGS, agentOk, caller, cors, dropboxToken, fail, forgetDropboxToken, hmac, json, playSecret, putSetting, randomHex, rest, setSecret, setting, sha256 } from './shared.ts';
 
 const CLIP_COLS = ['scan_id', 'awb', 'courier', 'camera', 'scanned_at', 'clip_start', 'clip_end', 'duration_s', 'size_bytes', 'status', 'pc_path', 'dropbox_path', 'gdrive_file_id', 'gdrive_link', 'error'];
-const STATUSES = new Set(['queued', 'cutting', 'uploading', 'done', 'failed', 'missing']);
+const STATUSES = new Set(['queued', 'cutting', 'uploading', 'done', 'failed', 'missing', 'removed']);
+const SCAN_LIMIT = 500;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+/** Agent version a.b.c at least `min` (a.b). */
+const atLeast = (v: unknown, maj: number, min: number) => { const [a, b] = String(v || '0').split('.').map(Number); return a > maj || (a === maj && b >= min); };
 const s = (v: unknown, n = 300) => (v == null ? null : String(v).slice(0, n));
 
 async function agentPoll(body: any, req: Request): Promise<Response> {
@@ -37,7 +44,11 @@ async function agentPoll(body: any, req: Request): Promise<Response> {
   // minute, or sooner when something the Settings page shows has changed.
   const status = body?.status && typeof body.status === 'object' && JSON.stringify(body.status).length < 20_000 ? body.status : {};
   const prev = await setting('packcam_agent');
-  const gist = (x: any) => JSON.stringify([x?.version, x?.lan_url, x?.enabled, x?.queue, x?.dropbox, x?.gdrive, x?.last_error, (x?.cameras ?? []).map((c: any) => [c?.number, c?.ok, c?.error])]);
+  // Storage counts by level only (ok / low / full): free space moves every
+  // minute and is refreshed by the once-a-minute write anyway. A camera test
+  // answer goes out at once — the Settings page is waiting for it.
+  const levels = (st: any) => Object.entries(st && typeof st === 'object' ? st : {}).map(([k, v]: [string, any]) => [k, v?.level ?? null]);
+  const gist = (x: any) => JSON.stringify([x?.version, x?.lan_url, x?.enabled, x?.queue, [x?.dropbox?.ok, x?.dropbox?.error], [x?.gdrive?.connected, x?.gdrive?.configured, x?.gdrive?.upload_error], x?.last_error, (x?.cameras ?? []).map((c: any) => [c?.number, c?.ok, c?.error]), levels(x?.storage), x?.tests ?? null]);
   if (!prev?.last_seen || Date.now() - Date.parse(prev.last_seen) > 60_000 || gist(prev) !== gist(status)) await putSetting('packcam_agent', { ...status, last_seen: now });
 
   const cams = await rest('packtime_cameras?select=id,number,is_active,ip,rtsp_port,rtsp_path,username&is_active=eq.true&ip=not.is.null&order=number');
@@ -51,14 +62,26 @@ async function agentPoll(body: any, req: Request): Promise<Response> {
   // Camera numbers are free text: quote and escape each for PostgREST, then
   // URL-encode the list so characters like & or # cannot break the query.
   const numbers = cameras.map((c: any) => `"${c.number.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`).join(',');
+  const where = `camera=in.(${encodeURIComponent(numbers)})`;
+  // Agent 1.4.0+ reads by received_at (when the server got the scan, or a
+  // "+30 s" for it): a scan a phone sent late after losing Wi-Fi keeps its
+  // earlier, real scanned_at and would fall behind a scanned_at cursor. A
+  // full page returns next_cursor, the last row's received_at, which the
+  // agent takes as it is (its usual cursor lags 2 minutes behind the newest
+  // scan, and a burst of 500+ late scans would otherwise come back forever).
+  // Older agents keep the scanned_at query they understand.
   // Sent even while recording is off: on the poll that switches it off, the
   // agent still takes the scans made in the last few seconds before it.
-  const scans = cameras.length
-    ? await rest(`packtime_scans?select=id,awb,courier,camera,scanned_at&scanned_at=gte.${encodeURIComponent(since)}&camera=in.(${encodeURIComponent(numbers)})&order=scanned_at.asc&limit=500`)
-    : [];
+  let scans: any[] = []; let nextCursor: string | null = null;
+  if (cameras.length && atLeast(status.version, 1, 4)) {
+    scans = await rest(`packtime_scans?select=id,awb,courier,camera,scanned_at,received_at,user_id,session_id,extend_seconds&received_at=gte.${encodeURIComponent(since)}&${where}&order=received_at.asc,id.asc&limit=${SCAN_LIMIT}`);
+    if (scans.length === SCAN_LIMIT) nextCursor = scans[SCAN_LIMIT - 1].received_at;
+  } else if (cameras.length) {
+    scans = await rest(`packtime_scans?select=id,awb,courier,camera,scanned_at&scanned_at=gte.${encodeURIComponent(since)}&${where}&order=scanned_at.asc&limit=${SCAN_LIMIT}`);
+  }
 
   const dropbox = settings.targets.dropbox ? await dropboxToken() : null;
-  return json({ ok: true, now, settings, cameras, scans, dropbox, play_secret: await playSecret() }, req);
+  return json({ ok: true, now, settings, cameras, scans, next_cursor: nextCursor, dropbox, play_secret: await playSecret() }, req);
 }
 
 async function agentReport(body: any, req: Request): Promise<Response> {
@@ -76,6 +99,19 @@ async function agentReport(body: any, req: Request): Promise<Response> {
     await rest('packcam_clips?on_conflict=scan_id', { method: 'POST', prefer: 'resolution=merge-duplicates', body: JSON.stringify(uniform) });
   }
   return json({ ok: true, saved: clips.length }, req);
+}
+
+async function agentRemoved(body: any, req: Request): Promise<Response> {
+  const ids = (Array.isArray(body?.scan_ids) ? body.scan_ids : []).map(String).filter((x: string) => UUID.test(x)).slice(0, 500);
+  const now = new Date().toISOString();
+  // 100 ids per request keeps the URL far below the gateway's limit.
+  for (let i = 0; i < ids.length; i += 100) {
+    const inIds = `scan_id=in.(${ids.slice(i, i + 100).join(',')})`;
+    // No copy left anywhere: no longer "Saved". Then the PC path goes on all.
+    await rest(`packcam_clips?${inIds}&dropbox_path=is.null&gdrive_link=is.null&status=in.(done,failed,uploading)`, { method: 'PATCH', body: JSON.stringify({ status: 'removed', error: 'The video was moved or deleted from the office PC', updated_at: now }) });
+    await rest(`packcam_clips?${inIds}&pc_path=not.is.null`, { method: 'PATCH', body: JSON.stringify({ pc_path: null, updated_at: now }) });
+  }
+  return json({ ok: true, removed: ids.length }, req);
 }
 
 async function play(body: any, req: Request): Promise<Response> {
@@ -119,9 +155,9 @@ Deno.serve(async (req) => {
   const body = await req.json().catch(() => null);
   const action = String(body?.action || '');
   try {
-    if (action === 'agent_poll' || action === 'agent_report') {
+    if (action === 'agent_poll' || action === 'agent_report' || action === 'agent_removed') {
       if (!(await agentOk(req))) return fail(401, 'Agent key not accepted — create a new one in Settings → Pack Cam', req);
-      return action === 'agent_poll' ? await agentPoll(body, req) : await agentReport(body, req);
+      return action === 'agent_poll' ? await agentPoll(body, req) : action === 'agent_report' ? await agentReport(body, req) : await agentRemoved(body, req);
     }
     const who = await caller(req);
     if (!who) return fail(401, 'Sign in to DailyOffice first', req);

@@ -94,7 +94,7 @@ for (const [enc, tag] of [['libx264', 'H.264'], ['libx265', 'H.265']]) {
 // ---- the stand-in server ----
 const pcFolder = path.join(tmp, 'Packing Videos');   // the PC folder set in Settings → Pack Cam
 const settings = { enabled: true, targets: { pc: true, dropbox: true, gdrive: true }, pc_folder: pcFolder, dropbox_folder: '/Packing/Cam', gdrive_folder_name: 'Packing/Cam', max_clip_seconds: 12, pre_roll_seconds: 1, post_roll_seconds: 1, buffer_hours: 6 };
-const scans = []; const clips = new Map();
+const scans = []; const clips = new Map(); const removedIds = [];
 const dbx = new Map(); const drive = new Map(); const driveFolders = []; let lastStatus = null;
 const body = req => new Promise(r => { const b = []; req.on('data', c => b.push(c)); req.on('end', () => r(Buffer.concat(b))); });
 const send = (res, code, obj, headers = {}) => { res.writeHead(code, { 'content-type': 'application/json', ...headers }); res.end(obj == null ? '' : JSON.stringify(obj)); };
@@ -108,9 +108,10 @@ const server = http.createServer(async (req, res) => {
       const since = d.cursor ? Date.parse(d.cursor) : 0;
       return send(res, 200, { ok: true, now: iso(sNow()), settings, play_secret: SECRET,
         cameras: [{ id: 'c1', number: '1', ip: '127.0.0.1', rtsp_port: 554, rtsp_path: '/x', username: 'admin', password: 'p@ss' }],
-        scans: scans.filter(s => Date.parse(s.scanned_at) >= since),
+        scans: scans.filter(s => Date.parse(s.received_at || s.scanned_at) >= since),
         dropbox: { access_token: 'dbx-token', expires_in: 14000 } });
     }
+    if (d.action === 'agent_removed') { removedIds.push(...d.scan_ids); return send(res, 200, { ok: true }); }
     if (d.action === 'agent_report') {
       for (const c of d.clips) clips.set(c.scan_id, c);
       return send(res, 200, { ok: true });
@@ -118,9 +119,12 @@ const server = http.createServer(async (req, res) => {
   }
   if (u.pathname === '/dbx-content/files/upload') {
     const a = JSON.parse(req.headers['dropbox-api-arg']);
+    if (/FAIL/.test(a.path)) return send(res, 500, { error_summary: 'internal_error/' });
     dbx.set(a.path, b.length);
     return send(res, 200, { path_display: a.path });
   }
+  if (u.pathname === '/dbx-api/users/get_space_usage') return send(res, 200, { used: 1.5e9, allocation: { '.tag': 'individual', allocated: 2e9 } });
+  if (u.pathname === '/g-api/about') return send(res, 200, { storageQuota: { limit: '100000000000', usage: '1000000000' } });
   if (u.pathname === '/g-token') return send(res, 200, { access_token: 'g-token', expires_in: 3600 });
   if (u.pathname === '/g-api/files' && req.method === 'GET') return send(res, 200, { files: [] });
   if (u.pathname === '/g-api/files' && req.method === 'POST') { driveFolders.push(JSON.parse(b).name); return send(res, 200, { id: 'folder-' + crypto.randomUUID().slice(0, 6) }); }
@@ -139,7 +143,7 @@ const cfgFile = path.join(tmp, 'config.json');
 fs.writeFileSync(cfgFile, JSON.stringify({ server: `http://127.0.0.1:${P}/fn`, agent_key: KEY, data_dir: dataDir, port: AGENT_PORT, ffmpeg: 'ffmpeg', gdrive_client_id: 'id', gdrive_client_secret: 's', poll_ms: 1000, lan_url: `http://127.0.0.1:${AGENT_PORT}` }));
 const agent = spawn(process.execPath, [path.join(here, '..', 'packcam.mjs'), cfgFile], {
   env: { ...process.env, PACKCAM_TEST_INPUT_1: video, PACKCAM_SEGMENT_SECONDS: '4',
-    PACKCAM_DROPBOX_CONTENT: `http://127.0.0.1:${P}/dbx-content`,
+    PACKCAM_DROPBOX_CONTENT: `http://127.0.0.1:${P}/dbx-content`, PACKCAM_DROPBOX_API: `http://127.0.0.1:${P}/dbx-api`, PACKCAM_NO_NOTEPAD: '1', PACKCAM_REMOVED_CHECK_MS: '2000',
     PACKCAM_GOOGLE_TOKEN: `http://127.0.0.1:${P}/g-token`, PACKCAM_GDRIVE_API: `http://127.0.0.1:${P}/g-api`, PACKCAM_GDRIVE_UPLOAD: `http://127.0.0.1:${P}/g-upload` },
   stdio: ['ignore', 'pipe', 'pipe'] });
 let agentLog = '';
@@ -204,6 +208,59 @@ try {
   await until(() => /cannot be used/.test(lastStatus?.last_error || ''), 10_000, 'folder warning in status');
   check(/cannot be used/.test(lastStatus?.last_error || '') && lastStatus?.pc_folder === path.join(dataDir, 'clips'), `status says so and shows the folder really used (${lastStatus?.pc_folder})`);
   check(!/p@ss/.test(agentLog), 'camera password never written to the log');
+
+  // The key from an older config.json now lives in the data folder's key.txt.
+  check(fs.readFileSync(path.join(dataDir, 'key.txt'), 'utf8').includes(KEY), 'agent key moved from config.json to key.txt in the data folder');
+  // Free space where clips go, in the heartbeat: Dropbox 0.5 GB free → full.
+  await until(() => lastStatus?.storage?.dropbox?.free_gb != null || !lastStatus?.storage?.dropbox, 10_000, 'storage in status');
+  const stg = lastStatus?.storage || {};
+  check(stg.recording?.level && stg.pc?.level, `storage: recording disk and PC folder reported (${JSON.stringify(stg.pc)})`);
+  // A scan a phone sent late (offline): its real scan time is minutes before
+  // the agent's cursor, but it was received now — it must still be picked up.
+  const late = { id: crypto.randomUUID(), awb: 'AWB-LATE', courier: null, camera: '1', scanned_at: iso(sNow() - 5 * 60_000), received_at: iso(sNow()) };
+  scans.push(late);
+  await until(() => clips.has(late.id), 15_000, 'late scan picked up');
+  check(clips.has(late.id), `a scan sent late keeps its real time and is still picked up (${clips.get(late.id)?.status})`);
+  // Two packers on one camera: P1's video runs to P1's own next scan, not
+  // to P2's scan in between.
+  Object.assign(settings, { targets: { pc: true, dropbox: false, gdrive: false } });
+  const scanBy = (awb, user, extra = {}) => { const s = { id: crypto.randomUUID(), awb, courier: null, camera: '1', scanned_at: iso(sNow()), received_at: iso(sNow()), user_id: user, ...extra }; scans.push(s); return s; };
+  const p1 = scanBy('AWB-P1A', 'u1'); await sleep(3000);
+  scanBy('AWB-P2A', 'u2'); await sleep(3000);
+  scanBy('AWB-P1B', 'u1');
+  // "+30 s" (here +4 s) with no next scan: the whole video is the limit plus the extra.
+  const ext = scanBy('AWB-EXT', 'u3', { extend_seconds: 4 });
+  await until(() => clips.get(p1.id)?.status === 'done' && clips.get(ext.id)?.status === 'done', 60_000, 'packer + extend clips');
+  check(clips.get(p1.id)?.duration_s >= 6.5, `two packers: P1's video runs to P1's next scan (~8 s, got ${clips.get(p1.id)?.duration_s})`);
+  check(Math.abs((clips.get(ext.id)?.duration_s || 0) - 16) <= 1, `"+ time" makes the video longer than the limit (~16 s, got ${clips.get(ext.id)?.duration_s})`);
+  // A video moved off the PC by hand is reported, so it stops showing "Saved".
+  const p1file = clips.get(p1.id)?.pc_path;
+  if (p1file) fs.unlinkSync(p1file);
+  await until(() => removedIds.includes(p1.id), 15_000, 'removed video reported');
+  check(removedIds.includes(p1.id), 'video deleted from the PC folder is reported to the server');
+  // A clip cut at the limit before a late scan (phone offline) arrived is cut
+  // again to end at that scan.
+  const l1 = scanBy('AWB-L1', 'u5');
+  await until(() => clips.get(l1.id)?.status === 'done', 40_000, 'L1 cut at the limit');
+  const firstDur = clips.get(l1.id)?.duration_s;
+  scanBy('AWB-L2', 'u5', { scanned_at: iso(Date.parse(l1.scanned_at) + 4000) });
+  await until(() => clips.get(l1.id)?.status === 'done' && clips.get(l1.id)?.duration_s < 9, 40_000, 'L1 cut again');
+  check(firstDur > 11 && clips.get(l1.id)?.duration_s < 9, `late scan inside a cut video: cut again to end there (${firstDur} s → ${clips.get(l1.id)?.duration_s} s)`);
+
+  // Dropbox uploads failing: the status no longer says "Ready".
+  Object.assign(settings, { targets: { pc: true, dropbox: true, gdrive: false } });
+  const bad = scanBy('AWB-FAIL', 'u4'); await sleep(2000); scanBy('AWB-FAIL2', 'u4');
+  await until(() => lastStatus?.dropbox?.ok === false, 40_000, 'dropbox failing in status');
+  check(lastStatus?.dropbox?.ok === false && /Uploads failing/.test(lastStatus?.dropbox?.error || ''), `Dropbox uploads failing shows in the status (${JSON.stringify(lastStatus?.dropbox)})`);
+  check(!!bad, 'failing upload scan made');
+
+  // "Test connection": a new nonce → each camera asked, a plain answer back.
+  Object.assign(settings, { targets: { pc: false, dropbox: true, gdrive: true }, test_nonce: String(sNow()) });
+  await until(() => lastStatus?.tests?.['1']?.nonce === settings.test_nonce, 40_000, 'camera test answer');
+  const tst = lastStatus?.tests?.['1'];
+  check(tst && tst.ok === false && !/rtsp|ffmpeg|DESCRIBE/i.test(tst.message), `test connection: plain answer (${tst?.message})`);
+  await until(() => lastStatus?.storage?.dropbox?.level === 'full', 5_000, 'dropbox full');
+  check(lastStatus?.storage?.dropbox?.level === 'full' && lastStatus?.storage?.dropbox?.free_gb === 0.5, `Dropbox nearly full shows as full (${JSON.stringify(lastStatus?.storage?.dropbox)})`);
 } finally {
   agent.kill('SIGINT');
   await sleep(1500);
