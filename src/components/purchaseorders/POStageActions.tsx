@@ -1,9 +1,11 @@
 // The order's next steps, right under its rail (Motion Lab 06): Approve,
 // Mark sent, Receive, Close remaining / Reopen and Cancel PO, in the order
-// the work goes. A status button keeps its "Approving…" label until the new
-// stage has landed on the rail (waitLanded) and every stage button waits
-// while one runs, so a second tap never lands on a stale button. Receive
-// opens the receive sheet and says how much is still due.
+// the work goes. While a step runs, the row keeps showing the order as it
+// was when the button was tapped — the "Approving…" label stays and the
+// next steps swap in only when the new stage has landed on the rail
+// (waitLanded) — and every write on the sheet waits (the shared `busy`), so
+// a second tap never lands on a stale button. Receive opens the receive
+// sheet and says how much is still due.
 import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { S } from '../../lib/theme';
@@ -11,6 +13,7 @@ import { friendlyError } from '../../lib/friendlyError';
 import { pendingOf } from './POCloseModal';
 import { receivedOf } from './PORailCard';
 import { fmtQty } from './poStats';
+import { TRAVEL_MS } from './PORail';
 import type { ConfirmOptions } from '../ui/ConfirmModal';
 import type { PurchaseOrder, PurchaseOrderItem } from '../../types/database';
 
@@ -22,31 +25,37 @@ const TEXT: Record<Step, { idle: string; busy: string; done: string }> = {
   reopen: { idle: 'Reopen', busy: 'Reopening…', done: 'Purchase order reopened' },
 };
 
-export default function POStageActions({ po, items, canManage, ask, onChanged, waitLanded, onReceive, onCloseRemaining, addToast }: {
+export default function POStageActions({ po: livePo, items: liveItems, canManage, ask, onChanged, waitLanded, busy: sheetBusy, setBusy: setSheetBusy, onReceive, onCloseRemaining, addToast }: {
   po: PurchaseOrder; items: PurchaseOrderItem[]; canManage: boolean;
   ask: (o: ConfirmOptions) => Promise<boolean>;
   /** Re-reads the order. */
   onChanged: () => void | Promise<void>;
-  /** Resolves once the rail shows the order's new stage (or after a short safety wait). */
+  /** Resolves once the rail shows the order's new stage. */
   waitLanded: () => Promise<void>;
+  /** The sheet's shared write gate (also held by receipt undo). */
+  busy: string; setBusy: (b: string) => void;
   onReceive: () => void; onCloseRemaining: () => void;
   addToast: (m: string, t?: string) => void;
 }) {
-  const [busy, setBusy] = useState<Step | ''>('');
+  const [frozen, setFrozen] = useState<{ po: PurchaseOrder; items: PurchaseOrderItem[] } | null>(null);
+  const { po, items } = frozen ?? { po: livePo, items: liveItems };
+  const busy = (sheetBusy as Step | '');
+  const setBusy = (b: Step | '') => { setSheetBusy(b); if (!b) setFrozen(null); };
 
   const run = async (step: Step) => {
-    if (busy) return;
+    if (sheetBusy) return;
     if (step === 'cancelled') {
       const ok = await ask({ title: `Cancel PO #${po.po_number}?`, message: 'The order stays on record but is closed to further edits and receiving. This cannot be undone.', confirmLabel: 'Cancel PO', cancelLabel: 'Keep', danger: true });
       if (!ok) return;
     }
-    setBusy(step);
+    setFrozen({ po: livePo, items: liveItems }); setBusy(step);
     try {
       const { error } = await supabase.rpc('set_po_status', { p_po_id: po.id, p_status: step });
       if (error) throw error;
       const landed = waitLanded();
       await onChanged();
-      await landed;
+      // The safety wait starts once the re-read is back, so a slow network never cuts the flight short.
+      await Promise.race([landed, new Promise(r => window.setTimeout(r, TRAVEL_MS + 900))]);
       addToast(TEXT[step].done, 'success');
     } catch (e) { addToast(friendlyError(e), 'error'); }
     setBusy('');

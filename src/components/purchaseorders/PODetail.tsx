@@ -45,17 +45,17 @@ export default function PODetail({ po, items, receipts, audit, names, statusColo
 }) {
   const { ask, modalProps } = useConfirm();
   useModalLock();
+  // One gate for every write on this sheet: a stage change and a receipt undo never overlap.
   const [busy, setBusy] = useState('');
   const [closing, setClosing] = useState(false);
   // Raised from a costing sheet: the list embed carries the costing's SKU.
   const costingSku = (po as PurchaseOrder & { costing_products?: { sku: string } | null }).costing_products?.sku ?? null;
 
-  // A stage change waits for the rail: resolved by the card's next landing,
-  // or after a short safety wait when nothing lands.
+  // A stage change waits for the rail: resolved by the card's next landing
+  // (POStageActions adds the safety wait once the re-read is back).
   const landRef = useRef<(() => void) | null>(null);
   const waitLanded = () => new Promise<void>(res => {
-    const done = () => { window.clearTimeout(t); if (landRef.current === done) landRef.current = null; res(); };
-    const t = window.setTimeout(done, 1500);
+    const done = () => { if (landRef.current === done) landRef.current = null; res(); };
     landRef.current = done;
   });
 
@@ -92,7 +92,7 @@ export default function PODetail({ po, items, receipts, audit, names, statusColo
         <div style={{ padding: '16px 18px', overflowY: 'auto', WebkitOverflowScrolling: 'touch', flex: 1, minHeight: 0 }}>
           {/* The hero: title, status pill, the pipeline rail (the light travels when the order moves on), the latest event and who. */}
           <PORailCard po={po} items={items} receipts={receipts} audit={audit} names={names} statusColors={statusColors} onLanded={() => landRef.current?.()} />
-          <POStageActions po={po} items={items} canManage={canManage} ask={ask} onChanged={onChanged} waitLanded={waitLanded} onReceive={onReceive} onCloseRemaining={() => setClosing(true)} addToast={addToast} />
+          <POStageActions po={po} items={items} canManage={canManage} ask={ask} onChanged={onChanged} waitLanded={waitLanded} busy={busy} setBusy={setBusy} onReceive={onReceive} onCloseRemaining={() => setClosing(true)} addToast={addToast} />
           <POHeaderInfo po={po} costingSku={costingSku} names={names} />
 
           {/* Items */}

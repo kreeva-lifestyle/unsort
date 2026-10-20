@@ -734,5 +734,5 @@ html.launching .brand-slot { opacity: 0; }
 /* Rolling text (ui/Roll): the new line and the outgoing ghost share one cell. */
 .roll { display: inline-grid; position: relative; vertical-align: top; min-width: 0; }
 .roll > span { grid-area: 1 / 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.roll > span + span { position: absolute; inset: 0; pointer-events: none; }   /* the outgoing ghost: out of flow, so the cell is already the new text's width */
+.roll > span + span { pointer-events: none; }   /* the outgoing ghost shares the cell, so the old word slides out whole (Motion Lab 06) */
 @media (max-width: 420px) { .po-card .po-rail { margin: 24px 20px 52px; } .po-card-cap .roll > span { white-space: normal; overflow-wrap: anywhere; } }

@@ -89,8 +89,8 @@ export default function PORailCard({ po, items, receipts, audit, names, statusCo
       <PORail state={state} onLanded={land}
         qty={got.got > 0 || shownState.stage === 3 ? got.text.replace(' of ', ' / ') : null} />
       <div className="po-card-cap">
-        {/* The trail landing only completes the caption (the Sent time): adopted silently, no roll. */}
-        <Roll text={ev.text} baseline={state.ready} />
+        {/* A trail arriving only completes the caption (the Sent time): adopted silently, no roll. */}
+        <Roll text={ev.text} baseline={audit} />
         <span className="who" title={ev.who || undefined}>{ev.who || (names === null && shown.po.created_by ? '…' : '')}</span>
       </div>
     </div>
