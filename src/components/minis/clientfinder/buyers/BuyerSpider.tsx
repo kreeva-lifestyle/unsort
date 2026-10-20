@@ -46,12 +46,12 @@ export default function BuyerSpider({ addToast }: { addToast: (m: string, t?: st
   useEffect(() => {
     loadStatus();
     if (!profile?.id) return;
-    supabase.from('buyer_runs').select(RUN_COLS).eq('created_by', profile.id).order('created_at', { ascending: false }).limit(10)
+    // Filtered in the query, so an older paused run is never pushed out by newer finished ones.
+    const cutoff = new Date(Date.now() - SHOW_DONE_MS).toISOString();
+    supabase.from('buyer_runs').select(RUN_COLS).eq('created_by', profile.id).or(`status.in.(running,paused),updated_at.gte."${cutoff}"`).order('created_at', { ascending: false }).limit(30)
       .then(({ data, error: e }) => {
         if (e) { addToast(friendlyError(e), 'error'); return; }
-        const cutoff = Date.now() - SHOW_DONE_MS;
         const shown = ((data ?? []) as BuyerRun[])
-          .filter(r => r.status === 'running' || r.status === 'paused' || new Date(r.updated_at).getTime() >= cutoff)
           .map(r => (r.status === 'running' ? { ...r, status: 'paused' as const, step_note: 'Paused — tap Resume to continue' } : r));
         setRuns(shown);
         setSelected(s => s ?? shown[0]?.id ?? null);

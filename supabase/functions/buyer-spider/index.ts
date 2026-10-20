@@ -470,6 +470,11 @@ async function enqueue(runId: string, hits: Hit[], hop: number, parent: string, 
   return (inserted as any[]).filter(r => r.state === 'pending').length;
 }
 
+// A status that cannot be read counts as running: the step carries on rather than stopping on a blip.
+async function runStatus(runId: string): Promise<string | null> {
+  try { return (await rest(`buyer_runs?id=eq.${runId}&select=status`))?.[0]?.status ?? null; } catch { return 'running'; }
+}
+
 // Runs the queries for one node (skipping the first `skip`, already run on a
 // previous attempt). Every search is counted on the run the moment it ran, so
 // a failure mid-way loses nothing; the caller gets how many ran before it.
@@ -481,6 +486,9 @@ async function expand(run: any, cfg: SearchCfg, queries: string[], hop: number, 
   let monthUsed = await monthUsage();
   for (let i = skip; i < queries.length; i++) {
     if (queriesUsed >= MAX_QUERIES_PER_RUN) break;
+    // Paused or stopped from another screen while this step searches: stop
+    // here, the searches left wait for Resume (they are kept by the caller).
+    if (await runStatus(run.id) !== 'running') return { added, used, monthUsed, error: new Error('search_halted') };
     let taken: number | null;
     try { taken = await reserveSearch(); } catch (e) { return { added, used, monthUsed, error: e }; }
     if (taken === null) return { added, used, monthUsed: MONTHLY_SEARCH_CAP, error: new Error('search_monthly_cap') };
@@ -572,6 +580,12 @@ async function step(who: { id: string }, body: any, req: Request): Promise<Respo
   // run were counted as they ran; `usedNow` is only for the note.
   const pause = async (e: unknown, usedNow = 0) => {
     const m = String((e as Error)?.message || e);
+    // Someone paused or stopped the run while this step worked: it keeps the
+    // status they gave it (a Stop must never come back as Paused).
+    if (m === 'search_halted' || await runStatus(runId) !== 'running') {
+      const now = (await rest(`buyer_runs?id=eq.${runId}&select=*`).catch(() => null))?.[0] ?? run0;
+      return json({ ok: true, run: now, done: true, search_usage: usage() }, req);
+    }
     const friendly = /^search/.test(m) ? searchErrorText(e) : m.slice(0, 300);
     const run = await bump(runId, { status: 'paused', error: friendly, note: `${friendly}${usedNow ? ` (${usedNow} searches done)` : ''}` });
     return json({ ok: false, error: friendly, run, search_usage: usage() }, req, 502);
