@@ -168,7 +168,7 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
       <Suspense fallback={null}>
       {showForm && <POForm editing={editing} duplicateFrom={duplicating} onClose={closeForm} onSaved={onSaved} addToast={addToast} />}
 
-      {detail && <PODetail
+      {detail && <PODetail key={detail.po.id}
         po={detail.po} items={detail.items} receipts={detail.receipts} audit={detail.audit} names={detail.names}
         statusColors={PO_STATUS_COLORS} canManage={canManage}
         onClose={() => setDetail(null)} onChanged={refreshDetail} onRetryActivity={() => loadActivity(detail.po, detail.receipts)}

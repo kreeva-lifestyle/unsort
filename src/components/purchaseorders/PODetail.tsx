@@ -1,26 +1,28 @@
-// Read-only PO detail: header (with who raised / approved / closed it),
-// line items with Ordered/Received/Remaining, receipts log (who received),
-// who did what, and status/role-gated actions. Status transitions
-// (approve / mark sent / cancel) run here via set_po_status; edit /
-// duplicate / receive / print are emitted to the parent.
-import { useState } from 'react';
+// Read-only PO detail: the hero card with its rail and, right under it, the
+// order's next steps (POStageActions: approve / mark sent / receive / close /
+// reopen / cancel); header (with who raised / approved / closed it), line
+// items with Ordered/Received/Remaining, receipts log (who received), who
+// did what. Edit / duplicate / receive / print are emitted to the parent.
+import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
 import ConfirmModal, { useConfirm } from '../ui/ConfirmModal';
 import { useModalLock } from '../../hooks/useModalLock';
-import POCloseModal, { pendingOf } from './POCloseModal';
+import POCloseModal from './POCloseModal';
 import POActivity from './POActivity';
 import POReceipts from './POReceipts';
 import POHeaderInfo from './POHeaderInfo';
 import PORailCard from './PORailCard';
+import POStageActions from './POStageActions';
+import { useLandedOrder } from './useLandedOrder';
 import { itemLabel } from './poItemLabel';
 import type { PurchaseOrder, PurchaseOrderItem, PurchaseOrderReceipt, AuditLog } from '../../types/database';
 
 const inr = (n: unknown) => Number(n || 0).toLocaleString('en-IN');
 
-export default function PODetail({ po, items, receipts, audit, names, statusColors, canManage, onClose, onChanged, onRetryActivity, onEdit, onDuplicate, onReceive, onPrint, onPendency, addToast }: {
+export default function PODetail({ po: livePo, items: liveItems, receipts: liveReceipts, audit, names, statusColors, canManage, onClose, onChanged, onRetryActivity, onEdit, onDuplicate, onReceive, onPrint, onPendency, addToast }: {
   po: PurchaseOrder;
   items: PurchaseOrderItem[];
   receipts: PurchaseOrderReceipt[];
@@ -43,27 +45,23 @@ export default function PODetail({ po, items, receipts, audit, names, statusColo
   addToast: (m: string, t?: string) => void;
 }) {
   const { ask, modalProps } = useConfirm();
+  // Everything below the rail shows the order as it was until the rail's light lands.
+  const { shown, holding, land } = useLandedOrder({ po: livePo, items: liveItems, receipts: liveReceipts }, audit);
+  const { po, items, receipts } = shown;
   useModalLock();
+  // One gate for every write on this sheet: a stage change and a receipt undo never overlap.
   const [busy, setBusy] = useState('');
   const [closing, setClosing] = useState(false);
   // Raised from a costing sheet: the list embed carries the costing's SKU.
   const costingSku = (po as PurchaseOrder & { costing_products?: { sku: string } | null }).costing_products?.sku ?? null;
 
-  const setStatus = async (status: 'approved' | 'sent' | 'cancelled', label: string) => {
-    if (busy) return;
-    if (status === 'cancelled') {
-      const ok = await ask({ title: `Cancel PO #${po.po_number}?`, message: 'The order stays on record but is closed to further edits and receiving. This cannot be undone.', confirmLabel: 'Cancel PO', cancelLabel: 'Keep', danger: true });
-      if (!ok) return;
-    }
-    setBusy(status);
-    try {
-      const { error } = await supabase.rpc('set_po_status', { p_po_id: po.id, p_status: status });
-      if (error) throw error;
-      addToast(`Purchase order ${label}`, 'success');
-      await onChanged();   // the label holds until the new stage is on screen — no second tap lands on a stale button
-    } catch (e) { addToast(friendlyError(e), 'error'); }
-    setBusy('');
-  };
+  // A stage change waits for the rail: resolved by the card's next landing
+  // (POStageActions adds the safety wait once the re-read is back).
+  const landRef = useRef<(() => void) | null>(null);
+  const waitLanded = () => new Promise<void>(res => {
+    const done = () => { if (landRef.current === done) landRef.current = null; res(); };
+    landRef.current = done;
+  });
 
   // Undo a mistyped receipt — reverses the received tally + recomputes status.
   const removeReceipt = async (r: PurchaseOrderReceipt) => {
@@ -82,31 +80,6 @@ export default function PODetail({ po, items, receipts, audit, names, statusColo
   };
   const canRemoveReceipt = canManage && !['draft', 'cancelled'].includes(po.status);
 
-  // Short-close: end an order whose balance will never arrive. Reopen undoes
-  // it (the server recomputes the status from the receipts), so a mis-tap is
-  // not a dead end.
-  const reopen = async () => {
-    if (busy) return;
-    setBusy('reopen');
-    try {
-      const { error } = await supabase.rpc('set_po_status', { p_po_id: po.id, p_status: 'reopen' });
-      if (error) throw error;
-      addToast('Purchase order reopened', 'success');
-      await onChanged();
-    } catch (e) { addToast(friendlyError(e), 'error'); }
-    setBusy('');
-  };
-
-  const isOpen = ['approved', 'sent', 'partially_received'].includes(po.status);
-  const stillPending = items.some(it => pendingOf(it) > 0);
-  const canClose = isOpen && stillPending && canManage;
-  const canReopen = po.status === 'closed' && canManage;
-  const canReceive = ['approved', 'sent', 'partially_received'].includes(po.status);
-  const canApprove = po.status === 'draft' && canManage;
-  // "Mark Sent" only makes sense before goods start arriving; once a PO is
-  // partially received it was obviously already sent, so hide it then.
-  const canSend = po.status === 'approved' && canManage; // same gate as Approve/Cancel — status transitions are manager+ actions
-  const canCancel = !['completed', 'cancelled'].includes(po.status) && canManage;
   const canEdit = po.status === 'draft';
 
   return createPortal(
@@ -122,7 +95,8 @@ export default function PODetail({ po, items, receipts, audit, names, statusColo
             calc(90vh - 190px) was taller than the mobile bottom sheet. */}
         <div style={{ padding: '16px 18px', overflowY: 'auto', WebkitOverflowScrolling: 'touch', flex: 1, minHeight: 0 }}>
           {/* The hero: title, status pill, the pipeline rail (the light travels when the order moves on), the latest event and who. */}
-          <PORailCard po={po} items={items} receipts={receipts} audit={audit} names={names} statusColors={statusColors} />
+          <PORailCard po={livePo} items={liveItems} shown={shown} audit={audit} names={names} statusColors={statusColors} onLanded={() => { land(); landRef.current?.(); }} />
+          <POStageActions po={po} items={items} canManage={canManage} ask={ask} onChanged={onChanged} waitLanded={waitLanded} busy={busy} holding={holding} setBusy={setBusy} onReceive={onReceive} onCloseRemaining={() => setClosing(true)} addToast={addToast} />
           <POHeaderInfo po={po} costingSku={costingSku} names={names} />
 
           {/* Items */}
@@ -167,14 +141,8 @@ export default function PODetail({ po, items, receipts, audit, names, statusColo
         <div className="po-actions" style={{ padding: '12px 18px', borderTop: `1px solid ${T.bd}`, display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           <button onClick={onPrint} style={{ ...S.btnGhost, ...S.btnSm }}>Print / Share</button>
           <button onClick={onPendency} style={{ ...S.btnGhost, ...S.btnSm }}>Vendor pending</button>
-          {canClose && <button onClick={() => setClosing(true)} title="The rest is not coming — write off the balance" style={{ ...S.btnGhost, ...S.btnSm }}>Close remaining</button>}
-          {canReopen && <button onClick={reopen} disabled={!!busy} style={{ ...S.btnGhost, ...S.btnSm, pointerEvents: busy ? 'none' : 'auto', opacity: busy ? 0.5 : 1 }}>{busy === 'reopen' ? 'Reopening…' : 'Reopen'}</button>}
           <button onClick={onDuplicate} style={{ ...S.btnGhost, ...S.btnSm }}>Duplicate</button>
           {canEdit && <button onClick={onEdit} style={{ ...S.btnGhost, ...S.btnSm }}>Edit</button>}
-          {canCancel && <button onClick={() => setStatus('cancelled', 'cancelled')} disabled={!!busy} style={{ ...S.btnDanger, ...S.btnSm, pointerEvents: busy ? 'none' : 'auto', opacity: busy ? 0.5 : 1 }}>{busy === 'cancelled' ? 'Cancelling…' : 'Cancel PO'}</button>}
-          {canSend && <button onClick={() => setStatus('sent', 'marked sent')} disabled={!!busy} style={{ ...S.btnGhost, ...S.btnSm, pointerEvents: busy ? 'none' : 'auto', opacity: busy ? 0.5 : 1 }}>{busy === 'sent' ? 'Marking…' : 'Mark Sent'}</button>}
-          {canApprove && <button onClick={() => setStatus('approved', 'approved')} disabled={!!busy} style={{ ...S.btnPrimary, ...S.btnSm, pointerEvents: busy ? 'none' : 'auto', opacity: busy ? 0.5 : 1 }}>{busy === 'approved' ? 'Approving…' : 'Approve'}</button>}
-          {canReceive && <button onClick={onReceive} style={{ ...S.btnPrimary, ...S.btnSm }}>Receive</button>}
         </div>
       </div>
       <ConfirmModal {...modalProps} />

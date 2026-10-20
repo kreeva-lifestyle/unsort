@@ -1,13 +1,15 @@
 // The purchase order's pipeline rail (Motion Lab 06): Draft → Approved →
 // Sent → Received as four stops on one rail. When the order moves on, a
-// point of light travels to the next stop, the rail fills behind it and
-// the stop settles with one pulse. "Sent" is optional in this process, so
-// a stop the order skipped shows hollow instead of pretending; a partial
-// receipt fills the last stop like a pie; an order that stopped (cancelled,
-// or closed short) gets a cap where it stopped and the rest of the rail
-// dims — it never "moves on". `mini` is the list's silent version: stops
-// and fill only, no labels, no travel.
-import { useLayoutEffect, useRef } from 'react';
+// point of light travels to the next stop (480 ms, --e-emph) and the rail
+// fills behind it; the new stop, the pill and the caption change only when
+// the light lands, and the stop settles with one pulse. "Sent" is optional
+// in this process, so a stop the order skipped turns hollow as the light
+// passes it; a partial receipt fills the last stop like a pie; an order
+// that stopped (cancelled, or closed short) gets a cap where it stopped and
+// the rest of the rail dims — it never "moves on". Reached stops stay the
+// rail's indigo; the stage colour is the fill's far end and the pulse.
+// `mini` is the list's silent version: stops and fill only, no labels.
+import { useLayoutEffect, useRef, useState } from 'react';
 import { T, alpha } from '../../lib/theme';
 import { animate, E, reducedMotion } from '../../lib/motion';
 import type { PurchaseOrder, PurchaseOrderItem, AuditLog } from '../../types/database';
@@ -21,6 +23,7 @@ export interface RailState {
 }
 const P = [0, 1 / 3, 2 / 3, 1];
 const LABELS = ['Draft', 'Approved', 'Sent', 'Received'];
+export const TRAVEL_MS = 480;
 
 /** Where an order stands, from its header, its lines and (when loaded) its
  *  trail. The trail places a stopped order that had been sent, and decides
@@ -46,69 +49,98 @@ export function railState(po: Pick<PurchaseOrder, 'status' | 'approved_at'>, ite
   }
 }
 
-export default function PORail({ state, dates, qty, mini }: { state: RailState; /** One short date per stop, where known. */ dates?: (string | null)[]; /** Under the last stop: "12 / 20" (the card supplies it); the share otherwise. */ qty?: string | null; mini?: boolean }) {
+/** True when going from `a` to `b` sends the light along the rail: the
+ *  order moved forward and did not stop. The trail landing only repositions,
+ *  and under Reduce Motion everything lands at once. */
+export function travels(a: RailState, b: RailState): boolean {
+  return !b.stopped && b.stage > a.stage && !(!a.ready && b.ready) && !reducedMotion();
+}
+const keyOf = (s: RailState) => `${s.stage}|${s.partial}|${s.skippedSent}|${s.stopped}|${s.ready}`;
+/** The fill's far end: the stage the order reached, whether or not it stopped there. */
+const stageColor = (s: RailState) => (s.partial != null ? T.yl : s.stage === 3 ? T.gr : s.stage === 2 ? T.bl : T.ac2);
+const capped = (s: RailState) => s.stopped === 'cancelled' || (s.stopped === 'closed' && s.stage < 3);
+
+export default function PORail({ state, qty, mini, onLanded }: { state: RailState; /** Under the last stop: "12 / 20" (the card supplies it); the share otherwise. */ qty?: string | null; mini?: boolean; /** Called once the stops show `state` — after the light lands, or at once when nothing travels. */ onLanded?: () => void }) {
   const rail = useRef<HTMLDivElement>(null), fill = useRef<HTMLDivElement>(null), light = useRef<HTMLDivElement>(null), cap = useRef<HTMLDivElement>(null);
   const nodes = useRef<(HTMLDivElement | null)[]>([]);
-  const prev = useRef<RailState | null>(null);
-  const color = state.stopped === 'cancelled' ? T.re : state.stopped === 'closed' && state.stage < 3 ? T.tx3
-    : state.partial != null ? T.yl : state.stage === 3 ? T.gr : state.stage === 2 ? T.bl : T.ac2;
-  const showCap = state.stopped === 'cancelled' || (state.stopped === 'closed' && state.stage < 3);
+  const prev = useRef<RailState | null>(null), latest = useRef(state), landed = useRef(onLanded);
+  const flight = useRef(0), flying = useRef(false);
+  latest.current = state; landed.current = onLanded;
+  // What the stops show: the state the light last landed on. While it
+  // travels, the stop it left is already "done" and Sent turns hollow as the
+  // light passes it.
+  const [shown, setShown] = useState(state);
+  const [leaving, setLeaving] = useState<number | null>(null);
+  const [skipNow, setSkipNow] = useState(false);
+  const key = keyOf(state);
 
   useLayoutEffect(() => {
     const before = prev.current; prev.current = state;
     const f = fill.current, r = rail.current;
-    if (!f || !r) return;
-    const p1 = P[state.stage];
-    f.style.transform = `scaleX(${p1})`;
-    if (mini || !before) return;                                   // first paint: already there
-    const changed = before.stage !== state.stage || before.partial !== state.partial || before.stopped !== state.stopped;
-    if (!changed) return;
-    if (!before.ready && state.ready) return;                      // the trail landing only repositions: no travel, no pulse
-    const settle = (i: number) => {
-      const n = nodes.current[i]; if (!n) return;
+    if (f) f.style.transform = `scaleX(${P[state.stage]})`;
+    const settle = (s: RailState) => {
+      const n = nodes.current[s.stage]; if (!n) return;
       animate(n.querySelector('.pulse'), [{ opacity: .8, transform: 'scale(1)' }, { opacity: 0, transform: 'scale(2.3)' }], { duration: 450, easing: E.out });
       animate(n.querySelector('.o'), [{ transform: 'scale(.8)' }, { transform: 'scale(1)' }], { duration: 320, easing: E.spring });
     };
+    const land = () => { setShown(latest.current); setLeaving(null); setSkipNow(false); };
+    if (mini || !before || !f || !r) { land(); landed.current?.(); return; }
+    if (flying.current) return;                                    // a change mid-flight (the trail landing) is adopted when the light lands
     // The cap grows in whenever it becomes visible — also when an already
     // closed order is cancelled, or loses its last receipt.
-    const capBefore = before.stopped === 'cancelled' || (before.stopped === 'closed' && before.stage < 3);
-    if (showCap && !capBefore) animate(cap.current, [{ transform: 'scaleY(0)' }, { transform: 'scaleY(1)' }], { duration: 320, easing: E.spring });
-    if (!state.stopped && state.stage > before.stage) {           // moving on: the light travels
-      const p0 = P[before.stage], W = r.clientWidth;
-      const travel = animate(f, [{ transform: `scaleX(${p0})` }, { transform: `scaleX(${p1})` }], { duration: 480, easing: E.emph });
-      if (!reducedMotion()) animate(light.current, [{ transform: `translateX(${p0 * W}px)`, opacity: 0 }, { opacity: 1, offset: .12 }, { opacity: 1, offset: .82 }, { transform: `translateX(${p1 * W}px)`, opacity: 0 }], { duration: 480, easing: E.emph });
-      travel.finished.then(() => settle(state.stage));
-    } else settle(state.stage);
-  }, [state, mini, showCap]);
+    if (capped(state) && !capped(before)) animate(cap.current, [{ transform: 'scaleY(0)' }, { transform: 'scaleY(1)' }], { duration: 320, easing: E.spring });
+    if (!travels(before, state)) {
+      land();
+      const moved = before.stage !== state.stage || before.partial !== state.partial || before.stopped !== state.stopped;
+      // A stop that newly stopped gets its cap instead of a pulse.
+      if (moved && !(!before.ready && state.ready) && !(state.stopped && !before.stopped)) settle(state);
+      landed.current?.();
+      return;
+    }
+    const id = ++flight.current; flying.current = true;
+    const p0 = P[before.stage], p1 = P[state.stage], W = r.clientWidth;
+    setLeaving(before.stage);
+    animate(f, [{ transform: `scaleX(${p0})` }, { transform: `scaleX(${p1})` }], { duration: TRAVEL_MS, easing: E.emph });
+    const trip = animate(light.current, [{ transform: `translateX(${p0 * W}px)`, opacity: 0 }, { opacity: 1, offset: .12 }, { opacity: 1, offset: .82 }, { transform: `translateX(${p1 * W}px)`, opacity: 0 }], { duration: TRAVEL_MS, easing: E.emph });
+    const skip = state.skippedSent && !before.skippedSent ? window.setTimeout(() => { if (flight.current === id) setSkipNow(true); }, TRAVEL_MS * .45) : 0;
+    trip.finished.then(() => {
+      window.clearTimeout(skip);
+      if (flight.current !== id) return;
+      flying.current = false;
+      land(); settle(latest.current); landed.current?.();
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `key` is the state's value; a new object with the same value is no change
+  }, [key, mini]);
 
+  const v = shown;
   const cls = (i: number) => {
-    if (state.stopped === 'cancelled' && i === state.stage) return 'po-node x';
-    if (state.stopped === 'closed' && i === state.stage && state.stage < 3) return 'po-node stop';
-    if (i === 2 && state.skippedSent) return 'po-node skip';
-    if (i === 3 && state.partial != null && state.stage === 3) return 'po-node part';
-    if (i < state.stage) return 'po-node done';
-    if (i === state.stage) return 'po-node cur';
+    if (leaving === i) return 'po-node done';
+    if (v.stopped === 'cancelled' && i === v.stage) return 'po-node x';
+    if (v.stopped === 'closed' && i === v.stage && v.stage < 3) return 'po-node stop';
+    if (i === 2 && (v.skippedSent || skipNow)) return 'po-node skip';
+    if (i === 3 && v.partial != null && v.stage === 3) return 'po-node part';
+    if (i < v.stage) return 'po-node done';
+    if (i === v.stage) return 'po-node cur';
     return 'po-node';
   };
-  const pct = state.partial != null ? Math.round(state.partial * 100) : null;
+  const pct = v.partial != null ? Math.round(v.partial * 100) : null;
   const under = (i: number) => mini ? null
     : i === 3 && (qty || pct != null) ? qty ?? `${pct}%`       // one short line: the pill and the caption already say "closed"
-    : state.stopped === 'closed' && i === state.stage ? 'closed' : dates?.[i] ?? null;
-  // Stops already passed stay in the rail's own indigo; only the stop the
-  // order is at wears the stage colour, so the eye lands on where it is now.
-  const nodeVars = (i: number) => { const c = i < state.stage ? T.ac2 : color; return { left: `${P[i] * 100}%`, '--nc': c, '--nc-soft': alpha(c, .16), '--nc-glow': alpha(c, .45) } as React.CSSProperties; };
-  const vars = { '--rc': color, '--cxp': `${P[state.stage] * 100}%`, '--cap': color, '--cap-glow': alpha(color, .6) } as React.CSSProperties;
-  const label = `${LABELS[state.stage]}${state.stopped ? `, ${state.stopped}` : ''}${pct != null ? `, ${pct}% received` : ''}${state.skippedSent ? ', Sent skipped' : ''}`;
+    : v.stopped === 'closed' && i === v.stage ? 'closed' : null;
+  const ac = { '--nc': T.ac2, '--nc-soft': alpha(T.ac2, .16), '--nc-glow': alpha(T.ac2, .45) } as React.CSSProperties;
+  const capColor = state.stopped === 'cancelled' ? T.re : T.tx3;
+  const vars = { '--rc': stageColor(state), '--pc': stageColor(v), '--cxp': `${P[state.stage] * 100}%`, '--cap': capColor, '--cap-glow': alpha(capColor, .6) } as React.CSSProperties;
+  const label = `${LABELS[state.stage]}${state.stopped ? `, ${state.stopped}` : ''}${state.partial != null ? `, ${Math.round(state.partial * 100)}% received` : ''}${state.skippedSent ? ', Sent skipped' : ''}`;
   return (
     <div ref={rail} className={`po-rail${mini ? ' po-rail-mini' : ''}${state.stopped ? ' cx' : ''}`} style={vars} role="img" aria-label={label}>
       <div className="base" /><div ref={fill} className="fill" />
       {LABELS.map((l, i) => (
-        <div key={l} ref={el => { nodes.current[i] = el; }} className={`${cls(i)}${i === 3 ? ' end' : ''}`} style={nodeVars(i)}>
-          <div className="o" style={i === 3 && pct != null && state.stopped !== 'cancelled' ? { background: `conic-gradient(${T.yl} 0 ${pct}%, ${T.s} ${pct}% 100%)` } : undefined}><b className="pulse" /></div>
+        <div key={l} ref={el => { nodes.current[i] = el; }} className={cls(i)} style={{ left: `${P[i] * 100}%`, ...ac }}>
+          <div className="o" style={i === 3 && pct != null && v.stage === 3 && v.stopped !== 'cancelled' ? { background: `conic-gradient(${T.yl} 0 ${pct}%, ${T.s} ${pct}% 100%)` } : undefined}><b className="pulse" /></div>
           {!mini && <span>{l}{under(i) && <small>{under(i)}</small>}</span>}
         </div>
       ))}
-      <div ref={cap} className="cap" style={{ left: `${P[state.stage] * 100}%`, transform: showCap ? 'scaleY(1)' : 'scaleY(0)' }} />
+      <div ref={cap} className="cap" style={{ left: `${P[state.stage] * 100}%`, transform: capped(state) ? 'scaleY(1)' : 'scaleY(0)' }} />
       <div ref={light} className="light" />
     </div>
   );

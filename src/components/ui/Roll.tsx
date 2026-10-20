@@ -5,7 +5,8 @@
 // first paint, nor when `baseline` changes — a caller passes something that
 // flips when its text is merely completed (the trail landing), not moved on.
 // The outgoing ghost is a plain DOM node appended after React's own child,
-// positioned out of flow so the cell takes the new text's width at once.
+// sharing its grid cell, so the old word slides out whole (never cut to an
+// ellipsis) and the cell takes the new text's width once the ghost is gone.
 import { useLayoutEffect, useRef } from 'react';
 import { animate, E, M, reducedMotion } from '../../lib/motion';
 

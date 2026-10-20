@@ -339,14 +339,15 @@ export const CHALLAN_STATUS_COLORS: Record<string, { bg: string; color: string }
 // partially_received→amber, completed→green, closed→slate, cancelled→red.
 // Closed (the balance was written off) is neither a success nor a failure,
 // so it reads neutral — never green, never red.
+// Motion Lab 06 pills: the light tint of each stage colour on a 12% wash.
 export const PO_STATUS_COLORS: Record<string, { bg: string; color: string }> = {
-  draft: { bg: 'oklch(1 0 0 / 0.06)', color: T.tx3 },
+  draft: { bg: T.glass2, color: T.tx2 },
   approved: { bg: T.ac3, color: T.ac2 },
-  sent: { bg: oklchTint(0.77, 0.14, 230, 0.10), color: T.bl },
-  partially_received: { bg: oklchTint(0.78, 0.18, 75, 0.10), color: T.yl },
-  completed: { bg: oklchTint(0.72, 0.19, 145, 0.10), color: T.gr },
-  closed: { bg: oklchTint(0.70, 0.04, 250, 0.10), color: 'oklch(0.70 0.04 250)' },
-  cancelled: { bg: oklchTint(0.63, 0.22, 25, 0.10), color: T.re },
+  sent: { bg: oklchTint(0.77, 0.14, 230, 0.12), color: 'oklch(0.83 0.10 230)' },
+  partially_received: { bg: oklchTint(0.78, 0.18, 75, 0.12), color: 'oklch(0.88 0.14 85)' },
+  completed: { bg: oklchTint(0.72, 0.19, 145, 0.12), color: 'oklch(0.82 0.16 145)' },
+  closed: { bg: oklchTint(0.70, 0.04, 250, 0.12), color: 'oklch(0.70 0.04 250)' },
+  cancelled: { bg: oklchTint(0.63, 0.22, 25, 0.12), color: 'oklch(0.78 0.12 20)' },
 };
 
 // ─── Pill (status / aging / attention chip) ─────────────────────────────

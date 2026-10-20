@@ -3,9 +3,24 @@
 // stripped, fades stay — and never throws. index.css carries the same
 // values as --m-* / --e-* for CSS transitions.
 export const M = { instant: 90, fast: 160, base: 220, slow: 320, emph: 450 } as const;
+// The settle spring: a damped spring (ζ .62, ω 9.6) sampled into linear(),
+// so a stop wobbles once before it rests. Browsers without linear() (before
+// Safari 17.2) keep the single-overshoot cubic-bezier, here and in --e-spring.
+const spring = (() => {
+  const fallback = 'cubic-bezier(.34,1.56,.64,1)';
+  try {
+    const z = 0.62, w = 9.6, wd = w * Math.sqrt(1 - z * z), n = 40, pts: number[] = [];
+    for (let i = 0; i <= n; i++) { const t = i / n; pts.push(+(1 - Math.exp(-z * w * t) * (Math.cos(wd * t) + (z * w / wd) * Math.sin(wd * t))).toFixed(4)); }
+    pts[n] = 1;
+    const s = `linear(${pts.join(', ')})`;
+    if (!CSS.supports('transition-timing-function', s)) return fallback;
+    document.documentElement.style.setProperty('--e-spring', s);
+    return s;
+  } catch { return fallback; }
+})();
 export const E = {
   out: 'cubic-bezier(.2,.9,.3,1)', emph: 'cubic-bezier(.16,1,.3,1)',
-  in: 'cubic-bezier(.4,0,1,1)', spring: 'cubic-bezier(.34,1.56,.64,1)',
+  in: 'cubic-bezier(.4,0,1,1)', spring,
 } as const;
 
 export const reducedMotion = (): boolean => {

@@ -137,5 +137,5 @@ export const PO_TYPE_LABELS: Record<PurchaseOrderType, string> =
   { fabric: 'Fabric', job_work: 'Job Work', material: 'Material' };
 export const PO_STATUS_LABELS: Record<PurchaseOrderStatus, string> = {
   draft: 'Draft', approved: 'Approved', sent: 'Sent',
-  partially_received: 'Partially Received', completed: 'Completed', closed: 'Closed', cancelled: 'Cancelled',
+  partially_received: 'Partially received', completed: 'Completed', closed: 'Closed', cancelled: 'Cancelled',
 };
