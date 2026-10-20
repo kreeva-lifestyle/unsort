@@ -3,10 +3,12 @@
 // style strings via alert() and addToast(). Map the common cases to plain language,
 // send the raw text to console.error so devs can still debug.
 
+import { noteError } from './recentErrors';
+
 export function friendlyError(raw: unknown, fallback = 'Something went wrong. Please try again.'): string {
   const msg = String((raw as { message?: string } | undefined)?.message ?? raw ?? '').trim();
   const code = ((raw as { code?: string } | undefined)?.code ?? '').toString();
-  if (msg) console.error('[app error]', code || '(no code)', msg);
+  if (msg) { console.error('[app error]', code || '(no code)', msg); noteError(code ? `${code} ${msg}` : msg); }
   if (!msg) return fallback;
   const l = msg.toLowerCase();
 

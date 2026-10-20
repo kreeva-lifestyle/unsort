@@ -10,6 +10,11 @@ After every set of changes:
 
 This applies to all code changes. No confirmation needed.
 
+**Exception — fixes for staff problem reports** (`issue_reports`, the
+scheduled check in `docs/PROBLEM-REPORTS.md`): open the PR and stop. Merge
+only after an admin has approved it in the app (`status = 'approved'`). The
+owner decided this on 2026-10-20; never merge such a PR otherwise.
+
 ## Pre-merge self-review — MANDATORY
 Before creating the PR, re-read the full diff (`git diff main...HEAD`) as a
 reviewer, not the author, and check:

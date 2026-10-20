@@ -4,6 +4,7 @@
 // Handled errors that go through addToast(friendlyError) are deliberately
 // NOT logged — they're expected and already surfaced.
 import { supabase } from './supabase';
+import { noteError } from './recentErrors';
 
 type ErrorSource = 'boundary' | 'window' | 'promise' | 'manual';
 
@@ -64,6 +65,7 @@ export async function logError(err: unknown, source: ErrorSource, extra?: { comp
   try {
     const message = messageOf(err).slice(0, 2000);
     if (!message || isNoise(message, source)) return;
+    noteError(message);
     if (sessionCount >= SESSION_CAP) return;
 
     const signature = `${source}::${message}`;

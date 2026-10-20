@@ -2,17 +2,19 @@ import { useState, useEffect, useRef } from 'react';
 import { T } from '../../lib/theme';
 import { useCrumbs } from '../../hooks/useBreadcrumb';
 import { closeAllLayers, closeTopLayer, layerCount } from '../../hooks/useBackClose';
+import ReportProblemButton from '../feedback/ReportProblem';
 
 // A crumb that can be tapped looks like text but is a real button: keyboard
 // reachable, a 44px target, no link semantics (nothing here is a URL of its
 // own — the hash names the page, layers live in history state).
 const crumbBtn: React.CSSProperties = { background: 'none', border: 0, padding: '0 2px', margin: 0, font: 'inherit', color: 'inherit', cursor: 'pointer', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minHeight: 44 };
 
-export default function Header({ title, onNotifClick, notifications, markAsRead, sidebarOpen, onToggleSidebar }: {
+export default function Header({ title, onNotifClick, notifications, markAsRead, addToast, sidebarOpen, onToggleSidebar }: {
   title: string;
   onNotifClick?: (n: any) => void;
   notifications: any[];
   markAsRead: (id: string) => void;
+  addToast: (m: string, t?: string) => void;
   sidebarOpen?: boolean;
   onToggleSidebar?: () => void;
 }) {
@@ -83,6 +85,7 @@ export default function Header({ title, onNotifClick, notifications, markAsRead,
         </div>
         <div style={{ flex: 1 }} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <ReportProblemButton addToast={addToast} />
         <div style={{ position: 'relative' }}>
         <button onClick={() => setShow(!show)} aria-label="Notifications" style={{ width: 36, height: 36, borderRadius: 10, border: `1px solid ${T.bd2}`, background: 'transparent', cursor: 'pointer', position: 'relative', color: T.tx, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .15s' }} onMouseEnter={e => { e.currentTarget.style.background = 'oklch(1 0 0 / 0.05)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
           <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8 }}><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" /></svg>
