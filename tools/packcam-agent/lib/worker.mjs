@@ -1,6 +1,9 @@
 // One step of work at a time: cut a clip or upload it. Each scan's job goes
 // queued → uploading → done (or missing / failed); every change is reported
-// to the server on the next round. Clips are never deleted by Pack Cam —
+// to the server on the next round. A clip marked to be cut again (a late
+// scan inside it, or "+30 s" after it stopped) goes back to queued first.
+// Every upload's outcome is kept per place (ctx.uploadResult), so the
+// status shows "uploads failing" instead of "Ready" when they do. Clips are never deleted by Pack Cam —
 // the team removes them from the PC folder, Dropbox or Drive themselves.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -68,10 +71,24 @@ function clipFile(ctx, s, job) {
   return path.join(dir, job.name);
 }
 
+/** Throw away the cut clip and its uploads so it is cut again from the recording. */
+async function resetForRecut(ctx, job) {
+  const why = job.recut;
+  if (job.file) { try { fs.unlinkSync(job.file); } catch { /* already gone */ } }
+  if (job.gdrive_file_id) { try { await ctx.drive.remove(job.gdrive_file_id); } catch (e) { log(`clip ${job.awb}: ${e.message}`); } }
+  // Dropbox: the new cut is uploaded over the old one (same path, overwrite).
+  delete ctx.state.st.files[job.id];
+  Object.assign(job, { recut: null, recuts: (job.recuts || 0) + 1, status: 'queued', file: null, pc_path: null, dropbox_path: null, gdrive_file_id: null, gdrive_link: null,
+    start: null, end: null, duration: null, size: null, capped: false, error: null, attempts: 0, next_try: 0 });
+  ctx.state.mark(job);
+  log(`clip ${job.awb}: cutting again (${why})`);
+}
+
 /** Do the next step for `job` if it is due. Returns true when it did something. */
 export async function step(ctx, job, now) {
-  if (job.next_try > now) return false;
   const { cfg, state } = ctx;
+  if (job.recut) { await resetForRecut(ctx, job); return true; }
+  if (job.next_try > now) return false;
   const s = ctx.settings();
   if (!s) return false;
   try {
@@ -80,7 +97,7 @@ export async function step(ctx, job, now) {
       const scanMs = Date.parse(job.scanned_at) - ctx.offset();
       const next = state.nextScanMs(job);
       const nextMs = next == null ? null : next - ctx.offset();
-      const win = windowFor(scanMs, nextMs, s);
+      const win = windowFor(scanMs, nextMs, s, (Number(job.extend) || 0) * 1000);
       if (!readyToCut(win, nextMs != null, listSegments(cameraDir(cfg.data_dir, job.camera)), now)) return false;
       const out = clipFile(ctx, s, job);
       const r = await cutClip(cfg, { id: job.id, camera: job.camera }, win, out);
@@ -95,7 +112,7 @@ export async function step(ctx, job, now) {
       Object.assign(job, {
         status: 'uploading', file: r.file, targets: t, attempts: 0, next_try: 0, error: null,
         start: new Date(Date.parse(r.start) + ctx.offset()).toISOString(), end: new Date(Date.parse(r.end) + ctx.offset()).toISOString(),
-        duration: r.duration, size: r.size, pc_path: t.pc ? r.file : null,
+        duration: r.duration, size: r.size, pc_path: t.pc ? r.file : null, capped: !!win.capped,
         dropbox_folder: clean(s.dropbox_folder), gdrive_folder: s.gdrive_folder_name || 'PackCam',
       });
       if (t.pc) state.st.files[job.id] = r.file;
@@ -109,12 +126,17 @@ export async function step(ctx, job, now) {
       if (job.targets.dropbox && !job.dropbox_path) {
         const tok = ctx.dropbox();
         if (!tok?.access_token) throw new Error(tok?.error || 'Waiting for the Dropbox login from the server');
-        job.dropbox_path = await dropboxUpload(tok.access_token, job.file, `${job.dropbox_folder}/${date}/${path.basename(job.file)}`);
+        try { job.dropbox_path = await dropboxUpload(tok.access_token, job.file, `${job.dropbox_folder}/${date}/${path.basename(job.file)}`); }
+        catch (e) { ctx.uploadResult('dropbox', e); throw e; }
+        ctx.uploadResult('dropbox', null);
         state.mark(job);
         return true;
       }
       if (job.targets.gdrive && !job.gdrive_file_id) {
-        const g = await ctx.drive.upload(job.file, job.gdrive_folder, date);
+        let g;
+        try { g = await ctx.drive.upload(job.file, job.gdrive_folder, date); }
+        catch (e) { ctx.uploadResult('gdrive', e); throw e; }
+        ctx.uploadResult('gdrive', null);
         Object.assign(job, { gdrive_file_id: g.id, gdrive_link: g.link });
         state.mark(job);
         return true;

@@ -14,5 +14,6 @@ export function makeApi(cfg) {
   return {
     poll: (cursor, status) => call('agent_poll', { cursor, status }),
     report: clips => call('agent_report', { clips }),
+    removed: scanIds => call('agent_removed', { scan_ids: scanIds }),
   };
 }

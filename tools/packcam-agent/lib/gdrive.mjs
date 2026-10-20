@@ -143,5 +143,11 @@ export function makeDrive(cfg) {
     return { free: total == null ? null : Math.max(0, total - Number(q.usage || 0)), total };
   }
 
-  return { configured, authUrl, finishConnect, upload, status, space };
+  /** Remove a file Pack Cam itself uploaded (a clip being cut again). */
+  async function remove(id) {
+    const r = await api(`${API}/files/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    if (!r.ok && r.status !== 404) throw new Error(`Google Drive ${r.status}: could not remove the old video`);
+  }
+
+  return { configured, authUrl, finishConnect, upload, status, space, remove };
 }

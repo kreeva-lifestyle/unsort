@@ -1,7 +1,8 @@
 // Turning a scan into a clip.
 //
-// Window: from the scan (minus a few seconds of pre-roll) to the next scan
-// on the same camera (plus a little post-roll), never longer than the cap.
+// Window: from the scan (minus a few seconds of pre-roll) to the same
+// packer's next scan on that camera (plus a little post-roll), never longer
+// than the cap (plus any "+30 s" the packer pressed).
 // A clip is cut once the recording has moved past its end; if the next scan
 // has not happened, it waits until the cap runs out.
 // The cut is a stream copy from the one-minute pieces (the camera's own
@@ -20,11 +21,11 @@ import { covering, listSegments, cameraDir } from './segments.mjs';
  * included: it runs from pre-roll before the scan to post-roll after the next
  * scan, or stops at the limit, whichever comes first.
  */
-export function windowFor(scanMs, nextMs, s) {
+export function windowFor(scanMs, nextMs, s, extraMs = 0) {
   const pre = Math.max(0, Number(s.pre_roll_seconds) || 0) * 1000;
   const post = Math.max(0, Number(s.post_roll_seconds) || 0) * 1000;
   // Never so short that the video could end before (or just after) the scan.
-  const cap = Math.max(10_000 + pre, (Number(s.max_clip_seconds) || 600) * 1000);
+  const cap = Math.max(10_000 + pre, (Number(s.max_clip_seconds) || 600) * 1000) + Math.max(0, extraMs);
   const start = scanMs - pre;
   const end = nextMs != null && nextMs > scanMs ? Math.min(nextMs + post, start + cap) : start + cap;
   return { start, end, scan: scanMs, limit: cap, capped: end === start + cap };

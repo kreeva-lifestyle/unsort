@@ -38,7 +38,10 @@ const recorders = new Map();          // camera number → Recorder
 // "Test connection" answers, camera number → { nonce, ok, message }.
 const tests = {}; let testNonce = null;
 
-const ctx = { cfg, state, drive, settings: () => settings, dropbox: () => dropbox, offset: () => offset, setFolderWarning: w => { folderWarning = w; } };
+// The last upload to each place: null = it worked; an Error = it failed.
+const uploads = { dropbox: undefined, gdrive: undefined };
+const uploadResult = (place, err) => { uploads[place] = err ? { error: String(err.message || err).slice(0, 200), at: Date.now() } : null; };
+const ctx = { cfg, state, drive, settings: () => settings, dropbox: () => dropbox, offset: () => offset, setFolderWarning: w => { folderWarning = w; }, uploadResult };
 
 function syncRecorders(cameras) {
   const want = new Map(cameras.map(c => [c.number, c]));
@@ -56,8 +59,10 @@ function status() {
     enabled: !!settings?.enabled, disk: diskInfo(cfg.data_dir), buffer_gb: +(bufferBytes / 1e9).toFixed(1),
     cameras: [...recorders.values()].map(r => r.status()),
     queue: { waiting: jobs.filter(j => j.status === 'queued' || j.status === 'uploading').length, failed: jobs.filter(j => j.status === 'failed').length },
-    dropbox: settings?.targets?.dropbox ? (dropbox?.error ? { ok: false, error: dropbox.error } : { ok: !!dropbox?.access_token }) : null,
-    gdrive: settings?.targets?.gdrive ? drive.status() : null,
+    // "Ready" only while the last upload there worked (or none was tried yet).
+    dropbox: settings?.targets?.dropbox ? (dropbox?.error ? { ok: false, error: dropbox.error }
+      : uploads.dropbox ? { ok: false, error: `Uploads failing: ${uploads.dropbox.error}` } : { ok: !!dropbox?.access_token }) : null,
+    gdrive: settings?.targets?.gdrive ? { ...drive.status(), upload_error: uploads.gdrive ? `Uploads failing: ${uploads.gdrive.error}` : null } : null,
     // Where clips really go: the fallback while the chosen folder cannot be used.
     pc_folder: pcFolder,
     storage: storage.status({ settings, dropboxToken: dropbox, jobs, pcFolder, dataDir: cfg.data_dir }),
@@ -108,13 +113,13 @@ async function checkIn() {
     // Scans made just before recording was switched off still have footage:
     // take them on this first poll, then keep the cursor at "now" so turning
     // recording back on does not list the unrecorded scans as missing clips.
-    if (wasRecording) state.ingest(d.scans || []);
+    if (wasRecording) state.ingest(d.scans || [], d.next_cursor, keepMs());
     wasRecording = false;
     if (state.st.cursor !== d.now) { state.st.cursor = d.now; state.touch(); }
     return;
   }
   wasRecording = true;
-  const added = state.ingest(d.scans || []);
+  const added = state.ingest(d.scans || [], d.next_cursor, keepMs());
   if (added) log(`${added} new scan(s)`);
 }
 
@@ -125,7 +130,26 @@ async function report() {
   state.reported(rows);
 }
 
-let lastForget = 0;
+/** How long the raw recording is kept (a cut clip can only be cut again within it). */
+const keepMs = () => Math.max(1, Number(settings?.buffer_hours) || 6) * 3600_000;
+
+/**
+ * Videos moved or deleted from the PC folder by hand: tell the server, so
+ * they stop showing "Saved" (a Dropbox / Drive copy still plays).
+ */
+let lastRemovedCheck = 0;
+async function reportRemoved(now) {
+  if (now - lastRemovedCheck < (Number(process.env.PACKCAM_REMOVED_CHECK_MS) || 10 * 60_000)) return;   // env: tests only
+  lastRemovedCheck = now;
+  const ids = state.removedFiles();
+  for (let i = 0; i < ids.length; i += 500) {
+    const part = ids.slice(i, i + 500);
+    await api.removed(part);
+    state.forgetFiles(part);
+    log(`${part.length} video(s) moved or deleted from the PC folder`);
+  }
+}
+
 function housekeeping(now) {
   // Keep `buffer_hours` of recording, but never a piece a waiting clip still
   // needs — unless the disk is nearly full.
@@ -143,7 +167,7 @@ function housekeeping(now) {
   }
   bufferBytes = total;
   state.tidy(now);
-  if (now - lastForget > 3600_000) { lastForget = now; state.forgetRemoved(); }
+
 }
 
 async function checkInLoop() {
@@ -152,6 +176,7 @@ async function checkInLoop() {
     try {
       await checkIn();
       await report();
+      await reportRemoved(Date.now());
       serverOk = true;
       if (!/^Disk/.test(lastError)) lastError = '';
     } catch (e) {

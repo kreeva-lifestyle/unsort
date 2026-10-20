@@ -7,9 +7,19 @@
 import { supabase } from '../../lib/supabase';
 import type { PackTimeScanInsert } from '../../types/database';
 
-/** Insert a scan made at `at` (this phone's clock; ms). */
+const SEND_TIMEOUT_MS = 6000;
+const MAX_QUEUED_MS = 7 * 86_400_000;   // as the server's cap (migration 20261020132901)
+
+/**
+ * Insert a scan made at `at` (this phone's clock; ms). The wait is measured
+ * when the request leaves, so a send that stalls on weak Wi-Fi is cut off
+ * after 6 s and goes to the retry (which measures again): a scan never
+ * arrives late with a near-zero wait and gets the arrival time.
+ */
 export const sendScan = (row: PackTimeScanInsert, at?: number) =>
-  supabase.from('packtime_scans').insert(at ? { ...row, queued_ms: Math.max(0, Math.min(86_400_000, Date.now() - at)) } : row);
+  supabase.from('packtime_scans')
+    .insert(at ? { ...row, queued_ms: Math.max(0, Math.min(MAX_QUEUED_MS, Date.now() - at)) } : row)
+    .abortSignal(AbortSignal.timeout(SEND_TIMEOUT_MS));
 
 // Scans whose DB insert failed twice — parked here so the operator can retry
 // from the banner. Persisted to localStorage: module scope survives unmount
