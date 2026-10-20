@@ -218,7 +218,7 @@ const MainApp = () => {
           <span>More</span>
         </button>
       </div>
-      <HeaderComponent title={titles[tab]} onNotifClick={handleNotifClick} notifications={notifications} markAsRead={markAsRead} sidebarOpen={sidebarOpen} onToggleSidebar={() => setSidebarOpen(o => !o)} />
+      <HeaderComponent title={titles[tab]} onNotifClick={handleNotifClick} notifications={notifications} markAsRead={markAsRead} addToast={addToast} sidebarOpen={sidebarOpen} onToggleSidebar={() => setSidebarOpen(o => !o)} />
       <main ref={mainRef} style={{ flex: 1, overflow: 'auto' }}>
         <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40 }}><div className="spinner" /></div>}>
         {mounted.has('dashboard') && <div style={{ display: tab === 'dashboard' ? 'block' : 'none' }}>{canSeeDashboardData(profile?.role, profile?.module_access) ? <Dashboard navigateTo={setTab} active={tab === 'dashboard'} /> : <HomeLite navigateTo={setTab} />}</div>}

@@ -855,7 +855,7 @@ export interface BuyerSearchUsage { month: string; used: number; updated_at: str
 // existing `from '../types/database'` import keeps working.
 export * from './purchaseOrders';
 export * from './challanOrders'; export * from './jobwork'; export * from './skuThumbs'; // jobwork: Minis → Jobwork; sku_thumbs: Dropbox thumbnails
-export * from './packtime'; export * from './packcam'; // PackStation + Pack Cam (packing videos)
+export * from './packtime'; export * from './packcam'; export * from './issueReports'; // PackStation + Pack Cam (packing videos) + Report a problem
 
 // ─── indya_sku_map (8 cols) ─────────────────────────────────────────────
 // Indya Import's saved SKU fixes: the code as Indya sent it → the correct

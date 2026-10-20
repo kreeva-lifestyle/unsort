@@ -11,12 +11,13 @@ import ModelCard from '../listingai/ModelCard';
 export default function ListingAISettings({ addToast }: { addToast: (m: string, t?: string) => void }) {
   const [hasKey, setHasKey] = useState<boolean | null>(null);
   const [model, setModel] = useState('');
+  const [effort, setEffort] = useState('');
   const [err, setErr] = useState('');
 
   const loadStatus = useCallback(async () => {
     try {
       const { status, data } = await call({ action: 'status' });
-      if (data?.ok) { setHasKey(!!data.hasKey); setModel(String(data.model || '')); setErr(''); }
+      if (data?.ok) { setHasKey(!!data.hasKey); setModel(String(data.model || '')); setEffort(String(data.effort || '')); setErr(''); }
       else setErr(String(data?.details || data?.error || `Failed (${status})`));
     } catch (e) { setErr(friendlyError(e)); }
   }, []);
@@ -34,7 +35,7 @@ export default function ListingAISettings({ addToast }: { addToast: (m: string, 
         <div style={{ background: 'oklch(0.63 0.22 25 / .08)', border: '1px solid oklch(0.63 0.22 25 / .2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.re, marginBottom: 12 }}>{err}</div>
       )}
       {hasKey !== null && <KeyCard hasKey={hasKey} onSaved={loadStatus} addToast={addToast} />}
-      {hasKey !== null && <ModelCard model={model} onSaved={loadStatus} addToast={addToast} />}
+      {hasKey !== null && <ModelCard model={model} effort={effort} onSaved={loadStatus} addToast={addToast} />}
       <div style={{ fontSize: 11, color: T.tx3, lineHeight: 1.7 }}>
         Templates, SKUs and generation live in the Listing AI tab. Price-like columns are always exported blank,
         and columns with fixed dropdown lists only ever receive values from those lists.

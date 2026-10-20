@@ -2,17 +2,19 @@ import { useState, useEffect, useRef } from 'react';
 import { T } from '../../lib/theme';
 import { useCrumbs } from '../../hooks/useBreadcrumb';
 import { closeAllLayers, closeTopLayer, layerCount } from '../../hooks/useBackClose';
+import ReportProblemButton from '../feedback/ReportProblem';
 
 // A crumb that can be tapped looks like text but is a real button: keyboard
 // reachable, a 44px target, no link semantics (nothing here is a URL of its
 // own — the hash names the page, layers live in history state).
 const crumbBtn: React.CSSProperties = { background: 'none', border: 0, padding: '0 2px', margin: 0, font: 'inherit', color: 'inherit', cursor: 'pointer', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minHeight: 44 };
 
-export default function Header({ title, onNotifClick, notifications, markAsRead, sidebarOpen, onToggleSidebar }: {
+export default function Header({ title, onNotifClick, notifications, markAsRead, addToast, sidebarOpen, onToggleSidebar }: {
   title: string;
   onNotifClick?: (n: any) => void;
   notifications: any[];
   markAsRead: (id: string) => void;
+  addToast: (m: string, t?: string) => void;
   sidebarOpen?: boolean;
   onToggleSidebar?: () => void;
 }) {
@@ -53,7 +55,8 @@ export default function Header({ title, onNotifClick, notifications, markAsRead,
         {onToggleSidebar && <button className="desktop-only" onClick={onToggleSidebar} style={{ width: 32, height: 32, borderRadius: 8, border: `1px solid ${T.bd}`, background: 'transparent', cursor: 'pointer', color: T.tx3, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all .15s' }} title={sidebarOpen ? 'Collapse menu' : 'Expand menu'} aria-label="Toggle sidebar">
           <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' }}>{sidebarOpen ? <><path d="M3 12h18M3 6h18M3 18h18" /></> : <><path d="M18 6L6 18M6 6l12 12" /></>}</svg>
         </button>}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, minWidth: 0 }}>
+        {/* Shrinks (and the trail ellipsises) so the report and bell buttons always fit at 393 px. */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 1, minWidth: 0, overflow: 'hidden' }}>
           {/* The brand slot: where the launch's crest lands (lib/launch.ts
               keeps it invisible until then, via html.launching). */}
           <img id="brand-slot" className="brand-slot" src="/crest.webp" alt="" width={28} height={28} style={{ width: 28, height: 28, borderRadius: '50%', flexShrink: 0 }} />
@@ -61,8 +64,8 @@ export default function Header({ title, onNotifClick, notifications, markAsRead,
               the page name closes every open layer (back to the page root),
               a middle crumb closes every layer above it, the last is where
               you are (aria-current). */}
-          <nav aria-label="Breadcrumb" style={{ minWidth: 0 }}>
-            <ol style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>
+          <nav aria-label="Breadcrumb" style={{ minWidth: 0, overflow: 'hidden' }}>
+            <ol style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', alignItems: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               <li>
                 <h1 className="header-title" style={{ margin: 0, fontSize: 17, fontWeight: 700, color: crumbs.length > 0 ? T.tx3 : T.tx, fontFamily: T.sora, letterSpacing: -0.2 }}>
                   {crumbs.length > 0
@@ -82,7 +85,8 @@ export default function Header({ title, onNotifClick, notifications, markAsRead,
           </nav>
         </div>
         <div style={{ flex: 1 }} />
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+        <ReportProblemButton addToast={addToast} />
         <div style={{ position: 'relative' }}>
         <button onClick={() => setShow(!show)} aria-label="Notifications" style={{ width: 36, height: 36, borderRadius: 10, border: `1px solid ${T.bd2}`, background: 'transparent', cursor: 'pointer', position: 'relative', color: T.tx, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .15s' }} onMouseEnter={e => { e.currentTarget.style.background = 'oklch(1 0 0 / 0.05)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
           <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8 }}><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" /></svg>
