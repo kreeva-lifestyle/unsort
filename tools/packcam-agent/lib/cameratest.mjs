@@ -6,6 +6,7 @@
 import { execFile } from 'node:child_process';
 import { rtspUrl } from './recorder.mjs';
 import { plainCameraError } from './cameraerrors.mjs';
+import { log } from './util.mjs';
 
 export function testCamera(cfg, cam) {
   return new Promise(resolve => {
@@ -23,4 +24,36 @@ export function testCamera(cfg, cam) {
       resolve({ ok: true, message: `Connected — ${codec}${v.width ? `, ${v.width}×${v.height}` : ''}` });
     });
   });
+}
+
+/** The answers (tests) and run(): what packcam.mjs calls on every poll. */
+export function makeTester(cfg, recorderOf) {
+  // "Test connection" answers, camera number → { nonce, ok, message }.
+  const tests = {}; let testNonce = null;
+  /**
+   * Settings → Pack Cam → Cameras → "Test connection" sets a new test_nonce:
+   * ask every camera once; one stopped for a wrong password records again once
+   * it answers (e.g. the password was changed on the camera to match).
+   * After a start, a press more than 2 minutes old is only noted.
+   */
+  async function run(nonce, cameras, serverNow) {
+    if (!nonce || nonce === testNonce) return;
+    const first = testNonce === null; testNonce = nonce;
+    // The nonce is the press time (ms): one pressed while the PC was starting still counts.
+    if (first && !(Math.abs(Date.parse(serverNow) - Number(nonce)) < 120_000)) return;
+    log('testing the camera connections');
+    // All at once: an unreachable camera takes ~10 s, and the app is waiting.
+    await Promise.all(cameras.map(async c => {
+      const r = await testCamera(cfg, c);
+      if (nonce !== testNonce) return;   // a newer press is running
+      tests[c.number] = { nonce, ok: r.ok, message: r.message, at: new Date().toISOString() };
+      log(`camera ${c.number} test: ${r.message}`);
+      // Only a camera that answered goes back to recording: one stopped for a
+      // wrong password stays stopped (each failed login brings the camera's
+      // lock-out nearer); a new password in the app starts it afresh anyway.
+      if (r.ok) recorderOf(c.number)?.retry();
+    }));
+  }
+
+  return { tests, run };
 }

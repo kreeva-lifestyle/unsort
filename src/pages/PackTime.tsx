@@ -18,6 +18,7 @@ import { useScanClips, ScanVideoButton } from '../components/packcam/ScanVideo';
 import { usePackcamLive, CamStatusLine } from '../components/packcam/ScanCamStatus';
 import RecentScans, { type ScanEntry } from '../components/packtime/RecentScans';
 import { sendScan, failedDbScans, persistFailed } from '../components/packtime/scanSend';
+import { beep, beepOk, beepErr } from '../components/packtime/beep';
 import type {
   Brand,
   PackTimeCourier,
@@ -33,33 +34,6 @@ import { logSwallowed } from '../lib/errorLogger';
 import { useModalLock } from '../hooks/useModalLock';
 
 // ── Beep ────────────────────────────────────────────────────────────────────────
-let audioCtx: AudioContext | null = null;
-
-// iOS Safari: AudioContext must be created/resumed from a user gesture.
-// resume() is async — by the time beep() plays, context may still be suspended.
-// Fix: warm it up on every touch so it's always "running" when beep() fires.
-if (typeof window !== 'undefined') {
-  const warmAudio = () => {
-    if (!audioCtx) audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-  };
-  document.addEventListener('touchstart', warmAudio, { passive: true });
-  document.addEventListener('click', warmAudio);
-}
-
-async function beep(freq: number, dur: number, type: OscillatorType = 'square') {
-  try {
-    if (!audioCtx) audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    if (audioCtx.state !== 'running') await audioCtx.resume();
-    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
-    o.connect(g); g.connect(audioCtx.destination);
-    o.type = type; o.frequency.value = freq; g.gain.value = 0.3;
-    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
-    o.start(audioCtx.currentTime); o.stop(audioCtx.currentTime + dur);
-  } catch {}
-}
-function beepOk() { beep(880, 0.12); setTimeout(() => beep(1100, 0.12), 100); }
-function beepErr() { beep(300, 0.3, 'sawtooth'); setTimeout(() => beep(200, 0.4, 'sawtooth'), 200); }
 
 // ── Timestamp helper ────────────────────────────────────────────────────────────
 function pad(n: number) { return n < 10 ? '0' + n : String(n); }
@@ -564,16 +538,16 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     awbSetRef.current.add(key);
     rowCountRef.current++;
     const count = rowCountRef.current;
-    const now = new Date();
+    const now = new Date(); const scanId = crypto.randomUUID();   // the id lets the packer add time to this scan's video
     const timestamp = formatTimestamp(now);
 
     setLastScanned(trimmed);
     setSessionCount(p => p + 1);
     setSheetTotal(p => p + 1);
-    setRecentScans(p => [{ awb: trimmed, time: now.toLocaleTimeString('en-IN'), success: true, pending: true, at: now.getTime() }, ...p].slice(0, 30));
+    setRecentScans(p => [{ awb: trimmed, time: now.toLocaleTimeString('en-IN'), success: true, pending: true, at: now.getTime(), id: scanId }, ...p].slice(0, 30));
 
     // Save to Supabase DB first, then Sheet
-    const scanRow: PackTimeScanInsert = { session_id: sessionIdRef.current, awb: trimmed, courier, camera, brand: courierBrand, sheet_name: courierSheet, user_id: userIdRef.current };
+    const scanRow: PackTimeScanInsert = { id: scanId, session_id: sessionIdRef.current, awb: trimmed, courier, camera, brand: courierBrand, sheet_name: courierSheet, user_id: userIdRef.current };
     const row = [count, trimmed, timestamp, camera, courierBrand];
     const at = now.getTime();
     sendScan(scanRow, at).then(({ error }) => {
@@ -690,7 +664,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     setHistoryLoading(true);
     // 'estimated' like every other pager — 'exact' forced a full count scan
     // of the app's largest table on every history view.
-    let query = supabase.from('packtime_scans').select('id, session_id, awb, courier, camera, sheet_name, scanned_at, user_id, brand', { count: 'estimated' })
+    let query = supabase.from('packtime_scans').select('id, session_id, awb, courier, camera, sheet_name, scanned_at, user_id, brand, received_at', { count: 'estimated' })
       .gte('scanned_at', new Date(historyDateFrom + 'T00:00:00').toISOString())
       .lte('scanned_at', new Date(historyDateTo + 'T23:59:59.999').toISOString());
     if (historySearch) query = query.ilike('awb', `%${historySearch.replace(/[%_]/g, '\\$&')}%`);

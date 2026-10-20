@@ -16,7 +16,9 @@ import { agentOnline, loadCameras, loadSettings, patchSettings, saveCamera, type
 
 type TestAnswer = { ok: boolean; message: string };
 interface TestProps { testing: boolean; answer?: TestAnswer; onTest: () => void }
-const TEST_WAIT_MS = 45_000;
+// The PC sees the press on its next check-in (5 s), tries every camera at once
+// (an unreachable one takes ~10-25 s) and answers on the check-in after.
+const TEST_WAIT_MS = 60_000;
 const newer = (v: string | undefined, than: string) => { const a = String(v || '0').split('.').map(Number); const b = than.split('.').map(Number); for (let i = 0; i < 3; i++) if ((a[i] || 0) !== b[i]) return (a[i] || 0) > b[i]; return true; };
 
 const IP = /^[A-Za-z0-9.-]{1,253}$/;
@@ -116,7 +118,10 @@ export default function CamerasPanel({ agent, isAdmin, onTested, addToast }: { a
         if (want.every(n => got[n])) { setTesting(null); latest.current.onTested(); latest.current.addToast('Connection test finished', 'success'); return; }
         if (Date.now() > until) {
           setTesting(null);
-          setTestErr(!newer(a.version, '1.4.0') ? 'The office PC has an older Pack Cam that cannot test — download the PC program again and unzip it over the old one (your key is kept)' : 'No answer from the office PC — is it on and connected to the internet?');
+          const missing = want.filter(n => !got[n]);
+          setTestErr(!newer(a.version, '1.4.0') ? 'The office PC has an older Pack Cam that cannot test — download the PC program again and unzip it over the old one (your key is kept)'
+            : Object.keys(got).length ? `No answer yet for camera ${missing.join(', ')} — the PC could not finish testing it. Press Test connection again in a minute.`
+            : 'No answer from the office PC — is it on and connected to the internet?');
         }
       } catch (e) { logSwallowed('packcam connection test', e); }
     }, 3000);

@@ -95,6 +95,18 @@ nothing to set up on the PC.
   as full, on the Pack Cam page and on the PackStation scan screen.
 * Scans sent late by a phone that lost Wi-Fi keep their real scan time (the
   phone sends how long each one waited), so their videos are still right.
+  If an earlier video was already cut over that time (it ran to the limit
+  while the scans were stuck on the phone), it is cut again to end at the
+  late scan, while its recording is still on the PC.
+* Two packers on one camera: each video runs from a packer's scan to that
+  same packer's next scan (not a colleague's), never past the limit.
+* Long parcels: in the last 20 seconds of the countdown the packer can press
+  **+30 s** (up to 10 minutes in all); the countdown beeps at 10 seconds left,
+  ticks through the last 5 and sounds when the video stops.
+* Dropbox / Drive show "Uploads failing" (not "Ready") while uploads fail.
+* Videos moved or deleted from the PC folder by hand are noticed within 10
+  minutes and show "Removed from PC" instead of "Saved" (a Dropbox / Drive copy
+  still plays). A folder whose drive is unplugged is not counted.
 * Keep the camera clocks and the PC clock on automatic time (NTP). The agent
   corrects the PC clock against the server, but a camera's on-screen time
   should match too.

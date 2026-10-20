@@ -8,7 +8,7 @@ import { logSwallowed } from '../../../lib/errorLogger';
 import ConfirmModal, { useConfirm } from '../../ui/ConfirmModal';
 import type { PackcamAgentStatus } from '../../../types/packcam';
 import { agentOnline, newAgentKey, scansWithoutAddress } from './packcamApi';
-import { PLACE_NAME, spaceText, storageAlerts } from '../../packcam/packcamHealth';
+import { PLACE_NAME, spaceText, storageAlerts, uploadProblems } from '../../packcam/packcamHealth';
 
 const card: React.CSSProperties = { background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: 16, marginBottom: 12 };
 const head: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: T.tx, fontFamily: T.sora, marginBottom: 10 };
@@ -37,6 +37,7 @@ export default function AgentPanel({ agent, recording, isAdmin, addToast }: { ag
   const { ask, modalProps } = useConfirm();
   const online = agentOnline(agent);
   const alerts = recording ? storageAlerts(agent) : [];
+  const uploadsFailing = recording ? uploadProblems(agent) : [];
   const seen = agent.last_seen ? new Date(agent.last_seen).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : null;
 
   // Scans on a camera number with no address are skipped by the PC. A hint
@@ -69,6 +70,9 @@ export default function AgentPanel({ agent, recording, isAdmin, addToast }: { ag
         {seen && !online && recording && <div style={{ margin: '8px 0', background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '8px 10px', fontSize: 12, color: T.re, lineHeight: 1.5 }}>
           No packing videos are being saved. Check the office PC is switched on (after a power cut, switch it on — Pack Cam starts by itself when Windows signs in) and that its internet / Wi-Fi works.
         </div>}
+        {uploadsFailing.map(t => (
+          <div key={t} style={{ margin: '8px 0', background: T.yl22, border: `1px solid ${T.yl88}`, borderRadius: 6, padding: '8px 10px', fontSize: 12, color: T.yl, lineHeight: 1.5 }}>{t}. Videos stay on the PC and are sent again every few minutes; check the account (full? signed out?).</div>
+        ))}
         {alerts.map(a => (
           <div key={a.place} style={{ margin: '8px 0', background: a.level === 'full' ? 'rgba(239,68,68,.08)' : T.yl22, border: `1px solid ${a.level === 'full' ? 'rgba(239,68,68,.2)' : T.yl88}`, borderRadius: 6, padding: '8px 10px', fontSize: 12, color: a.level === 'full' ? T.re : T.yl, lineHeight: 1.5 }}>{a.text}</div>
         ))}
@@ -91,7 +95,7 @@ export default function AgentPanel({ agent, recording, isAdmin, addToast }: { ag
             <Row key={c.number} label={`Camera ${c.number}`}><span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Dot ok={c.ok} />{c.ok ? 'Recording' : c.error || 'Not recording'}</span></Row>
           ))}
           {agent.dropbox && <Row label="Dropbox">{agent.dropbox.ok ? 'Ready' : agent.dropbox.error || 'Waiting'}</Row>}
-          {agent.gdrive && <Row label="Google Drive">{agent.gdrive.connected ? 'Connected' : agent.gdrive.configured ? 'Not signed in — open http://localhost:8765 on the PC' : 'Not set up on the PC (see README)'}</Row>}
+          {agent.gdrive && <Row label="Google Drive">{agent.gdrive.upload_error ? agent.gdrive.upload_error : agent.gdrive.connected ? 'Connected' : agent.gdrive.configured ? 'Not signed in — open http://localhost:8765 on the PC' : 'Not set up on the PC (see README)'}</Row>}
           {agent.pc_folder && <Row label="Clips folder on PC">{agent.pc_folder}</Row>}
           {agent.lan_url && <Row label="Office address">{agent.lan_url}</Row>}
           {agent.last_error && <div style={{ marginTop: 10, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.re }}>{agent.last_error}</div>}

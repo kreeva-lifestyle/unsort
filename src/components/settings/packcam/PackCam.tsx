@@ -13,7 +13,7 @@ import CamerasPanel from './CamerasPanel';
 import StoragePanel from './StoragePanel';
 import ClipsPanel from './ClipsPanel';
 import PackCamSwitch from './PackCamSwitch';
-import { storageAlerts } from '../../packcam/packcamHealth';
+import { storageAlerts, uploadProblems } from '../../packcam/packcamHealth';
 
 type Sub = 'status' | 'cameras' | 'storage' | 'videos';
 const SUBS: { id: Sub; label: string }[] = [{ id: 'status', label: 'Status & setup' }, { id: 'cameras', label: 'Cameras' }, { id: 'storage', label: 'Storage' }, { id: 'videos', label: 'Videos' }];
@@ -50,6 +50,7 @@ export default function PackCam({ addToast, isAdmin }: { addToast: (m: string, t
   const online = agentOnline(state.agent);
   const on = state.settings.enabled;
   const full = on ? storageAlerts(state.agent)[0] : undefined;
+  const failing = on && uploadProblems(state.agent).length > 0;
   // A new settings object from a save: newer than any refresh already on its way.
   const saved = (s: PackcamSettings) => { seq.current++; setState(p => (p ? { ...p, settings: s } : p)); };
   return (
@@ -58,7 +59,7 @@ export default function PackCam({ addToast, isAdmin }: { addToast: (m: string, t
       <div style={{ display: 'flex', gap: 6, marginBottom: 12, overflowX: 'auto' }}>
         {SUBS.map(s => (
           <button key={s.id} type="button" onClick={() => setSub(s.id)} style={{ minHeight: 44, padding: '6px 14px', borderRadius: 8, border: `1px solid ${sub === s.id ? T.ac : T.bd}`, background: sub === s.id ? T.ac3 : 'transparent', color: sub === s.id ? T.ac2 : T.tx2, fontSize: 12, fontWeight: sub === s.id ? 600 : 500, cursor: 'pointer', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: T.sans }}>
-            {s.id === 'status' && <span style={{ width: 8, height: 8, borderRadius: '50%', background: !on ? T.tx3 : !online ? (state.agent.last_seen ? T.re : T.tx3) : full ? (full.level === 'full' ? T.re : T.yl) : T.gr }} />}
+            {s.id === 'status' && <span style={{ width: 8, height: 8, borderRadius: '50%', background: !on ? T.tx3 : !online ? (state.agent.last_seen ? T.re : T.tx3) : full ? (full.level === 'full' ? T.re : T.yl) : failing ? T.yl : T.gr }} />}
             {s.label}
           </button>
         ))}

@@ -9,7 +9,7 @@ export const spaceText = (s: PackcamSpace) =>
   s.checking ? 'Checking…'
   : s.error ? `Could not check — ${s.error}`
   : s.free_gb == null ? 'No limit'
-  : `${s.free_gb} GB free${s.total_gb ? ` of ${s.total_gb} GB` : ''}${s.days != null ? ` · about ${s.days} day${s.days === 1 ? '' : 's'} left` : ''}`;
+  : `${s.free_gb} GB free${s.total_gb ? ` of ${s.total_gb} GB` : ''}${s.days == null ? '' : s.days < 1 ? ' · less than a day left' : ` · about ${s.days} day${s.days === 1 ? '' : 's'} left`}`;
 
 export interface StorageAlert { place: PackcamPlace; level: 'low' | 'full'; text: string; short: string }
 
@@ -23,7 +23,7 @@ export function storageAlerts(agent: PackcamAgentStatus): StorageAlert[] {
     // The videos folder is usually on the same disk as the recording: say it once.
     if (place === 'recording' && st.pc && st.pc.level !== 'ok' && st.pc.free_gb === s.free_gb) continue;
     const name = PLACE_NAME[place];
-    const left = `${s.free_gb ?? 0} GB left${s.days != null ? `, about ${s.days} day${s.days === 1 ? '' : 's'} of videos` : ''}`;
+    const left = `${s.free_gb ?? 0} GB left${s.days == null ? '' : s.days < 1 ? ', less than a day of videos' : `, about ${s.days} day${s.days === 1 ? '' : 's'} of videos`}`;
     if (s.level === 'full') out.push({ place, level: 'full', short: `${name} is full`,
       text: place === 'recording' ? `${name} is full (${left}) — Pack Cam keeps only the last hour of recording. Free up space on the PC.`
         : `${name} is full (${left}) — new videos cannot be saved there. Delete old videos or get more space.` });
@@ -41,4 +41,20 @@ export function enabledAt(s: Pick<PackcamSettings, 'enabled' | 'enabled_log'>, t
   let on = log.length ? !log[0].on : s.enabled;
   for (const e of log) { if (Date.parse(e.at) <= t) on = e.on; else break; }
   return on;
+}
+
+/** Dropbox / Drive uploads that are failing right now (agent 1.4.0+), in words. */
+export function uploadProblems(agent: PackcamAgentStatus): string[] {
+  const out: string[] = [];
+  if (agent.dropbox && !agent.dropbox.ok && agent.dropbox.error) out.push(`Dropbox: ${agent.dropbox.error}`);
+  if (agent.gdrive?.upload_error) out.push(`Google Drive: ${agent.gdrive.upload_error}`);
+  return out;
+}
+
+/** "Switched off at 10:42 by Owner" from the on/off log, or ''. */
+export function offSince(s: Pick<PackcamSettings, 'enabled_log'>): string {
+  const last = [...(s.enabled_log || [])].reverse().find(e => !e.on);
+  if (!last) return '';
+  const when = new Date(last.at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+  return `since ${when}${last.by ? ` (by ${last.by})` : ''}`;
 }

@@ -13,7 +13,7 @@ import { fetchClips, fmtDur, fmtSize, playable, type ClipFilter } from './packca
 
 const STATUS: Record<string, { c: string; t: string }> = {
   queued: { c: T.yl, t: 'Waiting' }, cutting: { c: T.yl, t: 'Cutting' }, uploading: { c: T.bl, t: 'Uploading' },
-  done: { c: T.gr, t: 'Saved' }, failed: { c: T.re, t: 'Failed' }, missing: { c: T.tx3, t: 'No recording' },
+  done: { c: T.gr, t: 'Saved' }, failed: { c: T.re, t: 'Failed' }, missing: { c: T.tx3, t: 'No recording' }, removed: { c: T.tx3, t: 'Removed from PC' },
 };
 const sel: React.CSSProperties = { ...S.fInput, width: 'auto', minWidth: 120, flex: '1 1 120px' };
 
@@ -47,7 +47,7 @@ export default function ClipsPanel({ cameras, addToast }: { cameras: string[]; a
           <option value="">All cameras</option>{cameras.map(c => <option key={c} value={c}>Camera {c}</option>)}
         </select>
         <select value={f.status} onChange={e => setFilter('status', e.target.value)} style={sel} aria-label="Status">
-          <option value="">All statuses</option><option value="done">Saved</option><option value="queued">Waiting</option><option value="uploading">Uploading</option><option value="failed">Failed</option><option value="missing">No recording</option>
+          <option value="">All statuses</option><option value="done">Saved</option><option value="queued">Waiting</option><option value="uploading">Uploading</option><option value="failed">Failed</option><option value="missing">No recording</option><option value="removed">Removed from PC</option>
         </select>
       </div>
       <div style={{ fontSize: 11, color: T.tx3, marginBottom: 10, lineHeight: 1.5 }}>Pack Cam does not delete videos. Clear old ones yourself from the PC's clips folder, Dropbox or Google Drive (one folder per day); a removed video just stops playing here.</div>

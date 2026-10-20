@@ -8,6 +8,7 @@ import { friendlyError } from '../../../lib/friendlyError';
 import Toggle from '../../ui/Toggle';
 import ConfirmModal, { useConfirm } from '../../ui/ConfirmModal';
 import type { PackcamSettings } from '../../../types/packcam';
+import { useAuth } from '../../../hooks/useAuth';
 import { patchSettings } from './packcamApi';
 
 const LOG_KEEP = 20;
@@ -15,14 +16,15 @@ const LOG_KEEP = 20;
 export default function PackCamSwitch({ settings, isAdmin, onChanged, addToast }: { settings: PackcamSettings; isAdmin: boolean; onChanged: (s: PackcamSettings) => void; addToast: (m: string, t?: string) => void }) {
   const [saving, setSaving] = useState(false);
   const { ask, modalProps } = useConfirm();
+  const { profile } = useAuth();
   const on = settings.enabled;
 
   const flip = async () => {
     if (saving || !isAdmin) return;
-    if (on && !await ask({ title: 'Turn Pack Cam off?', message: 'The office PC stops recording. Scans made while Pack Cam is off get no packing video, and PackStation stops showing the camera status and timer.', confirmLabel: 'Turn off', danger: true })) return;
+    if (on && !await ask({ title: 'Turn Pack Cam off?', message: 'The office PC stops recording. Scans made while Pack Cam is off get no packing video. Packers see "Pack Cam is switched off" on the scan screen (no camera status or timer).', confirmLabel: 'Turn off', danger: true })) return;
     setSaving(true);
     try {
-      const next = await patchSettings(now => ({ enabled: !on, enabled_log: [...(now.enabled_log || []), { at: new Date().toISOString(), on: !on }].slice(-LOG_KEEP) }));
+      const next = await patchSettings(now => ({ enabled: !on, enabled_log: [...(now.enabled_log || []), { at: new Date().toISOString(), on: !on, by: profile?.full_name || undefined }].slice(-LOG_KEEP) }));
       onChanged(next);
       addToast(on ? 'Pack Cam turned off' : 'Pack Cam turned on — the office PC starts recording within a few seconds', 'success');
     } catch (e) { addToast(friendlyError(e), 'error'); }
@@ -37,7 +39,7 @@ export default function PackCamSwitch({ settings, isAdmin, onChanged, addToast }
         </div>
         <div style={{ fontSize: 11, color: T.tx3, lineHeight: 1.5, marginTop: 2 }}>
           {on ? 'Every PackStation scan on a camera with an address gets a packing video.'
-            : 'No packing videos are recorded. PackStation works as usual, without camera status or timer. You can still set up the PC and cameras below.'}
+            : 'No packing videos are recorded. Packers see "Pack Cam is switched off" on the scan screen. You can still set up the PC and cameras below.'}
           {!isAdmin && ' Only an admin can switch it.'}
         </div>
       </div>
