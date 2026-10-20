@@ -2,25 +2,28 @@
 // "Report a problem", what the scheduled Claude Code check found and the fix
 // it prepared. A fix goes live only when an admin taps Approve here; the next
 // check (twice a day) merges and deploys it and tells the reporter.
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
+import { logSwallowed } from '../../lib/errorLogger';
 import Empty from '../ui/Empty';
 import { SkeletonRows } from '../ui/Skeleton';
-import { KINDS, STATUS_LABEL, allReports, decide, screenshotUrl, type IssueReport } from '../feedback/reportApi';
+import { KINDS, STATUS_LABEL, allReports, decide, screenshotUrl, waitingCount, type IssueReport } from '../feedback/reportApi';
 
 const PAGE = 25;
 const when = (iso: string) => new Date(iso).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 const tone = (s: IssueReport['status']) => (s === 'fixed' ? T.gr : s === 'fix_ready' ? T.yl : s === 'approved' ? T.bl : T.tx3);
 
 function ReportRow({ r, onDone, addToast }: { r: IssueReport; onDone: () => void; addToast: (m: string, t?: string) => void }) {
-  const [busy, setBusy] = useState<'' | 'approved' | 'declined'>('');
+  const [busy, setBusy] = useState<'' | 'approved' | 'declined' | 'new'>('');
   const [note, setNote] = useState('');
   const [shot, setShot] = useState('');
-  const act = async (status: 'approved' | 'declined') => {
+  const act = async (status: 'approved' | 'declined' | 'new') => {
     if (busy) return;
+    if (status === 'new' && !note.trim()) { addToast('Add a note with the missing detail first', 'error'); return; }
     setBusy(status);
-    try { await decide(r.id, status, note); addToast(status === 'approved' ? 'Approved — it goes live at the next check' : 'Fix declined', 'success'); onDone(); }
+    const done = { approved: 'Approved — it goes live at the next check', declined: r.status === 'fix_ready' ? 'Fix declined' : 'Report closed', new: 'Sent back — the next check looks again with your note' }[status];
+    try { await decide(r, status, note); addToast(done, 'success'); onDone(); }
     catch (e) { addToast(friendlyError(e), 'error'); }
     finally { setBusy(''); }
   };
@@ -52,6 +55,13 @@ function ReportRow({ r, onDone, addToast }: { r: IssueReport; onDone: () => void
           <button type="button" onClick={() => act('approved')} style={{ ...S.btnPrimary, flex: 1, minHeight: 44, pointerEvents: busy ? 'none' : 'auto', opacity: busy ? 0.5 : 1 }}>{busy === 'approved' ? 'Approving…' : 'Approve — make it live'}</button>
         </div>
       </div>}
+      {r.status === 'needs_info' && <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <input value={note} onChange={e => setNote(e.target.value)} maxLength={500} placeholder="Add the missing detail (or what to build, for an idea)" style={{ ...S.fInput, width: '100%' }} aria-label="Detail for the next check" />
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button type="button" onClick={() => act('declined')} style={{ ...S.btnGhost, minHeight: 44, pointerEvents: busy ? 'none' : 'auto', opacity: busy ? 0.5 : 1 }}>{busy === 'declined' ? 'Closing…' : 'Close'}</button>
+          <button type="button" onClick={() => act('new')} style={{ ...S.btnPrimary, flex: 1, minHeight: 44, pointerEvents: busy ? 'none' : 'auto', opacity: busy ? 0.5 : 1 }}>{busy === 'new' ? 'Sending…' : 'Send back with my note'}</button>
+        </div>
+      </div>}
       {r.admin_note && <div style={{ color: T.tx3, marginTop: 6 }}>Your note: {r.admin_note}</div>}
     </div>
   );
@@ -61,12 +71,23 @@ export default function ProblemReports({ addToast }: { addToast: (m: string, t?:
   const [open, setOpen] = useState(true);
   const [page, setPage] = useState(0);
   const [data, setData] = useState<{ rows: IssueReport[]; total: number } | null>(null);
+  const [waiting, setWaiting] = useState(0);
+  const seq = useRef(0);
+  // Only the newest request fills the list (switching Open / Done quickly).
   const load = useCallback(() => {
-    allReports(open, page, PAGE).then(setData).catch(e => { addToast(friendlyError(e), 'error'); setData({ rows: [], total: 0 }); });
+    const my = ++seq.current;
+    allReports(open, page, PAGE)
+      .then(d => {
+        if (my !== seq.current) return;
+        // The last item on a later page was just handled: step back a page.
+        if (!d.rows.length && page > 0) { setPage(p => Math.max(0, p - 1)); return; }
+        setData(d);
+      })
+      .catch(e => { if (my !== seq.current) return; addToast(friendlyError(e), 'error'); setData({ rows: [], total: 0 }); });
+    waitingCount().then(n => { if (my === seq.current) setWaiting(n); }).catch(e => logSwallowed('problem reports waiting count', e));
   }, [open, page, addToast]);
   useEffect(() => { setData(null); load(); }, [load]);
   const pages = Math.max(1, Math.ceil((data?.total || 0) / PAGE));
-  const waiting = data?.rows.filter(r => r.status === 'fix_ready').length || 0;
 
   return (
     <div>
@@ -74,7 +95,7 @@ export default function ProblemReports({ addToast }: { addToast: (m: string, t?:
       <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
         {[true, false].map(o => (
           <button key={String(o)} type="button" onClick={() => { setOpen(o); setPage(0); }} style={{ minHeight: 40, padding: '6px 14px', borderRadius: 8, border: `1px solid ${open === o ? T.ac : T.bd}`, background: open === o ? T.ac3 : 'transparent', color: open === o ? T.ac2 : T.tx2, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-            {o ? `Open${open && waiting ? ` · ${waiting} to approve` : ''}` : 'Done'}
+            {o ? `Open${waiting ? ` · ${waiting} to approve` : ''}` : 'Done'}
           </button>
         ))}
       </div>

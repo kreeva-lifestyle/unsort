@@ -4,6 +4,7 @@
 // live until an admin approves it in Settings → Problem reports.
 import { supabase } from '../../lib/supabase';
 import { recentErrors } from '../../lib/recentErrors';
+import { logSwallowed } from '../../lib/errorLogger';
 
 declare const __APP_BUILD__: string;   // injected by vite define (build stamp)
 
@@ -28,7 +29,9 @@ export const STATUS_LABEL: Record<ReportStatus, string> = {
 export function snapshotPage() {
   const root = document.querySelector('main') || document.body;
   const text = (root as HTMLElement).innerText || '';
-  const page_text = text.replace(/\s*\n\s*/g, '\n').replace(/\b\d{10,12}\b/g, '[phone]').replace(/[\w.+-]+@[\w-]+\.[\w.]+/g, '[email]').slice(0, 6000);
+  // Phone numbers in any usual form (98765 43210, +91-98765-43210, 9876543210) and e-mails
+  // are masked; longer runs (tracking numbers) are kept. No lookbehind: iOS 15 cannot compile it.
+  const page_text = text.replace(/\s*\n\s*/g, '\n').replace(/(^|[^\w+])((?:\+\d{1,3}[\s-]?|\d{2}[\s-])?\d(?:[\s-]?\d){9})(?!\w)/g, '$1[phone]').replace(/[\w.+-]+@[\w-]+\.[\w.]+/g, '[email]').slice(0, 6000);
   return {
     page: `${document.title} (${location.hash || '#/'})`.slice(0, 300),
     page_text,
@@ -53,19 +56,27 @@ async function shrink(file: File): Promise<Blob> {
   } catch { return file; }
 }
 
-export async function sendReport(snap: PageSnapshot, kind: ReportKind, note: string, picture: File | null, reporterName: string | null): Promise<void> {
+/**
+ * Saves the report first, then the picture: a picture that cannot be read or
+ * uploaded never loses the report. Returns false when the picture was skipped.
+ * (The server sets who sent it and when.)
+ */
+export async function sendReport(snap: PageSnapshot, kind: ReportKind, note: string, picture: File | null): Promise<boolean> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Sign in again to send a report');
   const id = crypto.randomUUID();
-  let screenshot_path: string | null = null;
-  if (picture) {
-    const blob = await shrink(picture);
-    screenshot_path = `${user.id}/${id}.${blob.type === 'image/png' ? 'png' : blob.type === 'image/webp' ? 'webp' : 'jpg'}`;
-    const up = await supabase.storage.from('issue-reports').upload(screenshot_path, blob, { contentType: blob.type || 'image/jpeg' });
-    if (up.error) throw up.error;
-  }
-  const { error } = await supabase.from('issue_reports').insert({ id, kind, note: note.trim().slice(0, 2000) || null, reporter_name: reporterName, screenshot_path, ...snap });
+  const { error } = await supabase.from('issue_reports').insert({ id, kind, note: note.trim().slice(0, 2000) || null, ...snap });
   if (error) throw error;
+  if (!picture) return true;
+  try {
+    const blob = await shrink(picture);
+    const path = `${user.id}/${id}.${blob.type === 'image/png' ? 'png' : blob.type === 'image/webp' ? 'webp' : 'jpg'}`;
+    const up = await supabase.storage.from('issue-reports').upload(path, blob, { contentType: blob.type || 'image/jpeg' });
+    if (up.error) throw up.error;
+    const { error: e2 } = await supabase.rpc('set_issue_screenshot', { p_id: id, p_path: path });
+    if (e2) throw e2;
+    return true;
+  } catch (e) { logSwallowed('issue report picture', e); return false; }
 }
 
 export async function myReports(): Promise<IssueReport[]> {
@@ -74,6 +85,13 @@ export async function myReports(): Promise<IssueReport[]> {
   const { data, error } = await supabase.from('issue_reports').select(REPORT_COLS).eq('created_by', user.id).order('created_at', { ascending: false }).limit(20);
   if (error) throw error;
   return (data || []) as IssueReport[];
+}
+
+/** Admin: how many fixes wait for approval (all pages). */
+export async function waitingCount(): Promise<number> {
+  const { count, error } = await supabase.from('issue_reports').select('id', { count: 'exact', head: true }).eq('status', 'fix_ready');
+  if (error) throw error;
+  return count || 0;
 }
 
 /** Admin: reports by status group, newest first. */
@@ -86,9 +104,14 @@ export async function allReports(open: boolean, page: number, size: number) {
   return { rows: (data || []) as IssueReport[], total: count || 0 };
 }
 
-/** Admin: approve a ready fix (the next run merges it), or decline it. */
-export async function decide(id: string, status: 'approved' | 'declined', adminNote: string) {
-  const { data, error } = await supabase.from('issue_reports').update({ status, admin_note: adminNote.trim() || null }).eq('id', id).eq('status', 'fix_ready').select('id');
+/**
+ * Admin decisions: approve a ready fix (the next check merges exactly that
+ * version) or decline it; for a report waiting for detail, send it back with
+ * a note (the next check looks again) or close it. Only applies if the report
+ * is still exactly as shown (same status and last change).
+ */
+export async function decide(r: Pick<IssueReport, 'id' | 'status' | 'updated_at'>, status: 'approved' | 'declined' | 'new', adminNote: string) {
+  const { data, error } = await supabase.from('issue_reports').update({ status, admin_note: adminNote.trim() || null }).eq('id', r.id).eq('status', r.status).eq('updated_at', r.updated_at).select('id');
   if (error) throw error;
   if (!data?.length) throw new Error('This report changed meanwhile — refresh and try again');
 }

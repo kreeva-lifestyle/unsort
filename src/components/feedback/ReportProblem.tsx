@@ -9,7 +9,6 @@ import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
 import { useModalLock } from '../../hooks/useModalLock';
 import { useBackClose } from '../../hooks/useBackClose';
-import { useAuth } from '../../hooks/useAuth';
 import { KINDS, STATUS_LABEL, myReports, sendReport, snapshotPage, type IssueReport, type PageSnapshot, type ReportKind } from './reportApi';
 
 const when = (iso: string) => new Date(iso).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
@@ -17,7 +16,6 @@ const when = (iso: string) => new Date(iso).toLocaleString('en-IN', { day: '2-di
 function ReportSheet({ snap, onClose, addToast }: { snap: PageSnapshot; onClose: () => void; addToast: (m: string, t?: string) => void }) {
   useModalLock();
   useBackClose(true, onClose);
-  const { profile } = useAuth();
   const [tab, setTab] = useState<'new' | 'mine'>('new');
   const [kind, setKind] = useState<ReportKind | null>(null);
   const [note, setNote] = useState('');
@@ -38,15 +36,15 @@ function ReportSheet({ snap, onClose, addToast }: { snap: PageSnapshot; onClose:
     if (!kind) { setErr('Pick what kind of problem it is'); return; }
     setSending(true); setErr('');
     try {
-      await sendReport(snap, kind, note, picture, profile?.full_name || null);
-      addToast('Problem sent — it will be looked at in the next check (twice a day)', 'success');
+      const withPicture = await sendReport(snap, kind, note, picture);
+      addToast(withPicture ? 'Problem sent — it will be looked at in the next check (twice a day)' : 'Problem sent, but the picture could not be added — the report is saved without it', withPicture ? 'success' : 'error');
       onClose();
     } catch (e) { setErr(friendlyError(e)); addToast(friendlyError(e), 'error'); }
     finally { setSending(false); }
   };
 
   const tabBtn = (id: 'new' | 'mine', label: string) => (
-    <button type="button" onClick={() => { setTab(id); setErr(''); }} style={{ flex: 1, minHeight: 40, borderRadius: 8, border: `1px solid ${tab === id ? T.ac : T.bd}`, background: tab === id ? T.ac3 : 'transparent', color: tab === id ? T.ac2 : T.tx2, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{label}</button>
+    <button type="button" role="tab" aria-selected={tab === id} onClick={() => { setTab(id); setErr(''); }} style={{ flex: 1, minHeight: 40, borderRadius: 8, border: `1px solid ${tab === id ? T.ac : T.bd}`, background: tab === id ? T.ac3 : 'transparent', color: tab === id ? T.ac2 : T.tx2, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{label}</button>
   );
 
   return createPortal(
@@ -57,24 +55,29 @@ function ReportSheet({ snap, onClose, addToast }: { snap: PageSnapshot; onClose:
           <button type="button" onClick={onClose} style={S.modalClose} aria-label="Close">&#215;</button>
         </div>
         <div style={{ padding: '14px 18px 18px', display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto' }}>
-          <div style={{ display: 'flex', gap: 8 }}>{tabBtn('new', 'New report')}{tabBtn('mine', 'My reports')}</div>
+          <div role="tablist" style={{ display: 'flex', gap: 8 }}>{tabBtn('new', 'New report')}{tabBtn('mine', 'My reports')}</div>
           {tab === 'new' ? <>
             <div style={{ fontSize: 12, color: T.tx3, lineHeight: 1.5 }}>The screen you were on (<b style={{ color: T.tx2 }}>{snap.page}</b>), what it showed and any error messages are sent with it — no need to type them.</div>
             <div>
-              <label style={S.fLabel}>What is it?</label>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              <div id="rp-kind" style={S.fLabel}>What is it?</div>
+              <div role="group" aria-labelledby="rp-kind" style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                 {KINDS.map(k => (
-                  <button key={k.id} type="button" onClick={() => { setKind(k.id); setErr(''); }} style={{ minHeight: 44, padding: '8px 12px', borderRadius: 8, border: `1px solid ${kind === k.id ? T.ac : T.bd2}`, background: kind === k.id ? T.ac3 : 'transparent', color: kind === k.id ? T.ac2 : T.tx2, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{k.label}</button>
+                  <button key={k.id} type="button" aria-pressed={kind === k.id} onClick={() => { setKind(k.id); setErr(''); }} style={{ minHeight: 44, padding: '8px 12px', borderRadius: 8, border: `1px solid ${kind === k.id ? T.ac : T.bd2}`, background: kind === k.id ? T.ac3 : 'transparent', color: kind === k.id ? T.ac2 : T.tx2, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{k.label}</button>
                 ))}
               </div>
             </div>
             <div>
-              <label style={S.fLabel}>A few words (optional)</label>
-              <textarea value={note} onChange={e => setNote(e.target.value)} rows={3} maxLength={2000} placeholder="e.g. the total shows ₹0 after I add an item" style={{ ...S.fInput, width: '100%', height: 'auto', minHeight: 72, resize: 'vertical', fontFamily: T.sans }} />
+              <label htmlFor="rp-note" style={S.fLabel}>A few words (optional)</label>
+              <textarea id="rp-note" value={note} onChange={e => setNote(e.target.value)} rows={3} maxLength={2000} placeholder="e.g. the total shows ₹0 after I add an item" style={{ ...S.fInput, width: '100%', height: 'auto', minHeight: 72, resize: 'vertical', fontFamily: T.sans }} />
             </div>
             <div>
-              <label style={S.fLabel}>Screenshot (optional)</label>
-              <input type="file" accept="image/*" onChange={e => setPicture(e.target.files?.[0] || null)} style={{ fontSize: 12, color: T.tx2 }} aria-label="Screenshot" />
+              <label htmlFor="rp-pic" style={S.fLabel}>Screenshot (optional)</label>
+              {picture
+                ? <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: T.tx2 }}>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{picture.name}</span>
+                    <button type="button" onClick={() => setPicture(null)} style={{ ...S.btnGhost, ...S.btnSm, minHeight: 36, flexShrink: 0 }}>Remove picture</button>
+                  </div>
+                : <input id="rp-pic" type="file" accept="image/jpeg,image/png,image/webp" onChange={e => setPicture(e.target.files?.[0] || null)} style={{ fontSize: 12, color: T.tx2 }} />}
             </div>
             {err && <div style={S.errorBox}>{err}</div>}
             <div style={{ display: 'flex', gap: 10 }}>
