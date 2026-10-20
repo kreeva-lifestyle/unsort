@@ -25,7 +25,7 @@ const TEXT: Record<Step, { idle: string; busy: string; done: string }> = {
   reopen: { idle: 'Reopen', busy: 'Reopening…', done: 'Purchase order reopened' },
 };
 
-export default function POStageActions({ po: livePo, items: liveItems, canManage, ask, onChanged, waitLanded, busy: sheetBusy, setBusy: setSheetBusy, onReceive, onCloseRemaining, addToast }: {
+export default function POStageActions({ po: livePo, items: liveItems, canManage, ask, onChanged, waitLanded, busy: sheetBusy, holding, setBusy: setSheetBusy, onReceive, onCloseRemaining, addToast }: {
   po: PurchaseOrder; items: PurchaseOrderItem[]; canManage: boolean;
   ask: (o: ConfirmOptions) => Promise<boolean>;
   /** Re-reads the order. */
@@ -34,6 +34,8 @@ export default function POStageActions({ po: livePo, items: liveItems, canManage
   waitLanded: () => Promise<void>;
   /** The sheet's shared write gate (also held by receipt undo). */
   busy: string; setBusy: (b: string) => void;
+  /** The sheet still shows the order as it was while the rail's light travels: its steps wait. */
+  holding: boolean;
   onReceive: () => void; onCloseRemaining: () => void;
   addToast: (m: string, t?: string) => void;
 }) {
@@ -43,7 +45,7 @@ export default function POStageActions({ po: livePo, items: liveItems, canManage
   const setBusy = (b: Step | '') => { setSheetBusy(b); if (!b) setFrozen(null); };
 
   const run = async (step: Step) => {
-    if (sheetBusy) return;
+    if (sheetBusy || holding) return;
     if (step === 'cancelled') {
       const ok = await ask({ title: `Cancel PO #${po.po_number}?`, message: 'The order stays on record but is closed to further edits and receiving. This cannot be undone.', confirmLabel: 'Cancel PO', cancelLabel: 'Keep', danger: true });
       if (!ok) return;
@@ -74,7 +76,7 @@ export default function POStageActions({ po: livePo, items: liveItems, canManage
   const got = receivedOf(items);
   const due = got.ordered - got.got;
   const receiveLabel = got.mixed || due <= 0 ? 'Receive' : got.got > 0 ? `Receive remaining ${fmtQty(due)}` : `Receive ${fmtQty(due)}`;
-  const wait = { pointerEvents: busy ? 'none' as const : 'auto' as const, opacity: busy ? 0.5 : 1 };
+  const wait = { pointerEvents: busy || holding ? 'none' as const : 'auto' as const, opacity: busy || holding ? 0.5 : 1 };
   const btn = (step: Step, look: React.CSSProperties) => (
     <button type="button" onClick={() => run(step)} aria-busy={busy === step} style={{ ...look, ...S.btnLg, ...wait }}>{busy === step ? TEXT[step].busy : TEXT[step].idle}</button>
   );

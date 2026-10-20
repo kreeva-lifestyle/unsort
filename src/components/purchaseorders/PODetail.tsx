@@ -46,7 +46,7 @@ export default function PODetail({ po: livePo, items: liveItems, receipts: liveR
 }) {
   const { ask, modalProps } = useConfirm();
   // Everything below the rail shows the order as it was until the rail's light lands.
-  const { shown, land } = useLandedOrder({ po: livePo, items: liveItems, receipts: liveReceipts }, audit);
+  const { shown, holding, land } = useLandedOrder({ po: livePo, items: liveItems, receipts: liveReceipts }, audit);
   const { po, items, receipts } = shown;
   useModalLock();
   // One gate for every write on this sheet: a stage change and a receipt undo never overlap.
@@ -96,7 +96,7 @@ export default function PODetail({ po: livePo, items: liveItems, receipts: liveR
         <div style={{ padding: '16px 18px', overflowY: 'auto', WebkitOverflowScrolling: 'touch', flex: 1, minHeight: 0 }}>
           {/* The hero: title, status pill, the pipeline rail (the light travels when the order moves on), the latest event and who. */}
           <PORailCard po={livePo} items={liveItems} shown={shown} audit={audit} names={names} statusColors={statusColors} onLanded={() => { land(); landRef.current?.(); }} />
-          <POStageActions po={po} items={items} canManage={canManage} ask={ask} onChanged={onChanged} waitLanded={waitLanded} busy={busy} setBusy={setBusy} onReceive={onReceive} onCloseRemaining={() => setClosing(true)} addToast={addToast} />
+          <POStageActions po={po} items={items} canManage={canManage} ask={ask} onChanged={onChanged} waitLanded={waitLanded} busy={busy} holding={holding} setBusy={setBusy} onReceive={onReceive} onCloseRemaining={() => setClosing(true)} addToast={addToast} />
           <POHeaderInfo po={po} costingSku={costingSku} names={names} />
 
           {/* Items */}
