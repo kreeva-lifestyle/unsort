@@ -6,7 +6,7 @@
 //     Settings → Pack Cam and only its sha-256 is stored
 //     (app_secrets.packcam_agent_token_hash).
 //       agent_poll   { cursor, status }  -> settings, cameras (with passwords),
-//                    new scans since cursor, a short-lived Dropbox access
+//                    new scans received since cursor, a short-lived Dropbox access
 //                    token (when Dropbox is on), play secret. Also stores the
 //                    agent's heartbeat (app_settings.packcam_agent).
 //       agent_report { clips } -> upserts clip rows.
@@ -37,7 +37,11 @@ async function agentPoll(body: any, req: Request): Promise<Response> {
   // minute, or sooner when something the Settings page shows has changed.
   const status = body?.status && typeof body.status === 'object' && JSON.stringify(body.status).length < 20_000 ? body.status : {};
   const prev = await setting('packcam_agent');
-  const gist = (x: any) => JSON.stringify([x?.version, x?.lan_url, x?.enabled, x?.queue, x?.dropbox, x?.gdrive, x?.last_error, (x?.cameras ?? []).map((c: any) => [c?.number, c?.ok, c?.error])]);
+  // Storage counts by level only (ok / low / full): free space moves every
+  // minute and is refreshed by the once-a-minute write anyway. A camera test
+  // answer goes out at once — the Settings page is waiting for it.
+  const levels = (st: any) => Object.entries(st && typeof st === 'object' ? st : {}).map(([k, v]: [string, any]) => [k, v?.level ?? null]);
+  const gist = (x: any) => JSON.stringify([x?.version, x?.lan_url, x?.enabled, x?.queue, x?.dropbox, x?.gdrive, x?.last_error, (x?.cameras ?? []).map((c: any) => [c?.number, c?.ok, c?.error]), levels(x?.storage), x?.tests ?? null]);
   if (!prev?.last_seen || Date.now() - Date.parse(prev.last_seen) > 60_000 || gist(prev) !== gist(status)) await putSetting('packcam_agent', { ...status, last_seen: now });
 
   const cams = await rest('packtime_cameras?select=id,number,is_active,ip,rtsp_port,rtsp_path,username&is_active=eq.true&ip=not.is.null&order=number');
@@ -47,6 +51,11 @@ async function agentPoll(body: any, req: Request): Promise<Response> {
 
   // New scans on the configured cameras since the agent's cursor (first run:
   // the last 10 minutes only — no backlog from before Pack Cam existed).
+  // By received_at (when the server got the scan): a scan a phone sent late
+  // after losing Wi-Fi has an earlier scanned_at, its real scan time, and
+  // would fall behind the cursor. Agents before 1.4.0 keep their cursor by
+  // scanned_at, which is never later than received_at, so they still see
+  // every scan (late ones too; duplicates are dropped by id).
   const since = typeof body?.cursor === 'string' && !isNaN(Date.parse(body.cursor)) ? body.cursor : new Date(Date.now() - 10 * 60_000).toISOString();
   // Camera numbers are free text: quote and escape each for PostgREST, then
   // URL-encode the list so characters like & or # cannot break the query.
@@ -54,7 +63,7 @@ async function agentPoll(body: any, req: Request): Promise<Response> {
   // Sent even while recording is off: on the poll that switches it off, the
   // agent still takes the scans made in the last few seconds before it.
   const scans = cameras.length
-    ? await rest(`packtime_scans?select=id,awb,courier,camera,scanned_at&scanned_at=gte.${encodeURIComponent(since)}&camera=in.(${encodeURIComponent(numbers)})&order=scanned_at.asc&limit=500`)
+    ? await rest(`packtime_scans?select=id,awb,courier,camera,scanned_at,received_at&received_at=gte.${encodeURIComponent(since)}&camera=in.(${encodeURIComponent(numbers)})&order=received_at.asc&limit=500`)
     : [];
 
   const dropbox = settings.targets.dropbox ? await dropboxToken() : null;

@@ -8,7 +8,10 @@ $ErrorActionPreference = 'Continue'
 $dir = [WildcardPattern]::Escape($PSScriptRoot.TrimEnd('\') + '\')
 $seg = $null
 try {
-  $data = (Get-Content -Raw (Join-Path $PSScriptRoot 'config.json') | ConvertFrom-Json).data_dir
+  # config.json is optional (the download ships only config.example.json).
+  $cfg = Join-Path $PSScriptRoot 'config.json'
+  if (-not (Test-Path $cfg)) { $cfg = Join-Path $PSScriptRoot 'config.example.json' }
+  $data = (Get-Content -Raw $cfg | ConvertFrom-Json).data_dir
   if ($data) { $seg = [WildcardPattern]::Escape(($data -replace '/', '\').TrimEnd('\') + '\segments') }
 } catch { }
 

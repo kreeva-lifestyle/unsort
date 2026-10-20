@@ -6,6 +6,7 @@
 import fs from 'node:fs';
 
 const CONTENT = process.env.PACKCAM_DROPBOX_CONTENT || 'https://content.dropboxapi.com/2';
+const RPC = process.env.PACKCAM_DROPBOX_API || 'https://api.dropboxapi.com/2';
 const CHUNK = 32 * 1024 * 1024;
 // The Dropbox-API-Arg header must be plain ASCII.
 const arg = o => JSON.stringify(o).replace(/[\u007f-￿]/g, c => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'));
@@ -58,4 +59,15 @@ export async function dropboxUpload(token, file, dest) {
     const done = await send('finish', { cursor: { session_id: session, offset: off }, commit: { path: dest, mode: 'overwrite', mute: true } }, piece);
     return done.path_display || dest;
   } finally { fs.closeSync(fd); }
+}
+
+/** The account's storage: { free, total } in bytes (a team space counts as the whole team's). */
+export async function dropboxSpace(token) {
+  const r = await fetch(`${RPC}/users/get_space_usage`, { method: 'POST', headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(30_000) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(`Dropbox ${r.status}: ${d.error_summary || 'could not read the storage'}`);
+  const a = d.allocation || {};
+  const total = Number(a.allocated) || null;
+  const used = a['.tag'] === 'team' ? Number(a.used) || Number(d.used) || 0 : Number(d.used) || 0;
+  return { free: total == null ? null : Math.max(0, total - used), total };
 }

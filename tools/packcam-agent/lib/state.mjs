@@ -29,7 +29,9 @@ export function makeState(dataDir) {
     const before = st.cursor;
     let added = 0; let newest = st.cursor ? Date.parse(st.cursor) + CURSOR_LAG_MS : 0;
     for (const sc of scans) {
-      newest = Math.max(newest, Date.parse(sc.scanned_at));
+      // The cursor follows when the server got the scan: a scan sent late by
+      // a phone that was offline keeps its real (earlier) scan time.
+      newest = Math.max(newest, Date.parse(sc.received_at || sc.scanned_at));
       if (st.jobs[sc.id]) continue;
       st.jobs[sc.id] = { id: sc.id, awb: sc.awb, courier: sc.courier ?? null, camera: String(sc.camera), scanned_at: sc.scanned_at, status: 'queued', attempts: 0, next_try: 0, rev: 1, sent: 0 };
       added++;

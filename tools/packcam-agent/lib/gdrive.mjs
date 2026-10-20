@@ -133,5 +133,15 @@ export function makeDrive(cfg) {
     return { configured: configured(), connected: !!s?.refresh_token, connected_at: s?.connected_at || null };
   }
 
-  return { configured, authUrl, finishConnect, upload, status };
+  /** The account's storage: { free, total } in bytes (total null = no limit). */
+  async function space() {
+    const r = await api(`${API}/about?fields=storageQuota`);
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(`Google Drive ${r.status}: ${d.error?.message || 'could not read the storage'}`);
+    const q = d.storageQuota || {};
+    const total = q.limit != null ? Number(q.limit) : null;
+    return { free: total == null ? null : Math.max(0, total - Number(q.usage || 0)), total };
+  }
+
+  return { configured, authUrl, finishConnect, upload, status, space };
 }

@@ -19,6 +19,9 @@ import { Recorder, stopOrphanRecorders } from './lib/recorder.mjs';
 import { dirBytes, prune } from './lib/segments.mjs';
 import { step } from './lib/worker.mjs';
 import { startServer } from './lib/server.mjs';
+import { ensureKey, readKey } from './lib/key.mjs';
+import { makeStorage } from './lib/storage.mjs';
+import { testCamera } from './lib/cameratest.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const cfg = loadConfig(process.argv[2] || path.join(here, 'config.json'));
@@ -27,10 +30,13 @@ const api = makeApi(cfg);
 const state = makeState(cfg.data_dir);
 const drive = makeDrive(cfg);
 const lanUrl = cfg.lan_url || `http://${lanAddress()}:${cfg.port}`;
+const storage = makeStorage(drive);
 
 let settings = null; let dropbox = null; let playSecret = null; let offset = 0;
 let serverOk = false; let lastError = ''; let bufferBytes = 0; let wasRecording = false; let folderWarning = '';
 const recorders = new Map();          // camera number → Recorder
+// "Test connection" answers, camera number → { nonce, ok, message }.
+const tests = {}; let testNonce = null;
 
 const ctx = { cfg, state, drive, settings: () => settings, dropbox: () => dropbox, offset: () => offset, setFolderWarning: w => { folderWarning = w; } };
 
@@ -44,6 +50,7 @@ function syncRecorders(cameras) {
 
 function status() {
   const jobs = Object.values(state.st.jobs);
+  const pcFolder = (!folderWarning && (settings?.pc_folder || '').trim()) || path.join(cfg.data_dir, 'clips');
   return {
     version: VERSION, host: os.hostname(), os: `${os.platform()} ${os.release()}`, lan_url: lanUrl,
     enabled: !!settings?.enabled, disk: diskInfo(cfg.data_dir), buffer_gb: +(bufferBytes / 1e9).toFixed(1),
@@ -52,12 +59,42 @@ function status() {
     dropbox: settings?.targets?.dropbox ? (dropbox?.error ? { ok: false, error: dropbox.error } : { ok: !!dropbox?.access_token }) : null,
     gdrive: settings?.targets?.gdrive ? drive.status() : null,
     // Where clips really go: the fallback while the chosen folder cannot be used.
-    pc_folder: (!folderWarning && (settings?.pc_folder || '').trim()) || path.join(cfg.data_dir, 'clips'),
+    pc_folder: pcFolder,
+    storage: storage.status({ settings, dropboxToken: dropbox, jobs, pcFolder, dataDir: cfg.data_dir }),
+    tests,
     last_error: [lastError, folderWarning].filter(Boolean).join(' · ') || null,
   };
 }
 
+/**
+ * Settings → Pack Cam → Cameras → "Test connection" sets a new test_nonce:
+ * ask every camera once; one stopped for a wrong password records again once
+ * it answers (e.g. the password was changed on the camera to match).
+ * After a start, a press more than 2 minutes old is only noted.
+ */
+async function runTests(nonce, cameras, serverNow) {
+  if (!nonce || nonce === testNonce) return;
+  const first = testNonce === null; testNonce = nonce;
+  // The nonce is the press time (ms): one pressed while the PC was starting still counts.
+  if (first && !(Math.abs(Date.parse(serverNow) - Number(nonce)) < 120_000)) return;
+  log('testing the camera connections');
+  // All at once: an unreachable camera takes ~10 s, and the app is waiting.
+  await Promise.all(cameras.map(async c => {
+    const r = await testCamera(cfg, c);
+    if (nonce !== testNonce) return;   // a newer press is running
+    tests[c.number] = { nonce, ok: r.ok, message: r.message, at: new Date().toISOString() };
+    log(`camera ${c.number} test: ${r.message}`);
+    // Only a camera that answered goes back to recording: one stopped for a
+    // wrong password stays stopped (each failed login brings the camera's
+    // lock-out nearer); a new password in the app starts it afresh anyway.
+    if (r.ok) recorders.get(c.number)?.retry();
+  }));
+}
+
 async function checkIn() {
+  // key.txt is read on every poll: a key pasted again (a new one made in the
+  // app) is used without restarting Pack Cam.
+  cfg.agent_key = readKey(cfg.key_file) || cfg.agent_key;
   const t0 = Date.now();
   const d = await api.poll(state.st.cursor, status());
   // How far this PC's clock is from the server's (scan times are the server's).
@@ -66,6 +103,7 @@ async function checkIn() {
   settings = d.settings; dropbox = d.dropbox; playSecret = d.play_secret;
   const recording = settings.enabled && (d.cameras || []).length > 0;
   syncRecorders(recording ? d.cameras : []);
+  runTests(settings.test_nonce || null, d.cameras || [], d.now).catch(e => log(`camera test: ${e.message}`));
   if (!recording) {
     // Scans made just before recording was switched off still have footage:
     // take them on this first poll, then keep the cursor at "now" so turning
@@ -175,5 +213,6 @@ await new Promise(resolve => {
   });
 });
 await stopOrphanRecorders(cfg);
+await ensureKey(cfg);
 checkInLoop();
 workLoop();

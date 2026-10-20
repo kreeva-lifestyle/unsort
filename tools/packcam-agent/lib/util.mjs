@@ -7,11 +7,18 @@ import os from 'node:os';
 export const VERSION = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
 export const SEGMENT_SECONDS = Number(process.env.PACKCAM_SEGMENT_SECONDS) || 60;   // env: tests only
 
+/**
+ * config.json is optional: the program download ships only config.example.json,
+ * so an update never overwrites settings made by hand. The agent key is in
+ * key.txt (lib/key.mjs); a key still in config.json is moved there.
+ */
 export function loadConfig(file) {
-  const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
+  const example = path.join(path.dirname(file), 'config.example.json');
+  const raw = JSON.parse(fs.readFileSync(fs.existsSync(file) ? file : example, 'utf8'));
   const cfg = {
     server: String(raw.server || '').trim(),
-    agent_key: String(raw.agent_key || '').trim(),
+    agent_key: '',
+    legacy_key: String(raw.agent_key || '').trim(),
     data_dir: path.resolve(String(raw.data_dir || './packcam-data')),
     port: Number(raw.port) || 8765,
     ffmpeg: String(raw.ffmpeg || 'ffmpeg'),
@@ -22,8 +29,10 @@ export function loadConfig(file) {
     // more than one network card (e.g. "http://192.168.1.20:8765").
     lan_url: String(raw.lan_url || '').trim(),
   };
-  if (!/^https?:\/\//.test(cfg.server)) throw new Error('config.json: "server" must be the packcam function URL');
-  if (cfg.agent_key.length < 20) throw new Error('config.json: paste the agent key from Settings → Pack Cam into "agent_key"');
+  // In the data folder (C:\PackCam), outside the program folder: replacing or
+  // deleting the program files never touches it.
+  cfg.key_file = path.join(cfg.data_dir, 'key.txt');
+  if (!/^https?:\/\//.test(cfg.server)) throw new Error('config: "server" must be the packcam function URL');
   // ffprobe sits next to ffmpeg (same folder, same naming).
   cfg.ffprobe = raw.ffprobe ? String(raw.ffprobe) : cfg.ffmpeg.replace(/ffmpeg(\.exe)?$/i, (_m, exe) => `ffprobe${exe || ''}`);
   for (const d of ['segments', 'clips', 'tmp', 'logs']) fs.mkdirSync(path.join(cfg.data_dir, d), { recursive: true });
