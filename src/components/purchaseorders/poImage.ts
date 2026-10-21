@@ -5,9 +5,10 @@
 // Rates are OFF unless asked for (owner's rule: the image that goes to a
 // vendor must not carry rates, amounts or totals).
 import type { PurchaseOrder, PurchaseOrderItem } from '../../types/database';
-import type { PoDocOptions } from './poPdf';
+import { docLines, type PoDocOptions } from './poPdf';
 import { PO_TYPE_LABELS, PO_STATUS_LABELS } from '../../types/database';
 import { exportName } from '../../lib/exportName';
+import { friendlyError } from '../../lib/friendlyError';
 import { itemLabel } from './poItemLabel';
 
 const inr = (n: unknown) => Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -20,8 +21,9 @@ const trunc = (ctx: CanvasRenderingContext2D, s: string, max: number) => {
   return t + '…';
 };
 
-export function renderPoImage(po: PurchaseOrder, items: PurchaseOrderItem[], opts: PoDocOptions = {}): Promise<Blob> {
+export function renderPoImage(po: PurchaseOrder, allItems: PurchaseOrderItem[], opts: PoDocOptions = {}): Promise<Blob> {
   const rates = opts.rates === true;
+  const items = docLines(allItems);
   const S = 2;            // supersample for crisp text
   const W = 720, PAD = 40;
   const hasSku = items.some(it => it.sku);
@@ -45,7 +47,7 @@ export function renderPoImage(po: PurchaseOrder, items: PurchaseOrderItem[], opt
   ctx.fillStyle = '#6B7280'; ctx.font = `400 12px ${SANS}`;
   ctx.fillText('Purchase Order', PAD, y + 18);
   ctx.textAlign = 'right'; ctx.fillStyle = '#111827'; ctx.font = `700 18px ${SANS}`;
-  ctx.fillText(`PO #${po.po_number}`, W - PAD, y);
+  ctx.fillText(`PO #${po.po_number}${po.revision > 1 ? ` · Rev ${po.revision}` : ''}`, W - PAD, y);
   ctx.fillStyle = '#6B7280'; ctx.font = `400 12px ${SANS}`;
   ctx.fillText(fmtDate(po.po_date), W - PAD, y + 18);
   // status pill
@@ -157,20 +159,26 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
 }
 
 // Share the PO image via the native share sheet; download as a fallback.
-export async function sharePoImage(po: PurchaseOrder, items: PurchaseOrderItem[], addToast: (m: string, t?: string) => void, opts: PoDocOptions = {}) {
+// Says how it went, so the preview can ask "Mark as sent?" after a share.
+export type ShareOutcome = 'shared' | 'downloaded' | 'cancelled' | 'failed';
+export async function sharePoImage(po: PurchaseOrder, items: PurchaseOrderItem[], addToast: (m: string, t?: string) => void, opts: PoDocOptions = {}): Promise<ShareOutcome> {
   let blob: Blob;
   try { blob = await renderPoImage(po, items, opts); }
-  catch { addToast('Could not build the PO image', 'error'); return; }
+  catch { addToast('Could not build the PO image', 'error'); return 'failed'; }
   const file = new File([blob], exportName('PO', [po.po_number, po.vendor_name], 'png'), { type: 'image/png' });
   const nav = navigator as Navigator & { canShare?: (d: unknown) => boolean };
   if (nav.canShare && nav.canShare({ files: [file] }) && nav.share) {
-    try { await nav.share({ files: [file], title: `Purchase Order #${po.po_number}`, text: `Purchase Order #${po.po_number} — ${po.vendor_name}` }); }
-    catch (e) { if ((e as Error)?.name !== 'AbortError') addToast('Sharing was cancelled', 'error'); }
-    return;
+    try { await nav.share({ files: [file], title: `Purchase Order #${po.po_number}`, text: `Purchase Order #${po.po_number} — ${po.vendor_name}` }); return 'shared'; }
+    catch (e) {
+      if ((e as Error)?.name === 'AbortError') return 'cancelled';
+      addToast(friendlyError(e, 'Could not share the PO — try again'), 'error');
+      return 'failed';
+    }
   }
   // Desktop / unsupported: download the image
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a'); a.href = url; a.download = file.name; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
   addToast('Sharing not supported here — image downloaded', 'success');
+  return 'downloaded';
 }

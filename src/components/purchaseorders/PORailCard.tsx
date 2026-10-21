@@ -15,17 +15,18 @@ import type { PurchaseOrder, PurchaseOrderItem, PurchaseOrderReceipt, AuditLog }
 
 const n = (v: unknown) => Number(v || 0);
 /** What the card reads from a line — the list's embed carries no more. */
-export type CardLine = Pick<PurchaseOrderItem, 'item_name' | 'fabric_code' | 'quantity' | 'received_qty' | 'unit'>;
+export type CardLine = Pick<PurchaseOrderItem, 'item_name' | 'fabric_code' | 'quantity' | 'received_qty' | 'unit'> & { cancelled_at?: string | null };
 export interface CardView { po: PurchaseOrder; items: CardLine[]; receipts: PurchaseOrderReceipt[] }
 // " · 26 Sep, 03:40 pm" — nothing when the time is not known.
 const at = (iso: string | null | undefined) => (iso ? ` · ${fmtWhen(iso)}` : '');
 
 /** "20 of 20" when every line shares a unit (metres and pieces are never
  *  added together); otherwise the share, "64%", and `mixed` is set. */
-export function receivedOf(items: Pick<PurchaseOrderItem, 'quantity' | 'received_qty' | 'unit'>[]): { got: number; ordered: number; text: string; mixed: boolean } {
+export function receivedOf(items: (Pick<PurchaseOrderItem, 'quantity' | 'received_qty' | 'unit'> & { cancelled_at?: string | null })[]): { got: number; ordered: number; text: string; mixed: boolean } {
   const ordered = items.reduce((t, it) => t + n(it.quantity), 0);
   const got = items.reduce((t, it) => t + Math.min(n(it.received_qty), n(it.quantity)), 0);
-  const mixed = new Set(items.map(it => (it.unit || '').trim().toLowerCase())).size > 1;
+  // An item cancelled before anything arrived does not count as another unit.
+  const mixed = new Set(items.filter(it => !(it.cancelled_at && n(it.quantity) <= 0)).map(it => (it.unit || '').trim().toLowerCase())).size > 1;
   const text = !mixed ? `${fmtQty(got)} of ${fmtQty(ordered)}` : `${ordered > 0 ? Math.round(got / ordered * 100) : 0}%`;
   return { got, ordered, text, mixed };
 }
@@ -67,7 +68,9 @@ export default function PORailCard({ po, items, shown, audit, names, statusColor
   const shownState = railState(shown.po, shown.items, audit);
   const got = receivedOf(shown.items);
   const ev = latestEvent(shown.po, shown.items, shown.receipts, audit, names, shownState.skippedSent);
-  const sub = [po.for_pieces ? `${po.for_pieces} pcs` : null, items[0] ? `${itemLabel(items[0])}${items.length > 1 ? `, +${items.length - 1} more` : ''}` : null].filter(Boolean).join(' · ');
+  // An item cancelled on the order is not what it is for any more.
+  const lines = items.filter(it => !it.cancelled_at);
+  const sub = [po.for_pieces ? `${po.for_pieces} pcs` : null, lines[0] ? `${itemLabel(lines[0])}${lines.length > 1 ? `, +${lines.length - 1} more` : ''}` : null].filter(Boolean).join(' · ');
   const title = `PO #${po.po_number} · ${po.vendor_name}`;
   return (
     <div className="po-card">

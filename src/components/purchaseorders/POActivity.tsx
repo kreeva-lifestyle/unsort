@@ -1,6 +1,6 @@
 // Who did what on a purchase order — the audit trail the PO RPCs write
 // (created, edited, approved, sent, received, receipt removed, closed,
-// reopened, cancelled), drawn by the shared ActivityList with the order's
+// reopened, cancelled, revised, item cancelled, vendor told, reminded), drawn by the shared ActivityList with the order's
 // own action names. The actor's name and the real time are stamped by the
 // database.
 import { T } from '../../lib/theme';
@@ -14,6 +14,8 @@ const ACTIONS: Record<string, ActionMeta> = {
   APPROVED: { label: 'Approved', tone: 'ac' }, SENT: { label: 'Marked sent', tone: 'bl' },
   RECEIVE: { label: 'Received', tone: 'gr' }, RECEIPT_REMOVED: { label: 'Receipt removed', tone: 're' },
   CLOSED: { label: 'Closed', tone: 'yl' }, REOPENED: { label: 'Reopened', tone: 'neutral' }, CANCELLED: { label: 'Cancelled', tone: 're' },
+  REVISED: { label: 'Revised', tone: 'ac' }, LINE_CANCELLED: { label: 'Item cancelled', tone: 're' },
+  REVISION_SENT: { label: 'Vendor told', tone: 'gr' }, REMINDED: { label: 'Reminder sent', tone: 'yl' },
 };
 
 export default function POActivity({ audit, poNumber, onRetry }: {

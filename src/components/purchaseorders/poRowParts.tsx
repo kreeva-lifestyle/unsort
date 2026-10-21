@@ -12,12 +12,14 @@ import type { RowView, Section, UnitQty } from './poSections';
 const DAY = new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short' });
 export const day = (d: string | null | undefined) => (d ? DAY.format(new Date(d.length <= 10 ? `${d}T00:00:00` : d)) : '—');
 const n = (v: unknown) => Number(v || 0);
+/** The lines still on the order — an item cancelled on it is not what the row is about. */
+const liveLines = (v: RowView) => { const all = v.po.purchase_order_items ?? []; const live = all.filter(it => !it.cancelled_at); return live.length ? live : all; };
 /** "204 pcs · 120 m" */
 export const unitsText = (q: UnitQty) => q.map(x => `${fmtQty(x.qty)} ${x.unit}`).join(' · ');
 
 /** The first line's SKU photo; a quiet tile when the order has no SKU. */
 export function Thumb({ v, size }: { v: RowView; size: number }) {
-  const sku = (v.po.purchase_order_items?.[0]?.sku || '').trim();
+  const sku = (liveLines(v)[0]?.sku || '').trim();
   if (sku) return <SkuThumb sku={sku} size={size} radius={size > 48 ? 10 : 8} />;
   return (
     <div aria-hidden style={{ width: size, height: size, borderRadius: size > 48 ? 10 : 8, background: T.s2, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -28,7 +30,7 @@ export function Thumb({ v, size }: { v: RowView; size: number }) {
 
 /** "DRS187" (or "PO #88" when there is no SKU) and the PO number beside it. */
 export function Title({ v, size }: { v: RowView; size: number }) {
-  const sku = (v.po.purchase_order_items?.[0]?.sku || '').trim();
+  const sku = (liveLines(v)[0]?.sku || '').trim();
   return (
     <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 8, minWidth: 0 }}>
       <span style={{ fontFamily: T.mono, fontSize: size, fontWeight: 700, color: T.tx, whiteSpace: 'nowrap' }}>{sku || `PO #${v.po.po_number}`}</span>
@@ -39,7 +41,7 @@ export function Title({ v, size }: { v: RowView; size: number }) {
 
 /** "Valentino · 137 +2 more" — the type when the order has no lines. */
 export function Item({ v }: { v: RowView }) {
-  const items = v.po.purchase_order_items ?? [], first = items[0];
+  const items = liveLines(v), first = items[0];
   if (!first) return <>{PO_TYPE_LABELS[v.po.po_type] || v.po.po_type}</>;
   return <>{itemLabel({ item_name: (first.item_name || '').trim() || 'item', fabric_code: first.fabric_code })}{items.length > 1 && <b style={{ color: T.ac2, fontWeight: 600 }}> +{items.length - 1} more</b>}</>;
 }

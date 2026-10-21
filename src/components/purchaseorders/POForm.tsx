@@ -1,7 +1,12 @@
-// Create / edit a Purchase Order. Self-contained: owns form state, computes
-// a live preview total (the server recomputes authoritatively on save), and
-// calls create_po_with_items / update_po_with_items. Only item name + qty are
-// mandatory (owner decision) — unit, rate and all header charges are optional.
+// Create / edit / revise a Purchase Order. Self-contained: owns form state,
+// computes a live preview total (the server recomputes authoritatively on
+// save), and calls create_po_with_items / update_po_with_items (a draft) /
+// amend_po (an approved, sent or part-received order — owner's ask: revise
+// instead of cancel and re-raise). A revision keeps every line's id so the
+// receipts on it stand, never lets a quantity drop below what arrived, keeps
+// the vendor, type and PO date as raised, and asks what changed. Only item
+// name + qty are mandatory (owner decision) — unit, rate and all header
+// charges are optional. Rules and payload: poFormSave.
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
@@ -9,32 +14,32 @@ import { T, S } from '../../lib/theme';
 import { useBackClose } from '../../hooks/useBackClose';
 import { friendlyError } from '../../lib/friendlyError';
 import { logSwallowed } from '../../lib/errorLogger';
-import { numericKeyDown } from '../../lib/numericInput';
-import VendorPicker from './VendorPicker';
-import TopVendorChips from './TopVendorChips';
+import POFormHeader from './POFormHeader';
 import POItemRows, { blankItem } from './POItemRows';
 import type { FormItem } from './POItemRows';
-import DateInput from '../ui/DateInput';
-import { PO_TYPES, PO_TYPE_LABELS } from '../../types/database';
+import POFormCharges, { type Charges } from './POFormCharges';
+import { poPayload, num } from './poFormSave';
 import type { PurchaseOrder, PurchaseOrderItem, PurchaseOrderType } from '../../types/database';
 import { useModalLock } from '../../hooks/useModalLock';
 
 export type EditingPO = PurchaseOrder & { items?: PurchaseOrderItem[] };
 /** A pre-filled NEW order (e.g. raised from a costing sheet's purchase plan): any header fields plus draft lines. */
-export type POPrefill = Partial<PurchaseOrder> & { items?: Array<Pick<PurchaseOrderItem, 'sku' | 'item_name' | 'fabric_code' | 'quantity' | 'unit' | 'rate'>> };
+export type POPrefill = Partial<PurchaseOrder> & { items?: Array<Pick<PurchaseOrderItem, 'sku' | 'item_name' | 'fabric_code' | 'quantity' | 'unit' | 'rate'> & Partial<Pick<PurchaseOrderItem, 'id' | 'received_qty' | 'cancelled_at'>>> };
 
 const localToday = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
-const num = (s: string) => { const n = parseFloat(s); return isNaN(n) ? 0 : n; };
 
 export default function POForm({ editing, duplicateFrom, prefill, onClose, onSaved, addToast }: {
   editing: EditingPO | null;
   duplicateFrom?: EditingPO | null;
   prefill?: POPrefill | null;
   onClose: () => void;
-  onSaved: (r: { id: string; po_number: number }, isNew: boolean) => void;
+  /** `revision` is set when a revision saved a change; `changed: false` when it saved nothing. */
+  onSaved: (r: { id: string; po_number: number; revision?: number; changed?: boolean }, isNew: boolean) => void;
   addToast: (m: string, t?: string) => void;
 }) {
   const src: POPrefill | null = editing || duplicateFrom || prefill || null;
+  // After approval an edit is a revision (amend_po), never the draft's delete-and-rewrite.
+  const amend = !!editing && editing.status !== 'draft';
   // Costing link travels with the order it was raised from (or the one being edited).
   const costingId = src?.costing_product_id ?? null;
   const [vendor, setVendor] = useState<{ id: string | null; name: string; phone: string }>({ id: src?.vendor_id ?? null, name: src?.vendor_name ?? '', phone: src?.vendor_phone ?? '' });
@@ -48,14 +53,14 @@ export default function POForm({ editing, duplicateFrom, prefill, onClose, onSav
   const [forPieces, setForPieces] = useState(src?.for_pieces ? String(src.for_pieces) : '');
   // Lump sum (owner's ask): priced as a whole, so the piece count is optional.
   const [lumpSum, setLumpSum] = useState(!!src?.lump_sum);
-  const [items, setItems] = useState<FormItem[]>(
-    src?.items?.length ? src.items.map(it => ({ sku: it.sku ?? '', item_name: it.item_name ?? '', fabric_code: it.fabric_code ?? '', quantity: String(it.quantity), unit: it.unit ?? '', rate: it.rate == null ? '' : String(it.rate) })) : [blankItem()]
-  );
+  // A cancelled line stays as it is (not on the form, not on a duplicate); an edited line keeps its id.
+  const [items, setItems] = useState<FormItem[]>(() => {
+    const lines = (src?.items ?? []).filter(it => !it.cancelled_at);
+    return lines.length ? lines.map(it => ({ ...(editing && it.id ? { id: it.id, received: Number(it.received_qty || 0), ordered: Number(it.quantity) } : {}), sku: it.sku ?? '', item_name: it.item_name ?? '', fabric_code: it.fabric_code ?? '', quantity: String(it.quantity), unit: it.unit ?? '', rate: it.rate == null ? '' : String(it.rate) })) : [blankItem()];
+  });
   const [showCharges, setShowCharges] = useState(!!(src?.discount_value || src?.tax_percent || src?.other_charges));
-  const [discountType, setDiscountType] = useState(src?.discount_type ?? 'flat');
-  const [discountValue, setDiscountValue] = useState(src?.discount_value ? String(src.discount_value) : '');
-  const [taxPercent, setTaxPercent] = useState(src?.tax_percent ? String(src.tax_percent) : '');
-  const [otherCharges, setOtherCharges] = useState(src?.other_charges ? String(src.other_charges) : '');
+  const [charges, setCharges] = useState<Charges>({ discountType: src?.discount_type ?? 'flat', discountValue: src?.discount_value ? String(src.discount_value) : '', taxPercent: src?.tax_percent ? String(src.tax_percent) : '', otherCharges: src?.other_charges ? String(src.other_charges) : '' });
+  const [reason, setReason] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -67,11 +72,13 @@ export default function POForm({ editing, duplicateFrom, prefill, onClose, onSav
   useBackClose(true, () => onClose());
 
   // Live preview — the server is authoritative, this just mirrors its formula.
-  const subtotal = items.reduce((s, it) => s + num(it.quantity) * num(it.rate), 0);
-  const discAmt = discountType === 'percentage' ? Math.round(subtotal * num(discountValue) / 100 * 100) / 100 : Math.min(Math.max(num(discountValue), 0), subtotal);
+  // A cancelled line keeps what arrived on it (quantity = received), and the server's total still counts it.
+  const keptCancelled = (editing?.items ?? []).filter(it => it.cancelled_at).reduce((s, it) => s + Math.round(Number(it.rate || 0) * Number(it.quantity || 0) * 100) / 100, 0);
+  const subtotal = keptCancelled + items.reduce((s, it) => s + num(it.quantity) * num(it.rate), 0);
+  const discAmt = charges.discountType === 'percentage' ? Math.round(subtotal * num(charges.discountValue) / 100 * 100) / 100 : Math.min(Math.max(num(charges.discountValue), 0), subtotal);
   const afterDisc = subtotal - discAmt;
-  const taxAmt = Math.round(afterDisc * num(taxPercent) / 100 * 100) / 100;
-  const grand = Math.round((afterDisc + taxAmt + num(otherCharges)) * 100) / 100;
+  const taxAmt = Math.round(afterDisc * num(charges.taxPercent) / 100 * 100) / 100;
+  const grand = Math.round((afterDisc + taxAmt + num(charges.otherCharges)) * 100) / 100;
 
   const setItem = (i: number, patch: Partial<FormItem>) => setItems(list => list.map((it, idx) => idx === i ? { ...it, ...patch } : it));
   // Fabric is bought by the meter (owner's rule): new rows on a fabric PO
@@ -102,62 +109,28 @@ export default function POForm({ editing, duplicateFrom, prefill, onClose, onSav
       || (last.po_type === 'fabric' ? 'Meter' : '');
     if (lastUnit) setItems(list => list.map(it => (it.unit ? it : { ...it, unit: lastUnit })));
   };
-  const removeRow = (i: number) => setItems(list => list.length > 1 ? list.filter((_, idx) => idx !== i) : list);
+  // A line that already has goods in is never removed here — its balance is cancelled from the order.
+  const removeRow = (i: number) => setItems(list => list.length > 1 && !list[i]?.received ? list.filter((_, idx) => idx !== i) : list);
 
   const save = async () => {
     if (saving) return;
     setError('');
-    if (!vendor.name.trim()) { setError('Select or enter a vendor'); return; }
-    if (!poType) { setError('Select a PO type — Fabric, Job Work, or Material'); return; }
-    // A row counts as "touched" only if the user typed something into it — the
-    // default quantity of '1' alone must not keep an untouched "+ Add item" row
-    // alive (it would then fail "item name is required" for a row the user
-    // never used). Keep the ORIGINAL index so errors point at the visual row.
-    const clean = items.map((it, idx) => ({ it, idx })).filter(({ it }) => it.sku.trim() || it.item_name.trim() || it.fabric_code.trim() || it.unit.trim() || it.rate.trim());
-    if (clean.length === 0) { setError('Add at least one item'); return; }
-    const skuRequired = poType === 'fabric' || poType === 'material';
-    for (const { it, idx } of clean) {
-      if (!it.item_name.trim()) { setError(`Row ${idx + 1}: item name is required`); return; }
-      if (skuRequired && !it.sku.trim()) { setError(`Row ${idx + 1} (${it.item_name}): SKU is required for Fabric / Material items`); return; }
-      // Owner's rule: every fabric line names its fabric code (the RPC refuses it too).
-      if (poType === 'fabric' && !it.fabric_code.trim()) { setError(`Row ${idx + 1} (${it.item_name}): fabric code is required for fabric items`); return; }
-      if (num(it.quantity) <= 0) { setError(`Row ${idx + 1} (${it.item_name}): quantity must be greater than 0`); return; }
-      if (it.rate && num(it.rate) < 0) { setError(`Row ${idx + 1} (${it.item_name}): rate cannot be negative`); return; }
-    }
-    if (discountType === 'percentage' && num(discountValue) > 100) { setError('Discount cannot exceed 100%'); return; }
-    if (discountType === 'flat' && num(discountValue) > subtotal) { setError('Discount cannot exceed the subtotal'); return; }
-    if (num(taxPercent) > 100) { setError('Tax % cannot exceed 100'); return; }
-    // Owner's rule: compulsory, digits only (the input already strips anything
-    // else) — unless the order is a lump sum, where it is optional.
-    const pieces = lumpSum ? (forPieces.trim() ? Number(forPieces) : null) : Number(forPieces);
-    if (!lumpSum && !forPieces.trim()) { setError('For how many pcs is required — or tick Lump sum'); return; }
-    if (pieces !== null && (!Number.isInteger(pieces) || pieces <= 0)) { setError('For how many pcs must be a whole number greater than 0'); return; }
+    const p = poPayload({ vendor, poType, poDate, expectedDate, paymentTerms, notes, forPieces, lumpSum, costingId, items, ...charges }, subtotal, amend);
+    if ('error' in p) { setError(p.error); return; }
     setSaving(true);
     try {
-      const p_po = {
-        vendor_id: vendor.id, vendor_name: vendor.name.trim(), vendor_phone: vendor.phone.trim() || null,
-        po_type: poType, po_date: poDate || null, expected_date: expectedDate || null,
-        payment_terms: paymentTerms.trim() || null, notes: notes.trim() || null,
-        for_pieces: pieces, lump_sum: lumpSum,
-        costing_product_id: costingId,
-        // Always send the values held in state — the Grand Total preview
-        // includes them whether or not the charges section is expanded, so
-        // collapsing the section must never silently strip an existing
-        // discount/tax from the saved PO.
-        discount_type: num(discountValue) > 0 ? discountType : null,
-        discount_value: num(discountValue),
-        tax_percent: num(taxPercent),
-        other_charges: num(otherCharges),
-      };
-      // The code travels only on fabric POs — a type switched away from
-      // fabric must not carry a stale code into a job-work / material item.
-      const p_items = clean.map(({ it }) => ({ item_name: it.item_name.trim(), sku: it.sku.trim() || null, fabric_code: poType === 'fabric' ? it.fabric_code.trim() || null : null, quantity: num(it.quantity), unit: it.unit.trim() || null, rate: it.rate === '' ? null : num(it.rate) }));
-      if (editing) {
-        const { error: e } = await supabase.rpc('update_po_with_items', { p_po_id: editing.id, p_po, p_items });
+      if (editing && amend) {
+        // base_revision: the server refuses the save if someone revised the order since this form opened.
+        const { data, error: e } = await supabase.rpc('amend_po', { p_po_id: editing.id, p_po: { ...p.p_po, base_revision: editing.revision }, p_items: p.p_items, p_reason: reason.trim() || null });
+        if (e) throw e;
+        const r = data as { changed: boolean; revision: number };
+        onSaved({ id: editing.id, po_number: editing.po_number, changed: r.changed, revision: r.changed ? r.revision : undefined }, false);
+      } else if (editing) {
+        const { error: e } = await supabase.rpc('update_po_with_items', { p_po_id: editing.id, p_po: p.p_po, p_items: p.p_items });
         if (e) throw e;
         onSaved({ id: editing.id, po_number: editing.po_number }, false);
       } else {
-        const { data, error: e } = await supabase.rpc('create_po_with_items', { p_po, p_items });
+        const { data, error: e } = await supabase.rpc('create_po_with_items', { p_po: p.p_po, p_items: p.p_items });
         if (e) throw e;
         if (!data?.id) throw new Error('Could not create the purchase order');
         onSaved({ id: data.id, po_number: data.po_number }, true);
@@ -174,87 +147,33 @@ export default function POForm({ editing, duplicateFrom, prefill, onClose, onSav
           off-screen and two scroll areas fought over the touch. */}
       <div className="modal-inner" style={{ ...S.modalBox, width: 640, display: 'flex', flexDirection: 'column', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
         <div style={S.modalHead}>
-          <span style={S.modalTitle}>{editing ? `Edit PO #${editing.po_number}` : duplicateFrom ? 'Duplicate Purchase Order' : prefill ? 'New PO from costing' : 'New Purchase Order'}</span>
+          <span style={S.modalTitle}>{amend && editing ? `Revise PO #${editing.po_number} → Rev ${editing.revision + 1}` : editing ? `Edit PO #${editing.po_number}` : duplicateFrom ? 'Duplicate Purchase Order' : prefill ? 'New PO from costing' : 'New Purchase Order'}</span>
           <button type="button" onClick={onClose} style={S.modalClose} aria-label="Close">&#215;</button>
         </div>
         <div style={{ padding: '16px 18px', overflowY: 'auto', WebkitOverflowScrolling: 'touch', flex: 1, minHeight: 0 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginBottom: 12 }}>
-            <div style={{ gridColumn: '1 / -1' }}>
-              <label style={S.fLabel}>Vendor *</label>
-              <VendorPicker value={vendor.name} phone={vendor.phone} onPick={pickVendor} addToast={addToast} />
-              {!editing && !vendor.name.trim() && <TopVendorChips onPick={pickVendor} />}
-            </div>
-            <div>
-              <label style={S.fLabel}>Type *</label>
-              <select value={poType} onChange={e => changeType(e.target.value as PurchaseOrderType | '')} style={{ ...S.fInput, color: poType ? T.tx : T.tx3 }}>
-                <option value="" disabled>Select type…</option>
-                {PO_TYPES.map(t => <option key={t} value={t}>{PO_TYPE_LABELS[t]}</option>)}
-              </select>
-            </div>
-            <div>
-              <label style={S.fLabel}>PO Date</label>
-              <DateInput value={poDate} onChange={e => setPoDate(e.target.value)} style={{ width: '100%' }} />
-            </div>
-            <div>
-              <label style={S.fLabel}>Expected</label>
-              <DateInput value={expectedDate} onChange={e => setExpectedDate(e.target.value)} style={{ width: '100%' }} />
-            </div>
-            <div>
-              <label style={S.fLabel}>Payment terms</label>
-              <input value={paymentTerms} onChange={e => setPaymentTerms(e.target.value)} placeholder="e.g. 30 days" style={S.fInput} />
-            </div>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                <label style={S.fLabel}>For how many pcs?{lumpSum ? '' : ' *'}</label>
-                {/* The tick makes the count optional: a lump-sum order is priced as a whole. */}
-                <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: lumpSum ? T.ac2 : T.tx3, cursor: 'pointer', minHeight: 24, marginBottom: 6, textTransform: 'none', letterSpacing: 0, fontWeight: 600 }}>
-                  <input type="checkbox" checked={lumpSum} onChange={e => setLumpSum(e.target.checked)} style={{ accentColor: T.ac, width: 14, height: 14, margin: 0 }} />Lump sum
-                </label>
-              </div>
-              <input value={forPieces} onChange={e => setForPieces(e.target.value.replace(/\D/g, ''))} onKeyDown={e => numericKeyDown(e)} inputMode="numeric" placeholder={lumpSum ? 'optional for a lump sum' : 'e.g. 120'} aria-label="For how many pieces" required={!lumpSum}
-                style={{ ...S.fInput, fontFamily: T.mono, borderColor: error && !lumpSum && !forPieces.trim() ? 'oklch(0.63 0.22 25 / .5)' : undefined }} />
-              <div style={{ fontSize: 10, color: T.tx3, marginTop: 3 }}>{lumpSum ? 'lump sum — priced as a whole; ' : ''}not shown on the shared or printed PO</div>
-            </div>
-          </div>
+          {amend && <div style={{ fontSize: 12, color: T.tx2, lineHeight: 1.5, marginBottom: 12 }}>The vendor, type and PO date stay as raised. What already arrived stays on record — a quantity can be cut only down to it. Every change is kept in the order’s history.</div>}
+          <POFormHeader amend={amend} editing={!!editing} vendor={vendor} onPickVendor={pickVendor} poType={poType} onType={changeType} poDate={poDate} onPoDate={setPoDate}
+            expectedDate={expectedDate} onExpected={setExpectedDate} paymentTerms={paymentTerms} onTerms={setPaymentTerms}
+            forPieces={forPieces} onPieces={setForPieces} lumpSum={lumpSum} onLumpSum={setLumpSum} piecesMissing={!!error && !lumpSum && !forPieces.trim()} addToast={addToast} />
 
           <label style={S.fLabel}>Items *</label>
           <POItemRows items={items} poType={poType} onChange={setItem} onRemove={removeRow} onAdd={addRow} />
 
-          <div style={{ marginTop: 14, borderTop: `1px solid ${T.bd}`, paddingTop: 12 }}>
-            <button onClick={() => setShowCharges(s => !s)} style={{ border: 'none', background: 'none', color: T.tx3, fontSize: 11, cursor: 'pointer', padding: 0 }}>{showCharges ? '− Hide' : '+ Add'} discount / tax / charges</button>
-            {showCharges && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10, marginTop: 10 }}>
-                <div>
-                  <label style={S.fLabel}>Discount</label>
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    <input value={discountValue} onChange={e => setDiscountValue(e.target.value)} onKeyDown={e => numericKeyDown(e)} inputMode="decimal" placeholder="0" style={{ ...S.fInput, flex: 1, fontFamily: T.mono }} />
-                    <select value={discountType} onChange={e => setDiscountType(e.target.value as typeof discountType)} style={{ ...S.fInput, width: 56, padding: '8px 6px' }}><option value="flat">₹</option><option value="percentage">%</option></select>
-                  </div>
-                </div>
-                <div><label style={S.fLabel}>Tax %</label><input value={taxPercent} onChange={e => setTaxPercent(e.target.value)} onKeyDown={e => numericKeyDown(e)} inputMode="decimal" placeholder="0" style={{ ...S.fInput, fontFamily: T.mono }} /></div>
-                <div><label style={S.fLabel}>Other charges</label><input value={otherCharges} onChange={e => setOtherCharges(e.target.value)} onKeyDown={e => numericKeyDown(e)} inputMode="decimal" placeholder="0" style={{ ...S.fInput, fontFamily: T.mono }} /></div>
-              </div>
-            )}
-          </div>
+          <POFormCharges show={showCharges} onToggle={() => setShowCharges(s => !s)} charges={charges} onCharges={c => setCharges(prev => ({ ...prev, ...c }))}
+            notes={notes} onNotes={setNotes} totals={{ subtotal, discAmt, taxAmt, other: num(charges.otherCharges), grand }} />
 
-          <div>
-            <label style={{ ...S.fLabel, marginTop: 12, display: 'block' }}>Notes</label>
-            <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Optional notes for this order…" style={{ ...S.fInput, width: '100%', height: 'auto', resize: 'vertical', fontFamily: T.sans }} />
-          </div>
-
-          <div style={{ marginTop: 14, padding: '12px 14px', background: T.glass1, border: `1px solid ${T.bd}`, borderRadius: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: T.tx3 }}><span>Subtotal</span><span style={{ fontFamily: T.mono }}>₹{subtotal.toLocaleString('en-IN')}</span></div>
-            {showCharges && discAmt > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: T.tx3 }}><span>Discount</span><span style={{ fontFamily: T.mono }}>−₹{discAmt.toLocaleString('en-IN')}</span></div>}
-            {showCharges && taxAmt > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: T.tx3 }}><span>Tax</span><span style={{ fontFamily: T.mono }}>₹{taxAmt.toLocaleString('en-IN')}</span></div>}
-            {showCharges && num(otherCharges) > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: T.tx3 }}><span>Other charges</span><span style={{ fontFamily: T.mono }}>₹{num(otherCharges).toLocaleString('en-IN')}</span></div>}
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15, fontWeight: 700, color: T.tx, borderTop: `1px solid ${T.bd}`, paddingTop: 6, marginTop: 2 }}><span>Grand Total</span><span style={{ fontFamily: T.mono }}>₹{grand.toLocaleString('en-IN')}</span></div>
-          </div>
+          {amend && (
+            <div style={{ marginTop: 12 }}>
+              <label style={S.fLabel}>What changed and why</label>
+              <input value={reason} onChange={e => setReason(e.target.value)} placeholder="Optional — e.g. vendor short on red" aria-label="Reason for the revision" style={{ ...S.fInput, width: '100%' }} />
+            </div>
+          )}
 
           {error && <div ref={errRef} style={{ marginTop: 12, background: 'oklch(0.63 0.22 25 / .08)', border: '1px solid oklch(0.63 0.22 25 / .2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.re }}>{error}</div>}
         </div>
         <div style={{ padding: '12px 18px', borderTop: `1px solid ${T.bd}`, display: 'flex', gap: 8, justifyContent: 'flex-end', flexShrink: 0 }}>
           <button onClick={onClose} style={{ ...S.btnGhost, minHeight: 44 }}>Cancel</button>
-          <button onClick={save} disabled={saving} style={{ ...S.btnPrimary, minHeight: 44, pointerEvents: saving ? 'none' : 'auto', opacity: saving ? 0.5 : 1 }}>{saving ? 'Saving…' : editing ? 'Save changes' : 'Save draft'}</button>
+          <button onClick={save} disabled={saving} style={{ ...S.btnPrimary, minHeight: 44, pointerEvents: saving ? 'none' : 'auto', opacity: saving ? 0.5 : 1 }}>{saving ? 'Saving…' : amend ? 'Save revision' : editing ? 'Save changes' : 'Save draft'}</button>
         </div>
       </div>
     </div>,

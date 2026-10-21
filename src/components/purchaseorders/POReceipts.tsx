@@ -34,7 +34,8 @@ export default function POReceipts({ receipts, items, names, canRemove, busy, on
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
               <span style={{ fontSize: 10, color: T.tx3 }}>received <span style={{ fontFamily: T.mono }}>{fmtDate(r.receipt_date)}</span></span>
-              {canRemove && <button onClick={() => onRemove(r)} disabled={!!busy} title="Remove this receipt" style={{ border: 'none', background: 'none', color: T.re, cursor: busy ? 'not-allowed' : 'pointer', fontSize: 11, fontWeight: 600, padding: '0 8px', minHeight: 44, opacity: busy ? 0.5 : 0.85 }}>Undo</button>}
+              {/* A cancelled item's receipts stay as recorded (the server refuses the undo too). */}
+              {canRemove && !item?.cancelled_at && <button onClick={() => onRemove(r)} disabled={!!busy} title="Remove this receipt" style={{ border: 'none', background: 'none', color: T.re, cursor: busy ? 'not-allowed' : 'pointer', fontSize: 11, fontWeight: 600, padding: '0 8px', minHeight: 44, opacity: busy ? 0.5 : 0.85 }}>Undo</button>}
             </div>
           </div>
         );

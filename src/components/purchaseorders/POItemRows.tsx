@@ -13,7 +13,8 @@ import SuggestInput from '../ui/SuggestInput';
 import ItemNameChips, { useRecentItemNames } from './ItemNameChips';
 import type { PurchaseOrderType } from '../../types/database';
 
-export type FormItem = { sku: string; item_name: string; fabric_code: string; quantity: string; unit: string; rate: string };
+/** `id` / `received` / `ordered`: an existing line on a revision — it keeps its id, and a cut stops at what arrived on it. */
+export type FormItem = { id?: string; received?: number; ordered?: number; sku: string; item_name: string; fabric_code: string; quantity: string; unit: string; rate: string };
 export const blankItem = (): FormItem => ({ sku: '', item_name: '', fabric_code: '', quantity: '1', unit: '', rate: '' });
 const UNIT_OPTIONS = ['Meter', 'Piece', 'Dozen'];
 const num = (s: string) => { const n = parseFloat(s); return isNaN(n) ? 0 : n; };
@@ -48,6 +49,8 @@ export default function POItemRows({ items, poType, onChange, onRemove, onAdd }:
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
         {items.map((it, i) => {
           const amt = num(it.quantity) * num(it.rate);
+          // A line with goods in stays (its balance is cancelled from the order instead).
+          const locked = items.length === 1 || !!it.received;
           return (
             <div key={i} style={{ border: `1px solid ${T.bd}`, borderRadius: 8, padding: 10, background: 'rgba(255,255,255,0.015)' }}>
               <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8 }}>
@@ -56,7 +59,7 @@ export default function POItemRows({ items, poType, onChange, onRemove, onAdd }:
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <SkuInput value={it.sku} onChange={v => onChange(i, { sku: v })} sizes={false} placeholder={skuRequired ? 'SKU *' : 'SKU'} style={{ ...S.fInput, width: '100%', fontFamily: T.mono }} />
                 </div>
-                <button onClick={() => onRemove(i)} disabled={items.length === 1} style={{ border: 'none', background: 'none', cursor: items.length === 1 ? 'not-allowed' : 'pointer', color: T.re, opacity: items.length === 1 ? 0.25 : 0.7, fontSize: 18, padding: '8px 10px', lineHeight: 1, flexShrink: 0 }} aria-label="Remove item">&times;</button>
+                <button onClick={() => onRemove(i)} disabled={locked} title={it.received ? 'Goods already arrived on this line — cancel its balance from the order' : undefined} style={{ border: 'none', background: 'none', cursor: locked ? 'not-allowed' : 'pointer', color: T.re, opacity: locked ? 0.25 : 0.7, fontSize: 18, padding: '8px 10px', lineHeight: 1, flexShrink: 0 }} aria-label="Remove item">&times;</button>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: fabric ? '1fr 1fr' : '1fr', gap: 6, marginBottom: 8 }}>
                 <input value={it.item_name} onChange={e => onChange(i, { item_name: e.target.value })} placeholder={fabric ? 'Fabric name *' : 'Item name *'} style={{ ...S.fInput, width: '100%', minWidth: 0 }} />
@@ -75,7 +78,12 @@ export default function POItemRows({ items, poType, onChange, onRemove, onAdd }:
                 </select>
                 <input value={it.rate} onChange={e => onChange(i, { rate: e.target.value })} onKeyDown={e => numericKeyDown(e)} inputMode="decimal" placeholder="Rate" style={{ ...S.fInput, width: '100%', minWidth: 0, fontFamily: T.mono }} />
               </div>
-              {amt > 0 && <div style={{ textAlign: 'right', fontSize: 12, fontFamily: T.mono, color: T.tx2, marginTop: 6 }}>= ₹{amt.toLocaleString('en-IN')}</div>}
+              {(!!it.received || amt > 0) && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12, marginTop: 6 }}>
+                  <span style={{ color: T.gr }}>{it.received ? `${it.received} already received — a cut stops there` : ''}</span>
+                  {amt > 0 && <span style={{ fontFamily: T.mono, color: T.tx2 }}>= ₹{amt.toLocaleString('en-IN')}</span>}
+                </div>
+              )}
             </div>
           );
         })}

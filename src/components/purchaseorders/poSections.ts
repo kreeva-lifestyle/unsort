@@ -58,7 +58,9 @@ export function viewOf(po: PORow, today: string): RowView {
   const items = po.purchase_order_items ?? [];
   const ordered = items.reduce((t, it) => t + n(it.quantity), 0);
   const got = items.reduce((t, it) => t + Math.min(n(it.received_qty), n(it.quantity)), 0);
-  const units = new Set(items.map(it => unitOf(it.unit)));
+  // An item cancelled before anything arrived (quantity 0) does not make the order "mixed units".
+  const unitLines = items.filter(it => !(it.cancelled_at && n(it.quantity) <= 0));
+  const units = new Set((unitLines.length ? unitLines : items).map(it => unitOf(it.unit)));
   const open = po.status === 'draft' || WAITING.includes(po.status);
   const due = open ? dueOf(po, today) : null;
   const pastDue = !!due && dueTone(due) === 'late';

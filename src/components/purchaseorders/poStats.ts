@@ -11,11 +11,11 @@ import { PENDING_STATUSES } from './pendencyData';
 import { daysBetween, sinceOf, dueOf, dueBucket, type DueKey } from './poDue';
 export { addDays, daysBetween, sinceOf } from './poDue';
 
-export const OPEN_COLS = 'status, po_date, created_at, expected_date, vendor_name, purchase_order_items(unit, quantity, received_qty)';
+export const OPEN_COLS = 'status, po_date, created_at, expected_date, vendor_name, purchase_order_items(unit, quantity, received_qty, cancelled_at)';
 export const RECENT_COLS = 'status, po_date, grand_total';
 export interface OpenRow {
   status: PurchaseOrderStatus; po_date: string | null; created_at: string | null; expected_date: string | null; vendor_name: string;
-  purchase_order_items: { unit: string | null; quantity: number | null; received_qty: number | null }[] | null;
+  purchase_order_items: { unit: string | null; quantity: number | null; received_qty: number | null; cancelled_at?: string | null }[] | null;
 }
 export interface RecentRow { status: PurchaseOrderStatus; po_date: string | null; grand_total: number | null }
 
@@ -93,7 +93,8 @@ export function poStatsOf(open: OpenRow[], recent: RecentRow[], today = fileDate
     v.orders += 1; v.oldestDays = Math.max(v.oldestDays, days); v.worstLate = Math.max(v.worstLate, d.late); vendors.set(r.vendor_name, v);
     for (const it of r.purchase_order_items ?? []) {
       const q = n(it.quantity), got = n(it.received_qty), left = Math.max(0, q - got), u = unitOf(it.unit);
-      s.lines += 1; if (left === 0) s.linesDone += 1;
+      // A cancelled item is not "received in full" (its quantity is just what arrived).
+      if (!it.cancelled_at) { s.lines += 1; if (left === 0) s.linesDone += 1; }
       const b = units.get(u) ?? { unit: u, ordered: 0, received: 0, pending: 0, lines: 0 };
       // Over-delivery is normal; the meter counts it as fully received, not more.
       b.ordered += q; b.received += Math.min(got, q); b.pending += left; b.lines += 1; units.set(u, b);
