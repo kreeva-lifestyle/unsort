@@ -48,8 +48,10 @@ export default function JobForm({ edit, draft = null, prefill = null, onClose, o
   // A draft keeps the job date only once someone picked it (else: the day it is finished).
   const [dateSet, setDateSet] = useState(!!draft?.form.job_date);
   const draftForm = () => toDraftForm(dateSet ? d : { ...d, job_date: '' }, mats);
-  const [startKey] = useState(() => JSON.stringify(toDraftForm(start.d, start.mats)));
-  const guard = useLeaveGuard({ dirty: () => JSON.stringify(toDraftForm(d, mats)) !== startKey, keepable: !j && !prefill, draftId: edit ? null : draft?.id ?? null,
+  // Changed = the form, the fabric to give now or the hand-over switch (the costing link is looked up, not typed).
+  const dirtyKey = (x: JobDraft, ms: MaterialDraft[], h: boolean) => JSON.stringify([toDraftForm({ ...x, costing_product_id: null }, ms), ms.filter(m => m.po_item_id).map(m => m.send_qty ?? ''), h]);
+  const [startKey] = useState(() => dirtyKey(start.d, start.mats, true));
+  const guard = useLeaveGuard({ dirty: () => dirtyKey(d, mats, handover) !== startKey, keepable: !j && !prefill, draftId: edit ? null : draft?.id ?? null,
     form: draftForm, onClose, onDrafts: () => onDrafts?.(), addToast });
   useBackClose(true, guard.back);
   const locked = useMemo(() => new Set(edit?.entries.flatMap(e => e.jobwork_entry_lines.map(l => l.material_id)) ?? []), [edit]);

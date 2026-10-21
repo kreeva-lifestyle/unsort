@@ -30,8 +30,9 @@ const n = (v: unknown) => Number(v || 0);
 const left = (l: Line) => Math.max(0, n(l.quantity) - n(l.received_qty));
 const live = (po: OpenPo) => po.purchase_order_items.filter(l => !l.cancelled_at).sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
 
-/** What was typed in a PO's receive sheet before "Receive them together": it carries over. */
-export type ChallanStart = { challanNo: string; date: string; remarks: string; qty: Record<string, string> };
+/** What was typed in a PO's receive sheet before "Receive them together": it carries over
+ *  (`recvd`: what each line had received when it was typed — the quantities hold only while that is unchanged). */
+export type ChallanStart = { challanNo: string; date: string; remarks: string; qty: Record<string, string>; recvd: Record<string, number> };
 
 export default function POReceiveChallan({ vendor: given, poId, init, onClose, onReceived, addToast }: {
   /** The vendor, when opened from one of its orders; null = pick one first. */
@@ -77,9 +78,14 @@ export default function POReceiveChallan({ vendor: given, poId, init, onClose, o
       if (!alive) return;
       if (!list) { setLoadFailed(true); return; }
       setPos(list);
-      // The order it was opened from comes ticked, with what was typed for it (else what is still to come).
+      // The order it was opened from comes ticked, with what was typed for it — unless someone received on it
+      // since (then what is still to come, and the user is told).
       const first = list.find(po => po.id === poId);
-      if (first) { setTicked(new Set([first.id])); setQty(Object.fromEntries(live(first).map(l => [l.id, init?.qty[l.id] ?? String(left(l))]))); }
+      if (!first) return;
+      const moved = !!init && live(first).some(l => init.recvd[l.id] === undefined || Math.abs(n(l.received_qty) - init.recvd[l.id]) > 1e-6);
+      setTicked(new Set([first.id]));
+      setQty(Object.fromEntries(live(first).map(l => [l.id, (moved ? undefined : init?.qty[l.id]) ?? String(left(l))])));
+      if (moved) setError(`PO #${first.po_number} changed since you opened it — the quantities now show what is still to come. Check them before you confirm.`);
     });
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- loads once per vendor (and on Retry)

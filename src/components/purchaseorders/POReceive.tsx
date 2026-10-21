@@ -128,7 +128,7 @@ export default function POReceive({ po, items: allItems, onClose, onReceived, on
             <div><label style={S.fLabel}>Receipt date</label><DateInput value={date} onChange={e => setDate(e.target.value)} style={{ width: '100%' }} /></div>
             <div><label style={S.fLabel}>Remarks</label><input value={remarks} onChange={e => setRemarks(e.target.value)} placeholder="Optional" style={S.fInput} /></div>
           </div>
-          <button type="button" onClick={() => onChallan({ challanNo: challan.trim(), date, remarks, qty })} className="touch44"
+          <button type="button" onClick={() => onChallan({ challanNo: challan.trim(), date, remarks, qty, recvd: Object.fromEntries(items.map(it => [it.id, recvdOf(it)])) })} className="touch44"
             style={{ border: 'none', background: 'none', color: T.ac2, fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: '8px 0 0', textAlign: 'left' }}>
             This challan has other orders from {po.vendor_name} too? Receive them together →
           </button>

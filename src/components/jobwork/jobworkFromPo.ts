@@ -36,13 +36,13 @@ export async function prefillFromPo(po: Pick<PurchaseOrder, 'id' | 'po_number' |
     carried.set(m.po_item_id, (carried.get(m.po_item_id) ?? 0) + (e?.kind === 'in' ? -n(l.qty) : n(l.qty)));
   }
   const pcs = n(po.for_pieces);
-  const fabric = lines.map(it => ({ po_item_id: it.id, label: itemLabel(it), unit: it.unit, received: n(it.received_qty), carried: Math.max(0, carried.get(it.id) ?? 0) }));
+  const fabric = lines.map(it => ({ po_item_id: it.id, label: itemLabel(it), unit: it.unit, received: n(it.received_qty), carried: Math.max(0, Math.round((carried.get(it.id) ?? 0) * 1000) / 1000) }));
   return {
     prefill: {
       po: { id: po.id, number: po.po_number },
       d: { sku: key(sku), pieces: pcs > 0 ? String(pcs) : '', qty_unit: 'pcs', notes: `Fabric from PO #${po.po_number}` },
       // Usage per piece: what the order bought for its pieces (4 decimals, as typed elsewhere).
-      mats: lines.map((it, i) => ({ name: itemLabel(it), unit: matUnit(it.unit), per_piece: pcs > 0 ? String(Math.round(n(it.quantity) / pcs * 10000) / 10000) : '', po_item_id: it.id, send_qty: String(Math.max(0, fabric[i].received - fabric[i].carried)) })),
+      mats: lines.map((it, i) => ({ name: itemLabel(it), unit: matUnit(it.unit), per_piece: pcs > 0 ? String(Math.round(n(it.quantity) / pcs * 10000) / 10000) : '', po_item_id: it.id, send_qty: String(Math.max(0, Math.round((fabric[i].received - fabric[i].carried) * 1000) / 1000)) })),
       fabric,
     },
     error: null,
