@@ -44,9 +44,8 @@ interface Props extends POFiltersProps {
 
 export default function POList(p: Props) {
   const filterActive = p.statusFilter || p.typeFilter || p.creatorFilter || p.dateFrom || p.dateTo;
-  // Only the layout on screen is built: the table on a desktop, the cards on
-  // a phone. Building both and hiding one with CSS doubled the work of every
-  // page of orders (the classes stay as the CSS fallback).
+  // Only the layout on screen is built: the card grid on a desktop, the
+  // swipeable column on a phone (the classes stay as the CSS fallback).
   const phone = useIsPhone();
   const shown = useProgressive(p.pos, p.loading);
   return (
@@ -79,7 +78,7 @@ export default function POList(p: Props) {
 
       {/* Every order as the Motion Lab card: a grid on a desktop, one column on a phone (swipe for Print). */}
       {!p.loading && p.pos.length > 0 && (phone
-        ? <div className="mobile-only" style={{ flexDirection: 'column', gap: 10, width: '100%' }}>
+        ? <div className="mobile-only" style={{ flexDirection: 'column', gap: 10, width: '100%', maxWidth: 640 }}>
             {shown.map((po, i) => (
               <SwipeRow key={po.id} actions={[{ label: 'Print', color: '#3B82F6', onClick: () => p.onPrint(po) }]} hint={i === 0} hintKey="po">
                 <POListCard po={po} statusColors={p.statusColors} onOpen={() => p.onOpenDetail(po)} />

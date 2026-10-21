@@ -7,8 +7,8 @@
 // passes it; a partial receipt fills the last stop like a pie; an order
 // that stopped (cancelled, or closed short) gets a cap where it stopped and
 // the rest of the rail dims — it never "moves on". Reached stops stay the
-// rail's indigo; the stage colour is the fill's far end and the pulse.
-// `mini` is the list's silent version: stops and fill only, no labels.
+// rail's indigo; the stage colour is the fill's far end and the pulse. The
+// detail's hero card and every card in the PO list carry the same rail.
 import { useLayoutEffect, useRef, useState } from 'react';
 import { T, alpha } from '../../lib/theme';
 import { animate, E, reducedMotion } from '../../lib/motion';
@@ -60,7 +60,7 @@ const keyOf = (s: RailState) => `${s.stage}|${s.partial}|${s.skippedSent}|${s.st
 const stageColor = (s: RailState) => (s.partial != null ? T.yl : s.stage === 3 ? T.gr : s.stage === 2 ? T.bl : T.ac2);
 const capped = (s: RailState) => s.stopped === 'cancelled' || (s.stopped === 'closed' && s.stage < 3);
 
-export default function PORail({ state, qty, mini, onLanded }: { state: RailState; /** Under the last stop: "12 / 20" (the card supplies it); the share otherwise. */ qty?: string | null; mini?: boolean; /** Called once the stops show `state` — after the light lands, or at once when nothing travels. */ onLanded?: () => void }) {
+export default function PORail({ state, qty, onLanded }: { state: RailState; /** Under the last stop: "12 / 20" (the card supplies it); the share otherwise. */ qty?: string | null; /** Called once the stops show `state` — after the light lands, or at once when nothing travels. */ onLanded?: () => void }) {
   const rail = useRef<HTMLDivElement>(null), fill = useRef<HTMLDivElement>(null), light = useRef<HTMLDivElement>(null), cap = useRef<HTMLDivElement>(null);
   const nodes = useRef<(HTMLDivElement | null)[]>([]);
   const prev = useRef<RailState | null>(null), latest = useRef(state), landed = useRef(onLanded);
@@ -84,7 +84,7 @@ export default function PORail({ state, qty, mini, onLanded }: { state: RailStat
       animate(n.querySelector('.o'), [{ transform: 'scale(.8)' }, { transform: 'scale(1)' }], { duration: 320, easing: E.spring });
     };
     const land = () => { setShown(latest.current); setLeaving(null); setSkipNow(false); };
-    if (mini || !before || !f || !r) { land(); landed.current?.(); return; }
+    if (!before || !f || !r) { land(); landed.current?.(); return; }
     if (flying.current) return;                                    // a change mid-flight (the trail landing) is adopted when the light lands
     // The cap grows in whenever it becomes visible — also when an already
     // closed order is cancelled, or loses its last receipt.
@@ -110,7 +110,7 @@ export default function PORail({ state, qty, mini, onLanded }: { state: RailStat
       land(); settle(latest.current); landed.current?.();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `key` is the state's value; a new object with the same value is no change
-  }, [key, mini]);
+  }, [key]);
 
   const v = shown;
   const cls = (i: number) => {
@@ -124,20 +124,19 @@ export default function PORail({ state, qty, mini, onLanded }: { state: RailStat
     return 'po-node';
   };
   const pct = v.partial != null ? Math.round(v.partial * 100) : null;
-  const under = (i: number) => mini ? null
-    : i === 3 && (qty || pct != null) ? qty ?? `${pct}%`       // one short line: the pill and the caption already say "closed"
+  const under = (i: number) => i === 3 && (qty || pct != null) ? qty ?? `${pct}%`       // one short line: the pill and the caption already say "closed"
     : v.stopped === 'closed' && i === v.stage ? 'closed' : null;
   const ac = { '--nc': T.ac2, '--nc-soft': alpha(T.ac2, .16), '--nc-glow': alpha(T.ac2, .45) } as React.CSSProperties;
   const capColor = state.stopped === 'cancelled' ? T.re : T.tx3;
   const vars = { '--rc': stageColor(state), '--pc': stageColor(v), '--cxp': `${P[state.stage] * 100}%`, '--cap': capColor, '--cap-glow': alpha(capColor, .6) } as React.CSSProperties;
   const label = `${LABELS[state.stage]}${state.stopped ? `, ${state.stopped}` : ''}${state.partial != null ? `, ${Math.round(state.partial * 100)}% received` : ''}${state.skippedSent ? ', Sent skipped' : ''}`;
   return (
-    <div ref={rail} className={`po-rail${mini ? ' po-rail-mini' : ''}${state.stopped ? ' cx' : ''}`} style={vars} role="img" aria-label={label}>
+    <div ref={rail} className={`po-rail${state.stopped ? ' cx' : ''}`} style={vars} role="img" aria-label={label}>
       <div className="base" /><div ref={fill} className="fill" />
       {LABELS.map((l, i) => (
-        <div key={l} ref={el => { nodes.current[i] = el; }} className={cls(i)} style={{ left: `${P[i] * 100}%`, ...ac }}>
+        <div key={l} ref={el => { nodes.current[i] = el; }} className={`${cls(i)}${i === 3 ? ' end' : ''}`} style={{ left: `${P[i] * 100}%`, ...ac }}>
           <div className="o" style={i === 3 && pct != null && v.stage === 3 && v.stopped !== 'cancelled' ? { background: `conic-gradient(${T.yl} 0 ${pct}%, ${T.s} ${pct}% 100%)` } : undefined}><b className="pulse" /></div>
-          {!mini && <span>{l}{under(i) && <small>{under(i)}</small>}</span>}
+          <span>{l}{under(i) && <small>{under(i)}</small>}</span>
         </div>
       ))}
       <div ref={cap} className="cap" style={{ left: `${P[state.stage] * 100}%`, transform: capped(state) ? 'scaleY(1)' : 'scaleY(0)' }} />

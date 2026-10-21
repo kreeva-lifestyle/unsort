@@ -698,6 +698,9 @@ html.launching .brand-slot { opacity: 0; }
 .po-node .pulse { position: absolute; inset: -2px; border-radius: 50%; border: 2px solid var(--pc, oklch(0.65 0.18 270)); opacity: 0; pointer-events: none; }
 .po-node span { position: absolute; top: 28px; font: 600 11px/1.3 Inter, system-ui, sans-serif; color: oklch(0.53 0.04 255); white-space: nowrap; text-align: center; transition: color var(--m-fast); }
 .po-node span small { display: block; font: 500 10px/1.3 'JetBrains Mono', ui-monospace, monospace; color: oklch(0.53 0.04 255); }
+/* The last stop's label ends just past the stop (centred for "Received"), so a
+   long "1,234.5 / 12,345" grows into the rail instead of past the card. */
+.po-node.end span { left: auto; right: -14px; text-align: right; }
 .po-node.done .o { border-color: var(--nc); background: var(--nc); }
 .po-node.done .o::after { background: oklch(0.12 0.02 265); }
 .po-node.cur .o { border-color: var(--nc); background: var(--nc); box-shadow: 0 0 0 5px var(--nc-soft), 0 0 18px var(--nc-glow); }
@@ -708,16 +711,6 @@ html.launching .brand-slot { opacity: 0; }
 /* Closed short before anything arrived: a quiet grey stop where it ended. */
 .po-node.stop .o { border-color: oklch(0.53 0.04 255); background: oklch(0.53 0.04 255); box-shadow: none; }
 .po-rail .cap { position: absolute; top: 0; width: 4px; height: 20px; margin-left: -2px; border-radius: 2px; background: var(--cap, oklch(0.63 0.22 25)); transform-origin: 50% 50%; box-shadow: 0 0 10px var(--cap-glow, oklch(0.63 0.22 25 / .6)); }
-/* The list's silent version: stops and fill only (two classes, so the phone
-   margins of the hero rail below never reach it). */
-.po-rail.po-rail-mini { margin: 0; height: 8px; min-width: 56px; }
-.po-rail-mini .base, .po-rail-mini .fill { top: 3px; }
-.po-rail-mini .po-node { width: 8px; margin-left: -4px; }
-.po-rail-mini .po-node .o { width: 8px; height: 8px; border-width: 1.5px; }
-.po-rail-mini .po-node .o::after { inset: 1.5px; }
-.po-rail-mini .po-node.cur .o { box-shadow: 0 0 0 2px var(--nc-soft); }
-.po-rail-mini .light, .po-rail-mini .pulse { display: none; }
-.po-rail-mini .cap { height: 8px; width: 3px; margin-left: -1.5px; }
 @media (max-width: 420px) { .po-rail { margin: 24px 18px 44px; } .po-node span { font-size: 10.5px; } }
 @media (prefers-reduced-motion: reduce) { .po-rail .light { display: none; } }
 /* The hero card around the rail: eyebrow, title, pill; a hairline; the latest event and who. */
@@ -726,18 +719,27 @@ html.launching .brand-slot { opacity: 0; }
 .po-card-h > div > b { display: block; font: 700 16px/1.25 Sora, Inter, system-ui, sans-serif; color: oklch(0.93 0.01 250); margin-top: 3px; overflow-wrap: anywhere; }   /* wraps beside the pill rather than cutting the vendor short */
 .po-card-k { font: 600 10px/1.2 'JetBrains Mono', ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; color: oklch(0.53 0.04 255); }
 .po-card-sub { font-size: 12px; color: oklch(0.53 0.04 255); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.po-card-cap .po-card-right { flex-shrink: 0; white-space: nowrap; font: 500 11px/1.3 'JetBrains Mono', ui-monospace, monospace; }   /* the list's "pending · late": whole, the event gives way */
+.po-card-cap .po-card-right { flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font: 500 11px/1.3 'JetBrains Mono', ui-monospace, monospace; }   /* the list's "pending / late": one short phrase, kept whole */
 .po-card-side { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; flex-shrink: 0; }
 /* The list's cards (POListCard): the whole card opens the order. */
-.po-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr)); gap: 12px; }
-.po-card-open { margin-bottom: 0; cursor: pointer; transition: border-color var(--m-fast) var(--e-out), transform var(--m-slow) var(--e-spring); -webkit-tap-highlight-color: transparent; }
+.po-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 12px; }
+/* A column with the caption pinned to the bottom, so the hairlines line up across a row. */
+.po-card-open { position: relative; display: flex; flex-direction: column; margin-bottom: 0; transition: border-color var(--m-fast) var(--e-out), transform var(--m-slow) var(--e-spring); -webkit-tap-highlight-color: transparent; }
+.po-card-open > .po-card-cap { margin-top: auto; }
+.po-card-hit { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }   /* a long vendor takes two lines at most (the ::after is positioned against the card, so it is not clipped) */
 .po-card-open:active { transform: scale(.985); transition-duration: var(--m-instant); }
-.po-card-open:focus-visible { outline: 2px solid oklch(0.65 0.18 270 / .6); outline-offset: 2px; }
 @media (hover: hover) { .po-card-open:hover { border-color: oklch(0.55 0.22 265 / .3); } }
+/* The title is the card's button; its ::after covers the whole card, so a tap anywhere opens the order. */
+.po-card-hit { background: none; border: 0; padding: 0; margin: 0; font: inherit; color: inherit; letter-spacing: inherit; text-align: left; cursor: pointer; }
+.po-card-hit::after { content: ''; position: absolute; inset: 0; border-radius: 16px; }
+.po-card-hit:focus-visible { outline: none; }
+.po-card-hit:focus-visible::after { outline: 2px solid oklch(0.65 0.18 270 / .6); outline-offset: 2px; }
+.po-card-print { position: relative; z-index: 1; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; margin: -8px -8px -8px 0; border: 0; border-radius: 6px; background: none; cursor: pointer; opacity: .6; transition: opacity var(--m-fast), background-color var(--m-fast); }
+.po-card-print:hover, .po-card-print:focus-visible { opacity: 1; background: oklch(1 0 0 / .04); }
 .po-card-pill { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 9px; border-radius: 6px; font: 600 11px/1 Inter, system-ui, sans-serif; white-space: nowrap; flex-shrink: 0; transition: background-color var(--m-fast), color var(--m-fast); }
 .po-card-pill i { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; background: currentColor; }
 .po-card .po-rail { margin: 26px 26px 52px; }
-.po-card-cap { margin-top: 0; padding-top: 12px; border-top: 1px solid oklch(1 0 0 / .05); display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 12px; color: oklch(0.62 0.04 255); min-width: 0; }
+.po-card-cap { margin-top: 0; padding-top: 12px; border-top: 1px solid oklch(1 0 0 / .05); display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 12px; color: oklch(0.62 0.04 255); min-width: 0; }
 .po-card-cap .who { color: oklch(0.53 0.04 255); font: 500 11px/1.3 'JetBrains Mono', ui-monospace, monospace; flex-shrink: 0; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Rolling text (ui/Roll): the new line and the outgoing ghost share one cell. */
 .roll { display: inline-grid; position: relative; vertical-align: top; min-width: 0; }

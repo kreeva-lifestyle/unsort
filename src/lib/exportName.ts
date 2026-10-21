@@ -30,11 +30,12 @@ export const fileSafe = (v: unknown, max = 40): string =>
 
 // Today in IST as YYYY-MM-DD. This is an India-time business: a UTC date
 // stamps the previous day for anything exported before 05:30 IST.
+let IST: Intl.DateTimeFormat | null | undefined;   // built once; null where the browser has no time zones
 export const fileDate = (d?: Date | string | number): string => {
   const dt = d === undefined ? new Date() : d instanceof Date ? d : new Date(d);
   if (Number.isNaN(dt.getTime())) return '';
-  try { return dt.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }); }
-  catch { return new Date(dt.getTime() + 5.5 * 3600_000).toISOString().slice(0, 10); }
+  if (IST === undefined) { try { IST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }); } catch { IST = null; } }
+  return IST ? IST.format(dt) : new Date(dt.getTime() + 5.5 * 3600_000).toISOString().slice(0, 10);
 };
 
 // "01 Jul 2026 to 25 Jul 2026" ranges compress to "2026-07-01-to-2026-07-25";
