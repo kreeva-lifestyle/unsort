@@ -4,7 +4,9 @@
 // and totals for us). Each revision the vendor should hear about can be sent
 // on WhatsApp from here; the newest one not yet sent is offered above the
 // order (POReviseNotice).
+import { supabase } from '../../lib/supabase';
 import { T } from '../../lib/theme';
+import { friendlyError } from '../../lib/friendlyError';
 import { fmtWhen } from '../../lib/humanize';
 import { fmtQty, unitOf } from './poStats';
 import { shortDate } from './POHeaderInfo';
@@ -44,13 +46,24 @@ export function changeText(c: POChange): string {
   return '';
 }
 
-export default function PORevisions({ po, items, revisions }: {
+export default function PORevisions({ po, items, revisions, onSent, addToast }: {
   po: PurchaseOrder;
   items: PurchaseOrderItem[];
   /** Newest first; null while loading. */
   revisions: PORevisionRow[] | null;
+  /** A revision was recorded as sent: re-read the order (the banner and the row follow). */
+  onSent: () => void;
+  addToast: (m: string, t?: string) => void;
 }) {
   if (!revisions?.length) return null;
+  // A cancelled or closed-short order is not one to ask the vendor to confirm.
+  const sendable = !['cancelled', 'closed'].includes(po.status);
+  // The tap opens WhatsApp (a real link); the first send of a revision is recorded too.
+  const record = (r: PORevisionRow) => {
+    if (r.notified_at) return;
+    supabase.rpc('set_po_revision_notified', { p_revision_id: r.id, p_how: 'whatsapp' })
+      .then(({ error }) => { if (error) addToast(friendlyError(error), 'error'); else onSent(); });
+  };
   return (
     <div style={{ marginBottom: 16 }}>
       <div style={{ fontSize: 11, fontWeight: 700, color: T.tx2, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>Changes</div>
@@ -63,8 +76,8 @@ export default function PORevisions({ po, items, revisions }: {
               <span style={{ fontFamily: T.mono, fontSize: 11, fontWeight: 700, color: T.ac2, padding: '1px 7px', borderRadius: 4, background: T.ac3 }}>Rev {r.revision}</span>
               <span style={{ fontSize: 12, color: T.tx, fontWeight: 600 }}>{r.kind === 'line_cancel' ? 'Item cancelled' : 'Revised'}</span>
               <span style={{ fontSize: 11, color: T.tx3 }}>by {who} · {fmtWhen(r.created_at)}</span>
-              {text && (
-                <a href={waLink(text, po.vendor_phone)} target="_blank" rel="noopener noreferrer" className="touch44"
+              {text && sendable && (
+                <a href={waLink(text, po.vendor_phone)} target="_blank" rel="noopener noreferrer" onClick={() => record(r)} className="touch44"
                   style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 600, color: T.gr, textDecoration: 'none' }}>
                   {r.notified_at ? 'Send again' : 'Send to vendor'}
                 </a>

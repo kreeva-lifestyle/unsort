@@ -13,8 +13,8 @@ import SuggestInput from '../ui/SuggestInput';
 import ItemNameChips, { useRecentItemNames } from './ItemNameChips';
 import type { PurchaseOrderType } from '../../types/database';
 
-/** `id` / `received`: an existing line on a revision — it keeps its id, and what arrived on it sets the floor for its quantity. */
-export type FormItem = { id?: string; received?: number; sku: string; item_name: string; fabric_code: string; quantity: string; unit: string; rate: string };
+/** `id` / `received` / `ordered`: an existing line on a revision — it keeps its id, and a cut stops at what arrived on it. */
+export type FormItem = { id?: string; received?: number; ordered?: number; sku: string; item_name: string; fabric_code: string; quantity: string; unit: string; rate: string };
 export const blankItem = (): FormItem => ({ sku: '', item_name: '', fabric_code: '', quantity: '1', unit: '', rate: '' });
 const UNIT_OPTIONS = ['Meter', 'Piece', 'Dozen'];
 const num = (s: string) => { const n = parseFloat(s); return isNaN(n) ? 0 : n; };
@@ -80,7 +80,7 @@ export default function POItemRows({ items, poType, onChange, onRemove, onAdd }:
               </div>
               {(!!it.received || amt > 0) && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12, marginTop: 6 }}>
-                  <span style={{ color: T.gr }}>{it.received ? `${it.received} already received — the quantity cannot go below it` : ''}</span>
+                  <span style={{ color: T.gr }}>{it.received ? `${it.received} already received — a cut stops there` : ''}</span>
                   {amt > 0 && <span style={{ fontFamily: T.mono, color: T.tx2 }}>= ₹{amt.toLocaleString('en-IN')}</span>}
                 </div>
               )}

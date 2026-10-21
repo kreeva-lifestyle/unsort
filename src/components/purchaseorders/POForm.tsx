@@ -56,7 +56,7 @@ export default function POForm({ editing, duplicateFrom, prefill, onClose, onSav
   // A cancelled line stays as it is (not on the form, not on a duplicate); an edited line keeps its id.
   const [items, setItems] = useState<FormItem[]>(() => {
     const lines = (src?.items ?? []).filter(it => !it.cancelled_at);
-    return lines.length ? lines.map(it => ({ ...(editing && it.id ? { id: it.id, received: Number(it.received_qty || 0) } : {}), sku: it.sku ?? '', item_name: it.item_name ?? '', fabric_code: it.fabric_code ?? '', quantity: String(it.quantity), unit: it.unit ?? '', rate: it.rate == null ? '' : String(it.rate) })) : [blankItem()];
+    return lines.length ? lines.map(it => ({ ...(editing && it.id ? { id: it.id, received: Number(it.received_qty || 0), ordered: Number(it.quantity) } : {}), sku: it.sku ?? '', item_name: it.item_name ?? '', fabric_code: it.fabric_code ?? '', quantity: String(it.quantity), unit: it.unit ?? '', rate: it.rate == null ? '' : String(it.rate) })) : [blankItem()];
   });
   const [showCharges, setShowCharges] = useState(!!(src?.discount_value || src?.tax_percent || src?.other_charges));
   const [charges, setCharges] = useState<Charges>({ discountType: src?.discount_type ?? 'flat', discountValue: src?.discount_value ? String(src.discount_value) : '', taxPercent: src?.tax_percent ? String(src.tax_percent) : '', otherCharges: src?.other_charges ? String(src.other_charges) : '' });
@@ -72,7 +72,9 @@ export default function POForm({ editing, duplicateFrom, prefill, onClose, onSav
   useBackClose(true, () => onClose());
 
   // Live preview — the server is authoritative, this just mirrors its formula.
-  const subtotal = items.reduce((s, it) => s + num(it.quantity) * num(it.rate), 0);
+  // A cancelled line keeps what arrived on it (quantity = received), and the server's total still counts it.
+  const keptCancelled = (editing?.items ?? []).filter(it => it.cancelled_at).reduce((s, it) => s + Math.round(Number(it.rate || 0) * Number(it.quantity || 0) * 100) / 100, 0);
+  const subtotal = keptCancelled + items.reduce((s, it) => s + num(it.quantity) * num(it.rate), 0);
   const discAmt = charges.discountType === 'percentage' ? Math.round(subtotal * num(charges.discountValue) / 100 * 100) / 100 : Math.min(Math.max(num(charges.discountValue), 0), subtotal);
   const afterDisc = subtotal - discAmt;
   const taxAmt = Math.round(afterDisc * num(charges.taxPercent) / 100 * 100) / 100;
@@ -118,7 +120,8 @@ export default function POForm({ editing, duplicateFrom, prefill, onClose, onSav
     setSaving(true);
     try {
       if (editing && amend) {
-        const { data, error: e } = await supabase.rpc('amend_po', { p_po_id: editing.id, p_po: p.p_po, p_items: p.p_items, p_reason: reason.trim() || null });
+        // base_revision: the server refuses the save if someone revised the order since this form opened.
+        const { data, error: e } = await supabase.rpc('amend_po', { p_po_id: editing.id, p_po: { ...p.p_po, base_revision: editing.revision }, p_items: p.p_items, p_reason: reason.trim() || null });
         if (e) throw e;
         const r = data as { changed: boolean; revision: number };
         onSaved({ id: editing.id, po_number: editing.po_number, changed: r.changed, revision: r.changed ? r.revision : undefined }, false);

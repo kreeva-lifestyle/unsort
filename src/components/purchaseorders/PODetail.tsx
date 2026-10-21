@@ -140,7 +140,7 @@ export default function PODetail({ po: livePo, items: liveItems, receipts: liveR
 
             <POReceipts receipts={receipts} items={items} names={names} canRemove={canRemoveReceipt} busy={busy} onRemove={removeReceipt} />
 
-            <PORevisions po={po} items={items} revisions={revisions} />
+            <PORevisions po={po} items={items} revisions={revisions} onSent={() => { void onChanged(); }} addToast={addToast} />
 
             <POActivity audit={audit} poNumber={po.po_number} onRetry={onRetryActivity} />
           </div>

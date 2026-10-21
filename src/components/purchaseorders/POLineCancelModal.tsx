@@ -73,14 +73,14 @@ export default function POLineCancelModal({ po, item, onClose, onDone, addToast 
           </div>
           <div style={{ fontSize: 12, color: T.tx2, lineHeight: 1.5, marginBottom: 12 }}>
             {got > 0
-              ? `The ${fmtQty(got)}${unit} already received stays on record; only the ${fmtQty(pending)}${unit} still to come is cancelled.`
+              ? `The ${fmtQty(got)}${unit} already received stays on record; only the ${fmtQty(pending)}${unit} still to come is cancelled. Check that ${fmtQty(got)}${unit} is right — after the cancel its receipts cannot be undone.`
               : `This item comes off the order. The other items carry on as they are.`}
           </div>
 
           <label style={S.fLabel}>Why? *</label>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '6px 0 8px' }}>
             {PRESETS.map(p => (
-              <button key={p} type="button" onClick={() => setReason(p)}
+              <button key={p} type="button" className="touch44" onClick={() => setReason(p)}
                 style={{ ...S.btnGhost, ...S.btnSm, minHeight: 32, padding: '5px 12px', fontSize: 11, borderRadius: 999, borderColor: reason === p ? T.ac3 : T.bd2, color: reason === p ? T.ac2 : T.tx3, background: reason === p ? T.ac3 : 'transparent' }}>
                 {p}
               </button>

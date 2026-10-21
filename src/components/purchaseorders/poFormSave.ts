@@ -39,7 +39,8 @@ export function poPayload(f: POFormState, subtotal: number, keepIds: boolean): {
     // Owner's rule: every fabric line names its fabric code (the RPC refuses it too).
     if (f.poType === 'fabric' && !it.fabric_code.trim()) return { error: `Row ${idx + 1} (${it.item_name}): fabric code is required for fabric items` };
     if (num(it.quantity) <= 0) return { error: `Row ${idx + 1} (${it.item_name}): quantity must be greater than 0` };
-    if (it.received && num(it.quantity) < it.received) return { error: `Row ${idx + 1} (${it.item_name}): ${it.received} already arrived — the quantity cannot go below that` };
+    // Only a cut is held at what arrived — a line that got more than ordered may stay as it is.
+    if (it.received && num(it.quantity) < it.received && num(it.quantity) < (it.ordered ?? Infinity)) return { error: `Row ${idx + 1} (${it.item_name}): ${it.received} already arrived — the quantity cannot go below that` };
     if (it.rate && num(it.rate) < 0) return { error: `Row ${idx + 1} (${it.item_name}): rate cannot be negative` };
   }
   if (f.discountType === 'percentage' && num(f.discountValue) > 100) return { error: 'Discount cannot exceed 100%' };

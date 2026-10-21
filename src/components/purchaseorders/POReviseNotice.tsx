@@ -9,16 +9,18 @@ import { supabase } from '../../lib/supabase';
 import { T, S, alpha } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
 import { waLink, waPhone } from '../../lib/whatsapp';
-import { revisedText } from './poWhatsApp';
+import { revisedText, vendorVisible } from './poWhatsApp';
 import type { PORevisionRow } from './poDetailData';
 import type { AuditLog, PurchaseOrder, PurchaseOrderItem } from '../../types/database';
 
-/** The revision the vendor still has to hear about, or null. */
+/** The revision the vendor still has to hear about, or null. The newest one
+ *  the vendor would see decides — a rates-only revision after it never hides
+ *  it — and once that one is sent its "order now" list covers older ones. */
 export function pendingRevision(po: PurchaseOrder, revisions: PORevisionRow[] | null, audit: AuditLog[] | null | 'error'): PORevisionRow | null {
-  const latest = revisions?.[0];
+  const latest = revisions?.find(vendorVisible);
   if (!latest || latest.notified_at) return null;
-  // Not yet with the vendor: the share / mark-sent carries the current order.
-  if (['draft', 'approved', 'cancelled'].includes(po.status)) return null;
+  // Not yet with the vendor (the share / mark-sent carries the current order), or no longer an order to confirm.
+  if (['draft', 'approved', 'cancelled', 'closed'].includes(po.status)) return null;
   const sent = Array.isArray(audit) ? audit.find(a => a.action === 'SENT') : null;
   if (sent?.created_at && sent.created_at > latest.created_at) return null;
   return latest;

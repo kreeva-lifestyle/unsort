@@ -49,10 +49,14 @@ export function reminderText(po: Head, items: Line[], today = fileDate()): strin
 
 const FIELD_WORD: Record<string, string> = { item_name: 'item', fabric_code: 'fabric code', sku: 'SKU', unit: 'unit' };
 
-/** One change as the vendor reads it; null for what the vendor never sees (rates, totals, pieces, terms, charges). */
-function changeLine(c: POChange): string | null {
+/** One change as the vendor reads it; null for what the vendor never sees (rates, totals, pieces, terms, charges).
+ *  `all` is the revision's whole list: a quantity change carries the new unit, so the old amount takes the unit it had. */
+function changeLine(c: POChange, all: POChange[] = []): string | null {
   switch (c.kind) {
-    case 'qty': return `• ${c.label}: ~${q(c.from, c.unit)}~ → *${q(c.to, c.unit)}*`;
+    case 'qty': {
+      const u = all.find((x): x is Extract<POChange, { kind: 'item' }> => x.kind === 'item' && x.field === 'unit' && x.item_id === c.item_id);
+      return `• ${c.label}: ~${q(c.from, u ? u.from : c.unit)}~ → *${q(c.to, c.unit)}*`;
+    }
     case 'added': return `• Added: ${c.label} — *${q(c.to, c.unit)}*`;
     case 'cancelled': return `• Cancelled: ${c.label} — ${q(c.from, c.unit)}${n(c.received) > 0 ? ` (we keep the ${q(c.received, c.unit)} already received)` : ''}`;
     case 'item': return `• ${c.label}: ${FIELD_WORD[c.field]} ${c.from || '—'} → *${c.to || '—'}*`;
@@ -69,7 +73,7 @@ export const vendorVisible = (rev: Pick<PurchaseOrderRevision, 'changes'>): bool
 
 /** "PO #111 has been revised (Rev 2) — changes … Order now: 1. … Please confirm." — null when nothing the vendor sees changed. */
 export function revisedText(po: Head, rev: Pick<PurchaseOrderRevision, 'revision' | 'kind' | 'changes' | 'reason'>, items: Line[]): string | null {
-  const changes = rev.changes.map(changeLine).filter((x): x is string => !!x);
+  const changes = rev.changes.map(c => changeLine(c, rev.changes)).filter((x): x is string => !!x);
   if (!changes.length) return null;
   const order = live(items).map((it, i) => `${i + 1}. ${itemLabel(it)} — ${q(it.quantity, it.unit)}${n(it.received_qty) > 0 ? ` (${q(it.received_qty, it.unit)} received)` : ''}`);
   const head = rev.kind === 'line_cancel'

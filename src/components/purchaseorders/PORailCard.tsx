@@ -22,10 +22,11 @@ const at = (iso: string | null | undefined) => (iso ? ` · ${fmtWhen(iso)}` : ''
 
 /** "20 of 20" when every line shares a unit (metres and pieces are never
  *  added together); otherwise the share, "64%", and `mixed` is set. */
-export function receivedOf(items: Pick<PurchaseOrderItem, 'quantity' | 'received_qty' | 'unit'>[]): { got: number; ordered: number; text: string; mixed: boolean } {
+export function receivedOf(items: (Pick<PurchaseOrderItem, 'quantity' | 'received_qty' | 'unit'> & { cancelled_at?: string | null })[]): { got: number; ordered: number; text: string; mixed: boolean } {
   const ordered = items.reduce((t, it) => t + n(it.quantity), 0);
   const got = items.reduce((t, it) => t + Math.min(n(it.received_qty), n(it.quantity)), 0);
-  const mixed = new Set(items.map(it => (it.unit || '').trim().toLowerCase())).size > 1;
+  // An item cancelled before anything arrived does not count as another unit.
+  const mixed = new Set(items.filter(it => !(it.cancelled_at && n(it.quantity) <= 0)).map(it => (it.unit || '').trim().toLowerCase())).size > 1;
   const text = !mixed ? `${fmtQty(got)} of ${fmtQty(ordered)}` : `${ordered > 0 ? Math.round(got / ordered * 100) : 0}%`;
   return { got, ordered, text, mixed };
 }
