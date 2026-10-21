@@ -226,7 +226,7 @@ would look like.
 - **Secrets stay server-side.** Never put API keys, service-role tokens,
   or private keys in client code. The anon key is the only credential
   that belongs in the browser bundle. For anything else, use a Supabase
-  Edge Function (see `packtime`, `ocr` for reference).
+  Edge Function (see `packtime` for reference).
 - **Trust the schema, validate the boundary.** Internal calls don't need
   defensive null checks everywhere — the DB types already enforce shape.
   But user input (forms, imported files, URL params) is always suspect;

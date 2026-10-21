@@ -48,7 +48,7 @@ src/
   pages/      Dashboard Inventory InventoryExtras BrandTags PackTime CashChallan CashBook PurchaseOrders
               ListingAIPage Attendance Minis PrintStation Settings Login PasswordReset
   modules/programs/   self-contained (hooks/ lib/ i18n/ components/)
-supabase/functions/   admin-users client-finder listing-ai master-sync odette-export otp-inbox packcam packtime pricing-ai short-track sign-qz
+supabase/functions/   admin-users client-finder listing-ai master-sync ocr (retired) odette-export otp-inbox packcam packtime pricing-ai short-track sign-qz
 tools/packcam-agent/  Pack Cam agent for the office PC (Node + ffmpeg; README, start.bat / start-hidden.vbs / stop.bat / install-startup.bat, npm test)
 supabase/migrations/  46 timestamp-prefixed SQL files (2026-05-28 → 2026-09-12)
 tools/boutique_leads.py   unrelated Google-Maps lead scraper (see §8)
@@ -331,6 +331,7 @@ marked (G).
 | `client-finder` | 673 | `minis/clientfinder/api.ts` | service role, `GOOGLE_*` (Vision) | `client_finder_searches/hits`; see §3.9 |
 | `buyer-spider` | 759 | `minis/clientfinder/buyers/buyerApi.ts` | service role; `app_secrets` Anthropic key + Brave Search key (`search_api_key`) | `buyer_runs/queue/leads`, `buyer_search_usage` (hard cap 1,000 Brave searches per UTC month); see §3.9 |
 | `otp-inbox` | 112 + `delivery.ts` 131 + `sheetPdf.ts` 104 | iOS Shortcut (POST with shared secret); `OtpSetupGuide` (`setup`) | service role | `otp_inbox` insert/update; `app_secrets.otp_push_secret`; delivery-sheet PDF → Dropbox; see §3.9 |
+| `ocr` | 17 | nothing (retired 2026-10-21: it was an unused OCR.space proxy with sign-in off and a fallback API key in its source) | none | answers 410 "retired" to any signed-in caller (`verify_jwt` on); holds no key |
 
 ### 2.7 Migrations (`supabase/migrations/`, replay in filename order)
 
