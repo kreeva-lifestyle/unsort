@@ -151,7 +151,7 @@ export default function POForm({ editing, duplicateFrom, prefill, onClose, onSav
           <button type="button" onClick={onClose} style={S.modalClose} aria-label="Close">&#215;</button>
         </div>
         <div style={{ padding: '16px 18px', overflowY: 'auto', WebkitOverflowScrolling: 'touch', flex: 1, minHeight: 0 }}>
-          {amend && <div style={{ fontSize: 12, color: T.tx2, lineHeight: 1.5, marginBottom: 12 }}>The vendor, type and PO date stay as raised. What already arrived stays on record — a quantity cannot go below it. Every change is kept in the order’s history.</div>}
+          {amend && <div style={{ fontSize: 12, color: T.tx2, lineHeight: 1.5, marginBottom: 12 }}>The vendor, type and PO date stay as raised. What already arrived stays on record — a quantity can be cut only down to it. Every change is kept in the order’s history.</div>}
           <POFormHeader amend={amend} editing={!!editing} vendor={vendor} onPickVendor={pickVendor} poType={poType} onType={changeType} poDate={poDate} onPoDate={setPoDate}
             expectedDate={expectedDate} onExpected={setExpectedDate} paymentTerms={paymentTerms} onTerms={setPaymentTerms}
             forPieces={forPieces} onPieces={setForPieces} lumpSum={lumpSum} onLumpSum={setLumpSum} piecesMissing={!!error && !lumpSum && !forPieces.trim()} addToast={addToast} />

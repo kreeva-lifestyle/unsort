@@ -6,6 +6,8 @@ import type { FormItem } from './POItemRows';
 import type { PurchaseOrderType } from '../../types/database';
 
 export const num = (s: string) => { const n = parseFloat(s); return isNaN(n) ? 0 : n; };
+/** Money to the paisa, as the database keeps it (a revision would otherwise record 10.555 → stored 10.56 as a change). */
+const paise = (s: string) => Math.round(num(s) * 100) / 100;
 
 export interface POFormState {
   vendor: { id: string | null; name: string; phone: string };
@@ -61,10 +63,10 @@ export function poPayload(f: POFormState, subtotal: number, keepIds: boolean): {
     // includes them whether or not the charges section is expanded, so
     // collapsing the section must never silently strip an existing
     // discount/tax from the saved PO.
-    discount_type: num(f.discountValue) > 0 ? f.discountType : null,
-    discount_value: num(f.discountValue),
-    tax_percent: num(f.taxPercent),
-    other_charges: num(f.otherCharges),
+    discount_type: paise(f.discountValue) > 0 ? f.discountType : null,
+    discount_value: paise(f.discountValue),
+    tax_percent: paise(f.taxPercent),
+    other_charges: paise(f.otherCharges),
   };
   // The code travels only on fabric POs — a type switched away from
   // fabric must not carry a stale code into a job-work / material item.
