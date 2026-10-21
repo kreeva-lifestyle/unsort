@@ -130,7 +130,7 @@ export function usePoList(active: boolean | undefined, addToast: (m: string, t?:
       if (dateTo) q = q.lte('po_date', dateTo);
       return q;
     };
-    const listQ = narrow(poQuery(`${PO_COLS}, costing_products(sku), purchase_order_items(sku, item_name, fabric_code, quantity, received_qty)`, { count: 'estimated' }).in('status', TAB_STATUSES[shown]))
+    const listQ = narrow(poQuery(`${PO_COLS}, costing_products(sku), purchase_order_items(sku, item_name, fabric_code, quantity, received_qty, unit)`, { count: 'estimated' }).in('status', TAB_STATUSES[shown]))
       .order('po_number', { ascending: false }).range(page * pageSize, (page + 1) * pageSize - 1);
     // A slice that lives on Open only has nothing on Completed: no query.
     const otherQ = quick ? null : narrow(poQuery('id', { count: 'exact', head: true }).in('status', TAB_STATUSES[other]));

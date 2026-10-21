@@ -726,6 +726,14 @@ html.launching .brand-slot { opacity: 0; }
 .po-card-h > div > b { display: block; font: 700 16px/1.25 Sora, Inter, system-ui, sans-serif; color: oklch(0.93 0.01 250); margin-top: 3px; overflow-wrap: anywhere; }   /* wraps beside the pill rather than cutting the vendor short */
 .po-card-k { font: 600 10px/1.2 'JetBrains Mono', ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; color: oklch(0.53 0.04 255); }
 .po-card-sub { font-size: 12px; color: oklch(0.53 0.04 255); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.po-card-cap .po-card-right { flex-shrink: 0; white-space: nowrap; font: 500 11px/1.3 'JetBrains Mono', ui-monospace, monospace; }   /* the list's "pending · late": whole, the event gives way */
+.po-card-side { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; flex-shrink: 0; }
+/* The list's cards (POListCard): the whole card opens the order. */
+.po-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr)); gap: 12px; }
+.po-card-open { margin-bottom: 0; cursor: pointer; transition: border-color var(--m-fast) var(--e-out), transform var(--m-slow) var(--e-spring); -webkit-tap-highlight-color: transparent; }
+.po-card-open:active { transform: scale(.985); transition-duration: var(--m-instant); }
+.po-card-open:focus-visible { outline: 2px solid oklch(0.65 0.18 270 / .6); outline-offset: 2px; }
+@media (hover: hover) { .po-card-open:hover { border-color: oklch(0.55 0.22 265 / .3); } }
 .po-card-pill { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 9px; border-radius: 6px; font: 600 11px/1 Inter, system-ui, sans-serif; white-space: nowrap; flex-shrink: 0; transition: background-color var(--m-fast), color var(--m-fast); }
 .po-card-pill i { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; background: currentColor; }
 .po-card .po-rail { margin: 26px 26px 52px; }
