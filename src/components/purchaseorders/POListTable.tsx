@@ -1,8 +1,9 @@
 // Desktop PO list, sorted into sections (owner's pick): the Jobwork table —
 // SKU photo | SKU · PO # and item | vendor and phone | received bar and
 // counts | PO date · due and how late | status | total — with a heading row
-// per section (Overdue first, in a red wash). The row opens the order; the
-// print button shows on hover. Phones use POListCards.
+// per section (Overdue first, in a red wash) whose money sits under Total.
+// The row opens the order (click, or Enter / Space once focused); the print
+// button shows on hover. Phones use POListCards.
 import { T, S, alpha } from '../../lib/theme';
 import type { Section } from './poSections';
 import { SECTION_META, STATUS_DOT } from './poSections';
@@ -24,10 +25,11 @@ export default function POListTable({ sections, onOpen, onPrint }: { sections: S
         <thead><tr>{th('', 'left', 64)}{th('PO')}{th('Vendor')}{th('Received', 'left', 240)}{th('PO date · due')}{th('Status')}{th('Total', 'right')}{th('', 'right', 52)}</tr></thead>
         {sections.map((s, si) => {
           const m = SECTION_META[s.key];
+          const head: React.CSSProperties = { padding: '9px 14px', background: s.key === 'overdue' ? alpha(T.re, 0.07) : 'rgba(255,255,255,0.018)' };
           return (
             <tbody key={s.key} id={`po-sec-${s.key}`}>
               <tr>
-                <td colSpan={6} style={{ padding: '9px 14px', borderTop: si ? `1px solid ${T.bd2}` : 'none', background: s.key === 'overdue' ? alpha(T.re, 0.07) : 'rgba(255,255,255,0.018)' }}>
+                <td colSpan={6} style={{ ...head, borderTop: si ? `1px solid ${T.bd2}` : 'none' }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ width: 8, height: 8, borderRadius: 999, background: m.color, flexShrink: 0 }} />
                     <span style={{ fontSize: 12, fontWeight: 600, color: m.color }}>{m.label}</span>
@@ -35,23 +37,26 @@ export default function POListTable({ sections, onOpen, onPrint }: { sections: S
                     <span style={{ fontSize: 11, color: T.tx3, marginLeft: 6 }}>{sectionHint(s)}</span>
                   </span>
                 </td>
-                <td colSpan={2} style={{ padding: '9px 14px', textAlign: 'right', borderTop: si ? `1px solid ${T.bd2}` : 'none', background: s.key === 'overdue' ? alpha(T.re, 0.07) : 'rgba(255,255,255,0.018)', fontFamily: T.mono, fontSize: 12, color: T.tx3 }}>
+                <td style={{ ...head, borderTop: si ? `1px solid ${T.bd2}` : 'none', textAlign: 'right', fontFamily: T.mono, fontSize: 12, color: T.tx3, whiteSpace: 'nowrap' }}>
                   {s.total > 0 ? `₹${s.total.toLocaleString('en-IN')}` : ''}
                 </td>
+                <td style={{ ...head, borderTop: si ? `1px solid ${T.bd2}` : 'none' }} />
               </tr>
               {s.rows.map(v => {
                 // Late and not yet arriving: the status says so (a part-received order keeps its own word).
                 const st = v.late && v.po.status !== 'partially_received' ? { label: 'Overdue', color: T.re } : STATUS_DOT[v.po.status], done = ['completed', 'closed', 'cancelled'].includes(v.po.status);
                 return (
-                  <tr key={v.po.id} className="jw-row po-row" onClick={() => onOpen(v.po)} style={{ cursor: 'pointer', opacity: done ? 0.8 : 1 }}>
+                  <tr key={v.po.id} className="jw-row po-row" tabIndex={0} aria-label={`Open PO #${v.po.po_number}, ${v.po.vendor_name}`} onClick={() => onOpen(v.po)}
+                    onKeyDown={e => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onOpen(v.po); } }} style={{ cursor: 'pointer', opacity: done ? 0.8 : 1 }}>
                     <td style={{ ...td, paddingRight: 0 }}><Thumb v={v} size={44} /></td>
                     <td style={td}>
                       <Title v={v} size={13} />
-                      <div style={{ fontSize: 11, color: T.tx3, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 280 }}><Item v={v} /></div>
+                      {/* width 0 + min-width 100%: the item never widens its column, it ends in "…" instead. */}
+                      <div style={{ fontSize: 11, color: T.tx3, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: 0, minWidth: '100%' }}><Item v={v} /></div>
                     </td>
-                    <td style={td}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>{v.po.vendor_name}</div>
-                      {v.po.vendor_phone && <div style={{ fontSize: 11, color: T.tx3, marginTop: 2, fontFamily: T.mono }}>{v.po.vendor_phone}</div>}
+                    <td style={{ ...td, minWidth: 160, maxWidth: 260 }}>
+                      <div title={v.po.vendor_name} style={{ fontSize: 13, fontWeight: 600, color: T.tx, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{v.po.vendor_name}</div>
+                      {v.po.vendor_phone && <div style={{ fontSize: 11, color: T.tx3, marginTop: 2, fontFamily: T.mono, whiteSpace: 'nowrap' }}>{v.po.vendor_phone}</div>}
                     </td>
                     <td style={td}>
                       <div style={{ width: 200 }}><Bar v={v} h={4} /></div>
@@ -60,7 +65,7 @@ export default function POListTable({ sections, onOpen, onPrint }: { sections: S
                     <td style={{ ...td, fontSize: 12, whiteSpace: 'nowrap' }}>
                       <span style={{ color: T.tx2 }}>{day(v.po.po_date ?? v.po.created_at)}</span>
                       <span style={{ color: T.tx3 }}> · </span>
-                      <span style={{ color: v.late ? T.re : T.tx3 }}>{v.due ? day(v.due.due) : '—'}</span>
+                      <span style={{ color: v.pastDue ? T.re : T.tx3 }}>{v.due ? day(v.due.due) : '—'}</span>
                       {v.due && <div style={{ fontSize: 11, marginTop: 3 }}><DueNote v={v} /></div>}
                     </td>
                     <td style={td}><StateDot label={st.label} color={st.color} /></td>

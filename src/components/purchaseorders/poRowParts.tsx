@@ -7,11 +7,13 @@ import SkuThumb from '../ui/SkuThumb';
 import { PO_TYPE_LABELS } from '../../types/database';
 import { itemLabel } from './poItemLabel';
 import { fmtQty } from './poStats';
-import type { RowView, Section } from './poSections';
+import type { RowView, Section, UnitQty } from './poSections';
 
 const DAY = new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short' });
 export const day = (d: string | null | undefined) => (d ? DAY.format(new Date(d.length <= 10 ? `${d}T00:00:00` : d)) : '—');
 const n = (v: unknown) => Number(v || 0);
+/** "204 pcs · 120 m" */
+export const unitsText = (q: UnitQty) => q.map(x => `${fmtQty(x.qty)} ${x.unit}`).join(' · ');
 
 /** The first line's SKU photo; a quiet tile when the order has no SKU. */
 export function Thumb({ v, size }: { v: RowView; size: number }) {
@@ -55,16 +57,16 @@ export function Received({ v }: { v: RowView }) {
   const done = v.po.status === 'completed' || (v.ordered > 0 && v.pending === 0);
   return (
     <>
-      <b style={{ color: done ? T.gr : T.tx2 }}>{fmtQty(v.got)}</b>/{fmtQty(v.ordered)} pcs
+      <b style={{ color: done ? T.gr : T.tx2 }}>{fmtQty(v.got)}</b>/{fmtQty(v.ordered)} {v.unit}
       {done ? ' received' : v.po.status === 'draft' || v.po.status === 'approved' ? ' · not sent yet' : v.po.status === 'closed' || v.po.status === 'cancelled' ? '' : <> · <b style={{ color: T.yl }}>{fmtQty(v.pending)}</b> pending</>}
     </>
   );
 }
 
-/** Under the dates: how late, due today, or how long to go. */
+/** Under the dates: how late (a draft past its date too), due today, or how long to go. */
 export function DueNote({ v }: { v: RowView }) {
   if (!v.due) return null;
-  if (v.late) return <span style={{ color: T.re, fontWeight: 600 }}>{v.due.late} d late</span>;
+  if (v.pastDue) return <span style={{ color: T.re, fontWeight: 600 }}>{v.due.late} d late</span>;
   if (v.due.left === 0) return <span style={{ color: T.yl, fontWeight: 600 }}>due today</span>;
   return <span style={{ color: T.tx3 }}>due in {v.due.left} d</span>;
 }
@@ -84,7 +86,7 @@ export function Total({ v, perPiece = true }: { v: RowView; perPiece?: boolean }
 
 /** The line beside a section's name: who to chase and how much is still to come. */
 export function sectionHint(s: Section): string {
-  const pcs = s.pending > 0 ? `${fmtQty(s.pending)} pcs` : '';
+  const pcs = unitsText(s.pending);
   switch (s.key) {
     case 'overdue': return ['Chase these first', [pcs && `${pcs} past due`, s.oldestLate > 0 && `oldest ${s.oldestLate} day${s.oldestLate === 1 ? '' : 's'}`].filter(Boolean).join(', ')].filter(Boolean).join(' · ');
     case 'approve': return 'Approve to send to the vendor';

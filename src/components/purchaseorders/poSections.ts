@@ -6,6 +6,7 @@
 // to chase. Pure: rows and an ISO "today" in, sections out.
 import { T } from '../../lib/theme';
 import { dueOf, dueTone, type DueState } from './poDue';
+import { unitOf } from './poStats';
 import type { PORow } from './POList';
 
 export type SectionKey = 'overdue' | 'approve' | 'send' | 'vendor' | 'partial' | 'received' | 'closed' | 'cancelled';
@@ -33,22 +34,35 @@ const WAITING: PORow['status'][] = ['approved', 'sent', 'partially_received'];
 export interface RowView {
   po: PORow;
   ordered: number; got: number; pending: number;
-  /** Lines in more than one unit: counts are not added, the share is shown instead. */
-  mixed: boolean;
+  /** The lines' one unit ("pcs", "m" …); lines in more than one unit are `mixed` — counts are not added, the share is shown instead. */
+  unit: string; mixed: boolean;
   /** Open orders only (drafts too): when it is due and where today stands. */
   due: DueState | null;
+  /** With the vendor (or approved) and past its due date: the Overdue section. */
   late: boolean;
+  /** Past its due date, whatever the status (a draft too): shown in red. */
+  pastDue: boolean;
 }
-export interface Section { key: SectionKey; rows: RowView[]; pending: number; total: number; oldestLate: number }
+/** Quantities still to come, kept apart by unit — metres are never added to pieces. */
+export type UnitQty = { unit: string; qty: number }[];
+export interface Section { key: SectionKey; rows: RowView[]; pending: UnitQty; total: number; oldestLate: number }
+
+/** Adds each row's still-to-come per unit (mixed-unit orders are left out). */
+export const pendingOf = (rows: RowView[]): UnitQty => {
+  const m = new Map<string, number>();
+  for (const r of rows) if (!r.mixed && r.pending > 0) m.set(r.unit, (m.get(r.unit) ?? 0) + r.pending);
+  return [...m.entries()].map(([unit, qty]) => ({ unit, qty })).sort((a, b) => b.qty - a.qty);
+};
 
 export function viewOf(po: PORow, today: string): RowView {
   const items = po.purchase_order_items ?? [];
   const ordered = items.reduce((t, it) => t + n(it.quantity), 0);
   const got = items.reduce((t, it) => t + Math.min(n(it.received_qty), n(it.quantity)), 0);
-  const mixed = new Set(items.map(it => (it.unit || '').trim().toLowerCase())).size > 1;
+  const units = new Set(items.map(it => unitOf(it.unit)));
   const open = po.status === 'draft' || WAITING.includes(po.status);
   const due = open ? dueOf(po, today) : null;
-  return { po, ordered, got, pending: Math.max(0, ordered - got), mixed, due, late: !!due && WAITING.includes(po.status) && dueTone(due) === 'late' };
+  const pastDue = !!due && dueTone(due) === 'late';
+  return { po, ordered, got, pending: Math.max(0, ordered - got), unit: [...units][0] ?? 'pcs', mixed: units.size > 1, due, late: pastDue && WAITING.includes(po.status), pastDue };
 }
 
 const sectionOf = (v: RowView): SectionKey => {
@@ -71,6 +85,6 @@ export function sectionsOf(pos: PORow[], today: string): Section[] {
   return SECTION_ORDER.filter(k => by.has(k)).map(k => {
     const rows = by.get(k)!;
     if (k === 'overdue') rows.sort((a, b) => (b.due?.late ?? 0) - (a.due?.late ?? 0));
-    return { key: k, rows, pending: rows.reduce((t, r) => t + (r.mixed ? 0 : r.pending), 0), total: rows.reduce((t, r) => t + n(r.po.grand_total), 0), oldestLate: Math.max(0, ...rows.map(r => r.due?.late ?? 0)) };
+    return { key: k, rows, pending: pendingOf(rows), total: rows.reduce((t, r) => t + n(r.po.grand_total), 0), oldestLate: Math.max(0, ...rows.map(r => r.due?.late ?? 0)) };
   });
 }

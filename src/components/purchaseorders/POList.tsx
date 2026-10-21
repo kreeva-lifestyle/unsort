@@ -53,7 +53,13 @@ export default function POList(p: Props) {
   // swipeable cards on a phone.
   const phone = useIsPhone();
   const shown = useProgressive(p.pos, p.loading);
-  const sections = useMemo(() => sectionsOf(shown, fileDate()), [shown]);
+  // Sections come from the whole page, so the order never reshuffles as rows
+  // arrive; the first paint shows the first rows of that order, the rest follow.
+  const all = useMemo(() => sectionsOf(p.pos, fileDate()), [p.pos]);
+  const sections = useMemo(() => {
+    let left = shown.length;
+    return all.map(s => { const rows = s.rows.slice(0, Math.max(0, left)); left -= rows.length; return { ...s, rows }; }).filter(s => s.rows.length);
+  }, [all, shown.length]);
   return (
     <>
       <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '10px 14px', marginBottom: 10, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -75,9 +81,9 @@ export default function POList(p: Props) {
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: phone ? 4 : 10 }}>
         <div style={{ fontSize: 9, color: T.tx3 }}>{p.totalCount} record{p.totalCount === 1 ? '' : 's'}{p.totalPages > 1 ? ' · counts below are for this page' : ''}</div>
-        {!phone && !p.loading && <POSectionStrip sections={sections} phone={false} />}
+        {!phone && !p.loading && <POSectionStrip sections={all} phone={false} />}
       </div>
-      {phone && !p.loading && <POSectionStrip sections={sections} phone />}
+      {phone && !p.loading && <POSectionStrip sections={all} phone />}
 
       {p.loading && <SkeletonRows rows={4} />}
       {!p.loading && p.pos.length === 0 && (p.otherTab.count

@@ -722,7 +722,9 @@ html.launching .brand-slot { opacity: 0; }
 .po-card-side { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; flex-shrink: 0; }
 /* The sectioned PO list (POListTable): the row's print button shows on hover. */
 .po-print { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 6px; border: 1px solid transparent; background: transparent; color: oklch(0.53 0.04 255); cursor: pointer; opacity: .35; transition: opacity var(--m-fast), background-color var(--m-fast), color var(--m-fast); }
-.po-row:hover .po-print, .po-print:focus-visible { opacity: 1; color: oklch(0.65 0.18 270); background: oklch(0.55 0.22 265 / .12); border-color: oklch(0.55 0.22 265 / .2); }
+.po-row:focus-visible { outline: 2px solid oklch(0.65 0.18 270 / .6); outline-offset: -2px; }
+.po-row:focus-visible td { background: oklch(0.55 0.22 265 / .04); }
+.po-row:hover .po-print, .po-row:focus-visible .po-print, .po-print:focus-visible { opacity: 1; color: oklch(0.65 0.18 270); background: oklch(0.55 0.22 265 / .12); border-color: oklch(0.55 0.22 265 / .2); }
 .po-card-pill { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 9px; border-radius: 6px; font: 600 11px/1 Inter, system-ui, sans-serif; white-space: nowrap; flex-shrink: 0; transition: background-color var(--m-fast), color var(--m-fast); }
 .po-card-pill i { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; background: currentColor; }
 .po-card .po-rail { margin: 26px 26px 52px; }

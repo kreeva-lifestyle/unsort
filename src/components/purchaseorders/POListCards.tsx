@@ -7,7 +7,7 @@ import { T, alpha } from '../../lib/theme';
 import SwipeRow from '../ui/SwipeRow';
 import type { Section } from './poSections';
 import { SECTION_META, STATUS_DOT } from './poSections';
-import { Thumb, Title, Item, Bar, Received, Total, day, sectionHint } from './poRowParts';
+import { Thumb, Title, Item, Bar, Received, Total, day, sectionHint, unitsText } from './poRowParts';
 import { StateDot } from './POListTable';
 import type { PORow } from './POList';
 
@@ -23,7 +23,7 @@ export default function POListCards({ sections, onOpen, onPrint }: { sections: S
               <span style={{ width: 8, height: 8, borderRadius: 999, background: m.color, flexShrink: 0 }} />
               <span style={{ fontSize: 13, fontWeight: 600, color: m.color }}>{m.label}</span>
               <span style={{ fontFamily: T.mono, fontSize: 11, fontWeight: 600, lineHeight: 1.5, padding: '0 7px', borderRadius: 999, color: m.color, background: alpha(m.color, 0.15) }}>{s.rows.length}</span>
-              <span style={{ marginLeft: 'auto', fontSize: 11, color: T.tx3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{s.key === 'overdue' && s.pending > 0 ? `${s.pending} pcs past due` : sectionHint(s)}</span>
+              <span style={{ marginLeft: 'auto', fontSize: 11, color: T.tx3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{s.key === 'overdue' && s.pending.length ? `${unitsText(s.pending)} past due` : sectionHint(s)}</span>
             </div>
             {s.rows.map(v => {
               const st = STATUS_DOT[v.po.status], done = ['completed', 'closed', 'cancelled'].includes(v.po.status);
@@ -44,7 +44,7 @@ export default function POListCards({ sections, onOpen, onPrint }: { sections: S
                       <div style={{ margin: '8px 0 6px' }}><Bar v={v} h={3} /></div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '4px 10px', flexWrap: 'wrap', fontSize: 11, color: T.tx3 }}>
                         <span><Received v={v} /></span>
-                        {v.due && <span style={{ color: v.late ? T.re : v.due.left === 0 ? T.yl : T.tx3 }}>{v.due.left === 0 && !v.late ? 'due today' : `due ${day(v.due.due)}`}</span>}
+                        {v.due && <span style={{ color: v.pastDue ? T.re : v.due.left === 0 ? T.yl : T.tx3 }}>{v.due.left === 0 && !v.pastDue ? 'due today' : `due ${day(v.due.due)}`}</span>}
                         <span style={{ marginLeft: 'auto' }}><Total v={v} perPiece={false} /></span>
                       </div>
                     </div>
