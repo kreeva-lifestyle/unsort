@@ -147,7 +147,7 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
       <POTabs tab={tab} onTab={setTab} counts={{ [tab]: loading ? null : totalCount, [otherTab]: otherCount } as Record<typeof tab, number | null>} />
 
       <POList
-        pos={pos} loading={loading} totalCount={totalCount} statusColors={PO_STATUS_COLORS}
+        pos={pos} loading={loading} totalCount={totalCount}
         search={search} onSearchChange={updateSearch}
         showFilters={showFilters} onToggleFilters={() => setShowFilters(f => !f)}
         statusFilter={statusFilter} onStatusFilterChange={setStatusFilter}

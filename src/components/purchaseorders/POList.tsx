@@ -1,14 +1,20 @@
-// PO list — search + collapsible filters, the orders as Motion Lab cards (POListCard), pager.
+// PO list — search + collapsible filters, the orders sorted into sections
+// (poSections: Overdue first) as Jobwork's list — POListTable on a desktop,
+// POListCards on a phone, POSectionStrip counting them — and the pager.
 // Parent owns all state & data; this is a pure presentational component.
+import { useMemo } from 'react';
 import { T, S } from '../../lib/theme';
 import { useIsPhone } from '../../hooks/useIsPhone';
 import { useProgressive } from '../../hooks/useProgressive';
 import Empty from '../ui/Empty';
-import SwipeRow from '../ui/SwipeRow';
 import { SkeletonRows } from '../ui/Skeleton';
 import type { PurchaseOrder, PurchaseOrderItem } from '../../types/database';
 import POFilters, { type POFiltersProps } from './POFilters';
-import POListCard from './POListCard';
+import { fileDate } from '../../lib/exportName';
+import { sectionsOf } from './poSections';
+import POListTable from './POListTable';
+import POListCards from './POListCards';
+import POSectionStrip from './POSectionStrip';
 
 export type PORow = PurchaseOrder & {
   purchase_order_items?: Array<Pick<PurchaseOrderItem, 'sku' | 'item_name' | 'fabric_code' | 'quantity' | 'received_qty' | 'unit'>>;
@@ -20,7 +26,6 @@ interface Props extends POFiltersProps {
   pos: PORow[];
   loading: boolean;
   totalCount: number;
-  statusColors: Record<string, { bg: string; color: string }>;
   search: string;
   onSearchChange: (v: string) => void;
   showFilters: boolean;
@@ -44,10 +49,11 @@ interface Props extends POFiltersProps {
 
 export default function POList(p: Props) {
   const filterActive = p.statusFilter || p.typeFilter || p.creatorFilter || p.dateFrom || p.dateTo;
-  // Only the layout on screen is built: the card grid on a desktop, the
-  // swipeable column on a phone (the classes stay as the CSS fallback).
+  // Only the layout on screen is built: the table on a desktop, the
+  // swipeable cards on a phone.
   const phone = useIsPhone();
   const shown = useProgressive(p.pos, p.loading);
+  const sections = useMemo(() => sectionsOf(shown, fileDate()), [shown]);
   return (
     <>
       <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '10px 14px', marginBottom: 10, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -67,7 +73,11 @@ export default function POList(p: Props) {
 
       {p.showFilters && <POFilters {...p} filterActive={!!filterActive} />}
 
-      <div style={{ fontSize: 9, color: T.tx3, marginBottom: 6 }}>{p.totalCount} record{p.totalCount === 1 ? '' : 's'}</div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: phone ? 4 : 10 }}>
+        <div style={{ fontSize: 9, color: T.tx3 }}>{p.totalCount} record{p.totalCount === 1 ? '' : 's'}{p.totalPages > 1 ? ' · counts below are for this page' : ''}</div>
+        {!phone && !p.loading && <POSectionStrip sections={sections} phone={false} />}
+      </div>
+      {phone && !p.loading && <POSectionStrip sections={sections} phone />}
 
       {p.loading && <SkeletonRows rows={4} />}
       {!p.loading && p.pos.length === 0 && (p.otherTab.count
@@ -76,18 +86,9 @@ export default function POList(p: Props) {
         ? <Empty icon="search" title="No orders match" message="Clear the search, chips or filters above to see every order." />
         : <Empty icon="clipboard" title="No purchase orders yet" message="Raise your first PO — pick a vendor, add the items you're buying, and track them from draft through to fully received." cta={p.canCreate ? '+ New Purchase Order' : undefined} onCta={p.canCreate ? p.onOpenEmpty : undefined} />)}
 
-      {/* Every order as the Motion Lab card: a grid on a desktop, one column on a phone (swipe for Print). */}
       {!p.loading && p.pos.length > 0 && (phone
-        ? <div className="mobile-only" style={{ flexDirection: 'column', gap: 10, width: '100%', maxWidth: 640 }}>
-            {shown.map((po, i) => (
-              <SwipeRow key={po.id} actions={[{ label: 'Print', color: '#3B82F6', onClick: () => p.onPrint(po) }]} hint={i === 0} hintKey="po">
-                <POListCard po={po} statusColors={p.statusColors} onOpen={() => p.onOpenDetail(po)} />
-              </SwipeRow>
-            ))}
-          </div>
-        : <div className="po-card-grid">
-            {shown.map(po => <POListCard key={po.id} po={po} statusColors={p.statusColors} onOpen={() => p.onOpenDetail(po)} onPrint={() => p.onPrint(po)} />)}
-          </div>)}
+        ? <POListCards sections={sections} onOpen={p.onOpenDetail} onPrint={p.onPrint} />
+        : <POListTable sections={sections} onOpen={p.onOpenDetail} onPrint={p.onPrint} />)}
 
       {p.totalPages > 0 && (
         <div className="pager" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10, fontSize: 11 }}>
