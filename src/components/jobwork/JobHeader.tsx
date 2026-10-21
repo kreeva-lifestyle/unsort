@@ -40,7 +40,7 @@ export default function JobHeader({ job, photo }: { job: JobworkSummary; photo: 
           </div>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 6, alignItems: 'center' }}>
             <StateDot label={ws.label} t={ws.tone} /><StateDot label={ps.label} t={ps.tone} />
-            <span style={{ fontSize: 11, color: isOverdue(job) ? T.re : T.tx3 }}>Given {fmtDate(job.job_date)}{job.expected_date ? ` · due back ${fmtDate(job.expected_date)}` : ''}</span>
+            <span style={{ fontSize: 11, color: isOverdue(job) ? T.re : T.tx3 }}>Given {fmtDate(job.job_date)}{job.expected_date ? ` · due back ${fmtDate(job.expected_date)}` : ''}{job.po_number ? ` · fabric from PO #${job.po_number}` : ''}</span>
           </div>
         </div>
       </div>

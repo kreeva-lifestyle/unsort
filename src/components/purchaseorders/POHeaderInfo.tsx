@@ -6,6 +6,7 @@ import { T } from '../../lib/theme';
 import { fmtWhen } from '../../lib/humanize';
 import { PO_TYPE_LABELS } from '../../types/database';
 import type { PurchaseOrder } from '../../types/database';
+import type { POJob } from './useStartJobwork';
 
 export const fmtDate = (d: string | null | undefined) => d ? new Date(d + (d.length <= 10 ? 'T00:00:00' : '')).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 /** "19 Sep" — under a rail stop; null when there is no date. */
@@ -26,12 +27,14 @@ const Who = ({ names, id, at }: { names: Record<string, string> | null; id: stri
   </>
 );
 
-export default function POHeaderInfo({ po, costingSku, names }: {
+export default function POHeaderInfo({ po, costingSku, names, jobs }: {
   po: PurchaseOrder;
   /** Raised from a costing sheet: that costing's SKU. */
   costingSku: string | null;
   /** Profile names by id, for the actor columns; null until they have loaded. */
   names: Record<string, string> | null;
+  /** Jobwork jobs started from this PO's fabric; null while loading. */
+  jobs?: POJob[] | null;
 }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12, marginBottom: 16 }}>
@@ -43,6 +46,7 @@ export default function POHeaderInfo({ po, costingSku, names }: {
       {po.for_pieces != null && po.for_pieces > 0 && <Info label="For pieces" value={<span style={{ fontFamily: T.mono }}>{po.for_pieces} pcs</span>} />}
       {po.lump_sum && <Info label="Pricing" value="Lump sum" />}
       {costingSku && <Info label="From costing" value={<span style={{ fontFamily: T.mono }}>{costingSku}</span>} />}
+      {!!jobs?.length && <Info label="Jobwork" value={<span style={{ fontFamily: T.mono }}>{jobs.map(j => `JW #${j.jw_number}${j.status === 'cancelled' ? ' (cancelled)' : ''}`).join(' · ')}</span>} />}
       {(po.created_by || po.created_at) && <Info label="Raised by" value={<Who names={names} id={po.created_by} at={po.created_at} />} />}
       {po.approved_at && <Info label="Approved by" value={<Who names={names} id={po.approved_by} at={po.approved_at} />} />}
       {po.revision > 1 && <Info label={`Revised · Rev ${po.revision}`} value={<Who names={names} id={po.revised_by} at={po.revised_at} />} />}

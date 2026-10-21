@@ -1,6 +1,7 @@
 // The job form's buttons, and the draft saving behind them. A new job:
 // Cancel · Save as draft · Create job. A saved draft: Discard draft (asks
 // first) · Save draft · Create job. Editing a job: Cancel · Save changes.
+// A job started from a PO: Cancel · Create job (no draft — the PO is the record).
 import { S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
 import ConfirmModal, { useConfirm } from '../ui/ConfirmModal';
@@ -36,7 +37,7 @@ export function useLeaveGuard({ dirty, keepable, draftId, form, onClose, onDraft
 }
 
 export default function JobFormActions({ mode, draftId, form, busy, setBusy, setError, onCancel, onDrafts, onSubmit, addToast }: {
-  mode: 'new' | 'draft' | 'edit';
+  mode: 'new' | 'draft' | 'edit' | 'po';
   draftId: string | null;
   form: () => JobworkDraftForm;
   busy: Busy; setBusy: (b: Busy) => void; setError: (e: string) => void;
@@ -74,7 +75,7 @@ export default function JobFormActions({ mode, draftId, form, busy, setBusy, set
       {mode === 'draft'
         ? <button type="button" onClick={discard} style={{ ...S.btnDanger, minHeight: 44, ...off(busy === 'discard') }}>{busy === 'discard' ? 'Discarding…' : 'Discard draft'}</button>
         : <button type="button" onClick={onCancel} style={{ ...S.btnGhost, minHeight: 44, ...off(false) }}>Cancel</button>}
-      {mode !== 'edit' && (
+      {(mode === 'new' || mode === 'draft') && (
         <button type="button" onClick={keep} style={{ ...S.btnGhost, minHeight: 44, ...off(busy === 'draft') }}>
           {busy === 'draft' ? 'Saving…' : mode === 'draft' ? 'Save draft' : 'Save as draft'}
         </button>
