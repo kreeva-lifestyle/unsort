@@ -20,6 +20,8 @@ export async function loadPoLines(): Promise<{ lines: PoLine[]; error: unknown }
   const { data, error } = await supabase.from('purchase_order_items')
     .select('id, item_name, fabric_code, sku, quantity, unit, rate, purchase_orders!inner(po_number, vendor_name, status, po_date)')
     .not('purchase_orders.status', 'in', '("draft","cancelled")')
+    // An item cancelled before anything arrived (quantity 0) was never bought.
+    .gt('quantity', 0)
     .gte('purchase_orders.po_date', since)
     .limit(500);
   if (error) return { lines: [], error };

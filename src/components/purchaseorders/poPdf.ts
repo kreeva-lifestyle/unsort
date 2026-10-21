@@ -16,8 +16,12 @@ const fmtDate = (d: string | null | undefined) => d ? new Date(d + (d.length <= 
 
 export interface PoDocOptions { rates?: boolean }
 
-export function buildPoPdf(po: PurchaseOrder, items: PurchaseOrderItem[], opts: PoDocOptions = {}): string {
+/** The lines a document shows: an item cancelled before anything arrived is off the order. */
+export const docLines = (items: PurchaseOrderItem[]) => items.filter(it => !(it.cancelled_at && Number(it.quantity) <= 0));
+
+export function buildPoPdf(po: PurchaseOrder, allItems: PurchaseOrderItem[], opts: PoDocOptions = {}): string {
   const rates = opts.rates === true;
+  const items = docLines(allItems);
   const hasSku = items.some(it => it.sku);
   const rows = items.map((it, i) => {
     const rate = it.rate == null ? '—' : inr(it.rate);
@@ -71,7 +75,7 @@ export function buildPoPdf(po: PurchaseOrder, items: PurchaseOrderItem[], opts: 
   <div class="head">
     <div><h1>Arya Designs</h1><div class="sub">Purchase Order</div></div>
     <div class="doc">
-      <div class="num">PO #${escHtml(po.po_number)}</div>
+      <div class="num">PO #${escHtml(po.po_number)}${po.revision > 1 ? ` · Rev ${escHtml(po.revision)}` : ''}</div>
       <div class="sub">${fmtDate(po.po_date)}</div>
       <span class="st">${escHtml(PO_STATUS_LABELS[po.status] || po.status)}</span>
     </div>

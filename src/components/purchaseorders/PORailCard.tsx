@@ -15,7 +15,7 @@ import type { PurchaseOrder, PurchaseOrderItem, PurchaseOrderReceipt, AuditLog }
 
 const n = (v: unknown) => Number(v || 0);
 /** What the card reads from a line — the list's embed carries no more. */
-export type CardLine = Pick<PurchaseOrderItem, 'item_name' | 'fabric_code' | 'quantity' | 'received_qty' | 'unit'>;
+export type CardLine = Pick<PurchaseOrderItem, 'item_name' | 'fabric_code' | 'quantity' | 'received_qty' | 'unit'> & { cancelled_at?: string | null };
 export interface CardView { po: PurchaseOrder; items: CardLine[]; receipts: PurchaseOrderReceipt[] }
 // " · 26 Sep, 03:40 pm" — nothing when the time is not known.
 const at = (iso: string | null | undefined) => (iso ? ` · ${fmtWhen(iso)}` : '');
@@ -67,7 +67,9 @@ export default function PORailCard({ po, items, shown, audit, names, statusColor
   const shownState = railState(shown.po, shown.items, audit);
   const got = receivedOf(shown.items);
   const ev = latestEvent(shown.po, shown.items, shown.receipts, audit, names, shownState.skippedSent);
-  const sub = [po.for_pieces ? `${po.for_pieces} pcs` : null, items[0] ? `${itemLabel(items[0])}${items.length > 1 ? `, +${items.length - 1} more` : ''}` : null].filter(Boolean).join(' · ');
+  // An item cancelled on the order is not what it is for any more.
+  const lines = items.filter(it => !it.cancelled_at);
+  const sub = [po.for_pieces ? `${po.for_pieces} pcs` : null, lines[0] ? `${itemLabel(lines[0])}${lines.length > 1 ? `, +${lines.length - 1} more` : ''}` : null].filter(Boolean).join(' · ');
   const title = `PO #${po.po_number} · ${po.vendor_name}`;
   return (
     <div className="po-card">

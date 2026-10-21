@@ -3,7 +3,7 @@
 // the list and the modal orchestration (form / detail / receive / print /
 // pendency / contacts). Mirrors the Cash Challan module; PO ≈ challan,
 // receipts ≈ payments.
-import { useState, useCallback, useRef, useEffect, Suspense } from 'react';
+import { useState, useCallback, useEffect, Suspense } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
@@ -20,13 +20,10 @@ import { usePoList, PO_COLS as COLS, TAB_STATUSES } from '../components/purchase
 import type { EditingPO } from '../components/purchaseorders/POForm';
 import { POForm, PODetail, POReceive, POPrintOverlay, PendencyReport, Contacts, prefetchPoParts } from '../components/purchaseorders/poLazy';
 import { whenIdle } from '../lib/idle';
-import { loadPoLines, loadPoActivity, ITEM_COLS } from '../components/purchaseorders/poDetailData';
-import type { PurchaseOrder, PurchaseOrderItem, PurchaseOrderReceipt, AuditLog } from '../types/database';
+import { ITEM_COLS } from '../components/purchaseorders/poDetailData';
+import { usePoDetail } from '../components/purchaseorders/usePoDetail';
+import type { PurchaseOrder, PurchaseOrderItem } from '../types/database';
 import { useModalLock } from '../hooks/useModalLock';
-
-// audit: null while the trail loads, 'error' when it failed (the card retries).
-// names: null until the profiles read lands, so nobody is called "unknown" meanwhile.
-type Detail = { po: PurchaseOrder; items: PurchaseOrderItem[]; receipts: PurchaseOrderReceipt[]; audit: AuditLog[] | null | 'error'; names: Record<string, string> | null };
 
 export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
   const { profile } = useAuth();
@@ -48,7 +45,7 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<EditingPO | null>(null);
   const [duplicating, setDuplicating] = useState<EditingPO | null>(null);
-  const [detail, setDetail] = useState<Detail | null>(null);
+  const { detail, setDetail, loadActivity, openDetail, refreshDetail } = usePoDetail(addToast, fetchPos);
   const [receiving, setReceiving] = useState<{ po: PurchaseOrder; items: PurchaseOrderItem[] } | null>(null);
   const [printData, setPrintData] = useState<{ po: PurchaseOrder; items: PurchaseOrderItem[] } | null>(null);
   // Vendor pendency report (owner's ask): open orders for one vendor with
@@ -62,38 +59,6 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
   useCrumb(detail ? `PO #${detail.po.po_number}` : null); // header: "Purchase Orders / PO #12"
   useBackClose(!!printData, () => setPrintData(null));
 
-  // Who did what, after the sheet is up: the trail and the names behind the
-  // actor ids, patched into the open detail — only while it is still the
-  // same PO, and only from the newest read (an older one landing late must
-  // not hide the action just taken). Not blocking — the card offers a retry;
-  // a good half (names) is kept even when the other half (trail) failed.
-  const actSeq = useRef(0);
-  const loadActivity = useCallback(async (po: PurchaseOrder, receipts: PurchaseOrderReceipt[]) => {
-    const seq = ++actSeq.current;
-    // Rows already on screen stay while the fresh read is in flight (the
-    // rail and the card would otherwise flicker); only a missing or failed
-    // trail shows "Loading…".
-    setDetail(d => d && d.po.id === po.id && !Array.isArray(d.audit) ? { ...d, audit: null } : d);
-    const a = await loadPoActivity(po, receipts);
-    if (seq !== actSeq.current) return;
-    const error = a.auditError || a.namesError;
-    if (error) addToast(friendlyError(error), 'error');
-    setDetail(d => d && d.po.id === po.id ? { ...d, audit: error ? 'error' : a.audit, names: a.namesError ? d.names : a.names } : d);
-  }, [addToast]);
-  // Load lines + receipts for a PO and open the detail panel at once.
-  const openDetail = useCallback(async (poRow: PurchaseOrder) => {
-    const d = await loadPoLines(poRow);
-    // Never open a detail (or later print) on silently-missing data — a
-    // transient failure here would render a PO with zero line items.
-    if (d.error) { addToast(friendlyError(d.error), 'error'); return; }
-    // A refresh of the same PO keeps the names and the trail it already has,
-    // so the header does not blink and the rail does not reposition.
-    setDetail(prev => prev && prev.po.id === poRow.id
-      ? { ...prev, po: poRow, items: d.items, receipts: d.receipts }
-      : { po: poRow, items: d.items, receipts: d.receipts, audit: null, names: null });
-    loadActivity(poRow, d.receipts);
-  }, [addToast, loadActivity]);
-
   const openPrint = useCallback(async (poRow: PurchaseOrder, preItems?: PurchaseOrderItem[]) => {
     let items = preItems;
     if (!items) {
@@ -105,9 +70,9 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
   }, [addToast]);
 
   const closeForm = () => { setShowForm(false); setEditing(null); setDuplicating(null); };
-  const onSaved = async (r: { id: string; po_number: number }, isNew: boolean) => {
+  const onSaved = async (r: { id: string; po_number: number; revision?: number; changed?: boolean }, isNew: boolean) => {
     closeForm();
-    addToast(isNew ? `PO #${r.po_number} created` : `PO #${r.po_number} updated`, 'success');
+    addToast(isNew ? `PO #${r.po_number} created` : r.changed === false ? `Nothing changed on PO #${r.po_number}` : r.revision ? `PO #${r.po_number} revised — now Rev ${r.revision}` : `PO #${r.po_number} updated`, 'success');
     fetchPos(); bumpData();
     // Edits originate from the detail view — reopen it so the user keeps their
     // place instead of being dropped back to the list.
@@ -116,17 +81,6 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
       if (error) { addToast(friendlyError(error), 'error'); return; }
       if (data) openDetail(data as PurchaseOrder);
     }
-  };
-
-  // Re-fetch the fresh PO row (not the stale detail.po) so status transitions —
-  // Approve / Mark Sent / Cancel / Receive — reflect immediately in the buttons.
-  const refreshDetail = async () => {
-    if (!detail) return;
-    const { data, error } = await supabase.from('purchase_orders').select(COLS).eq('id', detail.po.id).maybeSingle();
-    // A failed re-read must not quietly re-render the old status and buttons.
-    if (error) { addToast(friendlyError(error), 'error'); fetchPos(true); return; }
-    await openDetail((data as PurchaseOrder) ?? detail.po);
-    fetchPos(true);
   };
 
   if (showContacts) return <Suspense fallback={<div style={{ padding: 40, textAlign: 'center', fontSize: 12, color: T.tx3 }}>Loading…</div>}><Contacts canEdit={canCreate} onBack={() => setShowContacts(false)} addToast={addToast} /></Suspense>;
@@ -169,7 +123,7 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
       {showForm && <POForm editing={editing} duplicateFrom={duplicating} onClose={closeForm} onSaved={onSaved} addToast={addToast} />}
 
       {detail && <PODetail key={detail.po.id}
-        po={detail.po} items={detail.items} receipts={detail.receipts} audit={detail.audit} names={detail.names}
+        po={detail.po} items={detail.items} receipts={detail.receipts} audit={detail.audit} names={detail.names} revisions={detail.revisions}
         statusColors={PO_STATUS_COLORS} canManage={canManage}
         onClose={() => setDetail(null)} onChanged={refreshDetail} onRetryActivity={() => loadActivity(detail.po, detail.receipts)}
         onEdit={() => { setEditing({ ...detail.po, items: detail.items }); setDuplicating(null); setDetail(null); setShowForm(true); }}
@@ -185,7 +139,8 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
       {receiving && <POReceive po={receiving.po} items={receiving.items} onClose={() => setReceiving(null)}
         onReceived={() => { setReceiving(null); refreshDetail(); }} addToast={addToast} />}
 
-      {printData && <POPrintOverlay po={printData.po} items={printData.items} onClose={() => setPrintData(null)} addToast={addToast} />}
+      {printData && <POPrintOverlay po={printData.po} items={printData.items} canManage={canManage} onClose={() => setPrintData(null)} addToast={addToast}
+        onSent={async () => { setPrintData(p => p && { ...p, po: { ...p.po, status: 'sent' } }); bumpData(); if (detail?.po.id === printData.po.id) await refreshDetail(); else fetchPos(true); }} />}
       </Suspense>
 
       {active !== false && !detail && !showForm && !receiving && !printData && !pendency && canCreate && createPortal(

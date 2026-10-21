@@ -71,6 +71,10 @@ export interface PurchaseOrder {
   modified_by: string | null;
   created_at: string | null;
   updated_at: string | null;
+  /** 1 as raised; each revision or line cancel after approval adds one (history in purchase_order_revisions). */
+  revision: number;
+  revised_at: string | null;
+  revised_by: string | null;
 }
 
 export interface PurchaseOrderItem {
@@ -87,6 +91,36 @@ export interface PurchaseOrderItem {
   received_qty: number;
   sort_order: number | null;
   created_at: string | null;
+  /** A cancelled line keeps what arrived: `quantity` drops to the received amount and the balance is here. */
+  cancelled_qty: number;
+  cancelled_at: string | null;
+  cancelled_by: string | null;
+  cancel_reason: string | null;
+}
+
+/** One entry of a revision's change list (written by amend_po / cancel_po_line). */
+export type POChange =
+  | { kind: 'qty'; item_id: string; label: string; unit: string | null; from: number; to: number; received: number }
+  | { kind: 'added'; item_id: string; label: string; unit: string | null; to: number }
+  | { kind: 'cancelled'; item_id: string; label: string; unit: string | null; from: number; received: number }
+  | { kind: 'item'; item_id: string; label: string; field: 'item_name' | 'fabric_code' | 'sku' | 'unit'; from: string | null; to: string | null }
+  | { kind: 'rate'; item_id: string; label: string; from: number | null; to: number | null }
+  | { kind: 'field'; field: 'expected_date' | 'notes' | 'payment_terms' | 'for_pieces' | 'lump_sum' | 'discount' | 'tax_percent' | 'other_charges'; from: unknown; to: unknown }
+  | { kind: 'total'; from: number; to: number };
+
+/** purchase_order_revisions: Rev N of an order, what changed, and whether the vendor was told. */
+export interface PurchaseOrderRevision {
+  id: string;
+  po_id: string;
+  revision: number;
+  kind: 'amend' | 'line_cancel';
+  changes: POChange[];
+  reason: string | null;
+  created_by: string | null;
+  created_at: string;
+  notified_at: string | null;
+  notified_by: string | null;
+  notified_how: 'whatsapp' | 'told' | null;
 }
 
 export interface PurchaseOrderReceipt {
@@ -102,6 +136,8 @@ export interface PurchaseOrderReceipt {
 
 // Payloads passed to the create/update RPCs (money left to the server).
 export type POItemInput = {
+  /** An existing line when revising (amend_po updates it in place); absent for a new line. */
+  id?: string;
   item_name: string;
   sku?: string | null;
   fabric_code?: string | null;

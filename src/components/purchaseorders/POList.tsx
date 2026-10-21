@@ -17,7 +17,7 @@ import POListCards from './POListCards';
 import POSectionStrip from './POSectionStrip';
 
 export type PORow = PurchaseOrder & {
-  purchase_order_items?: Array<Pick<PurchaseOrderItem, 'sku' | 'item_name' | 'fabric_code' | 'quantity' | 'received_qty' | 'unit'>>;
+  purchase_order_items?: Array<Pick<PurchaseOrderItem, 'sku' | 'item_name' | 'fabric_code' | 'quantity' | 'received_qty' | 'unit'> & Partial<Pick<PurchaseOrderItem, 'cancelled_at'>>>;
   /** The costing this PO was raised from (embedded via costing_product_id). */
   costing_products?: { sku: string } | null;
 };

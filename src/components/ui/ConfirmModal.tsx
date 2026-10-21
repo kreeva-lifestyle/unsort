@@ -1,8 +1,8 @@
 // In-app replacement for window.confirm — async, theme-styled, danger-aware.
 // Usage:
-//   const [confirmState, askConfirm] = useConfirm();
-//   if (await askConfirm({ title: 'Delete?', message: '...', danger: true })) { ... }
-//   <ConfirmModal {...confirmState} />
+//   const { ask, modalProps } = useConfirm();
+//   if (await ask({ title: 'Delete?', message: '...', danger: true })) { ... }
+//   <ConfirmModal {...modalProps} />
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { T, S } from '../../lib/theme';
@@ -21,6 +21,8 @@ interface ConfirmModalProps extends ConfirmOptions {
   open: boolean;
   onConfirm: () => void;
   onCancel: () => void;
+  /** Above a full-screen overlay (print / share previews sit at 10000). */
+  zIndex?: number;
 }
 
 export default function ConfirmModal({
@@ -32,6 +34,7 @@ export default function ConfirmModal({
   danger = false,
   onConfirm,
   onCancel,
+  zIndex,
 }: ConfirmModalProps) {
   const confirmRef = useRef<HTMLButtonElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
@@ -53,7 +56,7 @@ export default function ConfirmModal({
   if (!open) return null;
 
   return createPortal(
-    <div style={S.modalOverlay} onClick={onCancel}>
+    <div style={zIndex ? { ...S.modalOverlay, zIndex } : S.modalOverlay} onClick={onCancel}>
       <div className="modal-inner" style={{ ...S.modalBox, width: 420 }} onClick={e => e.stopPropagation()}>
         <div style={{ padding: '18px 20px 14px', borderBottom: `1px solid ${T.bd}` }}>
           <div style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora, color: danger ? T.re : T.tx }}>{title}</div>

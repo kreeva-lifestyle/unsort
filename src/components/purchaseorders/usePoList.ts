@@ -14,7 +14,7 @@ import { addDays, ASSUMED_LEAD_DAYS } from './poDue';
 import type { PORow } from './POList';
 import type { PurchaseOrderStatus } from '../../types/database';
 
-export const PO_COLS = 'id, po_number, vendor_id, vendor_name, vendor_phone, po_type, status, po_date, expected_date, payment_terms, notes, for_pieces, lump_sum, costing_product_id, subtotal, discount_type, discount_value, discount_amount, tax_percent, tax_amount, other_charges, round_off, grand_total, approved_by, approved_at, cancelled_by, cancelled_at, closed_at, closed_by, close_reason, created_by, modified_by, created_at, updated_at';
+export const PO_COLS = 'id, po_number, vendor_id, vendor_name, vendor_phone, po_type, status, po_date, expected_date, payment_terms, notes, for_pieces, lump_sum, costing_product_id, subtotal, discount_type, discount_value, discount_amount, tax_percent, tax_amount, other_charges, round_off, grand_total, approved_by, approved_at, cancelled_by, cancelled_at, closed_at, closed_by, close_reason, created_by, modified_by, created_at, updated_at, revision, revised_at, revised_by';
 
 /** The summary tiles' one-tap slices: open orders, or open orders past their due date. */
 export type PoQuick = '' | 'open' | 'breached';
@@ -130,7 +130,7 @@ export function usePoList(active: boolean | undefined, addToast: (m: string, t?:
       if (dateTo) q = q.lte('po_date', dateTo);
       return q;
     };
-    const listQ = narrow(poQuery(`${PO_COLS}, costing_products(sku), purchase_order_items(sku, item_name, fabric_code, quantity, received_qty, unit)`, { count: 'estimated' }).in('status', TAB_STATUSES[shown]))
+    const listQ = narrow(poQuery(`${PO_COLS}, costing_products(sku), purchase_order_items(sku, item_name, fabric_code, quantity, received_qty, unit, cancelled_at)`, { count: 'estimated' }).in('status', TAB_STATUSES[shown]))
       .order('po_number', { ascending: false }).range(page * pageSize, (page + 1) * pageSize - 1);
     // A slice that lives on Open only has nothing on Completed: no query.
     const otherQ = quick ? null : narrow(poQuery('id', { count: 'exact', head: true }).in('status', TAB_STATUSES[other]));

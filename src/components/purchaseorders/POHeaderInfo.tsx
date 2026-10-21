@@ -1,5 +1,5 @@
 // The PO detail's header grid: vendor, type, dates, terms — and who did
-// what to the order and when (raised, approved, closed, cancelled), from
+// what to the order and when (raised, approved, revised, closed, cancelled), from
 // the actor columns on the header and the names behind them. Split out of
 // PODetail so that file stays under the 200-line limit.
 import { T } from '../../lib/theme';
@@ -45,6 +45,7 @@ export default function POHeaderInfo({ po, costingSku, names }: {
       {costingSku && <Info label="From costing" value={<span style={{ fontFamily: T.mono }}>{costingSku}</span>} />}
       {(po.created_by || po.created_at) && <Info label="Raised by" value={<Who names={names} id={po.created_by} at={po.created_at} />} />}
       {po.approved_at && <Info label="Approved by" value={<Who names={names} id={po.approved_by} at={po.approved_at} />} />}
+      {po.revision > 1 && <Info label={`Revised · Rev ${po.revision}`} value={<Who names={names} id={po.revised_by} at={po.revised_at} />} />}
       {po.status === 'closed' && <Info label="Closed by" value={<><Who names={names} id={po.closed_by} at={po.closed_at} />{po.close_reason ? <div style={{ fontSize: 11, color: T.tx3 }}>{po.close_reason}</div> : null}</>} />}
       {po.status === 'cancelled' && po.cancelled_at && <Info label="Cancelled by" value={<Who names={names} id={po.cancelled_by} at={po.cancelled_at} />} />}
     </div>

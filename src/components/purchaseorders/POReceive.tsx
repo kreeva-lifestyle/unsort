@@ -20,13 +20,15 @@ import { itemLabel } from './poItemLabel';
 const localToday = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 const num = (s: string) => { const n = parseFloat(s); return isNaN(n) ? 0 : n; };
 
-export default function POReceive({ po, items, onClose, onReceived, addToast }: {
+export default function POReceive({ po, items: allItems, onClose, onReceived, addToast }: {
   po: PurchaseOrder;
   items: PurchaseOrderItem[];
   onClose: () => void;
   onReceived: () => void;
   addToast: (m: string, t?: string) => void;
 }) {
+  // A cancelled item takes no more goods (the server refuses it too).
+  const items = allItems.filter(it => !it.cancelled_at);
   // Live received totals — starts from the snapshot passed in, refreshed from
   // the server just before submit (see the stale-receipt guard below).
   const [liveRecvd, setLiveRecvd] = useState<Record<string, number>>(() => Object.fromEntries(items.map(it => [it.id, Number(it.received_qty || 0)])));
