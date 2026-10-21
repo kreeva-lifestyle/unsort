@@ -731,10 +731,11 @@ html.launching .brand-slot { opacity: 0; }
 @media (hover: hover) { .po-card-open:hover { border-color: oklch(0.55 0.22 265 / .3); } }
 /* The title is the card's button; its ::after covers the whole card, so a tap anywhere opens the order. */
 .po-card-hit { background: none; border: 0; padding: 0; margin: 0; font: inherit; color: inherit; letter-spacing: inherit; text-align: left; cursor: pointer; }
-.po-card-hit::after { content: ''; position: absolute; inset: 0; border-radius: 16px; }
+.po-card-hit::after { content: ''; position: absolute; inset: 0; z-index: 1; border-radius: 16px; }   /* above the rail, pill and caption, which are positioned too */
+.po-card-hit:active { animation: none; transform: none; }   /* the global button bump would make the button the ::after's box mid-press and lose the click */
 .po-card-hit:focus-visible { outline: none; }
 .po-card-hit:focus-visible::after { outline: 2px solid oklch(0.65 0.18 270 / .6); outline-offset: 2px; }
-.po-card-print { position: relative; z-index: 1; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; margin: -8px -8px -8px 0; border: 0; border-radius: 6px; background: none; cursor: pointer; opacity: .6; transition: opacity var(--m-fast), background-color var(--m-fast); }
+.po-card-print { position: relative; z-index: 2; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; margin: -8px -8px -8px 0; border: 0; border-radius: 6px; background: none; cursor: pointer; opacity: .6; transition: opacity var(--m-fast), background-color var(--m-fast); }
 .po-card-print:hover, .po-card-print:focus-visible { opacity: 1; background: oklch(1 0 0 / .04); }
 .po-card-pill { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 9px; border-radius: 6px; font: 600 11px/1 Inter, system-ui, sans-serif; white-space: nowrap; flex-shrink: 0; transition: background-color var(--m-fast), color var(--m-fast); }
 .po-card-pill i { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; background: currentColor; }

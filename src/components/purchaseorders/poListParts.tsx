@@ -10,8 +10,8 @@ import type { PORow } from './POList';
 // (or creation) — owner's ask, so a forgotten order stands out in the grid —
 // and where it stands against its due date (poDue): red once breached,
 // amber on the day it is due. The card's caption has room for one short
-// phrase — "pending 12 d", "due today" or "17 d late" — the rest is in its
-// tooltip. Same definition of "open" as the vendor
+// phrase — "pending 12 d", "due today" or "17 d late" — the rest goes in the
+// card's tooltip. Same definition of "open" as the vendor
 // pendency report (approved, sent, partially received): a draft has not
 // reached the vendor, so it is not waiting on anyone; completed / cancelled
 // are over.
@@ -23,12 +23,12 @@ export const pendingDays = (po: PORow): number | null => {
 };
 const TONE_COLOR: Record<DueTone, string> = { late: T.re, today: T.yl, ok: T.tx3 };
 const DAY = new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short' });
-export const PendingSince = ({ po }: { po: PORow }) => {
+export const pendingInfo = (po: PORow): { text: string; title: string; color: string } | null => {
   const d = pendingDays(po);
   if (d === null) return null;
   const due = dueOf(po, fileDate()), tone = dueTone(due);
   const pending = d === 0 ? 'pending since today' : `pending ${d} d`;
   const text = tone === 'late' ? `${due.late} d late` : tone === 'today' ? 'due today' : pending;
   const title = `${pending} · due ${DAY.format(new Date(due.due + 'T00:00:00'))}${due.assumed ? ` — no expected date on the PO, so ${ASSUMED_LEAD_DAYS} days from the ${po.po_date ? 'PO date' : 'day it was raised'}` : ''}`;
-  return <span title={title} style={{ color: TONE_COLOR[tone] }}>{text}</span>;
+  return { text, title, color: TONE_COLOR[tone] };
 };

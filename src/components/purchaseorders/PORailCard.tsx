@@ -26,7 +26,7 @@ export interface CardView { po: PurchaseOrder; items: CardLine[]; receipts: Purc
 const DAY = new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short' });
 const stamp = (short: boolean) => (iso: string | null | undefined) => (!iso ? '' : ` · ${short ? DAY.format(new Date(iso)) : fmtWhen(iso)}`);
 /** The list's parts of the card (POListCard). */
-export interface CardList { eyebrow: string; sub: ReactNode; aside: ReactNode; right: ReactNode; onOpen: () => void }
+export interface CardList { eyebrow: string; sub: ReactNode; aside: ReactNode; right: ReactNode; onOpen: () => void; /** Tooltip over the card (the pending detail). */ hint?: string }
 
 /** "20 of 20" when every line shares a unit (metres and pieces are never
  *  added together); otherwise the share, "64%", and `mixed` is set. */
@@ -86,7 +86,7 @@ export default function PORailCard({ po, items, shown, audit, names, statusColor
         <div style={{ minWidth: 0 }}>
           <div className="po-card-k">{list ? list.eyebrow : 'Purchase order'}</div>
           {/* In the list the title is the card's one button, stretched over the whole card (index.css .po-card-hit). */}
-          <b>{list ? <button type="button" className="po-card-hit" onClick={list.onOpen}>{title}</button> : title}</b>
+          <b>{list ? <button type="button" className="po-card-hit" onClick={list.onOpen} title={list.hint}>{title}</button> : title}</b>
           {sub && <div className="po-card-sub">{sub}</div>}
         </div>
         <div className="po-card-side">

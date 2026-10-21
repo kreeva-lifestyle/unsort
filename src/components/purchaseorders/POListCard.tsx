@@ -14,7 +14,7 @@ import { PO_TYPE_LABELS, type PurchaseOrderReceipt } from '../../types/database'
 import PORailCard from './PORailCard';
 import { itemLabel } from './poItemLabel';
 import { fmtQty } from './poStats';
-import { PendingSince } from './poListParts';
+import { pendingInfo } from './poListParts';
 import { useLandedOrder } from './useLandedOrder';
 import type { PORow } from './POList';
 
@@ -31,6 +31,8 @@ export default function POListCard({ po, statusColors, onOpen, onPrint }: {
   const live = useMemo(() => ({ po, items, receipts: NO_RECEIPTS }), [po, items]);
   const { shown, land } = useLandedOrder(live, null);
   const first = items[0], sku = (first?.sku || '').trim();
+  // The pending phrase follows the held order, so it changes with the pill when the light lands.
+  const pend = pendingInfo(shown.po);
   const sub = (
     <>
       {po.for_pieces ? `for ${fmtQty(po.for_pieces)} pcs · ` : null}
@@ -44,7 +46,7 @@ export default function POListCard({ po, statusColors, onOpen, onPrint }: {
     sub,
     aside: <span style={{ fontFamily: T.mono, fontSize: 15, fontWeight: 700, color: T.tx, whiteSpace: 'nowrap' }}>₹{Number(po.grand_total || 0).toLocaleString('en-IN')}</span>,
     right: <>
-      <PendingSince po={po} />
+      {pend && <span style={{ color: pend.color }}>{pend.text}</span>}
       {onPrint && (
         <button type="button" className="po-card-print" onClick={onPrint} title="Print" aria-label={`Print PO #${po.po_number}`}>
           <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: T.tx2, strokeWidth: 2 }}><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6z" /></svg>
@@ -52,6 +54,7 @@ export default function POListCard({ po, statusColors, onOpen, onPrint }: {
       )}
     </>,
     onOpen,
+    hint: pend ? `PO #${po.po_number} · ${pend.title}` : undefined,
   };
   return <PORailCard po={po} items={items} shown={shown} audit={null} names={null} statusColors={statusColors} onLanded={land} list={list} />;
 }
