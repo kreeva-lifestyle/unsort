@@ -132,6 +132,8 @@ export interface PurchaseOrderReceipt {
   remarks: string | null;
   received_by: string | null;
   created_at: string | null;
+  /** The vendor's challan / bill number the goods came on (one challan may cover several POs). */
+  challan_no: string | null;
 }
 
 // Payloads passed to the create/update RPCs (money left to the server).
