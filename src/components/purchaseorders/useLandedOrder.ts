@@ -10,7 +10,7 @@ import { railState, travels, TRAVEL_MS } from './PORail';
 import type { PurchaseOrder, PurchaseOrderItem, PurchaseOrderReceipt, AuditLog } from '../../types/database';
 
 export interface OrderView { po: PurchaseOrder; items: PurchaseOrderItem[]; receipts: PurchaseOrderReceipt[] }
-/** Anything the rail can place: the detail's full order, or a list row (POListCard). */
+/** Anything the rail can place (the detail's order). */
 type Placeable = { po: PurchaseOrder; items: Pick<PurchaseOrderItem, 'quantity' | 'received_qty'>[]; receipts: unknown };
 
 export function useLandedOrder<V extends Placeable = OrderView>(live: V, audit: AuditLog[] | null | 'error'): { shown: V; holding: boolean; land: () => void } {

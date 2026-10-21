@@ -4,11 +4,7 @@
 // the order with who did it — "Received 20 of 20 · 26 Sep, 03:40 pm" /
 // "Owner". When the order moves on, the pill and the caption hold the old
 // stage while the light travels (`shown`, from useLandedOrder) and roll the
-// moment it lands, together with the stop's pulse. The PO list shows every
-// order as this same card (POListCard, `list`): its own eyebrow and line of
-// items, the total under the pill, dates without the time, "pending / late"
-// in place of who, and the title is a button stretched over the whole card.
-import type { ReactNode } from 'react';
+// moment it lands, together with the stop's pulse.
 import { fmtWhen } from '../../lib/humanize';
 import Roll from '../ui/Roll';
 import PORail, { railState } from './PORail';
@@ -21,12 +17,8 @@ const n = (v: unknown) => Number(v || 0);
 /** What the card reads from a line — the list's embed carries no more. */
 export type CardLine = Pick<PurchaseOrderItem, 'item_name' | 'fabric_code' | 'quantity' | 'received_qty' | 'unit'>;
 export interface CardView { po: PurchaseOrder; items: CardLine[]; receipts: PurchaseOrderReceipt[] }
-// " · 26 Sep, 03:40 pm" (" · 26 Sep" in the list) — nothing when the time
-// is not known (the list reads no receipts or trail).
-const DAY = new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short' });
-const stamp = (short: boolean) => (iso: string | null | undefined) => (!iso ? '' : ` · ${short ? DAY.format(new Date(iso)) : fmtWhen(iso)}`);
-/** The list's parts of the card (POListCard). */
-export interface CardList { eyebrow: string; sub: ReactNode; aside: ReactNode; right: ReactNode; onOpen: () => void; /** Tooltip over the card (the pending detail). */ hint?: string }
+// " · 26 Sep, 03:40 pm" — nothing when the time is not known.
+const at = (iso: string | null | undefined) => (iso ? ` · ${fmtWhen(iso)}` : '');
 
 /** "20 of 20" when every line shares a unit (metres and pieces are never
  *  added together); otherwise the share, "64%", and `mixed` is set. */
@@ -42,8 +34,7 @@ export function receivedOf(items: Pick<PurchaseOrderItem, 'quantity' | 'received
 const PILL_LABEL: Partial<Record<PurchaseOrder['status'], string>> = { completed: 'Received' };
 
 /** The latest thing that happened to the order, and who did it. */
-export function latestEvent(po: PurchaseOrder, items: CardLine[], receipts: PurchaseOrderReceipt[], audit: AuditLog[] | null | 'error', names: Record<string, string> | null, skippedSent = false, short = false): { text: string; who: string } {
-  const at = stamp(short);
+export function latestEvent(po: PurchaseOrder, items: CardLine[], receipts: PurchaseOrderReceipt[], audit: AuditLog[] | null | 'error', names: Record<string, string> | null, skippedSent = false): { text: string; who: string } {
   const name = (id: string | null) => (id && names ? names[id] || 'Unknown user' : '');
   const r = receivedOf(items);
   const last = receipts[0];                                     // newest first
@@ -51,7 +42,7 @@ export function latestEvent(po: PurchaseOrder, items: CardLine[], receipts: Purc
     case 'cancelled': return { text: `Cancelled${at(po.cancelled_at)}`, who: name(po.cancelled_by) };
     case 'closed': return { text: `Closed${r.got > 0 ? ` at ${r.text}` : ''}${at(po.closed_at)}`, who: name(po.closed_by) };
     case 'completed': return { text: `Received ${r.text}${skippedSent ? ' · Sent was skipped' : at(last?.created_at)}`, who: name(last?.received_by ?? null) };
-    case 'partially_received': return { text: `Received ${r.text}${r.mixed || short ? '' : ` · ${fmtQty(r.ordered - r.got)} still due`}`, who: name(last?.received_by ?? null) };
+    case 'partially_received': return { text: `Received ${r.text}${r.mixed ? '' : ` · ${fmtQty(r.ordered - r.got)} still due`}`, who: name(last?.received_by ?? null) };
     case 'sent': {
       const row = Array.isArray(audit) ? audit.find(a => a.action === 'SENT') : null;
       return { text: `Sent to ${po.vendor_name}${at(row?.created_at)}`, who: row?.user_email || '' };
@@ -61,7 +52,7 @@ export function latestEvent(po: PurchaseOrder, items: CardLine[], receipts: Purc
   }
 }
 
-export default function PORailCard({ po, items, shown, audit, names, statusColors, onLanded, list }: {
+export default function PORailCard({ po, items, shown, audit, names, statusColors, onLanded }: {
   /** The live order: the rail follows it (and travels when it moves on). */
   po: PurchaseOrder; items: CardLine[];
   /** The order as the rest of the card shows it — the old one until the rail lands. */
@@ -70,28 +61,24 @@ export default function PORailCard({ po, items, shown, audit, names, statusColor
   statusColors: Record<string, { bg: string; color: string }>;
   /** The new stage is on screen (the light landed, or nothing had to travel). */
   onLanded?: () => void;
-  /** The list's variant (POListCard). */
-  list?: CardList;
 }) {
   const sc = statusColors[shown.po.status] || statusColors.draft;
   const state = railState(po, items, audit);
   const shownState = railState(shown.po, shown.items, audit);
   const got = receivedOf(shown.items);
-  const ev = latestEvent(shown.po, shown.items, shown.receipts, audit, names, shownState.skippedSent, !!list);
-  const sub = list ? list.sub : [po.for_pieces ? `${po.for_pieces} pcs` : null, items[0] ? `${itemLabel(items[0])}${items.length > 1 ? `, +${items.length - 1} more` : ''}` : null].filter(Boolean).join(' · ');
+  const ev = latestEvent(shown.po, shown.items, shown.receipts, audit, names, shownState.skippedSent);
+  const sub = [po.for_pieces ? `${po.for_pieces} pcs` : null, items[0] ? `${itemLabel(items[0])}${items.length > 1 ? `, +${items.length - 1} more` : ''}` : null].filter(Boolean).join(' · ');
   const title = `PO #${po.po_number} · ${po.vendor_name}`;
   return (
-    <div className={list ? 'po-card po-card-open' : 'po-card'}>
+    <div className="po-card">
       <div className="po-card-h">
         <div style={{ minWidth: 0 }}>
-          <div className="po-card-k">{list ? list.eyebrow : 'Purchase order'}</div>
-          {/* In the list the title is the card's one button, stretched over the whole card (index.css .po-card-hit). */}
-          <b>{list ? <button type="button" className="po-card-hit" onClick={list.onOpen} title={list.hint}>{title}</button> : title}</b>
+          <div className="po-card-k">Purchase order</div>
+          <b>{title}</b>
           {sub && <div className="po-card-sub">{sub}</div>}
         </div>
         <div className="po-card-side">
           <span className="po-card-pill" style={{ background: sc.bg, color: sc.color }}><i /><Roll text={PILL_LABEL[shown.po.status] || PO_STATUS_LABELS[shown.po.status] || shown.po.status} /></span>
-          {list?.aside}
         </div>
       </div>
       <PORail state={state} onLanded={onLanded}
@@ -99,7 +86,7 @@ export default function PORailCard({ po, items, shown, audit, names, statusColor
       <div className="po-card-cap">
         {/* A trail arriving only completes the caption (the Sent time): adopted silently, no roll. */}
         <Roll text={ev.text} baseline={Array.isArray(audit) ? audit : 'none'} />
-        {list ? <span className="po-card-right">{list.right}</span> : <span className="who" title={ev.who || undefined}>{ev.who || (names === null && shown.po.created_by ? '…' : '')}</span>}
+        <span className="who" title={ev.who || undefined}>{ev.who || (names === null && shown.po.created_by ? '…' : '')}</span>
       </div>
     </div>
   );
