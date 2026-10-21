@@ -30,12 +30,15 @@ const n = (v: unknown) => Number(v || 0);
 const left = (l: Line) => Math.max(0, n(l.quantity) - n(l.received_qty));
 const live = (po: OpenPo) => po.purchase_order_items.filter(l => !l.cancelled_at).sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
 
-export default function POReceiveChallan({ vendor: given, poId, challanNo, onClose, onReceived, addToast }: {
+/** What was typed in a PO's receive sheet before "Receive them together": it carries over. */
+export type ChallanStart = { challanNo: string; date: string; remarks: string; qty: Record<string, string> };
+
+export default function POReceiveChallan({ vendor: given, poId, init, onClose, onReceived, addToast }: {
   /** The vendor, when opened from one of its orders; null = pick one first. */
   vendor: ChallanVendor | null;
   /** An order to tick from the start. */
   poId?: string;
-  challanNo?: string;
+  init?: ChallanStart;
   onClose: () => void;
   onReceived: () => void;
   addToast: (m: string, t?: string) => void;
@@ -44,9 +47,12 @@ export default function POReceiveChallan({ vendor: given, poId, challanNo, onClo
   const [pos, setPos] = useState<OpenPo[] | null>(null);
   const [ticked, setTicked] = useState<Set<string>>(new Set());
   const [qty, setQty] = useState<Record<string, string>>({});
-  const [challan, setChallan] = useState(challanNo ?? '');
-  const [date, setDate] = useState(fileDate());
-  const [remarks, setRemarks] = useState('');
+  const [challan, setChallan] = useState(init?.challanNo ?? '');
+  const [date, setDate] = useState(init?.date || fileDate());
+  const [remarks, setRemarks] = useState(init?.remarks ?? '');
+  // A failed read of the orders offers a retry instead of a sheet stuck on "Loading…".
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [reload, setReload] = useState(0);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const errRef = useRef<HTMLDivElement>(null);
@@ -66,15 +72,18 @@ export default function POReceiveChallan({ vendor: given, poId, challanNo, onClo
   useEffect(() => {
     if (!vendor) return;
     let alive = true;
+    setLoadFailed(false);
     loadPos(vendor).then(list => {
-      if (!alive || !list) return;
+      if (!alive) return;
+      if (!list) { setLoadFailed(true); return; }
       setPos(list);
+      // The order it was opened from comes ticked, with what was typed for it (else what is still to come).
       const first = list.find(po => po.id === poId);
-      if (first) { setTicked(new Set([first.id])); setQty(Object.fromEntries(live(first).map(l => [l.id, String(left(l))]))); }
+      if (first) { setTicked(new Set([first.id])); setQty(Object.fromEntries(live(first).map(l => [l.id, init?.qty[l.id] ?? String(left(l))]))); }
     });
     return () => { alive = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- loads once per vendor
-  }, [vendor]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loads once per vendor (and on Retry)
+  }, [vendor, reload]);
 
   // A tick fills the order's lines with what is still to come; an untick clears them.
   const tick = (po: OpenPo) => {
@@ -93,14 +102,14 @@ export default function POReceiveChallan({ vendor: given, poId, challanNo, onClo
     if (!lines.length) { setError('Tick the orders on this challan and enter what arrived'); return; }
     setSaving(true);
     try {
-      // Stale guard: someone received on one of these orders while this was open.
-      const { data: fresh, error: fe } = await supabase.from('purchase_order_items').select('id, received_qty').in('id', lines.map(x => x.l.id));
+      // Stale guard: someone received on one of these orders, or cancelled one of its items, while this was open.
+      const { data: fresh, error: fe } = await supabase.from('purchase_order_items').select('id, received_qty, cancelled_at').in('id', lines.map(x => x.l.id));
       if (fe) throw fe;
-      const now = new Map(((fresh as { id: string; received_qty: number }[] | null) ?? []).map(r => [r.id, n(r.received_qty)]));
-      if (lines.some(x => now.get(x.l.id) !== n(x.l.received_qty))) {
+      const now = new Map(((fresh as { id: string; received_qty: number; cancelled_at: string | null }[] | null) ?? []).map(r => [r.id, r]));
+      if (lines.some(x => { const r = now.get(x.l.id); return !r || !!r.cancelled_at || n(r.received_qty) !== n(x.l.received_qty); })) {
         const list = await loadPos(vendor);
-        if (list) setPos(list);
-        setError('Someone just received on one of these orders — the numbers above are now up to date; check the quantities and confirm again.');
+        // A failed re-read keeps its own error (set by loadPos) rather than claiming the numbers are fresh.
+        if (list) { setPos(list); setError('One of these orders changed while this was open (a receipt, or an item cancelled) — the list above is now up to date; check the quantities and confirm again.'); }
         setSaving(false);
         return;
       }
@@ -123,12 +132,14 @@ export default function POReceiveChallan({ vendor: given, poId, challanNo, onClo
           {!vendor ? <POChallanVendors onPick={setVendor} onError={e => setError(friendlyError(e))} /> : (
             <>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginBottom: 14 }}>
-                <div><label style={S.fLabel}>Challan no. *</label><input value={challan} onChange={e => setChallan(e.target.value)} maxLength={40} autoFocus={!challanNo} placeholder="e.g. TK/4411" style={{ ...S.fInput, fontFamily: T.mono }} /></div>
+                <div><label style={S.fLabel}>Challan no. *</label><input value={challan} onChange={e => setChallan(e.target.value)} maxLength={40} autoFocus={!init?.challanNo} placeholder="e.g. TK/4411" style={{ ...S.fInput, fontFamily: T.mono }} /></div>
                 <div><label style={S.fLabel}>Receipt date</label><DateInput value={date} onChange={e => setDate(e.target.value)} style={{ width: '100%' }} /></div>
                 <div><label style={S.fLabel}>Remarks</label><input value={remarks} onChange={e => setRemarks(e.target.value)} placeholder="Optional" style={S.fInput} /></div>
               </div>
               <label style={S.fLabel}>Orders on this challan</label>
-              {pos === null && <div style={{ fontSize: 12, color: T.tx3, padding: '20px 0', textAlign: 'center' }}>Loading…</div>}
+              {pos === null && (loadFailed
+                ? <div style={{ textAlign: 'center', padding: '14px 0' }}><button type="button" onClick={() => { setError(''); setReload(r => r + 1); }} style={{ ...S.btnGhost, minHeight: 44 }}>Try again</button></div>
+                : <div style={{ fontSize: 12, color: T.tx3, padding: '20px 0', textAlign: 'center' }}>Loading…</div>)}
               {pos?.length === 0 && <div style={{ fontSize: 12, color: T.tx3, padding: '20px 0', textAlign: 'center' }}>{vendor.name} has nothing still to come.</div>}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 6 }}>
                 {pos?.map(po => {
@@ -165,7 +176,7 @@ export default function POReceiveChallan({ vendor: given, poId, challanNo, onClo
         <div style={{ padding: '12px 18px', borderTop: `1px solid ${T.bd}`, display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center' }}>
           {vendor && !given && <button type="button" onClick={() => { setVendor(null); setPos(null); setTicked(new Set()); setQty({}); }} style={{ ...S.btnGhost, minHeight: 44, marginRight: 'auto' }}>Other vendor</button>}
           <button type="button" onClick={onClose} style={{ ...S.btnGhost, minHeight: 44 }}>Cancel</button>
-          {vendor && <button type="button" onClick={submit} disabled={saving} style={{ ...S.btnPrimary, minHeight: 44, pointerEvents: saving ? 'none' : 'auto', opacity: saving ? 0.5 : 1 }}>{saving ? 'Saving…' : orders > 1 ? `Receive on ${orders} orders` : 'Confirm receipt'}</button>}
+          {vendor && <button type="button" onClick={submit} disabled={saving || !pos} style={{ ...S.btnPrimary, minHeight: 44, pointerEvents: saving || !pos ? 'none' : 'auto', opacity: saving || !pos ? 0.5 : 1 }}>{saving ? 'Saving…' : orders > 1 ? `Receive on ${orders} orders` : 'Confirm receipt'}</button>}
         </div>
       </div>
     </div>,

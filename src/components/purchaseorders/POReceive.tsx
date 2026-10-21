@@ -18,6 +18,7 @@ import DateInput from '../ui/DateInput';
 import type { PurchaseOrder, PurchaseOrderItem } from '../../types/database';
 import { useModalLock } from '../../hooks/useModalLock';
 import { itemLabel } from './poItemLabel';
+import type { ChallanStart } from './POReceiveChallan';
 
 const localToday = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 const num = (s: string) => { const n = parseFloat(s); return isNaN(n) ? 0 : n; };
@@ -27,8 +28,8 @@ export default function POReceive({ po, items: allItems, onClose, onReceived, on
   items: PurchaseOrderItem[];
   onClose: () => void;
   onReceived: () => void;
-  /** The challan covers other orders too: receive them together (the number typed so far goes along). */
-  onChallan: (challanNo: string) => void;
+  /** The challan covers other orders too: receive them together (everything typed so far goes along). */
+  onChallan: (typed: ChallanStart) => void;
   addToast: (m: string, t?: string) => void;
 }) {
   // A cancelled item takes no more goods (the server refuses it too).
@@ -127,7 +128,7 @@ export default function POReceive({ po, items: allItems, onClose, onReceived, on
             <div><label style={S.fLabel}>Receipt date</label><DateInput value={date} onChange={e => setDate(e.target.value)} style={{ width: '100%' }} /></div>
             <div><label style={S.fLabel}>Remarks</label><input value={remarks} onChange={e => setRemarks(e.target.value)} placeholder="Optional" style={S.fInput} /></div>
           </div>
-          <button type="button" onClick={() => onChallan(challan.trim())} className="touch44"
+          <button type="button" onClick={() => onChallan({ challanNo: challan.trim(), date, remarks, qty })} className="touch44"
             style={{ border: 'none', background: 'none', color: T.ac2, fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: '8px 0 0', textAlign: 'left' }}>
             This challan has other orders from {po.vendor_name} too? Receive them together →
           </button>

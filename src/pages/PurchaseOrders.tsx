@@ -20,6 +20,7 @@ import { usePoList, PO_COLS as COLS, TAB_STATUSES } from '../components/purchase
 import type { EditingPO } from '../components/purchaseorders/POForm';
 import { POForm, PODetail, POReceive, POReceiveChallan, POPrintOverlay, PendencyReport, Contacts, prefetchPoParts } from '../components/purchaseorders/poLazy';
 import type { ChallanVendor } from '../components/purchaseorders/POChallanVendors';
+import type { ChallanStart } from '../components/purchaseorders/POReceiveChallan';
 import { whenIdle } from '../lib/idle';
 import { ITEM_COLS } from '../components/purchaseorders/poDetailData';
 import { usePoDetail } from '../components/purchaseorders/usePoDetail';
@@ -49,7 +50,7 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
   const { detail, setDetail, loadActivity, openDetail, refreshDetail } = usePoDetail(addToast, fetchPos);
   const [receiving, setReceiving] = useState<{ po: PurchaseOrder; items: PurchaseOrderItem[] } | null>(null);
   // One vendor challan on several orders: vendor null = picked inside; poId = the order it was opened from.
-  const [challan, setChallan] = useState<{ vendor: ChallanVendor | null; poId?: string; challanNo?: string } | null>(null);
+  const [challan, setChallan] = useState<{ vendor: ChallanVendor | null; poId?: string; init?: ChallanStart } | null>(null);
   const [printData, setPrintData] = useState<{ po: PurchaseOrder; items: PurchaseOrderItem[] } | null>(null);
   // Vendor pendency report (owner's ask): open orders for one vendor with
   // pending-since headlined, shareable as an image. null = closed.
@@ -142,9 +143,9 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
 
       {receiving && <POReceive po={receiving.po} items={receiving.items} onClose={() => setReceiving(null)}
         onReceived={() => { setReceiving(null); refreshDetail(); }} addToast={addToast}
-        onChallan={no => { setChallan({ vendor: { id: receiving.po.vendor_id, name: receiving.po.vendor_name }, poId: receiving.po.id, challanNo: no }); setReceiving(null); }} />}
+        onChallan={init => { setChallan({ vendor: { id: receiving.po.vendor_id, name: receiving.po.vendor_name }, poId: receiving.po.id, init }); setReceiving(null); }} />}
 
-      {challan && <POReceiveChallan vendor={challan.vendor} poId={challan.poId} challanNo={challan.challanNo} onClose={() => setChallan(null)} addToast={addToast}
+      {challan && <POReceiveChallan vendor={challan.vendor} poId={challan.poId} init={challan.init} onClose={() => setChallan(null)} addToast={addToast}
         onReceived={() => { setChallan(null); bumpData(); if (detail) refreshDetail(); else fetchPos(true); }} />}
 
       {printData && <POPrintOverlay po={printData.po} items={printData.items} canManage={canManage} onClose={() => setPrintData(null)} addToast={addToast}

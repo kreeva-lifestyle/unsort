@@ -78,7 +78,7 @@ export default function POList(p: Props) {
           Pending
         </button>
         {p.onReceiveChallan && (
-          <button onClick={p.onReceiveChallan} title="One challan from a vendor — receive it on all its orders at once" style={{ ...S.btnGhost, color: T.tx3, borderColor: T.bd2, background: 'rgba(255,255,255,0.03)', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+          <button onClick={p.onReceiveChallan} className="touch44" title="One challan from a vendor — receive it on all its orders at once" style={{ ...S.btnGhost, color: T.tx3, borderColor: T.bd2, background: 'rgba(255,255,255,0.03)', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
             <svg viewBox="0 0 24 24" style={{ width: 13, height: 13, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}><path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4" /></svg>
             Receive challan
           </button>
