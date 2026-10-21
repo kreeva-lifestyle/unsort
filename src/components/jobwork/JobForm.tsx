@@ -3,6 +3,7 @@
 // components become chips — choosing one offers its outside-work rate
 // (JOBWORK ₹523…) and fills the fabric lines with their usage per piece.
 // A new job can be saved as a draft and finished later (jobworkDrafts.ts).
+// Started from a fabric PO (`prefill`) it comes filled and carries the fabric (PoFabricNote).
 import { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { T, S } from '../../lib/theme';
@@ -20,14 +21,18 @@ import { JOB_TYPES, QTY_UNITS, today, inr, unitLabel, validQty, type JobDetail }
 import { saveJob, costingFor, type JobDraft, type MaterialDraft, type CostingRef } from './jobworkApi';
 import { componentNames, rateHints, materialHints } from './jobworkCosting';
 import { createFromDraft, startForm, toDraftForm } from './jobworkDrafts';
+import { startFromPo, type JobPrefill } from './jobworkFromPo';
+import PoFabricNote from './PoFabricNote';
 import JobFormActions, { useLeaveGuard, type Busy } from './JobFormActions';
 import ConfirmModal from '../ui/ConfirmModal';
 import type { JobworkDraft } from '../../types/database';
 
-export default function JobForm({ edit, draft = null, onClose, onSaved, onDrafts, addToast }: {
+export default function JobForm({ edit, draft = null, prefill = null, onClose, onSaved, onDrafts, addToast }: {
   edit: JobDetail | null;
   /** A saved draft to finish (new jobs only). */
   draft?: JobworkDraft | null;
+  /** A new job started from a fabric PO (no draft: the PO is the record). */
+  prefill?: JobPrefill | null;
   onClose: () => void;
   onSaved: (id: string) => void;
   /** A draft was saved, discarded or turned into a job. */
@@ -36,24 +41,27 @@ export default function JobForm({ edit, draft = null, onClose, onSaved, onDrafts
 }) {
   useModalLock();
   const j = edit?.job;
-  const [start] = useState(() => startForm(edit, edit ? null : draft));
+  const [start] = useState(() => startForm(edit, edit ? null : draft, prefill));
+  const [handover, setHandover] = useState(true);
   const [d, setD] = useState<JobDraft>(start.d);
   const [mats, setMats] = useState<MaterialDraft[]>(start.mats);
   // A draft keeps the job date only once someone picked it (else: the day it is finished).
   const [dateSet, setDateSet] = useState(!!draft?.form.job_date);
   const draftForm = () => toDraftForm(dateSet ? d : { ...d, job_date: '' }, mats);
-  const [startKey] = useState(() => JSON.stringify(toDraftForm(start.d, start.mats)));
-  const guard = useLeaveGuard({ dirty: () => JSON.stringify(toDraftForm(d, mats)) !== startKey, keepable: !j, draftId: edit ? null : draft?.id ?? null,
+  // Changed = the form, the fabric to give now or the hand-over switch (the costing link is looked up, not typed).
+  const dirtyKey = (x: JobDraft, ms: MaterialDraft[], h: boolean) => JSON.stringify([toDraftForm({ ...x, costing_product_id: null }, ms), ms.filter(m => m.po_item_id).map(m => m.send_qty ?? ''), h]);
+  const [startKey] = useState(() => dirtyKey(start.d, start.mats, true));
+  const guard = useLeaveGuard({ dirty: () => dirtyKey(d, mats, handover) !== startKey, keepable: !j && !prefill, draftId: edit ? null : draft?.id ?? null,
     form: draftForm, onClose, onDrafts: () => onDrafts?.(), addToast });
   useBackClose(true, guard.back);
   const locked = useMemo(() => new Set(edit?.entries.flatMap(e => e.jobwork_entry_lines.map(l => l.material_id)) ?? []), [edit]);
   const [costing, setCosting] = useState<CostingRef | null>(null);
   // The photo is asked for only once the SKU is real (picked from the
   // suggestions, or an existing job / costing sheet) — never per keystroke.
-  const [picked, setPicked] = useState(!!edit || !!draft?.form.sku);
+  const [picked, setPicked] = useState(!!edit || !!draft?.form.sku || !!prefill);
   // …and only after the code has settled: typing DRS177 passes through the
   // real designs DRS1 and DRS17, which must not each cost a Dropbox lookup.
-  const [thumbSku, setThumbSku] = useState(edit ? edit.job.sku : draft?.form.sku ?? '');
+  const [thumbSku, setThumbSku] = useState(edit ? edit.job.sku : draft?.form.sku ?? prefill?.d.sku ?? '');
   useEffect(() => {
     if (!(picked || costing) || !d.sku.trim()) { setThumbSku(''); return; }
     const t = setTimeout(() => setThumbSku(d.sku.trim()), 800);
@@ -101,11 +109,11 @@ export default function JobForm({ edit, draft = null, onClose, onSaved, onDrafts
     if (d.expected_date && d.expected_date < d.job_date) return setError('Expected back cannot be before the job date');
     const rows = mats.filter(m => m.name.trim());
     setBusy('job');
-    const { id, error: err } = draftId ? await createFromDraft(draftId, d, rows, draftForm()) : await saveJob(j?.id ?? null, d, rows);
+    const { id, error: err } = prefill ? await startFromPo(prefill.po.id, d, rows, handover) : draftId ? await createFromDraft(draftId, d, rows, draftForm()) : await saveJob(j?.id ?? null, d, rows);
     setBusy('');
     if (draftId) onDrafts?.();
     if (err || !id) { setError(friendlyError(err)); return; }
-    addToast(j ? `JW #${j.jw_number} updated` : 'Job created', 'success');
+    addToast(j ? `JW #${j.jw_number} updated` : prefill ? `Job created from PO #${prefill.po.number}` : 'Job created', 'success');
     onSaved(id);
   };
 
@@ -117,7 +125,7 @@ export default function JobForm({ edit, draft = null, onClose, onSaved, onDrafts
     <div style={S.modalOverlay} onClick={() => { if (!guard.blockOutside()) onClose(); }}>
       <div className="modal-inner" style={{ ...S.modalBox, width: 560 }} onClick={e => e.stopPropagation()}>
         <div style={S.modalHead}>
-          <span style={S.modalTitle}>{j ? `Edit JW #${j.jw_number}` : draftId ? 'Draft job' : 'New job'}</span>
+          <span style={S.modalTitle}>{j ? `Edit JW #${j.jw_number}` : prefill ? `Jobwork from PO #${prefill.po.number}` : draftId ? 'Draft job' : 'New job'}</span>
           <button type="button" onClick={guard.request} style={S.modalClose} aria-label="Close">&#215;</button>
         </div>
         <div style={{ padding: '14px 18px 18px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12 }}
@@ -168,6 +176,7 @@ export default function JobForm({ edit, draft = null, onClose, onSaved, onDrafts
             {field('Job date', true, <DateInput value={d.job_date} max={today()} onChange={e => { setDateSet(true); patch({ job_date: e.target.value }); }} style={{ width: '100%' }} />)}
             {field('Expected back', false, <DateInput value={d.expected_date} min={d.job_date} onChange={e => patch({ expected_date: e.target.value })} style={{ width: '100%' }} />)}
           </div>
+          {prefill && <PoFabricNote poNumber={prefill.po.number} fabric={prefill.fabric} mats={mats} onMats={setMats} handover={handover} onHandover={setHandover} />}
           <div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 6 }}>
               <label style={{ ...S.fLabel, marginBottom: 0 }}>Material given</label>
@@ -179,7 +188,7 @@ export default function JobForm({ edit, draft = null, onClose, onSaved, onDrafts
           {field('Notes', false, <textarea value={d.notes} onChange={e => patch({ notes: e.target.value })} rows={2} placeholder="Design, colour, special instructions…"
             style={{ ...S.fInput, width: '100%', height: 'auto', minHeight: 60, resize: 'vertical', lineHeight: 1.5 }} />)}
           {error && <div style={S.errorBox}>{error}</div>}
-          <JobFormActions mode={j ? 'edit' : draftId ? 'draft' : 'new'} draftId={draftId} form={draftForm} busy={busy} setBusy={setBusy}
+          <JobFormActions mode={j ? 'edit' : prefill ? 'po' : draftId ? 'draft' : 'new'} draftId={draftId} form={draftForm} busy={busy} setBusy={setBusy}
             setError={setError} onCancel={guard.request} onDrafts={() => { onDrafts?.(); onClose(); }} onSubmit={submit} addToast={addToast} />
           <ConfirmModal {...guard.modalProps} />
         </div>

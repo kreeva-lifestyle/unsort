@@ -36,13 +36,17 @@ export interface JobworkOrder {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  /** The fabric PO the job was started from ("Start jobwork" on a PO), else null. */
+  po_id: string | null;
 }
 
 // --- jobwork_order_summary (view: order + totals) ---
 export interface JobworkSummary extends Pick<JobworkOrder,
   'id' | 'jw_number' | 'vendor_id' | 'vendor_name' | 'vendor_phone' | 'job_type' | 'sku' | 'component' |
   'costing_product_id' | 'pieces' | 'qty_unit' | 'rate' | 'job_date' | 'expected_date' | 'status' | 'notes' | 'close_reason' |
-  'created_at' | 'updated_at'> {
+  'created_at' | 'updated_at' | 'po_id'> {
+  /** The source PO's number (joined), null when the job was not started from a PO. */
+  po_number: number | null;
   pcs_ok: number;
   pcs_rejected: number;
   pcs_rework: number;
@@ -67,6 +71,8 @@ export interface JobworkMaterial {
   sort_order: number;
   /** Taken off the job (soft) — kept so history never loses its name. */
   removed: boolean;
+  /** The PO line this fabric came from (a job started from a PO), else null. */
+  po_item_id: string | null;
   created_at: string;
   updated_at: string;
 }

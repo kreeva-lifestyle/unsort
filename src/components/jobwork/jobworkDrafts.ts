@@ -62,8 +62,8 @@ export async function createFromDraft(id: string, d: JobDraft, rows: MaterialDra
 export const hasContent = (f: JobworkDraftForm) =>
   !!(f.vendor_name.trim() || f.sku.trim() || f.job_type.trim() || f.component.trim() || f.pieces.trim() || f.rate.trim() || f.notes.trim() || f.materials.some(m => m.name.trim()));
 
-/** The form's starting values: an existing job (edit), a saved draft, or blank. */
-export function startForm(edit: JobDetail | null, draft: JobworkDraft | null): { d: JobDraft; mats: MaterialDraft[] } {
+/** The form's starting values: an existing job (edit), a saved draft, a job started from a PO (`from`), or blank. */
+export function startForm(edit: JobDetail | null, draft: JobworkDraft | null, from?: { d: Partial<JobDraft>; mats: MaterialDraft[] } | null): { d: JobDraft; mats: MaterialDraft[] } {
   const j = edit?.job;
   if (j) return {
     d: { vendor_id: j.vendor_id, vendor_name: j.vendor_name, vendor_phone: j.vendor_phone ?? '', job_type: j.job_type, sku: j.sku,
@@ -72,6 +72,7 @@ export function startForm(edit: JobDetail | null, draft: JobworkDraft | null): {
     mats: (edit.materials ?? []).filter(m => !m.removed).map(m => ({ id: m.id, name: m.name, unit: m.unit, per_piece: m.per_piece == null ? '' : String(m.per_piece) })),
   };
   const blank: JobDraft = { vendor_id: null, vendor_name: '', vendor_phone: '', job_type: '', sku: '', component: '', costing_product_id: null, pieces: '', qty_unit: 'pcs', rate: '', job_date: today(), expected_date: '', notes: '' };
+  if (from) return { d: { ...blank, ...from.d }, mats: from.mats };
   if (!draft) return { d: blank, mats: [] };
   const { materials, ...f } = draft.form;
   // Filled over the blank form, so a draft saved by an older version still

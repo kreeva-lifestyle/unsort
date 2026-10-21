@@ -16,7 +16,7 @@ const REV_COLS = 'id, po_id, revision, kind, changes, reason, created_by, create
 export async function loadPoLines(po: PurchaseOrder): Promise<{ items: PurchaseOrderItem[]; receipts: PurchaseOrderReceipt[]; error: unknown }> {
   const [i, r] = await Promise.all([
     supabase.from('purchase_order_items').select(ITEM_COLS).eq('po_id', po.id).order('sort_order'),
-    supabase.from('purchase_order_receipts').select('id, po_id, po_item_id, received_qty, receipt_date, remarks, received_by, created_at').eq('po_id', po.id).order('created_at', { ascending: false }),
+    supabase.from('purchase_order_receipts').select('id, po_id, po_item_id, received_qty, receipt_date, remarks, received_by, created_at, challan_no').eq('po_id', po.id).order('created_at', { ascending: false }),
   ]);
   const error = i.error || r.error;
   if (error) return { items: [], receipts: [], error };

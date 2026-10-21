@@ -5,7 +5,8 @@
 // items with Ordered/Received/Remaining and Cancel on one line, receipts log
 // (who received), the history of changes, who did what. Edit / Revise /
 // duplicate / receive / print are emitted to the parent; Remind vendor opens
-// WhatsApp with what is still pending.
+// WhatsApp with what is still pending; Start jobwork (a received fabric PO)
+// opens the Jobwork job form filled from the order (useStartJobwork).
 import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
@@ -26,6 +27,7 @@ import POHeaderInfo from './POHeaderInfo';
 import PORailCard from './PORailCard';
 import POStageActions from './POStageActions';
 import { useLandedOrder } from './useLandedOrder';
+import { useStartJobwork } from './useStartJobwork';
 import { reminderText } from './poWhatsApp';
 import type { PORevisionRow } from './poDetailData';
 import type { PurchaseOrder, PurchaseOrderItem, PurchaseOrderReceipt, AuditLog } from '../../types/database';
@@ -107,6 +109,7 @@ export default function PODetail({ po: livePo, items: liveItems, receipts: liveR
       .then(({ error }) => { if (error) logSwallowed('PO reminder audit', error); });
   };
   const rev = pendingRevision(po, revisions, audit);
+  const jw = useStartJobwork({ po, items, onDone: () => { void onChanged(); }, addToast });
 
   return createPortal(
     <>
@@ -125,7 +128,7 @@ export default function PODetail({ po: livePo, items: liveItems, receipts: liveR
             <PORailCard po={livePo} items={liveItems} shown={shown} audit={audit} names={names} statusColors={statusColors} onLanded={() => { land(); landRef.current?.(); }} />
             <POStageActions po={po} items={items} canManage={canManage} ask={ask} onChanged={onChanged} waitLanded={waitLanded} busy={busy} holding={holding} setBusy={setBusy} onReceive={onReceive} onCloseRemaining={() => setClosing(true)} addToast={addToast} />
             {rev && <POReviseNotice key={rev.id} po={po} items={items} rev={rev} onDone={() => { void onChanged(); }} addToast={addToast} />}
-            <POHeaderInfo po={po} costingSku={costingSku} names={names} />
+            <POHeaderInfo po={po} costingSku={costingSku} names={names} jobs={jw.jobs} />
 
             <POLineTable items={items} canCancel={open && canManage && !holding} busy={!!busy} onCancel={setCancelling} />
 
@@ -150,6 +153,7 @@ export default function PODetail({ po: livePo, items: liveItems, receipts: liveR
             <button onClick={onPrint} style={{ ...S.btnGhost, ...S.btnSm }}>Print / Share</button>
             {/* A real link: the tap itself opens WhatsApp with the pending lines typed in. */}
             {remind && <a href={waLink(remind, po.vendor_phone)} target="_blank" rel="noopener noreferrer" onClick={logReminder} className="touch44" style={{ ...S.btnSuccess, ...S.btnSm, textDecoration: 'none' }}>Remind vendor</a>}
+            {jw.button}
             <button onClick={onPendency} style={{ ...S.btnGhost, ...S.btnSm }}>Vendor pending</button>
             <button onClick={onDuplicate} style={{ ...S.btnGhost, ...S.btnSm }}>Duplicate</button>
             {(canEdit || canRevise) && <button onClick={onEdit} disabled={!!busy || holding} style={{ ...S.btnGhost, ...S.btnSm, opacity: busy || holding ? 0.5 : 1 }}>{canEdit ? 'Edit' : 'Revise'}</button>}
@@ -159,6 +163,7 @@ export default function PODetail({ po: livePo, items: liveItems, receipts: liveR
         {closing && <POCloseModal po={po} items={items} onClose={() => setClosing(false)} onClosed={() => { setClosing(false); onChanged(); }} addToast={addToast} />}
       </div>
       {/* Outside the sheet's overlay: a tap on this modal's backdrop must not bubble up and close the order. */}
+      {jw.sheet}
       {cancelling && <POLineCancelModal po={po} item={cancelling} onClose={() => setCancelling(null)} onDone={() => { setCancelling(null); void onChanged(); }} addToast={addToast} />}
     </>,
     document.body,

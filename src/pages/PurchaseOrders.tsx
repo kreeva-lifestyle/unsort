@@ -18,7 +18,9 @@ import POQuickChips from '../components/purchaseorders/POQuickChips';
 import POTabs from '../components/purchaseorders/POTabs';
 import { usePoList, PO_COLS as COLS, TAB_STATUSES } from '../components/purchaseorders/usePoList';
 import type { EditingPO } from '../components/purchaseorders/POForm';
-import { POForm, PODetail, POReceive, POPrintOverlay, PendencyReport, Contacts, prefetchPoParts } from '../components/purchaseorders/poLazy';
+import { POForm, PODetail, POReceive, POReceiveChallan, POPrintOverlay, PendencyReport, Contacts, prefetchPoParts } from '../components/purchaseorders/poLazy';
+import type { ChallanVendor } from '../components/purchaseorders/POChallanVendors';
+import type { ChallanStart } from '../components/purchaseorders/POReceiveChallan';
 import { whenIdle } from '../lib/idle';
 import { ITEM_COLS } from '../components/purchaseorders/poDetailData';
 import { usePoDetail } from '../components/purchaseorders/usePoDetail';
@@ -47,6 +49,8 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
   const [duplicating, setDuplicating] = useState<EditingPO | null>(null);
   const { detail, setDetail, loadActivity, openDetail, refreshDetail } = usePoDetail(addToast, fetchPos);
   const [receiving, setReceiving] = useState<{ po: PurchaseOrder; items: PurchaseOrderItem[] } | null>(null);
+  // One vendor challan on several orders: vendor null = picked inside; poId = the order it was opened from.
+  const [challan, setChallan] = useState<{ vendor: ChallanVendor | null; poId?: string; init?: ChallanStart } | null>(null);
   const [printData, setPrintData] = useState<{ po: PurchaseOrder; items: PurchaseOrderItem[] } | null>(null);
   // Vendor pendency report (owner's ask): open orders for one vendor with
   // pending-since headlined, shareable as an image. null = closed.
@@ -116,6 +120,7 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
         onOpenEmpty={() => { setEditing(null); setDuplicating(null); setShowForm(true); }} canCreate={canCreate}
         onOpenDetail={openDetail} onPrint={(po) => openPrint(po)}
         onPendency={() => setPendency({ vendor: null })}
+        onReceiveChallan={canCreate ? () => setChallan({ vendor: null }) : undefined}
         page={page} totalPages={totalPages} onPageChange={setPage}
       />
 
@@ -137,13 +142,17 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
       {pendency && <PendencyReport vendor={pendency.vendor} onClose={() => setPendency(null)} addToast={addToast} />}
 
       {receiving && <POReceive po={receiving.po} items={receiving.items} onClose={() => setReceiving(null)}
-        onReceived={() => { setReceiving(null); refreshDetail(); }} addToast={addToast} />}
+        onReceived={() => { setReceiving(null); refreshDetail(); }} addToast={addToast}
+        onChallan={init => { setChallan({ vendor: { id: receiving.po.vendor_id, name: receiving.po.vendor_name }, poId: receiving.po.id, init }); setReceiving(null); }} />}
+
+      {challan && <POReceiveChallan vendor={challan.vendor} poId={challan.poId} init={challan.init} onClose={() => setChallan(null)} addToast={addToast}
+        onReceived={() => { setChallan(null); bumpData(); if (detail) refreshDetail(); else fetchPos(true); }} />}
 
       {printData && <POPrintOverlay po={printData.po} items={printData.items} canManage={canManage} onClose={() => setPrintData(null)} addToast={addToast}
         onSent={async () => { setPrintData(p => p && { ...p, po: { ...p.po, status: 'sent' } }); bumpData(); if (detail?.po.id === printData.po.id) await refreshDetail(); else fetchPos(true); }} />}
       </Suspense>
 
-      {active !== false && !detail && !showForm && !receiving && !printData && !pendency && canCreate && createPortal(
+      {active !== false && !detail && !showForm && !receiving && !challan && !printData && !pendency && canCreate && createPortal(
         <button className="fab" aria-label="New purchase order" onClick={() => { setEditing(null); setDuplicating(null); setShowForm(true); }}>+</button>,
         document.body,
       )}

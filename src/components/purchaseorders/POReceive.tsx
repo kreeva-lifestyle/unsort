@@ -1,7 +1,9 @@
 // Receive goods against a PO — the "payments" analog. Per line item shows
 // Ordered / Received / Remaining and an input for the qty arriving now
 // (defaults to remaining; over-receipt is ALLOWED — a 54 m order may deliver
-// 57 m, shown as "+N extra"). One shared date + remarks → receive_po_items.
+// 57 m, shown as "+N extra"). One shared challan no. + date + remarks →
+// receive_po_items. A challan that covers other orders of the same vendor
+// moves to "Receive a challan" (POReceiveChallan) with the number typed.
 // Before writing we re-check the server's received totals: if another user
 // recorded a receipt while this modal was open, the pre-filled quantities are
 // stale and confirming would silently double the tally.
@@ -16,15 +18,18 @@ import DateInput from '../ui/DateInput';
 import type { PurchaseOrder, PurchaseOrderItem } from '../../types/database';
 import { useModalLock } from '../../hooks/useModalLock';
 import { itemLabel } from './poItemLabel';
+import type { ChallanStart } from './POReceiveChallan';
 
 const localToday = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 const num = (s: string) => { const n = parseFloat(s); return isNaN(n) ? 0 : n; };
 
-export default function POReceive({ po, items: allItems, onClose, onReceived, addToast }: {
+export default function POReceive({ po, items: allItems, onClose, onReceived, onChallan, addToast }: {
   po: PurchaseOrder;
   items: PurchaseOrderItem[];
   onClose: () => void;
   onReceived: () => void;
+  /** The challan covers other orders too: receive them together (everything typed so far goes along). */
+  onChallan: (typed: ChallanStart) => void;
   addToast: (m: string, t?: string) => void;
 }) {
   // A cancelled item takes no more goods (the server refuses it too).
@@ -37,6 +42,7 @@ export default function POReceive({ po, items: allItems, onClose, onReceived, ad
   const [qty, setQty] = useState<Record<string, string>>(() => Object.fromEntries(items.map(it => [it.id, String(Math.max(0, Number(it.quantity) - Number(it.received_qty || 0)))])));
   const [date, setDate] = useState(localToday());
   const [remarks, setRemarks] = useState('');
+  const [challan, setChallan] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -73,7 +79,7 @@ export default function POReceive({ po, items: allItems, onClose, onReceived, ad
       }
     } catch (e) { setError(friendlyError(e)); setSaving(false); return; }
     try {
-      const p_receipts = receipts.map(r => ({ ...r, receipt_date: date || null, remarks: remarks.trim() || null }));
+      const p_receipts = receipts.map(r => ({ ...r, receipt_date: date || null, remarks: remarks.trim() || null, challan_no: challan.trim() || null }));
       const { error: e } = await supabase.rpc('receive_po_items', { p_po_id: po.id, p_receipts });
       if (e) throw e;
       addToast('Receipt recorded', 'success');
@@ -117,10 +123,15 @@ export default function POReceive({ po, items: allItems, onClose, onReceived, ad
               );
             })}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 10, marginTop: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginTop: 12 }}>
+            <div><label style={S.fLabel}>Challan no.</label><input value={challan} onChange={e => setChallan(e.target.value)} maxLength={40} placeholder="e.g. TK/4411" style={{ ...S.fInput, fontFamily: T.mono }} /></div>
             <div><label style={S.fLabel}>Receipt date</label><DateInput value={date} onChange={e => setDate(e.target.value)} style={{ width: '100%' }} /></div>
-            <div><label style={S.fLabel}>Remarks</label><input value={remarks} onChange={e => setRemarks(e.target.value)} placeholder="Optional (e.g. courier, invoice #)" style={S.fInput} /></div>
+            <div><label style={S.fLabel}>Remarks</label><input value={remarks} onChange={e => setRemarks(e.target.value)} placeholder="Optional" style={S.fInput} /></div>
           </div>
+          <button type="button" onClick={() => onChallan({ challanNo: challan.trim(), date, remarks, qty, recvd: Object.fromEntries(items.map(it => [it.id, recvdOf(it)])) })} className="touch44"
+            style={{ border: 'none', background: 'none', color: T.ac2, fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: '8px 0 0', textAlign: 'left' }}>
+            This challan has other orders from {po.vendor_name} too? Receive them together →
+          </button>
           {error && <div ref={errRef} style={{ marginTop: 12, background: 'oklch(0.63 0.22 25 / .08)', border: '1px solid oklch(0.63 0.22 25 / .2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.re }}>{error}</div>}
         </div>
         <div style={{ padding: '12px 18px', borderTop: `1px solid ${T.bd}`, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>

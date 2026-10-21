@@ -28,7 +28,7 @@ export default function POReceipts({ receipts, items, names, canRemove, busy, on
         return (
           <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: '7px 10px', background: T.glass1, border: `1px solid ${T.bd}`, borderRadius: 6, marginBottom: 4, fontSize: 12 }}>
             <div style={{ minWidth: 0 }}>
-              <span style={{ color: T.tx }}>{item ? itemLabel(item) : 'Item'}</span> <span style={{ color: T.gr, fontFamily: T.mono }}>+{Number(r.received_qty)}</span>{r.remarks && <span style={{ color: T.tx3, marginLeft: 6 }}>· {r.remarks}</span>}
+              <span style={{ color: T.tx }}>{item ? itemLabel(item) : 'Item'}</span> <span style={{ color: T.gr, fontFamily: T.mono }}>+{Number(r.received_qty)}</span>{r.challan_no && <span style={{ color: T.tx2, marginLeft: 6 }}>· Challan <span style={{ fontFamily: T.mono }}>{r.challan_no}</span></span>}{r.remarks && <span style={{ color: T.tx3, marginLeft: 6 }}>· {r.remarks}</span>}
               {/* Two moments, both named: the delivery date (right) and when it was keyed in (here). */}
               {(who || r.created_at) && <div style={{ fontSize: 10, color: T.tx3, marginTop: 2 }}>{who ? <>by <span style={{ color: T.tx2, fontWeight: 600 }}>{who}</span> · </> : ''}entered <span style={{ fontFamily: T.mono }}>{fmtWhen(r.created_at)}</span></div>}
             </div>

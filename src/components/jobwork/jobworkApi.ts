@@ -7,8 +7,8 @@ import type { JobworkSummary, JobworkMaterial, JobworkPayment, JobworkPaymentIns
 import type { CostingComponent } from '../minis/costing/costingModel';
 import { today, type EntryWithLines, type JobDetail, type JobActivityRow } from './jobworkModel';
 
-export const SUMMARY_COLS = 'id, jw_number, vendor_id, vendor_name, vendor_phone, job_type, sku, component, costing_product_id, pieces, qty_unit, rate, job_date, expected_date, status, notes, close_reason, created_at, updated_at, pcs_ok, pcs_rejected, pcs_rework, pcs_remaining, out_count, last_entry_date, bill, paid, due, last_pay_date';
-const MATERIAL_COLS = 'id, order_id, name, unit, per_piece, sort_order, removed, created_at, updated_at';
+export const SUMMARY_COLS = 'id, jw_number, vendor_id, vendor_name, vendor_phone, job_type, sku, component, costing_product_id, pieces, qty_unit, rate, job_date, expected_date, status, notes, close_reason, created_at, updated_at, pcs_ok, pcs_rejected, pcs_rework, pcs_remaining, out_count, last_entry_date, bill, paid, due, last_pay_date, po_id, po_number';
+const MATERIAL_COLS = 'id, order_id, name, unit, per_piece, sort_order, removed, created_at, updated_at, po_item_id';
 const ENTRY_COLS = 'id, order_id, kind, entry_date, pcs_ok, pcs_rejected, pcs_rework, note, created_by, created_at, jobwork_entry_lines(material_id, qty)';
 const PAY_COLS = 'id, order_id, pay_date, amount, mode, reference, note, created_by, created_at';
 
@@ -126,7 +126,8 @@ export async function openByVendor(): Promise<{ rows: VendorPending[]; error: un
   return { rows: [...by.values()].sort((a, b) => b.pending - a.pending || b.pendingM - a.pendingM || a.vendor.localeCompare(b.vendor)), error: null };
 }
 
-export interface MaterialDraft { id?: string; name: string; unit: string; per_piece: string }
+/** `po_item_id` / `send_qty`: a fabric line of a job started from a PO, and how much of it goes to the jobworker now. */
+export interface MaterialDraft { id?: string; name: string; unit: string; per_piece: string; po_item_id?: string | null; send_qty?: string }
 export interface JobDraft {
   vendor_id: string | null; vendor_name: string; vendor_phone: string;
   job_type: string; sku: string; component: string; costing_product_id: string | null;
