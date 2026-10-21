@@ -43,7 +43,9 @@ export const TOP_VENDORS = 6;
 export const OTHERS = 'Others';
 
 const n = (v: unknown): number => { const x = Number(v); return Number.isFinite(x) ? x : 0; };
-export const fmtQty = (v: number): string => v.toLocaleString('en-IN', { maximumFractionDigits: 2 });
+// One formatter for every quantity (a list card formats several per render).
+const QTY = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 });
+export const fmtQty = (v: number): string => QTY.format(v);
 export const inr = (v: number): string => '₹' + Math.round(v).toLocaleString('en-IN');
 const UNIT_ALIASES: Record<string, string> = {
   meter: 'm', meters: 'm', metre: 'm', metres: 'm', mtr: 'm', mtrs: 'm', m: 'm',

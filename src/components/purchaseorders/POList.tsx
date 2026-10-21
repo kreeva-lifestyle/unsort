@@ -1,4 +1,4 @@
-// PO list — search + collapsible filters, desktop table, mobile cards, pager.
+// PO list — search + collapsible filters, the orders as Motion Lab cards (POListCard), pager.
 // Parent owns all state & data; this is a pure presentational component.
 import { T, S } from '../../lib/theme';
 import { useIsPhone } from '../../hooks/useIsPhone';
@@ -6,14 +6,12 @@ import { useProgressive } from '../../hooks/useProgressive';
 import Empty from '../ui/Empty';
 import SwipeRow from '../ui/SwipeRow';
 import { SkeletonRows } from '../ui/Skeleton';
-import { PO_TYPE_LABELS } from '../../types/database';
 import type { PurchaseOrder, PurchaseOrderItem } from '../../types/database';
 import POFilters, { type POFiltersProps } from './POFilters';
-import PORail, { railState } from './PORail';
-import { StatusPill, itemsLabel, pendingDays, PendingSince, progress } from './poListParts';
+import POListCard from './POListCard';
 
 export type PORow = PurchaseOrder & {
-  purchase_order_items?: Array<Pick<PurchaseOrderItem, 'sku' | 'item_name' | 'fabric_code' | 'quantity' | 'received_qty'>>;
+  purchase_order_items?: Array<Pick<PurchaseOrderItem, 'sku' | 'item_name' | 'fabric_code' | 'quantity' | 'received_qty' | 'unit'>>;
   /** The costing this PO was raised from (embedded via costing_product_id). */
   costing_products?: { sku: string } | null;
 };
@@ -46,9 +44,8 @@ interface Props extends POFiltersProps {
 
 export default function POList(p: Props) {
   const filterActive = p.statusFilter || p.typeFilter || p.creatorFilter || p.dateFrom || p.dateTo;
-  // Only the layout on screen is built: the table on a desktop, the cards on
-  // a phone. Building both and hiding one with CSS doubled the work of every
-  // page of orders (the classes stay as the CSS fallback).
+  // Only the layout on screen is built: the card grid on a desktop, the
+  // swipeable column on a phone (the classes stay as the CSS fallback).
   const phone = useIsPhone();
   const shown = useProgressive(p.pos, p.loading);
   return (
@@ -79,85 +76,18 @@ export default function POList(p: Props) {
         ? <Empty icon="search" title="No orders match" message="Clear the search, chips or filters above to see every order." />
         : <Empty icon="clipboard" title="No purchase orders yet" message="Raise your first PO — pick a vendor, add the items you're buying, and track them from draft through to fully received." cta={p.canCreate ? '+ New Purchase Order' : undefined} onCta={p.canCreate ? p.onOpenEmpty : undefined} />)}
 
-      {/* Desktop table */}
-      {!phone && !p.loading && p.pos.length > 0 && <div className="desktop-only" style={{ border: `1px solid ${T.bd}`, borderRadius: 10, overflow: 'hidden', background: 'rgba(255,255,255,0.01)' }}>
-        <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 860, tableLayout: 'fixed' }}>
-            <colgroup><col style={{ width: '9%' }} /><col style={{ width: '18%' }} /><col style={{ width: '10%' }} /><col style={{ width: '17%' }} /><col style={{ width: '11%' }} /><col style={{ width: '12%' }} /><col style={{ width: '13%' }} /><col style={{ width: 44 }} /></colgroup>
-            <thead><tr style={{ borderBottom: `1px solid ${T.bd}` }}>
-              <th style={S.thStyle}>PO #</th><th style={S.thStyle}>Vendor</th><th style={S.thStyle}>Type</th><th style={S.thStyle}>Items</th><th style={{ ...S.thStyle, textAlign: 'right' }}>Total</th><th style={S.thStyle}>Received</th><th style={{ ...S.thStyle, textAlign: 'center' }}>Status</th><th style={S.thStyle} />
-            </tr></thead>
-            <tbody>
-              {shown.map(po => {
-                const sc = p.statusColors[po.status] || p.statusColors.draft;
-                const pr = progress(po);
-                return (
-                  <tr key={po.id} onClick={() => p.onOpenDetail(po)} style={{ borderBottom: `1px solid ${T.bd}`, cursor: 'pointer' }} onMouseEnter={e => ((e.currentTarget as HTMLElement).style.background = 'oklch(0.55 0.22 265 / .03)')} onMouseLeave={e => ((e.currentTarget as HTMLElement).style.background = 'transparent')}>
-                    <td style={S.tdStyle}><span style={{ fontFamily: T.mono, fontSize: 12, fontWeight: 600, color: T.ac2 }}>#{po.po_number}</span><div style={{ fontSize: 9, color: T.tx3, marginTop: 1 }}>{po.po_date ? new Date(po.po_date + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '—'}</div></td>
-                    <td style={S.tdStyle}><div style={{ fontWeight: 600, fontSize: 13, color: T.tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{po.vendor_name}</div>{po.vendor_phone && <div style={{ fontSize: 10, color: T.tx3, fontFamily: T.mono }}>{po.vendor_phone}</div>}</td>
-                    <td style={S.tdStyle}><span style={{ fontSize: 12, color: T.tx2 }}>{PO_TYPE_LABELS[po.po_type] || po.po_type}</span></td>
-                    <td style={S.tdStyle}>{(() => { const il = itemsLabel(po); return (<>
-                      <div style={{ fontSize: 12, fontFamily: T.mono, color: T.tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{il.head}</div>
-                      {il.sub && <div style={{ fontSize: 9, color: T.tx3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{il.sub}</div>}
-                      {po.for_pieces != null && po.for_pieces > 0 && <div style={{ fontSize: 9, color: T.tx3, fontFamily: T.mono, whiteSpace: 'nowrap' }}>for {po.for_pieces} pcs</div>}
-                      {po.lump_sum && <div style={{ fontSize: 9, color: T.tx3, whiteSpace: 'nowrap' }}>lump sum</div>}
-                    </>); })()}</td>
-                    <td style={{ ...S.tdStyle, textAlign: 'right' }}><span style={{ fontSize: 14, fontWeight: 700, fontFamily: T.mono, color: T.tx }}>₹{Number(po.grand_total || 0).toLocaleString('en-IN')}</span></td>
-                    <td style={S.tdStyle}>
-                      {/* The pipeline rail, silent: where this order stands; the share received when goods have arrived. */}
-                      {/* The share sits in a fixed slot, so every row's rail is the same length and the stops line up down the column. */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 4px' }}>
-                        <div style={{ flex: 1 }}><PORail mini state={railState(po, po.purchase_order_items ?? [], null)} /></div>
-                        <span style={{ width: 32, flexShrink: 0, textAlign: 'right', fontSize: 10, color: T.tx3, fontFamily: T.mono }}>{pr.received > 0 || po.status === 'completed' ? `${pr.pct}%` : ''}</span>
-                      </div>
-                    </td>
-                    <td style={{ ...S.tdStyle, textAlign: 'center' }}><StatusPill status={po.status} sc={sc} /><PendingSince po={po} /></td>
-                    <td style={{ ...S.tdStyle, padding: '11px 8px', textAlign: 'right' }}>
-                      <button onClick={e => { e.stopPropagation(); p.onPrint(po); }} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 4, opacity: 0.5 }} title="Print" aria-label="Print">
-                        <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: T.tx2, strokeWidth: 2 }}><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6z" /></svg>
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>}
-
-      {/* Mobile cards */}
-      {phone && !p.loading && p.pos.length > 0 && <div className="mobile-only" style={{ flexDirection: 'column', gap: 6, width: '100%' }}>
-        {shown.map((po, i) => {
-          const sc = p.statusColors[po.status] || p.statusColors.draft;
-          const pr = progress(po);
-          return (
-            <SwipeRow key={po.id} actions={[{ label: 'Print', color: '#3B82F6', onClick: () => p.onPrint(po) }]} hint={i === 0} hintKey="po">
-              <div onClick={() => p.onOpenDetail(po)} style={{ background: 'rgba(255,255,255,0.025)', border: `1px solid ${T.bd2}`, borderRadius: 10, padding: '12px 14px', cursor: 'pointer', width: '100%', boxSizing: 'border-box' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 4 }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{ fontSize: 11, fontFamily: T.mono, color: T.ac2, fontWeight: 600 }}>#{po.po_number}</span>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{po.vendor_name}</div>
-                  </div>
-                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <div style={{ fontSize: 15, fontWeight: 700, fontFamily: T.mono, color: T.tx }}>₹{Number(po.grand_total || 0).toLocaleString('en-IN')}</div>
-                    <div style={{ marginTop: 3 }}><StatusPill status={po.status} sc={sc} /></div>
-                  </div>
-                </div>
-                <div style={{ fontSize: 11, color: T.tx3, display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
-                  <span>{PO_TYPE_LABELS[po.po_type] || po.po_type}</span><span>·</span>
-                  {(() => { const il = itemsLabel(po); return <span style={{ color: T.tx2 }}>{il.head}{il.sub ? ` · ${il.sub}` : ''}</span>; })()}
-                  {po.for_pieces != null && po.for_pieces > 0 && <><span>·</span><span>for {po.for_pieces} pcs</span></>}
-                  {po.lump_sum && <><span>·</span><span>lump sum</span></>}
-                  {po.po_date && <><span>·</span><span>{new Date(po.po_date + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</span></>}
-                  {(po.status === 'partially_received' || po.status === 'completed') && <><span>·</span><span style={{ color: pr.pct >= 100 ? T.gr : T.yl }}>{pr.pct}% received</span></>}
-                  {pendingDays(po) !== null && <><span>·</span><PendingSince po={po} inline /></>}
-                </div>
-                <div style={{ margin: '10px 4px 0' }}><PORail mini state={railState(po, po.purchase_order_items ?? [], null)} /></div>
-              </div>
-            </SwipeRow>
-          );
-        })}
-      </div>}
+      {/* Every order as the Motion Lab card: a grid on a desktop, one column on a phone (swipe for Print). */}
+      {!p.loading && p.pos.length > 0 && (phone
+        ? <div className="mobile-only" style={{ flexDirection: 'column', gap: 10, width: '100%', maxWidth: 640 }}>
+            {shown.map((po, i) => (
+              <SwipeRow key={po.id} actions={[{ label: 'Print', color: '#3B82F6', onClick: () => p.onPrint(po) }]} hint={i === 0} hintKey="po">
+                <POListCard po={po} statusColors={p.statusColors} onOpen={() => p.onOpenDetail(po)} />
+              </SwipeRow>
+            ))}
+          </div>
+        : <div className="po-card-grid">
+            {shown.map(po => <POListCard key={po.id} po={po} statusColors={p.statusColors} onOpen={() => p.onOpenDetail(po)} onPrint={() => p.onPrint(po)} />)}
+          </div>)}
 
       {p.totalPages > 0 && (
         <div className="pager" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10, fontSize: 11 }}>
