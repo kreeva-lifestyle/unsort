@@ -17,6 +17,7 @@ import {
 } from './costingModel';
 import { canonicalizeNames } from './costingNames';
 import { uploadProductPhoto } from './costingThumbs';
+import { untouched, missingFromMaster, componentFor } from './masterIncludes';
 
 export type DocKind = 'sheet' | 'plan' | 'raise';
 type Ask = (o: { title: string; message?: string; confirmLabel?: string; danger?: boolean }) => Promise<boolean>;
@@ -47,6 +48,17 @@ export function useCostingSheet({ product, saved, library, onSaved, addToast, as
   const masterHit = resolveSku(index, p.sku)?.product ?? null;
   const masterPrice = masterHit && masterHit.price_exc_gst != null && Number(masterHit.price_exc_gst) > 0 ? Number(masterHit.price_exc_gst) : null;
   useEffect(() => { if (masterPrice && num(p.selling_price ?? '') !== masterPrice) setP(prev => ({ ...prev, selling_price: masterPrice })); }, [masterPrice, p.selling_price]);
+  // The master sheet's pieces for the SKU (owner: component = INCLUDES). A new
+  // sheet nobody has typed on takes them as its main components, spelled as
+  // the library spells them; one with its own is offered what it lacks.
+  const masterComps = masterHit?.includes ?? [];
+  useEffect(() => {
+    if (saved || masterComps.length === 0) return;
+    setP(prev => (prev.components.every(untouched) ? { ...prev, components: masterComps.map(n => componentFor(library, n)) } : prev));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per resolved SKU
+  }, [masterHit?.sku_norm, saved]);
+  const missingComps = missingFromMaster(p.components, masterComps);
+  const addMasterComp = (name: string) => setP(prev => ({ ...prev, components: [...prev.components, componentFor(library, name)] }));
 
   const patch = (q: Partial<CostingProduct>) => setP(prev => ({ ...prev, ...q }));
   const pcs = Math.floor(num(pieces));
@@ -141,5 +153,6 @@ export function useCostingSheet({ product, saved, library, onSaved, addToast, as
   return {
     p, patch, errors, errVersion, errorComps, saving, deleting, uploading, pieces, setPieces, pcs, total, masterPrice,
     doc, closeDoc: () => setDoc(null), save, openDoc, deleteCosting, uploadImage, patchComp, addComp, removeComp,
+    masterComps, missingComps, addMasterComp,
   };
 }

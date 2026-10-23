@@ -183,3 +183,11 @@ export async function recentJobworkers(limit = 5): Promise<{ list: RecentJobwork
   const rows = (data as { vendor_id: string | null; vendor_name: string; vendor_phone: string | null }[] | null) ?? [];
   return { list: rows.map(r => ({ id: r.vendor_id, name: r.vendor_name, phone: r.vendor_phone ?? '' })), error };
 }
+
+/** The type of the newest job given to this jobworker ('' when none) — fills "Type of job" on a pick. */
+export async function lastJobType(v: { id: string | null; name: string }): Promise<{ type: string; error: unknown }> {
+  let q = supabase.from('jobwork_orders').select('job_type').order('created_at', { ascending: false }).limit(1);
+  q = v.id ? q.eq('vendor_id', v.id) : q.is('vendor_id', null).ilike('vendor_name', v.name.trim().replace(/[%_]/g, '\\$&'));
+  const { data, error } = await q;
+  return { type: String((data as { job_type: string }[] | null)?.[0]?.job_type ?? '').trim(), error };
+}

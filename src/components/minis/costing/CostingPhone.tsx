@@ -10,6 +10,7 @@ import { useBackClose } from '../../../hooks/useBackClose';
 import { CostingLibrary, componentCost, money, selectedSupplier, subProblems } from './costingModel';
 import type { useCostingSheet } from './useCostingSheet';
 import ComponentCard from './ComponentCard';
+import MasterIncludes from './MasterIncludes';
 import CostingPhoneHeader from './CostingPhoneHeader';
 import CostingPhonePricing from './CostingPhonePricing';
 import CostingAttachments from './CostingAttachments';
@@ -77,6 +78,7 @@ export default function CostingPhone({ s, saved, library, topSubs, categories, a
 
       {tab === 'components' && (
         <div>
+          <MasterIncludes sku={p.sku} comps={s.masterComps} missing={s.missingComps} onAdd={n => { const i = p.components.length; s.addMasterComp(n); setOpenComp(i); }} />
           {p.components.map((c, i) => {
             // Red only once a failed Save named this component; before that
             // a half-done component is just quietly incomplete.

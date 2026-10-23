@@ -29,6 +29,8 @@ export interface Product {
   price_exc_gst: number | null;
   price_inc_gst: number | null;
   is_active: boolean;
+  /** The sheet's INCLUDES, parsed: ['LEHENGA', 'BLOUSE', 'DUPATTA'] — a design's components. */
+  includes: string[];
 }
 
 interface Index { all: Product[]; sorted: Product[]; byKey: Map<string, Product> }
@@ -37,7 +39,7 @@ let cache: Index | null = null;
 let inflight: Promise<Index> | null = null;
 
 const buildIndex = (rows: Product[]): Index => {
-  const all = rows.map(r => ({ ...r, sizes: r.sizes || [] }));
+  const all = rows.map(r => ({ ...r, sizes: r.sizes || [], includes: r.includes || [] }));
   const sorted = [...all].sort((a, b) => (a.sku_norm < b.sku_norm ? -1 : a.sku_norm > b.sku_norm ? 1 : 0));
   const byKey = new Map(all.map(p => [p.sku_norm, p]));
   return { all, sorted, byKey };
@@ -60,9 +62,11 @@ const PAGE = 1000;
 // the cached rows immediately, then check a cheap fingerprint and refetch only
 // if it moved (stale-while-revalidate).
 //
-// The v1 suffix is deliberate: bump it and every stale payload is ignored, so a
-// future column change cannot crash on an old shape.
-const CACHE_KEY = 'unsort.product_catalog.v1';
+// The version suffix is deliberate: bump it and every stale payload is
+// ignored, so a column change cannot crash on an old shape. v2 added
+// `includes`; the v1 copy is dropped so it does not sit in storage for good.
+const CACHE_KEY = 'unsort.product_catalog.v2';
+try { localStorage.removeItem('unsort.product_catalog.v1'); } catch { /* disabled storage */ }
 
 // count + newest updated_at catches every real change. An edited row moves
 // max(updated_at) — refresh_product_catalog() only touches rows that actually
@@ -102,7 +106,7 @@ const fetchAll = async (): Promise<Product[]> => {
     // .range() windows can overlap or skip rows entirely.
     const { data, error } = await supabase
       .from('product_catalog')
-      .select('sku, sku_norm, title, catalog, category, size, sizes, price_exc_gst, price_inc_gst, is_active')
+      .select('sku, sku_norm, title, catalog, category, size, sizes, price_exc_gst, price_inc_gst, is_active, includes')
       .order('sku_norm')
       .range(from, from + PAGE - 1);
     if (error) throw error;
