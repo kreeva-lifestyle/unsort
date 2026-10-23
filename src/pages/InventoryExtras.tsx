@@ -10,7 +10,8 @@ import { T, S } from '../lib/theme';
 import { useBackClose } from '../hooks/useBackClose';
 import { useAuth } from '../hooks/useAuth';
 import { useNotifications } from '../hooks/useNotifications';
-import SwipeRow from '../components/ui/SwipeRow';
+import ExtrasTable from '../components/inventory/ExtrasTable';
+import ExtrasCards from '../components/inventory/ExtrasCards';
 import { SkeletonRows } from '../components/ui/Skeleton';
 import Empty from '../components/ui/Empty';
 import SuggestInput from '../components/ui/SuggestInput';
@@ -417,65 +418,13 @@ export default function InventoryExtras() {
 
       {loading && extras.length === 0 && <SkeletonRows rows={6} />}
 
-      {/* Desktop Table */}
+      {/* Desktop table / phone cards (components/inventory) */}
       <div className="inv-extra-desktop" style={{ overflowX: 'auto', borderRadius: 10, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.01)' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead><tr>
-            <th style={th}>SKU</th><th style={th}>Category</th><th style={th}>Component</th>
-            <th style={th}>Size</th><th style={th}>Qty</th><th style={th}>Matches</th><th style={th}>Actions</th>
-          </tr></thead>
-          <tbody>
-            {paged.length === 0 && <tr><td colSpan={7} style={{ padding: 12 }}><Empty icon="search" title="No spare parts found" message="Adjust the filters, or add spare parts to see them here." /></td></tr>}
-            {paged.map(ex => (
-              <tr key={ex.id} style={{ transition: 'background 150ms' }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.02)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                <td style={{ ...td, fontFamily: T.mono, fontSize: 11, color: T.tx }}>{ex.sku}</td>
-                <td style={td}>{ex.product_name}{(() => { const p = products.find(pr => pr.id === ex.product_id); return p?.sku ? <span style={{ marginLeft: 4, fontSize: 9, color: T.tx3, fontFamily: T.mono }}>({p.sku})</span> : null; })()}</td>
-                <td style={td}>{ex.component_name}</td>
-                <td style={td}>{ex.size}</td>
-                <td style={{ ...td, fontWeight: 600, color: ex.quantity > 0 ? T.gr : T.re }}>{ex.quantity}{ex.quantity < 1 && <span style={{ marginLeft: 6, padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 700, textTransform: 'uppercase', background: 'oklch(0.63 0.22 25 / .10)', color: T.re }}>Out of stock</span>}</td>
-                <td style={td}>
-                  {(matchCounts[ex.id] || 0) > 0 ? (
-                    <button onClick={() => loadMatches(ex)} style={{ color: T.yl, cursor: 'pointer', fontSize: 11, fontWeight: 600, background: 'none', border: 'none', padding: 0, fontFamily: T.sans }} title="View matching items" aria-label={`${matchCounts[ex.id]} match${matchCounts[ex.id] > 1 ? 'es' : ''}`}>
-                      {matchCounts[ex.id]} match{matchCounts[ex.id] > 1 ? 'es' : ''}
-                    </button>
-                  ) : <span style={{ color: T.tx3, fontSize: 10 }}>--</span>}
-                </td>
-                <td style={{ ...td, whiteSpace: 'nowrap' }}>
-                  {canEdit ? <><button onClick={() => openEdit(ex)} style={{ ...S.btnGhost, ...S.btnSm }} title="Edit spare part" aria-label="Edit spare part">Edit</button>{' '}
-                  <button onClick={() => { setAdjustExtra(ex); setAdjustMode('add'); }} style={{ ...S.btnSuccess, ...S.btnSm }} title="Add quantity" aria-label="Add quantity">Add</button>{' '}
-                  <button onClick={() => { setAdjustExtra(ex); setAdjustMode('remove'); }} style={{ ...S.btnDanger, ...S.btnSm }} title="Remove quantity" aria-label="Remove quantity">Remove</button></> : <span style={{ color: T.tx3, fontSize: 10 }}>--</span>}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <ExtrasTable rows={paged} canEdit={!!canEdit} matchCounts={matchCounts} catSku={id => products.find(pr => pr.id === id)?.sku || undefined}
+          onMatches={loadMatches} onEdit={openEdit} onAdjust={(ex, mode) => { setAdjustExtra(ex); setAdjustMode(mode); }} />
       </div>
-
-      {/* Mobile card view */}
       <div className="inv-extra-mobile">
-        {paged.length === 0 && <Empty icon="search" title="No spare parts found" message="Adjust the filters, or add spare parts to see them here." />}
-        {paged.map((ex, idx) => (
-          <SwipeRow key={ex.id} hint={idx === 0 && !!canEdit} hintKey="spare-parts" actions={canEdit ? [
-            { label: 'Edit', color: '#6366F1', onClick: () => openEdit(ex) },
-            { label: 'Add', color: '#22C55E', onClick: () => { setAdjustExtra(ex); setAdjustMode('add'); } },
-            { label: 'Remove', color: '#EF4444', onClick: () => { setAdjustExtra(ex); setAdjustMode('remove'); } },
-          ] : []}>
-            <div style={{ padding: '12px 14px', borderBottom: `1px solid ${T.bd}` }} onClick={() => (matchCounts[ex.id] || 0) > 0 ? loadMatches(ex) : undefined}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontFamily: T.mono, fontSize: 11, color: T.ac2, fontWeight: 600 }}>{ex.sku}</div>
-                  <div style={{ fontSize: 12, fontWeight: 500, color: T.tx, marginTop: 2 }}>{ex.product_name} · {ex.component_name}</div>
-                  <div style={{ fontSize: 11, color: T.tx3, marginTop: 2 }}>{ex.size || '—'}</div>
-                </div>
-                <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, fontFamily: T.mono, color: ex.quantity > 0 ? T.gr : T.re }}>{ex.quantity}</div>
-                  {ex.quantity < 1 && <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', color: T.re, marginTop: 2 }}>Out of stock</div>}
-                  {(matchCounts[ex.id] || 0) > 0 && <div style={{ fontSize: 10, color: T.yl, fontWeight: 600, marginTop: 2 }}>{matchCounts[ex.id]} match{matchCounts[ex.id] > 1 ? 'es' : ''}</div>}
-                </div>
-              </div>
-            </div>
-          </SwipeRow>
-        ))}
+        <ExtrasCards rows={paged} canEdit={!!canEdit} matchCounts={matchCounts} onMatches={loadMatches} onEdit={openEdit} onAdjust={(ex, mode) => { setAdjustExtra(ex); setAdjustMode(mode); }} />
       </div>
 
       {extras.length === EXTRAS_LIMIT && <div style={{ fontSize: 11, color: T.yl, padding: '8px 14px', background: 'oklch(0.78 0.18 75 / .06)', border: '1px solid oklch(0.78 0.18 75 / .15)', borderRadius: 6, marginTop: 8, textAlign: 'center' }}>Showing first {EXTRAS_LIMIT} items. Use search to find more.</div>}

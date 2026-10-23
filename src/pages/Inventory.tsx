@@ -3,8 +3,10 @@ import React, { useState, useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import JsBarcode from 'jsbarcode';
 import { supabase } from '../lib/supabase';
-import { T, S, Icon } from '../lib/theme';
-import SwipeRow from '../components/ui/SwipeRow';
+import { T, S } from '../lib/theme';
+import InventoryTable from '../components/inventory/InventoryTable';
+import InventoryCards from '../components/inventory/InventoryCards';
+import { STATUS_DOT_COLOR, statusTag } from '../components/inventory/invStatus';
 import { friendlyError } from '../lib/friendlyError';
 import { safeHref } from '../lib/safeHref';
 import { useAuth } from '../hooks/useAuth';
@@ -21,26 +23,6 @@ import { SkeletonRows } from '../components/ui/Skeleton';
 import ConfirmModal, { useConfirm } from '../components/ui/ConfirmModal';
 import ActionSheet from '../components/ui/ActionSheet';
 import SuggestInput from '../components/ui/SuggestInput';
-
-// Status indicator — dot + plain label. Previous pills-with-bg were noisy in the
-// list view per audit P2; reserve pill treatment for modals.
-const STATUS_DOT_COLOR: Record<string, string> = {
-  completed: T.gr,
-  complete: T.gr,
-  damaged: T.re,
-  unsorted: T.yl,
-  dry_clean: T.bl,
-};
-const statusTag = (status: string) => ({
-  display: 'inline-flex' as const,
-  alignItems: 'center' as const,
-  gap: 6,
-  padding: '2px 0',
-  fontSize: 11,
-  fontWeight: 500,
-  color: STATUS_DOT_COLOR[status] || STATUS_DOT_COLOR.unsorted,
-});
-
 
 const MARKETPLACES = ['Myntra-Fusionic', 'Ajio-Fusionic', 'Tanuka', 'Svaraa', 'Amazon'];
 const SIZES = ['N/A', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'Semi-Stitched'];
@@ -111,8 +93,6 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
   const [showIntel, setShowIntel] = useState(false);
   const [showMoreFields, setShowMoreFields] = useState(false);
   const [quickStatusItem, setQuickStatusItem] = useState<string | null>(null);
-  const longPressTimer = useRef<ReturnType<typeof setTimeout>>();
-  const longPressed = useRef(false); // swallow the click that follows a long-press
   const [intelResults, setIntelResults] = useState<any[]>([]);
   const [showExtras, setShowExtras] = useState(false);
   const [exportPdfHtml, setExportPdfHtml] = useState<string | null>(null);
@@ -898,97 +878,17 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
       })()}
       {loading && items.length === 0 && <SkeletonRows rows={6} />}
       <div style={{ background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden', display: loading && items.length === 0 ? 'none' : undefined }}>
-        {/* Desktop table */}
+        {/* Desktop table / phone cards (components/inventory) */}
         <div className="inv-desktop">
-        <div className="table-wrap">
-        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 880 }}>
-          <thead><tr>
-            {canEdit && <th style={{ ...S.thStyle, width: 32, paddingLeft: 10, paddingRight: 4 }}>
-              <input
-                type="checkbox"
-                checked={paged.length > 0 && paged.every(i => selectedIds.has(i.id))}
-                onChange={e => {
-                  const next = new Set(selectedIds);
-                  if (e.target.checked) paged.forEach(i => next.add(i.id));
-                  else paged.forEach(i => next.delete(i.id));
-                  setSelectedIds(next);
-                }}
-                title="Select all on page"
-                style={{ cursor: 'pointer' }}
-              />
-            </th>}
-            {['Unique ID', 'SKU', 'Category', 'Size', 'Age', 'Tags', 'Notes', 'Status', 'Issues', 'Actions'].map((h) => <th key={h} style={S.thStyle}>{h}</th>)}
-          </tr></thead>
-          <tbody>{paged.map((item) => {
-            const missing = itemMissing[item.id] || [];
-            const damaged = itemDamaged[item.id] || [];
-            return (<tr key={item.id} id={'row-' + item.id} style={{ transition: 'background .2s', background: selectedIds.has(item.id) ? 'oklch(0.55 0.22 265 / .10)' : highlightId === item.id ? 'oklch(0.55 0.22 265 / .08)' : 'transparent' }} onMouseEnter={e => { if (highlightId !== item.id && !selectedIds.has(item.id)) e.currentTarget.style.background = 'rgba(255,255,255,.015)'; }} onMouseLeave={e => { if (highlightId !== item.id && !selectedIds.has(item.id)) e.currentTarget.style.background = 'transparent'; }}>
-            {canEdit && <td style={{ ...S.tdStyle, width: 32, paddingLeft: 10, paddingRight: 4 }}>
-              <input
-                type="checkbox"
-                checked={selectedIds.has(item.id)}
-                onClick={e => e.stopPropagation()}
-                onChange={e => {
-                  const next = new Set(selectedIds);
-                  if (e.target.checked) next.add(item.id); else next.delete(item.id);
-                  setSelectedIds(next);
-                }}
-                style={{ cursor: 'pointer' }}
-              />
-            </td>}
-            <td style={{ ...S.tdStyle, fontFamily: T.mono, fontSize: 10, whiteSpace: 'nowrap' }}><span style={{ color: T.gr }}>{item.batch_number || '—'}</span>{isCompletedView && item.paired_with && (() => { const pair = items.find(p => p.id === item.paired_with); return pair ? <button onClick={() => scrollToPair(item.paired_with)} style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 2, cursor: 'pointer', background: 'none', border: 'none', padding: 0 }} title="Click to find paired item" aria-label="Scroll to paired item"><svg viewBox="0 0 24 24" style={{ width: 9, height: 9, fill: 'none', stroke: T.ac2, strokeWidth: 2, flexShrink: 0 }}><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" /></svg><span style={{ fontSize: 9, color: T.ac2 }}>{pair.batch_number}</span></button> : null; })()}</td>
-            <td title={item.serial_number || ''} style={{ ...S.tdStyle, fontFamily: T.mono, color: T.ac2, fontSize: 10 }}>{item.serial_number || '—'}{safeHref(item.link) && <a href={safeHref(item.link)} target="_blank" rel="noopener noreferrer" style={{ marginLeft: 4, color: T.bl, verticalAlign: 'middle' }}><Icon name="link" size={10} /></a>}</td>
-            <td title={item.products?.name || ''} style={{ ...S.tdStyle, fontSize: 11 }}><span style={{ fontWeight: 500 }}>{item.products?.name}</span></td>
-            <td style={{ ...S.tdStyle, fontSize: 10, fontWeight: 500 }}>{item.size || '—'}</td>
-            <td style={S.tdStyle}>{item.created_at && (() => { const d = Math.floor((Date.now() - new Date(item.created_at).getTime()) / 86400000); return <span style={{ fontSize: 10, fontWeight: 600, color: d > 30 ? T.re : d > 14 ? T.yl : T.tx3 }}>{new Date(item.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })} · {d}d</span>; })()}</td>
-            <td style={S.tdStyle}><div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>{(itemTags[item.id] || []).map((t: any) => t && <span key={t.id} style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, background: 'oklch(0.55 0.22 265 / .10)', color: T.ac2 }}>{t.name}</span>)}{(itemTags[item.id] || []).length === 0 && <span style={{ color: T.tx3, fontSize: 10 }}>—</span>}</div></td>
-            <td style={{ ...S.tdStyle, fontSize: 11, maxWidth: 140 }}>{item.notes ? <button onClick={() => setExpandedNote(expandedNote === item.id ? null : item.id)} style={{ color: T.tx2, cursor: 'pointer', background: 'none', border: 'none', padding: 0, fontSize: 'inherit', fontFamily: 'inherit', textAlign: 'left' }} title="Toggle notes" aria-label="Toggle notes">{expandedNote === item.id ? item.notes : item.notes.length > 25 ? item.notes.slice(0, 25) + '...' : item.notes}</button> : <span style={{ color: T.tx3 }}>—</span>}</td>
-
-            <td style={S.tdStyle}><span style={statusTag(item.status)}><span style={{ width: 8, height: 8, borderRadius: '50%', background: 'currentColor', boxShadow: `0 0 4px currentColor`, flexShrink: 0 }} /><span style={{ textTransform: 'capitalize' }}>{item.status === 'dry_clean' ? 'Dry Clean' : item.status}</span></span></td>
-            <td style={S.tdStyle}>{(missing.length > 0 || damaged.length > 0) ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>{missing.map((name, i) => <span key={'m'+i} style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, background: 'oklch(0.78 0.18 75 / .08)', color: T.yl }}>Missing: {name}</span>)}{damaged.map((name, i) => <span key={'d'+i} style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, background: 'rgba(248,113,113,.08)', color: T.re }}>Damaged: {name}</span>)}</div> : <span style={{ color: T.tx3, fontSize: 10 }}>{item.status === 'completed' ? 'All good' : '—'}</span>}</td>
-            <td style={S.tdStyle}>
-              <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-                <button onClick={() => openComps(item)} style={{ ...S.btnPrimary, ...S.btnSm }}>View</button>
-                {!isCompletedView && item.status !== 'dry_clean' && completablePairs[item.id]?.length > 0 && <button onClick={() => setShowCompleteModal({ itemId: item.id })} style={{ ...S.btnSm, padding: '4px 10px', borderRadius: 5, border: 'none', cursor: 'pointer', fontSize: 10, fontWeight: 600, fontFamily: T.sans, background: 'oklch(0.72 0.19 145 / .12)', color: T.gr, display: 'inline-flex', alignItems: 'center', gap: 3, whiteSpace: 'nowrap' as const }}>Complete ({completablePairs[item.id].length})</button>}
-                {isCompletedView && canEdit && <button onClick={async () => { if (await ask({ title: item.paired_with ? 'Revert paired items?' : 'Revert this item?', message: item.paired_with ? 'This will revert BOTH paired items back to Inventory.' : 'This item will return to Inventory.', confirmLabel: 'Revert', danger: true })) handleCancelCompletion(item.id); }} style={{ ...S.btnSm, padding: '4px 10px', borderRadius: 5, border: '1px solid oklch(0.78 0.18 75 / .15)', cursor: 'pointer', fontSize: 10, fontWeight: 600, fontFamily: T.sans, background: 'oklch(0.78 0.18 75 / .05)', color: T.yl, display: 'inline-flex', alignItems: 'center', whiteSpace: 'nowrap' as const, pointerEvents: revertingId ? 'none' as const : 'auto' as const, opacity: revertingId === item.id ? 0.6 : 1 }}>{revertingId === item.id ? 'Reverting…' : `Revert${item.paired_with ? ' Both' : ''}`}</button>}
-                {canEdit && <button onClick={() => openEdit(item)} style={{ ...S.btnGhost, ...S.btnSm }}>Edit</button>}
-                {canEdit && <button onClick={() => handleDelete(item.id)} style={{ ...S.btnDanger, ...S.btnSm }}>Del</button>}
-              </div>
-            </td>
-          </tr>);})}</tbody>
-        </table>
+          <InventoryTable rows={paged} items={items} canEdit={canEdit} isCompletedView={isCompletedView} selectedIds={selectedIds} onSelect={setSelectedIds}
+            highlightId={highlightId} itemMissing={itemMissing} itemDamaged={itemDamaged} itemTags={itemTags} expandedNote={expandedNote} onToggleNote={setExpandedNote}
+            completablePairs={completablePairs} revertingId={revertingId} onView={openComps} onEdit={openEdit} onDelete={handleDelete}
+            onComplete={id => setShowCompleteModal({ itemId: id })} onScrollToPair={scrollToPair}
+            onRevert={async item => { if (await ask({ title: item.paired_with ? 'Revert paired items?' : 'Revert this item?', message: item.paired_with ? 'This will revert BOTH paired items back to Inventory.' : 'This item will return to Inventory.', confirmLabel: 'Revert', danger: true })) handleCancelCompletion(item.id); }} />
         </div>
-        </div>
-        {/* Mobile card view */}
         <div className="inv-mobile">
-          {paged.map((item, idx) => {
-            const missing = itemMissing[item.id] || [];
-            const damaged = itemDamaged[item.id] || [];
-            const swipeActions = [
-              { label: 'View', color: '#6366F1', onClick: () => openComps(item) },
-              ...(canEdit ? [{ label: 'Edit', color: '#3B82F6', onClick: () => openEdit(item) }] : []),
-              ...(canEdit ? [{ label: 'Del', color: '#EF4444', onClick: () => handleDelete(item.id) }] : []),
-            ];
-            return (
-              <SwipeRow key={item.id} actions={swipeActions} hint={idx === 0} hintKey="inventory">
-              <div style={{ padding: '12px 14px', borderBottom: `1px solid ${T.bd}`, borderLeft: `3px solid ${STATUS_DOT_COLOR[item.status] || T.yl}`, display: 'flex', flexDirection: 'column', gap: 6, position: 'relative', WebkitUserSelect: 'none', userSelect: 'none', cursor: 'pointer' }}
-                onClick={() => { if (longPressed.current) { longPressed.current = false; return; } openComps(item); }}
-                onTouchStart={() => { longPressed.current = false; if (!canEdit || item.status === 'completed') return; longPressTimer.current = setTimeout(() => { try { navigator.vibrate?.(15); } catch {} longPressed.current = true; setQuickStatusItem(item.id); }, 500); }}
-                onTouchEnd={() => clearTimeout(longPressTimer.current)}
-                onTouchMove={() => clearTimeout(longPressTimer.current)}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontFamily: T.mono, fontSize: 11, color: T.ac2, fontWeight: 600 }}>{item.serial_number || '—'}</div>
-                    <div style={{ fontSize: 13, fontWeight: 500, color: T.tx, marginTop: 2 }}>{item.products?.name || '—'}</div>
-                    <div style={{ fontSize: 11, color: T.tx3, marginTop: 2 }}>{item.size || '—'} · {item.location || '—'}{item.created_at && (() => { const d = Math.floor((Date.now() - new Date(item.created_at).getTime()) / 86400000); const dt = new Date(item.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }); return <><span> · {dt}</span>{d > 0 ? <span style={{ marginLeft: 6, padding: '1px 5px', borderRadius: 4, fontSize: 9, fontWeight: 600, background: d > 30 ? 'oklch(0.63 0.22 25 / .1)' : d > 14 ? 'oklch(0.78 0.18 75 / .1)' : 'rgba(255,255,255,.04)', color: d > 30 ? T.re : d > 14 ? T.yl : T.tx3 }}>{d}d</span> : null}</>; })()}</div>
-                  </div>
-                  <span style={statusTag(item.status)}><span style={{ width: 7, height: 7, borderRadius: '50%', background: 'currentColor', boxShadow: '0 0 4px currentColor', flexShrink: 0 }} /><span style={{ textTransform: 'capitalize', fontSize: 10 }}>{item.status === 'dry_clean' ? 'Dry Clean' : item.status}</span></span>
-                </div>
-                {(missing.length > 0 || damaged.length > 0) && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>{missing.map((name, i) => <span key={'m'+i} style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, background: 'oklch(0.78 0.18 75 / .08)', color: T.yl }}>Missing: {name}</span>)}{damaged.map((name, i) => <span key={'d'+i} style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, background: 'rgba(248,113,113,.08)', color: T.re }}>Damaged: {name}</span>)}</div>}
-              </div>
-              </SwipeRow>
-            );
-          })}
+          <InventoryCards rows={paged} canEdit={canEdit} isCompletedView={isCompletedView} itemMissing={itemMissing} itemDamaged={itemDamaged}
+            onView={openComps} onEdit={openEdit} onDelete={handleDelete} onQuickStatus={setQuickStatusItem} />
         </div>
         {/* Long-press quick status. Rendered OUTSIDE the SwipeRow (its transform
             + overflow:hidden would clip a position:fixed menu inside a card). */}
