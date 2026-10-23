@@ -20,7 +20,7 @@ export default function ExtrasCards({ rows, canEdit, matchCounts, onMatches, onE
           { label: 'Remove', color: '#EF4444', onClick: () => onAdjust(ex, 'remove') },
         ] : []}>
           <div role={n > 0 ? 'button' : undefined} onClick={() => (n > 0 ? onMatches(ex) : undefined)}
-            style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '12px 14px', borderBottom: `1px solid ${T.bd}`, cursor: n > 0 ? 'pointer' : 'default' }}>
+            className="jw-card" style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '12px 14px', marginBottom: 8, borderRadius: T.rLg, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.02)', cursor: n > 0 ? 'pointer' : 'default', transition: 'border-color .15s, background .15s' }}>
             <SkuThumb sku={ex.sku} size={56} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontFamily: T.mono, fontSize: 14, fontWeight: 700, color: T.tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ex.sku}</div>

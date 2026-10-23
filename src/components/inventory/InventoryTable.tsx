@@ -1,7 +1,8 @@
 // Desktop inventory list, in the Jobwork style: one row per item with the
 // SKU's photo, the SKU first (unique ID and category under it), then size,
 // age, tags, notes, a dot status, the missing/damaged chips and the actions.
-// Phones use InventoryCards (index.css swaps .inv-desktop / .inv-mobile).
+// The page puts it in the Jobwork frame (rounded box, horizontal scroll);
+// phones use InventoryCards (index.css swaps .inv-desktop / .inv-mobile).
 import { T, S, Icon } from '../../lib/theme';
 import { safeHref } from '../../lib/safeHref';
 import SkuThumb from '../ui/SkuThumb';
@@ -24,7 +25,6 @@ export default function InventoryTable({ rows, items, canEdit, isCompletedView, 
   const toggle = (id: string, on: boolean) => { const next = new Set(selectedIds); if (on) next.add(id); else next.delete(id); onSelect(next); };
   const toggleAll = (on: boolean) => { const next = new Set(selectedIds); rows.forEach(i => (on ? next.add(i.id) : next.delete(i.id))); onSelect(next); };
   return (
-    <div className="table-wrap">
       <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 940 }}>
         <thead><tr>
           {canEdit && <th style={{ ...S.thStyle, width: 32, paddingLeft: 10, paddingRight: 4 }}>
@@ -83,6 +83,5 @@ export default function InventoryTable({ rows, items, canEdit, isCompletedView, 
           );
         })}</tbody>
       </table>
-    </div>
   );
 }
