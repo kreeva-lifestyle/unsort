@@ -11,7 +11,7 @@ import { friendlyError } from '../../lib/friendlyError';
 import { numericKeyDown } from '../../lib/numericInput';
 import { useModalLock } from '../../hooks/useModalLock';
 import { useBackClose } from '../../hooks/useBackClose';
-import VendorPicker from '../purchaseorders/VendorPicker';
+import JobworkerField from './JobworkerField';
 import SkuInput from '../ui/SkuInput';
 import SuggestInput from '../ui/SuggestInput';
 import DateInput from '../ui/DateInput';
@@ -132,7 +132,7 @@ export default function JobForm({ edit, draft = null, prefill = null, onClose, o
           // Enter saves from the number fields only — in the suggestion boxes
           // (jobworker, SKU, job type) Enter picks the highlighted entry.
           onKeyDown={e => { if (e.key === 'Enter' && (e.target as HTMLInputElement).type === 'number') { e.preventDefault(); submit(); } }}>
-          {field('Jobworker', true, <VendorPicker value={d.vendor_name} phone={d.vendor_phone} addToast={addToast}
+          {field('Jobworker', true, <JobworkerField name={d.vendor_name} phone={d.vendor_phone} vendorId={d.vendor_id} recent={!j} addToast={addToast}
             onPick={v => patch({ vendor_id: v.id, vendor_name: v.name, vendor_phone: v.phone })} />)}
           <div className="two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             {field('SKU', true, <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>

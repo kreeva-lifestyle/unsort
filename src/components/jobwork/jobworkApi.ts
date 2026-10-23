@@ -175,3 +175,11 @@ export async function costingImage(id: string | null): Promise<{ url: string | n
   const { data, error } = await supabase.from('costing_products').select('image_url').eq('id', id).maybeSingle();
   return { url: (data as { image_url: string | null } | null)?.image_url ?? null, error };
 }
+
+export interface RecentJobworker { id: string | null; name: string; phone: string }
+/** The last jobworkers given work, newest first, one per name (recent_jobworkers) — the New job form's chips. */
+export async function recentJobworkers(limit = 5): Promise<{ list: RecentJobworker[]; error: unknown }> {
+  const { data, error } = await supabase.rpc('recent_jobworkers', { p_limit: limit });
+  const rows = (data as { vendor_id: string | null; vendor_name: string; vendor_phone: string | null }[] | null) ?? [];
+  return { list: rows.map(r => ({ id: r.vendor_id, name: r.vendor_name, phone: r.vendor_phone ?? '' })), error };
+}
