@@ -732,21 +732,11 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
   };
 
   return (
-    <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
-      {/* Stage toggle + subtitle (Brand Tags aesthetic) */}
-      <div className="inv-top-actions" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, gap: 12, flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {!showExtras && <div role="tablist" aria-label="Inventory" style={{ display: 'flex', gap: 6 }}>
-            {(['pending', 'completed'] as const).map(s => { const on = stage === s; return (
-              <button key={s} type="button" role="tab" aria-selected={on} onClick={() => { if (on) return; setStage(s); setPage(0); }}
-                style={{ ...(on ? S.btnPrimary : S.btnGhost), minHeight: 44, minWidth: 120, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                {{ pending: 'Active', completed: 'Completed' }[s]}
-                {on && <span style={{ fontFamily: T.mono, fontSize: 11, padding: '1px 7px', borderRadius: 999, background: 'rgba(255,255,255,.18)', color: T.tx }}>{filtered.length}</span>}
-              </button>); })}
-          </div>}
-          {!showExtras && <div style={{ fontSize: 12, color: T.tx3 }}>{filtered.length !== items.filter(i => isCompletedView ? i.status === 'completed' : i.status !== 'completed').length ? `${filtered.length} of ` : ''}{filtered.length} item{filtered.length === 1 ? '' : 's'} · {isCompletedView ? 'completed batches' : 'active SKUs by status'}</div>}
-        </div>
-        <div className="inv-action-btns" style={{ display: 'flex', gap: 5 }}>
+    <div className={`page-pad${canEdit && !isCompletedView && !showExtras ? ' has-fab' : ''}`} style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
+      {/* Same frame as Jobwork: one quiet line + the actions, then the stage tabs full width. */}
+      {!showExtras && <div className="inv-top-actions" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, gap: 12 }}>
+        <div style={{ fontSize: 12, color: T.tx3, minWidth: 0 }}>{filtered.length !== items.filter(i => isCompletedView ? i.status === 'completed' : i.status !== 'completed').length ? `${filtered.length} of ` : ''}{filtered.length} item{filtered.length === 1 ? '' : 's'} · {isCompletedView ? 'completed batches' : 'active SKUs by status'}</div>
+        <div className="inv-action-btns" style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
           {!showExtras && canEdit && !isCompletedView && <button onClick={() => { resetForm(); setShowModal(true); }} style={{ ...S.btnPrimary, border: 'none' }} className="desktop-only">+ Add Item</button>}
           {!showExtras && <div style={{ position: 'relative' }}>
             <button onClick={() => setShowExportMenu(v => !v)} style={S.btnGhost} title="Export options" aria-label="Export options">Export ▾</button>
@@ -780,7 +770,15 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
             </div></>}
           </div>}
         </div>
-      </div>
+      </div>}
+      {!showExtras && <div role="tablist" aria-label="Inventory" style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+        {(['pending', 'completed'] as const).map(s => { const on = stage === s; return (
+          <button key={s} type="button" role="tab" aria-selected={on} onClick={() => { if (on) return; setStage(s); setPage(0); }}
+            style={{ ...(on ? S.btnPrimary : S.btnGhost), flex: 1, maxWidth: 220, minHeight: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+            {{ pending: 'Active', completed: 'Completed' }[s]}
+            {on && <span style={{ fontFamily: T.mono, fontSize: 11, padding: '1px 7px', borderRadius: 999, background: 'rgba(255,255,255,.18)', color: T.tx }}>{filtered.length}</span>}
+          </button>); })}
+      </div>}
       {showExtras && canAccessModule(profile?.role, 'extras', profile?.module_access) ? <><div style={{ marginBottom: 10 }}><button onClick={() => { setShowExtras(false); }} style={S.btnGhost}>← Back to Inventory</button></div><InventoryExtras /></> : <>
       {/* Search + preset chips + Filters popover — the Jobwork toolbar */}
       <div className="filter-bar" style={{ marginBottom: activeFilterCount > 0 ? 10 : 12, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
@@ -790,14 +788,9 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search SKU, product, notes…" aria-label="Search inventory" style={{ ...S.fSearch, width: '100%' }} />
         </div>
 
-        {/* Preset chips */}
-        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-          {PRESETS.filter(p => isCompletedView ? p.id === 'all' : true).map(p => (
-            <button key={p.id} type="button" onClick={() => applyPreset(p)} aria-pressed={preset === p.id} style={listChip(preset === p.id)}>{p.label}</button>
-          ))}
-        </div>
-
-        {/* Filters button with multi-select popover */}
+        {/* Filters first, then the preset chips — one line, scrolling sideways on a phone */}
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+        {/* Filters button with multi-select popover — on the chips line */}
         <div style={{ position: 'relative' }}>
           <button type="button" onClick={() => setShowFiltersPopover(v => !v)} style={{ ...listChip(showFiltersPopover || activeFilterCount > 0), display: 'inline-flex', alignItems: 'center', gap: 7 }}>
             <svg viewBox="0 0 24 24" style={{ width: 13, height: 13, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8 }}><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" /></svg>
@@ -852,6 +845,11 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
               </div>
             </div>
           </>)}
+        </div>
+          {PRESETS.filter(p => isCompletedView ? p.id === 'all' : true).map(p => (
+            <button key={p.id} type="button" onClick={() => applyPreset(p)} aria-pressed={preset === p.id} style={listChip(preset === p.id)}>{p.label}</button>
+          ))}
+
         </div>
       </div>
 
