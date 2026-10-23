@@ -1,7 +1,8 @@
 // The job form's Jobworker field: the vendor picker and, on a new job, the
 // last 5 jobworkers given work as one-tap chips under it (owner's ask) —
-// newest first, one per name (recent_jobworkers). A tap fills the jobworker
-// exactly as picking it from the suggestions does; the one picked is lit.
+// newest first, a typed name resolved to the vendor master (recent_jobworkers).
+// A tap fills the jobworker as picking it from the suggestions does; the one
+// picked is lit.
 import { useEffect, useState } from 'react';
 import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
@@ -28,6 +29,8 @@ export default function JobworkerField({ name, phone, vendorId, recent, onPick, 
   }, [recent, addToast]);
 
   const isOn = (w: RecentJobworker) => (w.id ? w.id === vendorId : !vendorId && w.name.toLowerCase() === name.trim().toLowerCase());
+  // Two vendors with one name (the master allows it with different phones): the phone's last digits tell them apart.
+  const label = (w: RecentJobworker) => (w.phone && list.filter(x => x.name.toLowerCase() === w.name.toLowerCase()).length > 1 ? `${w.name} · ${w.phone.slice(-4)}` : w.name);
   return (
     <div>
       <VendorPicker value={name} phone={phone} addToast={addToast} onPick={onPick} />
@@ -40,7 +43,7 @@ export default function JobworkerField({ name, phone, vendorId, recent, onPick, 
               <button key={`${w.id ?? ''}:${w.name}`} type="button" className="touch44" aria-pressed={on} title={w.phone ? `${w.name} · ${w.phone}` : w.name}
                 onClick={() => onPick(w)}
                 style={{ ...S.btnGhost, ...S.btnSm, minHeight: 32, maxWidth: 180, borderRadius: 999, padding: '5px 12px', fontSize: 11, ...(on ? { borderColor: T.ac, color: T.ac2, background: T.ac3 } : {}) }}>
-                <span style={{ display: 'block', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w.name}</span>
+                <span style={{ display: 'block', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label(w)}</span>
               </button>
             );
           })}

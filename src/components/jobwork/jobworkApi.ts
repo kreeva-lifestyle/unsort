@@ -177,7 +177,7 @@ export async function costingImage(id: string | null): Promise<{ url: string | n
 }
 
 export interface RecentJobworker { id: string | null; name: string; phone: string }
-/** The last jobworkers given work, newest first, one per name (recent_jobworkers) — the New job form's chips. */
+/** The last jobworkers given work, newest first, typed names resolved to the vendor master (recent_jobworkers) — the New job form's chips. */
 export async function recentJobworkers(limit = 5): Promise<{ list: RecentJobworker[]; error: unknown }> {
   const { data, error } = await supabase.rpc('recent_jobworkers', { p_limit: limit });
   const rows = (data as { vendor_id: string | null; vendor_name: string; vendor_phone: string | null }[] | null) ?? [];
