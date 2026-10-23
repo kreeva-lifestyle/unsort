@@ -1,4 +1,4 @@
-// Phone inventory list, in the Jobwork card style: the SKU's photo, the SKU
+// Phone inventory list, in the Jobwork card style (one card per item): the SKU's photo, the SKU
 // first with its unique ID, category · size · location, the age, a dot
 // status, the missing/damaged chips. Tap opens the item; swipe reveals
 // View / Edit / Del; a long press (editors, not on completed items) opens
@@ -23,7 +23,7 @@ export default function InventoryCards({ rows, canEdit, itemMissing, itemDamaged
       ];
       return (
         <SwipeRow key={item.id} actions={actions} hint={idx === 0} hintKey="inventory">
-          <div role="button" style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '12px 14px', borderBottom: `1px solid ${T.bd}`, borderLeft: `3px solid ${STATUS_DOT_COLOR[item.status] || T.yl}`, cursor: 'pointer', WebkitUserSelect: 'none', userSelect: 'none' }}
+          <div role="button" className="jw-card" style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '12px 14px', marginBottom: 8, borderRadius: T.rLg, border: `1px solid ${T.bd}`, borderLeft: `3px solid ${STATUS_DOT_COLOR[item.status] || T.yl}`, background: 'rgba(255,255,255,0.02)', cursor: 'pointer', WebkitUserSelect: 'none', userSelect: 'none', transition: 'border-color .15s, background .15s' }}
             onClick={() => { if (longPressed.current) { longPressed.current = false; return; } onView(item); }}
             onTouchStart={() => { longPressed.current = false; if (!canEdit || item.status === 'completed') return; timer.current = setTimeout(() => { try { navigator.vibrate?.(15); } catch { /* not supported */ } longPressed.current = true; onQuickStatus(item.id); }, 500); }}
             onTouchEnd={() => clearTimeout(timer.current)} onTouchMove={() => clearTimeout(timer.current)}>

@@ -722,6 +722,8 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
   const paged = filtered.slice(page * perPage, (page + 1) * perPage);
   useEffect(() => { setPage(0); }, [filters, search, stage]);
 
+  // The Jobwork list's chip, for the presets and the Filters button.
+  const listChip = (on: boolean): React.CSSProperties => ({ ...S.btnGhost, ...S.btnSm, minHeight: 32, borderRadius: 999, padding: '5px 14px', fontSize: 11, flexShrink: 0, ...(on ? { borderColor: T.ac, color: T.ac2, background: T.ac3 } : {}) });
   const scrollToPair = (pairId: string) => {
     setHighlightId(pairId);
     const el = document.getElementById('row-' + pairId);
@@ -734,10 +736,13 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
       {/* Stage toggle + subtitle (Brand Tags aesthetic) */}
       <div className="inv-top-actions" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, gap: 12, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {!showExtras && <div className="inv-stage-toggle" style={{ display: 'flex', background: 'rgba(255,255,255,0.02)', borderRadius: 6, padding: 2, border: `1px solid ${T.bd}`, width: 'fit-content' }}>
-            {(['pending', 'completed'] as const).map(s => (
-              <button key={s} onClick={() => { setStage(s); setPage(0); }} style={{ padding: '5px 14px', borderRadius: 6, fontSize: 11, fontWeight: stage === s ? 600 : 400, cursor: 'pointer', background: stage === s ? `linear-gradient(135deg, ${T.ac87}, ${T.ac2cc})` : 'transparent', color: stage === s ? '#fff' : T.tx3, transition: 'all .15s', border: 'none', fontFamily: T.sans }}>{{ pending: 'Active', completed: 'Completed' }[s]}</button>
-            ))}
+          {!showExtras && <div role="tablist" aria-label="Inventory" style={{ display: 'flex', gap: 6 }}>
+            {(['pending', 'completed'] as const).map(s => { const on = stage === s; return (
+              <button key={s} type="button" role="tab" aria-selected={on} onClick={() => { if (on) return; setStage(s); setPage(0); }}
+                style={{ ...(on ? S.btnPrimary : S.btnGhost), minHeight: 44, minWidth: 120, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                {{ pending: 'Active', completed: 'Completed' }[s]}
+                {on && <span style={{ fontFamily: T.mono, fontSize: 11, padding: '1px 7px', borderRadius: 999, background: 'rgba(255,255,255,.18)', color: T.tx }}>{filtered.length}</span>}
+              </button>); })}
           </div>}
           {!showExtras && <div style={{ fontSize: 12, color: T.tx3 }}>{filtered.length !== items.filter(i => isCompletedView ? i.status === 'completed' : i.status !== 'completed').length ? `${filtered.length} of ` : ''}{filtered.length} item{filtered.length === 1 ? '' : 's'} · {isCompletedView ? 'completed batches' : 'active SKUs by status'}</div>}
         </div>
@@ -777,24 +782,24 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
         </div>
       </div>
       {showExtras && canAccessModule(profile?.role, 'extras', profile?.module_access) ? <><div style={{ marginBottom: 10 }}><button onClick={() => { setShowExtras(false); }} style={S.btnGhost}>← Back to Inventory</button></div><InventoryExtras /></> : <>
-      {/* Preset chips + search + Filters popover — Brand Tags glass-card aesthetic */}
-      <div className="filter-bar" style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '10px 14px', marginBottom: activeFilterCount > 0 ? 10 : 14, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+      {/* Search + preset chips + Filters popover — the Jobwork toolbar */}
+      <div className="filter-bar" style={{ marginBottom: activeFilterCount > 0 ? 10 : 12, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         {/* Search */}
-        <div style={{ flex: 1, minWidth: 200, position: 'relative' }}>
+        <div style={{ flex: '1 1 320px', maxWidth: 520, minWidth: 200, position: 'relative' }}>
           <svg viewBox="0 0 24 24" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, opacity: 0.5 }}><path d="M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.35-4.35" /></svg>
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search SKU, product, notes…" style={{ ...S.fSearch, background: 'transparent', border: 'none' }} />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search SKU, product, notes…" aria-label="Search inventory" style={{ ...S.fSearch, width: '100%' }} />
         </div>
 
         {/* Preset chips */}
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
           {PRESETS.filter(p => isCompletedView ? p.id === 'all' : true).map(p => (
-            <button key={p.id} onClick={() => applyPreset(p)} style={{ padding: '6px 12px', borderRadius: 8, border: `1px solid ${preset === p.id ? 'oklch(0.55 0.22 265 / .35)' : T.bd2}`, cursor: 'pointer', fontSize: 12, fontWeight: preset === p.id ? 600 : 500, background: preset === p.id ? 'oklch(0.55 0.22 265 / .10)' : 'rgba(255,255,255,0.02)', color: preset === p.id ? T.ac2 : T.tx2, fontFamily: T.sans, transition: T.transition, height: 32 }}>{p.label}</button>
+            <button key={p.id} type="button" onClick={() => applyPreset(p)} aria-pressed={preset === p.id} style={listChip(preset === p.id)}>{p.label}</button>
           ))}
         </div>
 
         {/* Filters button with multi-select popover */}
         <div style={{ position: 'relative' }}>
-          <button onClick={() => setShowFiltersPopover(v => !v)} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, height: 32, padding: '0 12px', background: showFiltersPopover || activeFilterCount > 0 ? 'oklch(0.55 0.22 265 / .10)' : 'rgba(255,255,255,0.02)', border: `1px solid ${showFiltersPopover || activeFilterCount > 0 ? 'oklch(0.55 0.22 265 / .35)' : T.bd2}`, borderRadius: 8, color: activeFilterCount > 0 ? T.ac2 : T.tx2, fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: T.sans }}>
+          <button type="button" onClick={() => setShowFiltersPopover(v => !v)} style={{ ...listChip(showFiltersPopover || activeFilterCount > 0), display: 'inline-flex', alignItems: 'center', gap: 7 }}>
             <svg viewBox="0 0 24 24" style={{ width: 13, height: 13, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8 }}><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" /></svg>
             Filters
             {activeFilterCount > 0 && <span style={{ background: T.ac, color: '#fff', borderRadius: 10, padding: '1px 7px', fontSize: 10, fontFamily: T.mono, fontWeight: 600, minWidth: 18, textAlign: 'center' as const }}>{activeFilterCount}</span>}
@@ -877,9 +882,9 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
         );
       })()}
       {loading && items.length === 0 && <SkeletonRows rows={6} />}
-      <div style={{ background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden', display: loading && items.length === 0 ? 'none' : undefined }}>
-        {/* Desktop table / phone cards (components/inventory) */}
-        <div className="inv-desktop">
+      <div style={{ display: loading && items.length === 0 ? 'none' : undefined }}>
+        {/* Desktop table in the Jobwork frame / phone cards (components/inventory) */}
+        <div className="inv-desktop" style={{ borderRadius: 10, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.01)', overflowX: 'auto' }}>
           <InventoryTable rows={paged} items={items} canEdit={canEdit} isCompletedView={isCompletedView} selectedIds={selectedIds} onSelect={setSelectedIds}
             highlightId={highlightId} itemMissing={itemMissing} itemDamaged={itemDamaged} itemTags={itemTags} expandedNote={expandedNote} onToggleNote={setExpandedNote}
             completablePairs={completablePairs} revertingId={revertingId} onView={openComps} onEdit={openEdit} onDelete={handleDelete}
@@ -910,15 +915,15 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
           : <Empty icon="box" title="No items yet" message="Register your first inventory item to start tracking components and pair matches." cta={canEdit ? '+ Add Item' : undefined} onCta={canEdit ? () => setShowModal(true) : undefined} />
         }</div>}
       </div>
-      <div className="pager" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 10, fontSize: 11 }}>
-        <select value={perPage} onChange={e => { setPerPage(Number(e.target.value)); setPage(0); }} style={{ ...S.fInput, width: 'auto', padding: '4px 8px', fontSize: 11, height: 28, borderRadius: 6, cursor: 'pointer' }}><option value={10}>10</option><option value={25}>25</option><option value={50}>50</option></select>
-        <span style={{ color: T.tx3 }}>rows</span>
-        {totalPages > 1 && <>
-          <button onClick={() => setPage(Math.max(0, page - 1))} style={{ ...S.btnGhost, ...S.btnSm, opacity: page === 0 ? 0.3 : 1, pointerEvents: page === 0 ? 'none' : 'auto' }} aria-label="Previous page">Prev</button>
-          <span style={{ color: T.tx3 }}>{page + 1} / {totalPages}</span>
-          <button onClick={() => setPage(Math.min(totalPages - 1, page + 1))} style={{ ...S.btnGhost, ...S.btnSm, opacity: page >= totalPages - 1 ? 0.3 : 1, pointerEvents: page >= totalPages - 1 ? 'none' : 'auto' }} aria-label="Next page">Next</button>
-        </>}
-        {invTruncated && <button onClick={() => { const next = invLimit + 5000; setInvLimit(next); fetchData(next); }} style={{ ...S.btnGhost, fontSize: 10, color: T.yl, borderColor: 'oklch(0.78 0.18 75 / .2)', background: 'oklch(0.78 0.18 75 / .06)' }}>Load More Items ({invLimit} loaded)</button>}
+      <div className="pager" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+        <button type="button" disabled={page === 0} onClick={() => setPage(Math.max(0, page - 1))} style={{ ...S.btnGhost, ...S.btnSm, minHeight: 32, opacity: page === 0 ? 0.3 : 1 }} aria-label="Previous page">Prev</button>
+        <span style={{ fontSize: 10, color: T.tx3 }}>{page + 1} / {Math.max(1, totalPages)}</span>
+        <button type="button" disabled={page >= totalPages - 1} onClick={() => setPage(Math.min(totalPages - 1, page + 1))} style={{ ...S.btnGhost, ...S.btnSm, minHeight: 32, opacity: page >= totalPages - 1 ? 0.3 : 1 }} aria-label="Next page">Next</button>
+        {invTruncated && <button type="button" onClick={() => { const next = invLimit + 5000; setInvLimit(next); fetchData(next); }} style={{ ...S.btnGhost, ...S.btnSm, minHeight: 32, color: T.yl, borderColor: 'oklch(0.78 0.18 75 / .2)', background: 'oklch(0.78 0.18 75 / .06)' }}>Load more ({invLimit} loaded)</button>}
+        <span style={{ marginLeft: 'auto', fontSize: 10, color: T.tx3 }}>{filtered.length} item{filtered.length === 1 ? '' : 's'}</span>
+        <select value={perPage} onChange={e => { setPerPage(Number(e.target.value)); setPage(0); }} aria-label="Items per page" style={{ ...S.fInput, width: 'auto', padding: '4px 8px', fontSize: 11, height: 28, borderRadius: 6, cursor: 'pointer' }}>
+          {[10, 25, 50, 100].map(x => <option key={x} value={x}>{x}</option>)}
+        </select>
       </div>
 
       {/* Bulk-actions dock — appears when rows are selected (audit P1) */}

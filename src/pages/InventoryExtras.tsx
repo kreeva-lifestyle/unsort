@@ -391,24 +391,24 @@ export default function InventoryExtras() {
       </div>
 
       {/* Filter bar */}
-      <div className="inv-extra-filters" style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '10px 14px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-        <div style={{ flex: 1, minWidth: 200, position: 'relative' }}>
+      <div className="inv-extra-filters" style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ flex: '1 1 320px', maxWidth: 520, minWidth: 200, position: 'relative' }}>
           <svg viewBox="0 0 24 24" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, opacity: 0.5 }}><path d="M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.35-4.35" /></svg>
           <input placeholder="Search SKU, category, component..." value={search} onChange={e => { setSearch(e.target.value); setPage(0); }}
-            style={{ ...S.fSearch, background: 'transparent', border: 'none' }} />
+            aria-label="Search spare parts" style={{ ...S.fSearch, width: '100%' }} />
         </div>
         <select value={catFilter} onChange={e => { setCatFilter(e.target.value); setPage(0); }}
-          style={{ background: 'transparent', border: `1px solid ${T.bd}`, borderRadius: 6, color: T.tx, fontFamily: T.sans, fontSize: 11, padding: '6px 10px', height: 36, outline: 'none', cursor: 'pointer', flexShrink: 0 }}>
+          style={{ ...S.fInput, width: 'auto', fontSize: 12, cursor: 'pointer', flexShrink: 0 }}>
           <option value="all">All Categories</option>
           {products.map(p => <option key={p.id} value={p.id}>{p.name}{p.sku ? ` (${p.sku})` : ''}</option>)}
         </select>
         <select value={compFilter} onChange={e => { setCompFilter(e.target.value); setPage(0); }}
-          style={{ background: 'transparent', border: `1px solid ${T.bd}`, borderRadius: 6, color: T.tx, fontFamily: T.sans, fontSize: 11, padding: '6px 10px', height: 36, outline: 'none', cursor: 'pointer', flexShrink: 0 }}>
+          style={{ ...S.fInput, width: 'auto', fontSize: 12, cursor: 'pointer', flexShrink: 0 }}>
           <option value="all">All Components</option>
           {[...new Set(extras.map(ex => ex.component_name))].sort().map(c => <option key={c} value={c}>{c}</option>)}
         </select>
         <select value={matchFilter} onChange={e => { setMatchFilter(e.target.value); setPage(0); }}
-          style={{ background: 'transparent', border: `1px solid ${T.bd}`, borderRadius: 6, color: T.tx, fontFamily: T.sans, fontSize: 11, padding: '6px 10px', height: 36, outline: 'none', cursor: 'pointer', flexShrink: 0 }}>
+          style={{ ...S.fInput, width: 'auto', fontSize: 12, cursor: 'pointer', flexShrink: 0 }}>
           <option value="all">All Matches</option>
           <option value="has">Has Matches</option>
           <option value="none">No Matches</option>
