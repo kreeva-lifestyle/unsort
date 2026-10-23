@@ -12,6 +12,7 @@ import { CostingProduct, CostingLibrary, subProblems, num } from './costingModel
 import { useCostingSheet } from './useCostingSheet';
 import { useIsPhone } from '../../../hooks/useIsPhone';
 import ComponentCard from './ComponentCard';
+import MasterIncludes from './MasterIncludes';
 import CostingHero from './CostingHero';
 import CostingRail from './CostingRail';
 import CostingSaveBar from './CostingSaveBar';
@@ -61,6 +62,7 @@ export default function CostingEditor({ product, saved, library, topSubs, onSave
             onSku={v => s.patch({ sku: v })} onCategory={v => s.patch({ category: v })} onFile={s.uploadImage} />
 
           <div style={{ height: 14 }} />
+          <MasterIncludes sku={p.sku} comps={s.masterComps} missing={s.missingComps} onAdd={s.addMasterComp} />
           {p.components.map((c, i) => (
             <ComponentCard key={i} comp={c} idx={i} library={library} topSubs={topSubs}
               defaultOpen={openDefaults[i] ?? true} openRequest={s.errorComps.has(i) ? s.errVersion : 0}

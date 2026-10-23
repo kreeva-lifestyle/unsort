@@ -4,7 +4,7 @@
 // (JOBWORK ₹523…) and fills the fabric lines with their usage per piece.
 // A new job can be saved as a draft and finished later (jobworkDrafts.ts).
 // Started from a fabric PO (`prefill`) it comes filled and carries the fabric (PoFabricNote).
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
@@ -19,7 +19,8 @@ import SkuThumb from '../ui/SkuThumb';
 import MaterialRows from './MaterialRows';
 import { JOB_TYPES, QTY_UNITS, today, inr, unitLabel, validQty, type JobDetail } from './jobworkModel';
 import { saveJob, costingFor, type JobDraft, type MaterialDraft, type CostingRef } from './jobworkApi';
-import { componentNames, rateHints, materialHints } from './jobworkCosting';
+import { rateHints, materialHints } from './jobworkCosting';
+import ComponentField from './ComponentField';
 import { createFromDraft, startForm, toDraftForm } from './jobworkDrafts';
 import { startFromPo, type JobPrefill } from './jobworkFromPo';
 import PoFabricNote from './PoFabricNote';
@@ -72,7 +73,26 @@ export default function JobForm({ edit, draft = null, prefill = null, onClose, o
   const [error, setError] = useState('');
   const patch = (p: Partial<JobDraft>) => { setD(x => ({ ...x, ...p })); setError(''); };
 
-  // Look the SKU's costing sheet up once the code settles.
+  // A jobworker pick fills "Type of job" with their last job's type (owner's
+  // ask); a typed type is never replaced, only an earlier auto-fill — which a
+  // jobworker with no jobs yet clears again.
+  const typeAuto = useRef(false);
+  const lastType = (t: string) => setD(x => { if (x.job_type.trim() && !typeAuto.current) return x; typeAuto.current = !!t; return x.job_type === t ? x : { ...x, job_type: t }; });
+  const hints = costing && d.component ? rateHints(costing.components, d.component) : [];
+  const fromCosting = costing && d.component ? materialHints(costing.components, d.component) : [];
+  const missing = fromCosting.filter(f => !mats.some(m => m.name.trim().toLowerCase() === f.name.toLowerCase()));
+  // A picked component brings its fabric lines (a fresh job with nothing typed —
+  // an existing one gets the "add from costing" button) and its one rate while none is typed.
+  const fillFrom = (c: CostingRef, comp: string) => {
+    if (!edit) setMats(ms => (ms.every(m => !m.name.trim()) ? materialHints(c.components, comp) : ms));
+    const h = rateHints(c.components, comp);
+    if (h.length === 1) setD(x => (x.rate.trim() ? x : { ...x, rate: String(h[0].rate) }));
+  };
+  const pickComponent = (c: string) => { patch({ component: c }); if (costing) fillFrom(costing, c); };
+  const dRef = useRef(d); dRef.current = d;
+
+  // Look the SKU's costing sheet up once the code settles. A component picked
+  // from the master-sheet chips before it arrived gets its lines and rate then.
   useEffect(() => {
     const sku = d.sku.trim();
     if (sku.length < 3) { setCosting(null); return; }
@@ -81,23 +101,11 @@ export default function JobForm({ edit, draft = null, prefill = null, onClose, o
       if (err) { addToast(friendlyError(err), 'error'); return; }
       setCosting(c);
       setD(x => ({ ...x, costing_product_id: c?.id ?? null }));
+      if (c && dRef.current.component.trim()) fillFrom(c, dRef.current.component);
     }, 350);
     return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fillFrom reads live state through refs and updaters
   }, [d.sku, addToast]);
-
-  const comps = costing ? componentNames(costing.components) : [];
-  const hints = costing && d.component ? rateHints(costing.components, d.component) : [];
-  const fromCosting = costing && d.component ? materialHints(costing.components, d.component) : [];
-  const missing = fromCosting.filter(f => !mats.some(m => m.name.trim().toLowerCase() === f.name.toLowerCase()));
-  const pickComponent = (c: string) => {
-    patch({ component: c });
-    if (!costing) return;
-    // A fresh job takes the component's fabric lines straight away; an
-    // existing one gets the "add from costing" button instead.
-    if (!edit && mats.every(m => !m.name.trim())) setMats(materialHints(costing.components, c));
-    const h = rateHints(costing.components, c);
-    if (h.length === 1 && !d.rate.trim()) patch({ component: c, rate: String(h[0].rate) });
-  };
 
   const submit = async () => {
     if (busy) return;
@@ -133,27 +141,17 @@ export default function JobForm({ edit, draft = null, prefill = null, onClose, o
           // (jobworker, SKU, job type) Enter picks the highlighted entry.
           onKeyDown={e => { if (e.key === 'Enter' && (e.target as HTMLInputElement).type === 'number') { e.preventDefault(); submit(); } }}>
           {field('Jobworker', true, <JobworkerField name={d.vendor_name} phone={d.vendor_phone} vendorId={d.vendor_id} recent={!j} addToast={addToast}
-            onPick={v => patch({ vendor_id: v.id, vendor_name: v.name, vendor_phone: v.phone })} />)}
+            onPick={v => patch({ vendor_id: v.id, vendor_name: v.name, vendor_phone: v.phone })} onLastType={lastType} />)}
           <div className="two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             {field('SKU', true, <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               {thumbSku && <SkuThumb sku={thumbSku} size={36} radius={8} />}
               <div style={{ flex: 1, minWidth: 0 }}><SkuInput value={d.sku} sizes={false} onChange={v => { setPicked(false); patch({ sku: v.toUpperCase() }); }}
                 onPick={(_p, _s, full) => { setPicked(true); patch({ sku: full }); }} style={{ ...S.fInput, width: '100%', textTransform: 'uppercase', fontFamily: T.mono }} /></div>
             </div>)}
-            {field('Type of job', true, <SuggestInput value={d.job_type} onChange={v => patch({ job_type: v })} options={JOB_TYPES}
+            {field('Type of job', true, <SuggestInput value={d.job_type} onChange={v => { typeAuto.current = false; patch({ job_type: v }); }} options={JOB_TYPES}
               placeholder="e.g. Embroidery" style={{ ...S.fInput, width: '100%' }} />)}
           </div>
-          <div>
-            <label style={S.fLabel}>Component sent</label>
-            {comps.length > 0 ? (
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {comps.map(c => <button key={c} type="button" onClick={() => pickComponent(c)} style={chip(d.component.toLowerCase() === c.toLowerCase())}>{c.toUpperCase()}</button>)}
-              </div>
-            ) : (
-              <input value={d.component} onChange={e => patch({ component: e.target.value })} placeholder="e.g. LEHANGA, TOP, DUPATTA" style={{ ...S.fInput, width: '100%' }} />
-            )}
-            <div style={{ fontSize: 10, color: T.tx3, marginTop: 4 }}>{costing ? `From the ${costing.sku} costing sheet` : d.sku.trim().length >= 3 ? 'No costing sheet for this SKU — type the component' : ''}</div>
-          </div>
+          <ComponentField sku={d.sku} costing={costing} value={d.component} onPick={pickComponent} onChange={v => patch({ component: v })} />
           <div className="two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             {/* Pieces are whole; meters take up to 2 decimals (8.80 m). */}
             {field(unitLabel(d.qty_unit), true, <div style={{ display: 'flex', gap: 6 }}>

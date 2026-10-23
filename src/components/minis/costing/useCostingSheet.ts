@@ -6,7 +6,7 @@
 // EXC GST locks the selling price; a failed attempt re-opens every folded
 // component that holds a problem (errVersion) so a tapped error always
 // finds its row.
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase, currentUserId } from '../../../lib/supabase';
 import { friendlyError } from '../../../lib/friendlyError';
 import { useCrumb } from '../../../hooks/useBreadcrumb';
@@ -17,6 +17,8 @@ import {
 } from './costingModel';
 import { canonicalizeNames } from './costingNames';
 import { uploadProductPhoto } from './costingThumbs';
+import { untouched, nameOnly, missingFromMaster, componentFor } from './masterIncludes';
+import { sameComponent } from '../../../lib/componentNames';
 
 export type DocKind = 'sheet' | 'plan' | 'raise';
 type Ask = (o: { title: string; message?: string; confirmLabel?: string; danger?: boolean }) => Promise<boolean>;
@@ -47,6 +49,25 @@ export function useCostingSheet({ product, saved, library, onSaved, addToast, as
   const masterHit = resolveSku(index, p.sku)?.product ?? null;
   const masterPrice = masterHit && masterHit.price_exc_gst != null && Number(masterHit.price_exc_gst) > 0 ? Number(masterHit.price_exc_gst) : null;
   useEffect(() => { if (masterPrice && num(p.selling_price ?? '') !== masterPrice) setP(prev => ({ ...prev, selling_price: masterPrice })); }, [masterPrice, p.selling_price]);
+  // The master sheet's pieces for the SKU (owner: component = INCLUDES). A new
+  // sheet nobody has typed on takes them as its main components, spelled as
+  // the library spells them, and keeps taking them while the SKU is still
+  // being typed (DRS1 → DRS17 → DRS177 each resolve); a name or line someone
+  // typed ends that. A saved sheet, or one with its own, is offered what it lacks.
+  const masterComps = masterHit?.includes ?? [];
+  const auto = useRef<string[]>([]);
+  useEffect(() => {
+    if (saved) return;
+    setP(prev => {
+      if (!prev.components.every(c => untouched(c) || (nameOnly(c) && auto.current.some(n => sameComponent(n, c.name))))) return prev;
+      const next = masterComps.map(n => componentFor(library, n));
+      auto.current = next.map(c => c.name);
+      return { ...prev, components: next.length > 0 ? next : [blankComponent()] };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per resolved SKU
+  }, [masterHit?.sku_norm, saved]);
+  const missingComps = missingFromMaster(p.components, masterComps);
+  const addMasterComp = (name: string) => setP(prev => ({ ...prev, components: [...prev.components, componentFor(library, name)] }));
 
   const patch = (q: Partial<CostingProduct>) => setP(prev => ({ ...prev, ...q }));
   const pcs = Math.floor(num(pieces));
@@ -141,5 +162,6 @@ export function useCostingSheet({ product, saved, library, onSaved, addToast, as
   return {
     p, patch, errors, errVersion, errorComps, saving, deleting, uploading, pieces, setPieces, pcs, total, masterPrice,
     doc, closeDoc: () => setDoc(null), save, openDoc, deleteCosting, uploadImage, patchComp, addComp, removeComp,
+    masterComps, missingComps, addMasterComp,
   };
 }
