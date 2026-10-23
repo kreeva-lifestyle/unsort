@@ -21,12 +21,22 @@ export const sameComponent = (a: string, b: string): boolean => {
   return k !== '' && k === componentKey(b);
 };
 
-/** `first` in its order, then every name in `more` that is not one of them already. */
+// The sheet says BOTTOM where a costing says PANT or PALAZZO: one piece.
+const BOTTOMS = new Set(['BOTTOM', 'PANT', 'PANTS', 'TROUSER', 'TROUSERS', 'PALAZZO', 'SHARARA', 'GHARARA', 'SALWAR', 'CHURIDAR', 'SKIRT', 'DHOTI']);
+
+/** `have` stands for `want`: the same piece under any spelling, or the
+ *  sheet's generic BOTTOM against any bottom (and a bottom against BOTTOM). */
+export const coversComponent = (have: string, want: string): boolean => {
+  const a = componentKey(have), b = componentKey(want);
+  return a !== '' && (a === b || (BOTTOMS.has(a) && BOTTOMS.has(b) && (a === 'BOTTOM' || b === 'BOTTOM')));
+};
+
+/** `first` in its order, then every name in `more` that none of them stands for already. */
 export const mergeComponents = (first: string[], more: string[]): string[] => {
   const out: string[] = [];
   for (const n of [...first, ...more]) {
     const t = n.trim();
-    if (t && !out.some(o => sameComponent(o, t))) out.push(t);
+    if (t && !out.some(o => coversComponent(o, t))) out.push(t);
   }
   return out;
 };

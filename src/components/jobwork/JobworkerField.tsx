@@ -24,8 +24,8 @@ export default function JobworkerField({ name, phone, vendorId, recent, onPick, 
   const seq = useRef(0);
   const pick = (v: RecentJobworker, lookup: boolean) => {
     onPick(v);
+    const n = ++seq.current;   // a later pick or keystroke outranks an answer still in flight
     if (!lookup) return;
-    const n = ++seq.current;
     lastJobType(v).then(({ type, error }) => {
       if (n !== seq.current) return;
       if (error) { addToast(friendlyError(error), 'error'); return; }

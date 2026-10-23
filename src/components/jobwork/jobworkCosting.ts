@@ -3,7 +3,7 @@
 // (JOBWORK ₹523, HANDWORK ₹560…) as one-tap rate suggestions, and the
 // physical materials of that component with their usage per piece.
 import { selectedSupplier, num, type CostingComponent } from '../minis/costing/costingModel';
-import { sameComponent } from '../../lib/componentNames';
+import { coversComponent } from '../../lib/componentNames';
 import type { MaterialDraft } from './jobworkApi';
 
 const LABOUR = /job\s*work|hand\s*work|embroid|print|dye|dyeing|cut\s*work|aari|zari|sequin|mirror|smock/i;
@@ -14,9 +14,9 @@ export interface RateHint { label: string; rate: number }
 export const componentNames = (components: CostingComponent[]): string[] =>
   [...new Set(components.map(c => c.name.trim()).filter(Boolean))];
 
-// Spelling-tolerant: the chip says LEHENGA (master sheet), the costing says "lehanga".
+// Spelling-tolerant: the chip says LEHENGA or BOTTOM (master sheet), the costing says "lehanga" or PANT.
 const findComp = (components: CostingComponent[], name: string) =>
-  components.find(c => sameComponent(c.name, name));
+  components.find(c => coversComponent(c.name, name));
 
 /** Outside-work lines of the component, e.g. "JOBWORK ₹523". */
 export function rateHints(components: CostingComponent[], comp: string): RateHint[] {

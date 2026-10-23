@@ -73,7 +73,26 @@ export default function JobForm({ edit, draft = null, prefill = null, onClose, o
   const [error, setError] = useState('');
   const patch = (p: Partial<JobDraft>) => { setD(x => ({ ...x, ...p })); setError(''); };
 
-  // Look the SKU's costing sheet up once the code settles.
+  // A jobworker pick fills "Type of job" with their last job's type (owner's
+  // ask); a typed type is never replaced, only an earlier auto-fill — which a
+  // jobworker with no jobs yet clears again.
+  const typeAuto = useRef(false);
+  const lastType = (t: string) => setD(x => { if (x.job_type.trim() && !typeAuto.current) return x; typeAuto.current = !!t; return x.job_type === t ? x : { ...x, job_type: t }; });
+  const hints = costing && d.component ? rateHints(costing.components, d.component) : [];
+  const fromCosting = costing && d.component ? materialHints(costing.components, d.component) : [];
+  const missing = fromCosting.filter(f => !mats.some(m => m.name.trim().toLowerCase() === f.name.toLowerCase()));
+  // A picked component brings its fabric lines (a fresh job with nothing typed —
+  // an existing one gets the "add from costing" button) and its one rate while none is typed.
+  const fillFrom = (c: CostingRef, comp: string) => {
+    if (!edit) setMats(ms => (ms.every(m => !m.name.trim()) ? materialHints(c.components, comp) : ms));
+    const h = rateHints(c.components, comp);
+    if (h.length === 1) setD(x => (x.rate.trim() ? x : { ...x, rate: String(h[0].rate) }));
+  };
+  const pickComponent = (c: string) => { patch({ component: c }); if (costing) fillFrom(costing, c); };
+  const dRef = useRef(d); dRef.current = d;
+
+  // Look the SKU's costing sheet up once the code settles. A component picked
+  // from the master-sheet chips before it arrived gets its lines and rate then.
   useEffect(() => {
     const sku = d.sku.trim();
     if (sku.length < 3) { setCosting(null); return; }
@@ -82,26 +101,11 @@ export default function JobForm({ edit, draft = null, prefill = null, onClose, o
       if (err) { addToast(friendlyError(err), 'error'); return; }
       setCosting(c);
       setD(x => ({ ...x, costing_product_id: c?.id ?? null }));
+      if (c && dRef.current.component.trim()) fillFrom(c, dRef.current.component);
     }, 350);
     return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fillFrom reads live state through refs and updaters
   }, [d.sku, addToast]);
-
-  // A jobworker pick fills "Type of job" with their last job's type (owner's
-  // ask); a type someone typed is never replaced, only an earlier auto-fill.
-  const typeAuto = useRef(false);
-  const lastType = (t: string) => setD(x => { if (!t || (x.job_type.trim() && !typeAuto.current)) return x; typeAuto.current = true; return { ...x, job_type: t }; });
-  const hints = costing && d.component ? rateHints(costing.components, d.component) : [];
-  const fromCosting = costing && d.component ? materialHints(costing.components, d.component) : [];
-  const missing = fromCosting.filter(f => !mats.some(m => m.name.trim().toLowerCase() === f.name.toLowerCase()));
-  const pickComponent = (c: string) => {
-    patch({ component: c });
-    if (!costing) return;
-    // A fresh job takes the component's fabric lines straight away; an
-    // existing one gets the "add from costing" button instead.
-    if (!edit && mats.every(m => !m.name.trim())) setMats(materialHints(costing.components, c));
-    const h = rateHints(costing.components, c);
-    if (h.length === 1 && !d.rate.trim()) patch({ component: c, rate: String(h[0].rate) });
-  };
 
   const submit = async () => {
     if (busy) return;
