@@ -13,6 +13,15 @@
 // viewport and the canvas snaps back to its real height. (Re-navigating in an
 // SPA has the same effect for the same reason.)
 //
+// A cold open in that state (the app was resumed, not force-quit, after the
+// keyboard shrank it) never shows the hook a taller height to compare with,
+// so it also checks the one number iOS keeps right: in a home-screen app the
+// page should fill screen.height. A shortfall the size of a status bar
+// (up to 80pt — a landscape phone or a split iPad window is far more) is the
+// stuck state. iOS only: Android's standalone keeps its status bar, so inner
+// < screen is normal there. A repair that does not reach the target is not
+// repeated for that same height (no flicker loop); a new height re-arms it.
+//
 // `#root` is that element: position:absolute; inset:0 inside the 100dvh body.
 // A display:none round-trip destroys scroll boxes, so scroll positions of the
 // page scroller and any open sheet are saved and put back in the same task —
@@ -28,6 +37,17 @@ const isTextField = (el: Element | null): boolean => {
   if (tag === 'INPUT') { const t = (el as HTMLInputElement).type; return !['button', 'checkbox', 'radio', 'submit', 'range', 'file', 'color'].includes(t); }
   return tag === 'TEXTAREA' || tag === 'SELECT' || (el as HTMLElement).isContentEditable;
 };
+
+const IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const standalone = (): boolean => (navigator as Navigator & { standalone?: boolean }).standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+/** The height the page should have when the OS shrank it by a status bar; 0 when nothing says it did. */
+const screenTarget = (): number => {
+  if (!IOS || !standalone()) return 0;
+  const gap = window.screen.height - window.innerHeight;
+  return gap > 0 && gap <= 80 ? window.screen.height : 0;
+};
+/** What a restore must reach: the tallest height seen, or the screen when that is the better clue. */
+const wantedH = (): number => Math.max(viewportRestoreStats.maxH, screenTarget());
 
 const keyboardOpen = (): boolean => {
   if (isTextField(document.activeElement)) return true;
@@ -48,15 +68,17 @@ export function restoreViewport(reason: string): boolean {
   for (const [e, top] of scrollers) e.scrollTop = top;
   viewportRestoreStats.restores += 1;
   viewportRestoreStats.lastReason = reason;
-  return window.innerHeight >= viewportRestoreStats.maxH - 1;
+  return window.innerHeight >= wantedH() - 1;
 }
 
 export function useViewportRestore(): void {
   useEffect(() => {
     let t: ReturnType<typeof setTimeout> | undefined;
     let retry: ReturnType<typeof setTimeout> | undefined;
+    // The height a repair could not fix: do not keep flipping the page at it.
+    let failedAt = 0;
     const track = () => { if (!keyboardOpen()) viewportRestoreStats.maxH = Math.max(viewportRestoreStats.maxH, window.innerHeight); };
-    const shrunk = () => viewportRestoreStats.maxH > 0 && window.innerHeight < viewportRestoreStats.maxH - 1 && !keyboardOpen();
+    const shrunk = () => !keyboardOpen() && window.innerHeight !== failedAt && window.innerHeight < wantedH() - 1;
     const check = (reason: string) => {
       clearTimeout(t);
       t = setTimeout(() => {
@@ -66,7 +88,7 @@ export function useViewportRestore(): void {
         // One retry: iOS sometimes reports the old height for a beat after the
         // keyboard animation ends. Never loop beyond this.
         clearTimeout(retry);
-        retry = setTimeout(() => { if (shrunk()) restoreViewport(reason + '+retry'); }, 300);
+        retry = setTimeout(() => { if (shrunk() && !restoreViewport(reason + '+retry')) failedAt = window.innerHeight; }, 300);
       }, 150);
     };
     track();
