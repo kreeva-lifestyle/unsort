@@ -1,6 +1,7 @@
 // Viewport diagnostic overlay for the iOS-standalone bottom-nav gap hunt.
 // Renders ONLY when the URL contains ?vpdebug or localStorage.vpdebug is set —
-// zero cost otherwise. Shows the live numbers that identify which viewport the
+// zero cost otherwise. In the home-screen app (no address bar) five quick taps
+// on the header crest toggle it (Header.tsx). Shows the live numbers that identify which viewport the
 // OS is misreporting (screen vs inner vs visualViewport vs safe-area inset vs
 // where the fixed nav actually landed), so a surviving gap can be diagnosed
 // from a single screenshot instead of guesswork.
@@ -13,6 +14,14 @@ const enabled = () => {
   try { return window.location.search.includes('vpdebug') || !!localStorage.getItem('vpdebug'); }
   catch { return false; }
 };
+
+/** Flip the overlay on/off for the next load; returns the new state. */
+export function toggleViewportDebug(): boolean {
+  try {
+    if (localStorage.getItem('vpdebug')) { localStorage.removeItem('vpdebug'); return false; }
+    localStorage.setItem('vpdebug', '1'); return true;
+  } catch { return false; }
+}
 
 export default function ViewportDebug() {
   const [on] = useState(enabled);
@@ -39,6 +48,8 @@ export default function ViewportDebug() {
         'gap(inner-navBot)': nr ? (window.innerHeight - nr.bottom).toFixed(1) : '-',
         standalone: String(window.matchMedia('(display-mode: standalone)').matches),
         maxH: String(viewportRestoreStats.maxH),
+        want: String(viewportRestoreStats.want || '-'),
+        failedAt: String(viewportRestoreStats.failedAt || '-'),
         restores: `${viewportRestoreStats.restores}${viewportRestoreStats.lastReason ? ' (' + viewportRestoreStats.lastReason + ')' : ''}`,
         build: typeof __APP_BUILD__ === 'string' ? __APP_BUILD__ : 'dev',
       });
