@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { toggleViewportDebug } from '../ui/ViewportDebug';
 import { T } from '../../lib/theme';
 import { useCrumbs } from '../../hooks/useBreadcrumb';
 import { closeAllLayers, closeTopLayer, layerCount } from '../../hooks/useBackClose';
@@ -18,6 +19,7 @@ export default function Header({ title, onNotifClick, notifications, markAsRead,
   sidebarOpen?: boolean;
   onToggleSidebar?: () => void;
 }) {
+  const taps = useRef<number[]>([]);
   const [show, setShow] = useState(false);
   const crumbs = useCrumbs();
   const unread = notifications.filter((n: any) => !n.is_read).length;
@@ -59,7 +61,8 @@ export default function Header({ title, onNotifClick, notifications, markAsRead,
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 1, minWidth: 0, overflow: 'hidden' }}>
           {/* The brand slot: where the launch's crest lands (lib/launch.ts
               keeps it invisible until then, via html.launching). */}
-          <img id="brand-slot" className="brand-slot" src="/crest.webp" alt="" width={28} height={28} style={{ width: 28, height: 28, borderRadius: '50%', flexShrink: 0 }} />
+          {/* Five quick taps: the screen-check overlay (ViewportDebug) — the only way to reach it in the home-screen app. */}
+          <img id="brand-slot" className="brand-slot" src="/crest.webp" alt="" width={28} height={28} onClick={() => { const now = Date.now(); taps.current = taps.current.filter(t => now - t < 2500).concat(now); if (taps.current.length >= 5) { taps.current = []; addToast(toggleViewportDebug() ? 'Screen check on — reopening' : 'Screen check off — reopening', 'success'); setTimeout(() => window.location.reload(), 600); } }} style={{ width: 28, height: 28, borderRadius: '50%', flexShrink: 0 }} />
           {/* Breadcrumb trail: every level but the current one is a way back —
               the page name closes every open layer (back to the page root),
               a middle crumb closes every layer above it, the last is where

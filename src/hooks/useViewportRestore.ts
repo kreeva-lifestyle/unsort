@@ -29,7 +29,7 @@
 import { useEffect } from 'react';
 
 // Exposed for the ?vpdebug overlay.
-export const viewportRestoreStats = { maxH: 0, restores: 0, lastReason: '' };
+export const viewportRestoreStats = { maxH: 0, restores: 0, lastReason: '', want: 0, failedAt: 0 };
 
 const isTextField = (el: Element | null): boolean => {
   if (!el) return false;
@@ -68,6 +68,7 @@ export function restoreViewport(reason: string): boolean {
   for (const [e, top] of scrollers) e.scrollTop = top;
   viewportRestoreStats.restores += 1;
   viewportRestoreStats.lastReason = reason;
+  viewportRestoreStats.want = wantedH();
   return window.innerHeight >= wantedH() - 1;
 }
 
@@ -88,7 +89,7 @@ export function useViewportRestore(): void {
         // One retry: iOS sometimes reports the old height for a beat after the
         // keyboard animation ends. Never loop beyond this.
         clearTimeout(retry);
-        retry = setTimeout(() => { if (shrunk() && !restoreViewport(reason + '+retry')) failedAt = window.innerHeight; }, 300);
+        retry = setTimeout(() => { if (shrunk() && !restoreViewport(reason + '+retry')) { failedAt = window.innerHeight; viewportRestoreStats.failedAt = failedAt; } }, 300);
       }, 150);
     };
     track();
@@ -103,8 +104,11 @@ export function useViewportRestore(): void {
     window.addEventListener('pageshow', onShow);
     document.addEventListener('visibilitychange', onVis);
     check('mount');
+    // A cold launch is still settling at mount: two more tries once iOS has
+    // finished its own launch layout, each allowed to retry the same height.
+    const later = [1500, 4000].map(ms => setTimeout(() => { failedAt = 0; viewportRestoreStats.failedAt = 0; check(`mount+${ms}ms`); }, ms));
     return () => {
-      clearTimeout(t); clearTimeout(retry);
+      clearTimeout(t); clearTimeout(retry); later.forEach(clearTimeout);
       window.removeEventListener('focusout', onFocusOut, true);
       window.visualViewport?.removeEventListener('resize', onVvResize);
       window.removeEventListener('resize', onResize);
