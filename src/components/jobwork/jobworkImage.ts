@@ -97,6 +97,7 @@ export function renderJobStatement(d: JobDetail, money: boolean, photo: HTMLImag
   doc.y += 22; doc.text(`${j.job_type}${j.component ? ' · ' + j.component.toUpperCase() : ''}`, tx, 13, 400, C.mid);
   doc.y += 20; doc.text(`Jobworker: ${j.vendor_name}${j.vendor_phone ? ' · ' + j.vendor_phone : ''}`, tx, 13, 600);
   doc.y += 18; doc.text(`Given ${fmtDate(j.job_date)}${j.expected_date ? '   ·   due back ' + fmtDate(j.expected_date) : ''}   ·   ${workState(j).label}`, tx, 11, 400, C.mid);
+  if (j.is_urgent) { doc.y += 18; doc.text(`URGENT${j.urgent_by ? ' — needed by ' + fmtDate(j.urgent_by) : ''}`, tx, 12, 800, C.red); }
   doc.y = Math.max(doc.y, photo ? top + 84 : 0) + 16;
   piecesRow(doc, d);
   materialTable(doc, d);
@@ -134,6 +135,7 @@ export function renderVendorStatement(vendor: string, list: JobDetail[], money: 
     doc.y = top + 12; doc.text(`${j.sku}  ·  JW #${j.jw_number}`, x, 15, 800);
     doc.text(`${qty(j.pcs_remaining)} of ${qu(j.pieces, j.qty_unit)} pending`, W - PAD, 13, 700, j.pcs_remaining ? C.amber : C.green, 'right');
     doc.y += 18; doc.text(`${j.job_type}${j.component ? ' · ' + j.component.toUpperCase() : ''} · given ${shortDate(j.job_date)}${j.expected_date ? ' · due ' + shortDate(j.expected_date) : ''} · ${qty(j.pcs_ok)} OK, ${qty(j.pcs_rejected - j.pcs_rework)} rejected${j.last_entry_date ? ' · last movement ' + shortDate(j.last_entry_date) : ''}`, x, 11, 400, C.mid, 'left', W - PAD - x);
+    if (j.is_urgent) { doc.y += 16; doc.text(`URGENT${j.urgent_by ? ' — needed by ' + shortDate(j.urgent_by) : ''}`, x, 11, 800, C.red); }
     const held = materialBalances(d, j.pcs_ok).filter(b => Math.abs(b.held) > 1e-9);
     if (held.length) { doc.y += 17; doc.text('With them: ' + held.map(b => `${qty(b.held)} ${unitShort(b.m.unit)} ${b.m.name}`).join(' · '), x, 11, 600, C.ink, 'left', W - PAD - x); }
     if (money) { doc.y += 17; doc.text(`Bill ${inr(j.bill)} · Paid ${inr(j.paid)} · Due ${inr(j.due)}`, x, 11, 400, C.mid); }

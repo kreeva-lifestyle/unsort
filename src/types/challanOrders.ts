@@ -2,6 +2,7 @@
 // Split out of database.ts (grandfathered over the size limit).
 
 /** 'converted' = every piece has gone out on a challan (shown as Processed). */
+import type { Urgent } from './urgency';
 export type CashChallanOrderStatus = 'pending' | 'converted' | 'cancelled';
 
 /** One ordered line: no price — prices are typed when the challan is made.
@@ -21,7 +22,7 @@ export interface CashChallanOrderDelivery {
   created_at: string;
 }
 
-export interface CashChallanOrder {
+export interface CashChallanOrder extends Urgent {
   id: string;
   /** The human order ID, shown as ORD-0012 (sequence, unique). */
   order_number: number;

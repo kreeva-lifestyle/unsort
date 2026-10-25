@@ -5,6 +5,7 @@ import type { JobworkSummary } from '../../types/database';
 import { StateDot } from './JobHeader';
 import SkuThumb from '../ui/SkuThumb';
 import { workState, payState, shortDate, inr, isOverdue, n, qty, qu } from './jobworkModel';
+import UrgentPill from '../ui/UrgentPill';
 
 export default function JobCard({ job, showMoney, onOpen }: { job: JobworkSummary; showMoney: boolean; onOpen: () => void }) {
   const ws = workState(job), ps = payState(job);
@@ -18,6 +19,7 @@ export default function JobCard({ job, showMoney, onOpen }: { job: JobworkSummar
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, minWidth: 0 }}>
         <span style={{ fontFamily: T.mono, fontSize: 14, fontWeight: 700, color: T.tx }}>{job.sku}</span>
         <span style={{ fontFamily: T.mono, fontSize: 10, color: T.tx3 }}>JW #{job.jw_number}</span>
+        <UrgentPill row={job} />
         <span style={{ marginLeft: 'auto' }}><StateDot label={ws.label} t={ws.tone} /></span>
       </div>
       <div style={{ fontSize: 12, color: T.tx2, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

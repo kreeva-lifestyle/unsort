@@ -129,7 +129,7 @@ export default function Jobwork({ addToast }: { addToast: (m: string, t?: string
       {onDrafts ? <JobDrafts search={search} version={draftVer} onOpen={setDraft} addToast={addToast} />
         : rows === null ? <div style={{ padding: 40, textAlign: 'center', fontSize: 12, color: T.tx3 }}>Loading jobs…</div>
         : rows.length === 0 ? (
-          search || vendor || filter === 'overdue' || filter === 'unpaid'
+          search || vendor || filter === 'overdue' || filter === 'unpaid' || filter === 'urgent'
             ? <Empty icon="search" title="No jobs match" message="Try another search or filter." />
             : filter === 'completed'
             ? <Empty icon="clipboard" title="No completed jobs yet" message="A job moves here once everything is received and nothing is owed — paid in full or nothing to bill — or when it is cancelled." />

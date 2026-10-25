@@ -5,6 +5,7 @@ import type { JobworkSummary } from '../../types/database';
 import { thumbUrl } from '../minis/costing/costingThumbs';
 import SkuThumb from '../ui/SkuThumb';
 import { workState, payState, isOverdue, fmtDate, inr, n, qty, per } from './jobworkModel';
+import UrgentPill from '../ui/UrgentPill';
 
 const tone = (t: string) => (({ gr: T.gr, yl: T.yl, re: T.re, bl: T.bl, tx3: T.tx3 }) as Record<string, string>)[t] ?? T.tx3;
 export const StateDot = ({ label, t }: { label: string; t: string }) => (
@@ -33,6 +34,7 @@ export default function JobHeader({ job, photo }: { job: JobworkSummary; photo: 
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
             <span style={{ fontFamily: T.mono, fontSize: 18, fontWeight: 700, color: T.tx }}>{job.sku}</span>
             <span style={{ fontSize: 11, color: T.tx3, fontFamily: T.mono }}>JW #{job.jw_number}</span>
+            <UrgentPill row={job} reason />
           </div>
           <div style={{ fontSize: 13, color: T.tx2, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {job.job_type}{job.component ? ` · ${job.component.toUpperCase()}` : ''} · <b style={{ color: T.tx }}>{job.vendor_name}</b>

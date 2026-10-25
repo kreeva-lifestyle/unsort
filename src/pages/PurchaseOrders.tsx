@@ -38,7 +38,7 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
     pos, loading, page, setPage, pageSize, setPageSize, totalCount, totalPages,
     search, debouncedSearch, updateSearch, statusFilter, setStatusFilter, typeFilter, setTypeFilter, creatorFilter, setCreatorFilter,
     dateFrom, setDateFrom, dateTo, setDateTo, showFilters, setShowFilters, users, fetchPos, clearFilters,
-    quick, setQuick, vendorFilter, setVendorFilter, dataVersion, bumpData, tab, setTab, otherCount,
+    quick, setQuick, vendorFilter, setVendorFilter, urgentOnly, setUrgentOnly, dataVersion, bumpData, tab, setTab, otherCount,
   } = usePoList(active, addToast);
   const otherTab = tab === 'open' ? 'completed' : 'open';
   // The list first; the sheets' code once it is on screen and the phone is idle.
@@ -115,8 +115,9 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
         pageSize={pageSize} onPageSizeChange={setPageSize}
         onClearFilters={clearFilters} tabStatuses={TAB_STATUSES[tab]}
         otherTab={{ label: otherTab === 'open' ? 'Open' : 'Completed', count: otherCount }}
-        narrowed={!!(quick || vendorFilter || search || debouncedSearch || statusFilter || typeFilter || creatorFilter || dateFrom || dateTo)}
+        narrowed={!!(quick || urgentOnly || vendorFilter || search || debouncedSearch || statusFilter || typeFilter || creatorFilter || dateFrom || dateTo)}
         onResetPage={() => setPage(0)}
+        urgentOnly={urgentOnly} onUrgentToggle={() => { setUrgentOnly(v => !v); setPage(0); }}
         onOpenEmpty={() => { setEditing(null); setDuplicating(null); setShowForm(true); }} canCreate={canCreate}
         onOpenDetail={openDetail} onPrint={(po) => openPrint(po)}
         onPendency={() => setPendency({ vendor: null })}
@@ -129,7 +130,7 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
 
       {detail && <PODetail key={detail.po.id}
         po={detail.po} items={detail.items} receipts={detail.receipts} audit={detail.audit} names={detail.names} revisions={detail.revisions}
-        statusColors={PO_STATUS_COLORS} canManage={canManage}
+        statusColors={PO_STATUS_COLORS} canManage={canManage} canUrgent={canCreate}
         onClose={() => setDetail(null)} onChanged={refreshDetail} onRetryActivity={() => loadActivity(detail.po, detail.receipts)}
         onEdit={() => { setEditing({ ...detail.po, items: detail.items }); setDuplicating(null); setDetail(null); setShowForm(true); }}
         onDuplicate={() => { setDuplicating({ ...detail.po, items: detail.items }); setEditing(null); setDetail(null); setShowForm(true); }}

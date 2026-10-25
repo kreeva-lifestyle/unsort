@@ -8,7 +8,7 @@
 import { supabase } from '../../lib/supabase';
 import type { CashChallanOrder, CashChallanOrderItem, CashChallanOrderStatus, CashChallanOrderDelivery, AuditLog } from '../../types/database';
 
-export const ORDER_COLS = 'id, order_number, customer_id, customer_name, customer_phone, items, notes, status, challan_id, created_by, created_at, updated_at, converted_at, converted_by, cash_challan_order_deliveries(id, challan_id, lines, reversed_at, created_at, cash_challans(challan_number, status))';
+export const ORDER_COLS = 'id, order_number, customer_id, customer_name, customer_phone, items, notes, status, challan_id, created_by, created_at, updated_at, converted_at, converted_by, is_urgent, urgent_reason, urgent_by, urgent_at, cash_challan_order_deliveries(id, challan_id, lines, reversed_at, created_at, cash_challans(challan_number, status))';
 const MAX_ROWS = 500;
 
 /** The order ID everyone uses: "ORD-0012" (same shape as HO-0012). */
@@ -101,7 +101,7 @@ export function orderProblem(customerName: string, items: CashChallanOrderItem[]
 /** Search matches the order ID ("ORD-12", "12"), the customer, the phone,
  *  a SKU on any line, or the notes — server-side (search_order_ids). */
 export async function fetchOrders(status: CashChallanOrderStatus | '', search: string): Promise<OrderRow[]> {
-  let q = supabase.from('cash_challan_orders').select(ORDER_COLS).order('created_at', { ascending: false }).limit(MAX_ROWS);
+  let q = supabase.from('cash_challan_orders').select(ORDER_COLS).order('is_urgent', { ascending: false }).order('created_at', { ascending: false }).limit(MAX_ROWS);
   if (status) q = q.eq('status', status);
   const s = search.trim();
   if (s) {

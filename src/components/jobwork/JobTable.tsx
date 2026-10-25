@@ -6,6 +6,7 @@ import type { JobworkSummary } from '../../types/database';
 import SkuThumb from '../ui/SkuThumb';
 import { StateDot } from './JobHeader';
 import { workState, payState, shortDate, inr, isOverdue, n, qty, qu } from './jobworkModel';
+import UrgentPill from '../ui/UrgentPill';
 
 export default function JobTable({ rows, showMoney, onOpen }: { rows: JobworkSummary[]; showMoney: boolean; onOpen: (id: string) => void }) {
   const th = (label: string, align: 'left' | 'right' = 'left', w?: number) => <th style={{ ...S.thStyle, textAlign: align, width: w, whiteSpace: 'nowrap' }}>{label}</th>;
@@ -28,6 +29,7 @@ export default function JobTable({ rows, showMoney, onOpen }: { rows: JobworkSum
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
                     <span style={{ fontFamily: T.mono, fontSize: 13, fontWeight: 700, color: T.tx }}>{j.sku}</span>
                     <span style={{ fontFamily: T.mono, fontSize: 10, color: T.tx3 }}>JW #{j.jw_number}</span>
+                    <UrgentPill row={j} />
                   </div>
                   <div style={{ fontSize: 11, color: T.tx3, marginTop: 2 }}>{j.job_type}{j.component ? ` · ${j.component.toUpperCase()}` : ''}</div>
                 </td>

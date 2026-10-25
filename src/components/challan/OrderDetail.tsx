@@ -13,6 +13,8 @@ import { useBackClose } from '../../hooks/useBackClose';
 import ActivityList, { type ActionMeta } from '../ui/ActivityList';
 import type { AuditLog } from '../../types/database';
 import { fmtOrderNo, lineLeft, deliveredCount, pieceCount, loadOrderHistory, type OrderRow } from './pendingOrdersModel';
+import UrgentPill from '../ui/UrgentPill';
+import UrgentSheet from '../ui/UrgentSheet';
 
 export const ORDER_STATUS: Record<string, { label: string; color: string }> = {
   pending: { label: 'Pending', color: T.yl }, converted: { label: 'Processed', color: T.gr }, cancelled: { label: 'Cancelled', color: T.tx3 },
@@ -20,10 +22,13 @@ export const ORDER_STATUS: Record<string, { label: string; color: string }> = {
 const ACTIONS: Record<string, ActionMeta> = {
   CREATE: { label: 'Created', tone: 'ac' }, UPDATE: { label: 'Edited', tone: 'ac' }, CHALLAN_MADE: { label: 'Challan made', tone: 'bl' }, CHALLAN_EDITED: { label: 'Challan edited', tone: 'yl' },
   PIECES_BACK: { label: 'Challan voided', tone: 're' }, PROCESSED: { label: 'Processed', tone: 'gr' }, CANCELLED: { label: 'Cancelled', tone: 're' }, REOPENED: { label: 'Reopened', tone: 'neutral' },
+  URGENT: { label: 'Marked urgent', tone: 're' }, URGENT_CLEARED: { label: 'Urgent cleared', tone: 'neutral' },
 };
 
-export default function OrderDetail({ order: o, canEdit, onClose, onMake, addToast }: {
+export default function OrderDetail({ order: o, canEdit, onClose, onMake, onChanged, addToast }: {
   order: OrderRow; canEdit: boolean; onClose: () => void;
+  /** The urgent flag changed: re-read the order and the list. */
+  onChanged: () => void;
   /** "Make challan" for what is still due (opens the pick sheet). */
   onMake: () => void;
   addToast: (m: string, t?: string) => void;
@@ -31,6 +36,7 @@ export default function OrderDetail({ order: o, canEdit, onClose, onMake, addToa
   useModalLock(true);
   useBackClose(true, onClose);
   const [history, setHistory] = useState<AuditLog[] | null | 'error'>(null);
+  const [urgentOpen, setUrgentOpen] = useState(false);
   const load = useCallback(() => {
     setHistory(null);
     loadOrderHistory(o.id).then(setHistory).catch(e => { addToast(friendlyError(e), 'error'); setHistory('error'); });
@@ -44,11 +50,13 @@ export default function OrderDetail({ order: o, canEdit, onClose, onMake, addToa
   const strip = (d: string | null) => (d ?? '').replace(new RegExp(`^${fmtOrderNo(o.order_number)}(?: —)? ?`), '');
 
   return createPortal(
+    <>
     <div style={S.modalOverlay} onClick={onClose}>
       <div className="modal-inner" style={{ ...S.modalBox, width: 560, display: 'flex', flexDirection: 'column', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
         <div style={S.modalHead}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flexWrap: 'wrap' }}>
             <span style={{ ...S.modalTitle, fontFamily: T.mono }}>{fmtOrderNo(o.order_number)}</span>
+            <UrgentPill row={o} />
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 6, background: alpha(st.color, .12), color: st.color }}><span style={{ width: 6, height: 6, borderRadius: '50%', background: st.color }} />{st.label}</span>
           </div>
           <button type="button" onClick={onClose} style={S.modalClose} aria-label="Close">&#215;</button>
@@ -56,6 +64,7 @@ export default function OrderDetail({ order: o, canEdit, onClose, onMake, addToa
         <div style={{ padding: '14px 18px', overflowY: 'auto', WebkitOverflowScrolling: 'touch', flex: 1, minHeight: 0 }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: T.tx }}>{o.customer_name}</div>
           <div style={{ fontSize: 11, color: T.tx3, marginTop: 2 }}>{o.customer_phone ? `${o.customer_phone} · ` : ''}ordered <span style={{ fontFamily: T.mono }}>{fmtWhen(o.created_at)}</span>{o.status === 'converted' && o.converted_at ? <> · processed <span style={{ fontFamily: T.mono }}>{fmtWhen(o.converted_at)}</span></> : null}</div>
+          {o.is_urgent && o.urgent_reason && <div style={{ fontSize: 12, color: T.tx2, marginTop: 4 }}><b style={{ color: T.re }}>Urgent:</b> {o.urgent_reason}</div>}
 
           {/* How much has gone out */}
           <div style={{ marginTop: 12 }}>
@@ -99,9 +108,12 @@ export default function OrderDetail({ order: o, canEdit, onClose, onMake, addToa
         </div>
         <div style={{ padding: '12px 18px', borderTop: `1px solid ${T.bd}`, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           <button type="button" onClick={onClose} style={{ ...S.btnGhost, minHeight: 44 }}>Close</button>
+          {canEdit && o.status === 'pending' && <button type="button" onClick={() => setUrgentOpen(true)} style={{ ...S.btnGhost, minHeight: 44, ...(o.is_urgent ? { color: T.re, borderColor: alpha(T.re, .35) } : {}) }}>{o.is_urgent ? 'Change urgent' : 'Mark urgent'}</button>}
           {canEdit && o.status === 'pending' && total - sent > 0 && <button type="button" onClick={onMake} style={{ ...S.btnPrimary, minHeight: 44 }}>Make challan · {total - sent} due</button>}
         </div>
       </div>
-    </div>,
+    </div>
+    {urgentOpen && <UrgentSheet module="cash_challan_order" id={o.id} title={fmtOrderNo(o.order_number)} row={o} onClose={() => setUrgentOpen(false)} onSaved={onChanged} addToast={addToast} />}
+    </>,
     document.body);
 }

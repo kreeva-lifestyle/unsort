@@ -87,6 +87,7 @@ export function sectionsOf(pos: PORow[], today: string): Section[] {
   return SECTION_ORDER.filter(k => by.has(k)).map(k => {
     const rows = by.get(k)!;
     if (k === 'overdue') rows.sort((a, b) => (b.due?.late ?? 0) - (a.due?.late ?? 0));
+    rows.sort((a, b) => Number(b.po.is_urgent) - Number(a.po.is_urgent)); // urgent first; the rest keep their order (stable)
     return { key: k, rows, pending: pendingOf(rows), total: rows.reduce((t, r) => t + n(r.po.grand_total), 0), oldestLate: Math.max(0, ...rows.map(r => r.due?.late ?? 0)) };
   });
 }

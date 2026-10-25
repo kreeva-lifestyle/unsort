@@ -14,7 +14,7 @@ import { addDays, ASSUMED_LEAD_DAYS } from './poDue';
 import type { PORow } from './POList';
 import type { PurchaseOrderStatus } from '../../types/database';
 
-export const PO_COLS = 'id, po_number, vendor_id, vendor_name, vendor_phone, po_type, status, po_date, expected_date, payment_terms, notes, for_pieces, lump_sum, costing_product_id, subtotal, discount_type, discount_value, discount_amount, tax_percent, tax_amount, other_charges, round_off, grand_total, approved_by, approved_at, cancelled_by, cancelled_at, closed_at, closed_by, close_reason, created_by, modified_by, created_at, updated_at, revision, revised_at, revised_by';
+export const PO_COLS = 'id, po_number, vendor_id, vendor_name, vendor_phone, po_type, status, po_date, expected_date, payment_terms, notes, for_pieces, lump_sum, costing_product_id, subtotal, discount_type, discount_value, discount_amount, tax_percent, tax_amount, other_charges, round_off, grand_total, approved_by, approved_at, cancelled_by, cancelled_at, closed_at, closed_by, close_reason, created_by, modified_by, created_at, updated_at, revision, revised_at, revised_by, is_urgent, urgent_reason, urgent_by, urgent_at';
 
 /** The summary tiles' one-tap slices: open orders, or open orders past their due date. */
 export type PoQuick = '' | 'open' | 'breached';
@@ -51,6 +51,8 @@ export function usePoList(active: boolean | undefined, addToast: (m: string, t?:
   const [dateTo, setDateTo] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [quick, setQuick] = useState<PoQuick>('');
+  // The Urgent chip beside Filters: flagged orders only.
+  const [urgentOnly, setUrgentOnly] = useState(false);
   const [tab, setTabState] = useState<PoTab>('open');
   // The other tab's count under the same search and filters (null = unknown).
   const [otherCount, setOtherCount] = useState<number | null>(null);
@@ -115,6 +117,7 @@ export function usePoList(active: boolean | undefined, addToast: (m: string, t?:
     const narrow = (q: PoQuery): PoQuery => {
       if (ors.length > 0) q = q.or(ors.join(','));
       if (quick) q = q.in('status', PENDING_STATUSES);
+      if (urgentOnly) q = q.eq('is_urgent', true);
       // "Breached" = past the due date: the expected date, or (none given)
       // the PO date plus ASSUMED_LEAD_DAYS — the same rule as poDue.dueOf,
       // which turns the list's row red.
@@ -131,7 +134,7 @@ export function usePoList(active: boolean | undefined, addToast: (m: string, t?:
       return q;
     };
     const listQ = narrow(poQuery(`${PO_COLS}, costing_products(sku), purchase_order_items(sku, item_name, fabric_code, quantity, received_qty, unit, cancelled_at)`, { count: 'estimated' }).in('status', TAB_STATUSES[shown]))
-      .order('po_number', { ascending: false }).range(page * pageSize, (page + 1) * pageSize - 1);
+      .order('is_urgent', { ascending: false }).order('po_number', { ascending: false }).range(page * pageSize, (page + 1) * pageSize - 1);
     // A slice that lives on Open only has nothing on Completed: no query.
     const otherQ = quick ? null : narrow(poQuery('id', { count: 'exact', head: true }).in('status', TAB_STATUSES[other]));
     const { data, count, error } = await listQ;
@@ -149,7 +152,7 @@ export function usePoList(active: boolean | undefined, addToast: (m: string, t?:
     setTotalCount(count || 0);
     setLoading(false);
     if (silent) setDataVersion(v => v + 1); // silent = something changed, not a new slice
-  }, [debouncedSearch, quick, tab, vendorFilter, statusFilter, typeFilter, creatorFilter, dateFrom, dateTo, page, pageSize, addToast]);
+  }, [debouncedSearch, quick, urgentOnly, tab, vendorFilter, statusFilter, typeFilter, creatorFilter, dateFrom, dateTo, page, pageSize, addToast]);
 
   useEffect(() => { fetchPos(); }, [fetchPos]);
 
@@ -178,14 +181,14 @@ export function usePoList(active: boolean | undefined, addToast: (m: string, t?:
   };
   const tabShown: PoTab = quick ? 'open' : tab;
 
-  const clearFilters = () => { setStatusFilter(''); setTypeFilter(''); setCreatorFilter(''); setDateFrom(''); setDateTo(''); setQuick(''); setVendorFilter(''); setPage(0); };
+  const clearFilters = () => { setStatusFilter(''); setTypeFilter(''); setCreatorFilter(''); setDateFrom(''); setDateTo(''); setQuick(''); setVendorFilter(''); setUrgentOnly(false); setPage(0); };
 
   return {
     pos, loading, page, setPage, pageSize, setPageSize, totalCount, totalPages,
     // debouncedSearch is what the rows on screen were fetched with.
     search, debouncedSearch, updateSearch, statusFilter, setStatusFilter, typeFilter, setTypeFilter, creatorFilter, setCreatorFilter,
     dateFrom, setDateFrom, dateTo, setDateTo, showFilters, setShowFilters, users, fetchPos, clearFilters,
-    quick, setQuick, vendorFilter, setVendorFilter, dataVersion, bumpData,
+    quick, setQuick, vendorFilter, setVendorFilter, urgentOnly, setUrgentOnly, dataVersion, bumpData,
     tab: tabShown, setTab, otherCount,
   };
 }

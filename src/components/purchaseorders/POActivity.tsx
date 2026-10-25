@@ -17,6 +17,7 @@ const ACTIONS: Record<string, ActionMeta> = {
   REVISED: { label: 'Revised', tone: 'ac' }, LINE_CANCELLED: { label: 'Item cancelled', tone: 're' },
   REVISION_SENT: { label: 'Vendor told', tone: 'gr' }, REMINDED: { label: 'Reminder sent', tone: 'yl' },
   JOBWORK: { label: 'Jobwork started', tone: 'bl' },
+  URGENT: { label: 'Marked urgent', tone: 're' }, URGENT_CLEARED: { label: 'Urgent cleared', tone: 'neutral' },
 };
 
 export default function POActivity({ audit, poNumber, onRetry }: {

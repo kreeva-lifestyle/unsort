@@ -3,7 +3,7 @@
 // POListCards on a phone, POSectionStrip counting them — and the pager.
 // Parent owns all state & data; this is a pure presentational component.
 import { useMemo } from 'react';
-import { T, S } from '../../lib/theme';
+import { T, S, alpha } from '../../lib/theme';
 import { useIsPhone } from '../../hooks/useIsPhone';
 import { useProgressive } from '../../hooks/useProgressive';
 import Empty from '../ui/Empty';
@@ -45,6 +45,9 @@ interface Props extends POFiltersProps {
   onPageChange: (p: number | ((prev: number) => number)) => void;
   /** Something is narrowing the list (search, filters, a summary slice): an empty result is "no match", not "no orders yet". */
   narrowed: boolean;
+  /** The Urgent chip: flagged orders only. */
+  urgentOnly: boolean;
+  onUrgentToggle: () => void;
   /** The other tab's name and how many orders it holds under the same search and filters. */
   otherTab: { label: string; count: number | null };
 }
@@ -72,6 +75,9 @@ export default function POList(p: Props) {
         <button onClick={p.onToggleFilters} style={{ ...S.btnGhost, color: p.showFilters || filterActive ? T.ac2 : T.tx3, borderColor: p.showFilters || filterActive ? T.ac3 : T.bd2, background: p.showFilters ? T.ac3 : 'rgba(255,255,255,0.03)', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
           <svg viewBox="0 0 24 24" style={{ width: 13, height: 13, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" /></svg>
           Filters{filterActive ? ` (${[p.statusFilter, p.typeFilter, p.creatorFilter, p.dateFrom, p.dateTo].filter(Boolean).length})` : ''}
+        </button>
+        <button onClick={p.onUrgentToggle} aria-pressed={p.urgentOnly} title="Only orders marked urgent" style={{ ...S.btnGhost, color: p.urgentOnly ? T.re : T.tx3, borderColor: p.urgentOnly ? alpha(T.re, .35) : T.bd2, background: p.urgentOnly ? alpha(T.re, .10) : 'rgba(255,255,255,0.03)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ width: 7, height: 7, borderRadius: 4, background: T.re, flexShrink: 0 }} />Urgent
         </button>
         <button onClick={p.onPendency} title="Pending orders per vendor — print or share" style={{ ...S.btnGhost, color: T.tx3, borderColor: T.bd2, background: 'rgba(255,255,255,0.03)', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
           <svg viewBox="0 0 24 24" style={{ width: 13, height: 13, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>

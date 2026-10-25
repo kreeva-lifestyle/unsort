@@ -10,6 +10,7 @@ const ACTIONS: Record<string, ActionMeta> = {
   PAYMENT: { label: 'Paid', tone: 'gr' }, PAYMENT_DELETE: { label: 'Payment deleted', tone: 're' },
   ENTRY_DELETE: { label: 'Entry deleted', tone: 're' },
   CLOSED: { label: 'Closed', tone: 'yl' }, CANCELLED: { label: 'Cancelled', tone: 're' }, OPEN: { label: 'Reopened', tone: 'neutral' },
+  URGENT: { label: 'Marked urgent', tone: 're' }, URGENT_CLEARED: { label: 'Urgent cleared', tone: 'neutral' },
 };
 
 export default function JobActivity({ rows, jwNumber, onRetry }: {

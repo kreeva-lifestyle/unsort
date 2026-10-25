@@ -8,9 +8,10 @@ import { itemLabel } from './poItemLabel';
 import { fmtQty, unitOf } from './poStats';
 import { dueOf, daysBetween, sinceOf } from './poDue';
 import type { PurchaseOrder, PurchaseOrderItem, PurchaseOrderRevision, POChange } from '../../types/database';
+import { urgentLine } from '../../lib/urgency';
 
 type Line = Pick<PurchaseOrderItem, 'item_name' | 'fabric_code' | 'quantity' | 'received_qty' | 'unit' | 'cancelled_at'> & { sort_order?: number | null };
-type Head = Pick<PurchaseOrder, 'po_number' | 'vendor_name' | 'po_date' | 'created_at' | 'expected_date' | 'revision'>;
+type Head = Pick<PurchaseOrder, 'po_number' | 'vendor_name' | 'po_date' | 'created_at' | 'expected_date' | 'revision'> & Partial<Pick<PurchaseOrder, 'is_urgent' | 'urgent_by'>>;
 
 const DAY = new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short' });
 const day = (d: string) => DAY.format(new Date(d.length <= 10 ? `${d}T00:00:00` : d));
@@ -34,8 +35,10 @@ export function reminderText(po: Head, items: Line[], today = fileDate()): strin
   const due = !d.assumed
     ? d.late > 0 ? `It was due on ${day(d.due)} — now *${plural(d.late, 'day')} late*.` : d.left === 0 ? 'It is due today.' : `Due on ${day(d.due)}.`
     : since > 0 ? `Ordered ${plural(since, 'day')} ago.` : 'Ordered today.';
+  const urgent = urgentLine(po);
   return [
     `Hi ${po.vendor_name},`,
+    ...(urgent ? [urgent] : []),
     `Reminder for *${title(po)}*${po.po_date ? ` dated ${day(po.po_date)}` : ''}.`,
     '',
     'Still pending:',
@@ -79,8 +82,10 @@ export function revisedText(po: Head, rev: Pick<PurchaseOrderRevision, 'revision
   const head = rev.kind === 'line_cancel'
     ? `*PO #${po.po_number}* (Rev ${rev.revision}) — please *cancel* this item:`
     : `*PO #${po.po_number} has been revised (Rev ${rev.revision})* — please note the changes:`;
+  const urgent = urgentLine(po);
   return [
     `Hi ${po.vendor_name},`,
+    ...(urgent ? [urgent] : []),
     head,
     '',
     ...changes,

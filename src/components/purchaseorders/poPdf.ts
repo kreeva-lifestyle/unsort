@@ -9,6 +9,7 @@ import { PO_TYPE_LABELS, PO_STATUS_LABELS } from '../../types/database';
 import { docTitle } from '../../lib/exportName';
 import { escHtml as escHtmlShared } from '../../lib/escape';
 import { itemLabel } from './poItemLabel';
+import { dayText } from '../../lib/urgency';
 
 const escHtml = escHtmlShared;
 const inr = (n: unknown) => Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -76,6 +77,7 @@ export function buildPoPdf(po: PurchaseOrder, allItems: PurchaseOrderItem[], opt
     <div><h1>Arya Designs</h1><div class="sub">Purchase Order</div></div>
     <div class="doc">
       <div class="num">PO #${escHtml(po.po_number)}${po.revision > 1 ? ` · Rev ${escHtml(po.revision)}` : ''}</div>
+      ${po.is_urgent ? `<div class="sub" style="color:#B91C1C;font-weight:700">URGENT${po.urgent_by ? ` — needed by ${escHtml(dayText(po.urgent_by))}` : ''}</div>` : ''}
       <div class="sub">${fmtDate(po.po_date)}</div>
       <span class="st">${escHtml(PO_STATUS_LABELS[po.status] || po.status)}</span>
     </div>
