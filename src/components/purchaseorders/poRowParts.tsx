@@ -8,6 +8,7 @@ import { PO_TYPE_LABELS } from '../../types/database';
 import { itemLabel } from './poItemLabel';
 import { fmtQty } from './poStats';
 import type { RowView, Section, UnitQty } from './poSections';
+import UrgentPill from '../ui/UrgentPill';
 
 const DAY = new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short' });
 export const day = (d: string | null | undefined) => (d ? DAY.format(new Date(d.length <= 10 ? `${d}T00:00:00` : d)) : '—');
@@ -35,6 +36,7 @@ export function Title({ v, size }: { v: RowView; size: number }) {
     <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 8, minWidth: 0 }}>
       <span style={{ fontFamily: T.mono, fontSize: size, fontWeight: 700, color: T.tx, whiteSpace: 'nowrap' }}>{sku || `PO #${v.po.po_number}`}</span>
       {sku && <span style={{ fontFamily: T.mono, fontSize: 10, color: T.tx3, whiteSpace: 'nowrap' }}>PO #{v.po.po_number}</span>}
+      <UrgentPill row={v.po} />
     </span>
   );
 }

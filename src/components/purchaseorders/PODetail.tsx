@@ -10,7 +10,7 @@
 import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
-import { T, S } from '../../lib/theme';
+import { T, S, alpha } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
 import { logSwallowed } from '../../lib/errorLogger';
 import { waLink } from '../../lib/whatsapp';
@@ -31,11 +31,13 @@ import { useStartJobwork } from './useStartJobwork';
 import { reminderText } from './poWhatsApp';
 import type { PORevisionRow } from './poDetailData';
 import type { PurchaseOrder, PurchaseOrderItem, PurchaseOrderReceipt, AuditLog } from '../../types/database';
+import UrgentPill from '../ui/UrgentPill';
+import UrgentSheet from '../ui/UrgentSheet';
 
 const inr = (n: unknown) => Number(n || 0).toLocaleString('en-IN');
 const OPEN = ['approved', 'sent', 'partially_received'];
 
-export default function PODetail({ po: livePo, items: liveItems, receipts: liveReceipts, audit, names, revisions, statusColors, canManage, onClose, onChanged, onRetryActivity, onEdit, onDuplicate, onReceive, onPrint, onPendency, addToast }: {
+export default function PODetail({ po: livePo, items: liveItems, receipts: liveReceipts, audit, names, revisions, statusColors, canManage, onClose, onChanged, onRetryActivity, onEdit, onDuplicate, onReceive, onPrint, onPendency, addToast, canUrgent }: {
   po: PurchaseOrder;
   items: PurchaseOrderItem[];
   receipts: PurchaseOrderReceipt[];
@@ -48,6 +50,8 @@ export default function PODetail({ po: livePo, items: liveItems, receipts: liveR
   onRetryActivity: () => void;
   statusColors: Record<string, { bg: string; color: string }>;
   canManage: boolean;
+  /** Admin / manager / operator: may mark the order urgent. */
+  canUrgent: boolean;
   onClose: () => void;
   /** Re-reads the order; awaited so a button stays "Approving…" until the new stage has landed. */
   onChanged: () => void | Promise<void>;
@@ -69,6 +73,7 @@ export default function PODetail({ po: livePo, items: liveItems, receipts: liveR
   const [busy, setBusy] = useState('');
   const [closing, setClosing] = useState(false);
   const [cancelling, setCancelling] = useState<PurchaseOrderItem | null>(null);
+  const [urgentOpen, setUrgentOpen] = useState(false);
   // Raised from a costing sheet: the list embed carries the costing's SKU.
   const costingSku = (po as PurchaseOrder & { costing_products?: { sku: string } | null }).costing_products?.sku ?? null;
 
@@ -117,7 +122,7 @@ export default function PODetail({ po: livePo, items: liveItems, receipts: liveR
         <div className="modal-inner" style={{ ...S.modalBox, width: 720, display: 'flex', flexDirection: 'column', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
           <div style={S.modalHead}>
             {/* The status lives on the hero card below (its pill rolls when the order moves on). */}
-            <span style={S.modalTitle}>PO #{po.po_number}{po.revision > 1 && <span style={{ fontFamily: T.mono, fontSize: 11, color: T.ac2, marginLeft: 8 }}>Rev {po.revision}</span>}</span>
+            <span style={S.modalTitle}>PO #{po.po_number}{po.revision > 1 && <span style={{ fontFamily: T.mono, fontSize: 11, color: T.ac2, marginLeft: 8 }}>Rev {po.revision}</span>}{po.is_urgent && <span style={{ marginLeft: 8 }}><UrgentPill row={po} /></span>}</span>
             <button type="button" onClick={onClose} style={S.modalClose} aria-label="Close">&#215;</button>
           </div>
 
@@ -126,6 +131,7 @@ export default function PODetail({ po: livePo, items: liveItems, receipts: liveR
           <div style={{ padding: '16px 18px', overflowY: 'auto', WebkitOverflowScrolling: 'touch', flex: 1, minHeight: 0 }}>
             {/* The hero: title, status pill, the pipeline rail (the light travels when the order moves on), the latest event and who. */}
             <PORailCard po={livePo} items={liveItems} shown={shown} audit={audit} names={names} statusColors={statusColors} onLanded={() => { land(); landRef.current?.(); }} />
+            {po.is_urgent && po.urgent_reason && <div style={{ fontSize: 12, color: T.tx2, marginBottom: 12 }}><b style={{ color: T.re }}>Urgent:</b> {po.urgent_reason}</div>}
             <POStageActions po={po} items={items} canManage={canManage} ask={ask} onChanged={onChanged} waitLanded={waitLanded} busy={busy} holding={holding} setBusy={setBusy} onReceive={onReceive} onCloseRemaining={() => setClosing(true)} addToast={addToast} />
             {rev && <POReviseNotice key={rev.id} po={po} items={items} rev={rev} onDone={() => { void onChanged(); }} addToast={addToast} />}
             <POHeaderInfo po={po} costingSku={costingSku} names={names} jobs={jw.jobs} />
@@ -153,6 +159,7 @@ export default function PODetail({ po: livePo, items: liveItems, receipts: liveR
             <button onClick={onPrint} style={{ ...S.btnGhost, ...S.btnSm }}>Print / Share</button>
             {/* A real link: the tap itself opens WhatsApp with the pending lines typed in. */}
             {remind && <a href={waLink(remind, po.vendor_phone)} target="_blank" rel="noopener noreferrer" onClick={logReminder} className="touch44" style={{ ...S.btnSuccess, ...S.btnSm, textDecoration: 'none' }}>Remind vendor</a>}
+            {canUrgent && !['completed', 'closed', 'cancelled'].includes(po.status) && <button onClick={() => setUrgentOpen(true)} disabled={!!busy} style={{ ...S.btnGhost, ...S.btnSm, ...(po.is_urgent ? { color: T.re, borderColor: alpha(T.re, .35) } : {}) }}>{po.is_urgent ? 'Change urgent' : 'Mark urgent'}</button>}
             {jw.button}
             <button onClick={onPendency} style={{ ...S.btnGhost, ...S.btnSm }}>Vendor pending</button>
             <button onClick={onDuplicate} style={{ ...S.btnGhost, ...S.btnSm }}>Duplicate</button>
@@ -164,6 +171,7 @@ export default function PODetail({ po: livePo, items: liveItems, receipts: liveR
       </div>
       {/* Outside the sheet's overlay: a tap on this modal's backdrop must not bubble up and close the order. */}
       {jw.sheet}
+      {urgentOpen && <UrgentSheet module="purchase_order" id={po.id} title={`PO #${po.po_number}`} row={po} onClose={() => setUrgentOpen(false)} onSaved={() => { void onChanged(); }} addToast={addToast} />}
       {cancelling && <POLineCancelModal po={po} item={cancelling} onClose={() => setCancelling(null)} onDone={() => { setCancelling(null); void onChanged(); }} addToast={addToast} />}
     </>,
     document.body,

@@ -7,7 +7,7 @@ import type { JobworkSummary, JobworkMaterial, JobworkPayment, JobworkPaymentIns
 import type { CostingComponent } from '../minis/costing/costingModel';
 import { today, type EntryWithLines, type JobDetail, type JobActivityRow } from './jobworkModel';
 
-export const SUMMARY_COLS = 'id, jw_number, vendor_id, vendor_name, vendor_phone, job_type, sku, component, costing_product_id, pieces, qty_unit, rate, job_date, expected_date, status, notes, close_reason, created_at, updated_at, pcs_ok, pcs_rejected, pcs_rework, pcs_remaining, out_count, last_entry_date, bill, paid, due, last_pay_date, po_id, po_number';
+export const SUMMARY_COLS = 'id, jw_number, vendor_id, vendor_name, vendor_phone, job_type, sku, component, costing_product_id, pieces, qty_unit, rate, job_date, expected_date, status, notes, close_reason, created_at, updated_at, pcs_ok, pcs_rejected, pcs_rework, pcs_remaining, out_count, last_entry_date, bill, paid, due, last_pay_date, po_id, po_number, is_urgent, urgent_reason, urgent_by, urgent_at';
 const MATERIAL_COLS = 'id, order_id, name, unit, per_piece, sort_order, removed, created_at, updated_at, po_item_id';
 const ENTRY_COLS = 'id, order_id, kind, entry_date, pcs_ok, pcs_rejected, pcs_rework, note, created_by, created_at, jobwork_entry_lines(material_id, qty)';
 const PAY_COLS = 'id, order_id, pay_date, amount, mode, reference, note, created_by, created_at';
@@ -23,10 +23,10 @@ const TAB_OR: Record<JobTab, string> = {
   completed: 'status.eq.cancelled,and(status.eq.closed,due.lte.0)',
 };
 /** 'completed' is the Completed tab; the rest are slices of the Open tab. */
-export type JobFilter = 'open' | 'overdue' | 'unpaid' | 'completed';
+export type JobFilter = 'open' | 'overdue' | 'unpaid' | 'urgent' | 'completed';
 export const tabOf = (f: JobFilter): JobTab => (f === 'completed' ? 'completed' : 'open');
 export const FILTERS: { id: JobFilter; label: string }[] = [
-  { id: 'open', label: 'All open' }, { id: 'overdue', label: 'Overdue' }, { id: 'unpaid', label: 'To pay' },
+  { id: 'open', label: 'All open' }, { id: 'overdue', label: 'Overdue' }, { id: 'unpaid', label: 'To pay' }, { id: 'urgent', label: 'Urgent' },
 ];
 
 type Narrow = { search: string; vendor?: string | null };
@@ -60,8 +60,9 @@ export async function listJobs(opts: Narrow & { filter: JobFilter; page: number;
   q = q.or(TAB_OR[tabOf(opts.filter)]);
   if (opts.filter === 'overdue') q = q.eq('status', 'open').lt('expected_date', today()).gt('pcs_remaining', 0);
   if (opts.filter === 'unpaid') q = q.gt('due', 0);
+  if (opts.filter === 'urgent') q = q.eq('is_urgent', true);
   const from = opts.page * opts.perPage;
-  const { data, error, count } = await q.order('created_at', { ascending: false }).order('id').range(from, from + opts.perPage - 1);
+  const { data, error, count } = await q.order('is_urgent', { ascending: false }).order('created_at', { ascending: false }).order('id').range(from, from + opts.perPage - 1);
   return { rows: (data ?? []) as unknown as JobworkSummary[], count: count ?? 0, error };
 }
 

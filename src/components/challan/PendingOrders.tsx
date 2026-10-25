@@ -10,7 +10,7 @@
 // piece sent; cancelled ones can be reopened.
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { T, S } from '../../lib/theme';
+import { T, S, alpha } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
 import Empty from '../ui/Empty';
 import ConfirmModal, { useConfirm } from '../ui/ConfirmModal';
@@ -19,6 +19,7 @@ import OrderPickSheet from './OrderPickSheet';
 import OrderDetail from './OrderDetail';
 import type { CashChallanOrder, CashChallanOrderStatus } from '../../types/database';
 import { fetchOrders, fetchOrder, cancelOrder, reopenOrder, pieceCount, lineLeft, deliveredCount, leftCount, challansOf, fmtOrderNo, type OrderRow } from './pendingOrdersModel';
+import UrgentPill from '../ui/UrgentPill';
 
 const TABS: { key: CashChallanOrderStatus; label: string }[] = [{ key: 'pending', label: 'Pending' }, { key: 'converted', label: 'Processed' }, { key: 'cancelled', label: 'Cancelled' }];
 const daysOld = (iso: string) => Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86400000));
@@ -33,6 +34,7 @@ export default function PendingOrders({ canEdit, onConvert, addToast }: {
   addToast: (m: string, t?: string) => void;
 }) {
   const [tab, setTab] = useState<CashChallanOrderStatus>('pending');
+  const [urgentOnly, setUrgentOnly] = useState(false);
   const [search, setSearch] = useState('');
   const [rows, setRows] = useState<OrderRow[] | null>(null);
   const [form, setForm] = useState<{ open: boolean; editing: CashChallanOrder | null }>({ open: false, editing: null });
@@ -77,6 +79,8 @@ export default function PendingOrders({ canEdit, onConvert, addToast }: {
     setBusyId('');
   };
 
+  // The Urgent chip (Pending tab only) narrows the rows already read.
+  const shown = rows && urgentOnly && tab === 'pending' ? rows.filter(o => o.is_urgent) : rows;
   return (
     <div className="page-pad" style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
@@ -93,6 +97,7 @@ export default function PendingOrders({ canEdit, onConvert, addToast }: {
             <button key={t.key} onClick={() => { setTab(t.key); setRows(null); }} aria-pressed={tab === t.key} style={{ ...S.btnGhost, minHeight: 36, ...(tab === t.key ? { background: T.ac3, color: T.ac2, borderColor: T.ac33 } : { color: T.tx3, borderColor: T.bd2 }) }}>{t.label}</button>
           ))}
         </div>
+        {tab === 'pending' && <button onClick={() => setUrgentOnly(v => !v)} aria-pressed={urgentOnly} title="Only orders marked urgent" style={{ ...S.btnGhost, minHeight: 36, display: 'inline-flex', alignItems: 'center', gap: 6, ...(urgentOnly ? { color: T.re, borderColor: alpha(T.re, .35), background: alpha(T.re, .10) } : { color: T.tx3, borderColor: T.bd2 }) }}><span style={{ width: 7, height: 7, borderRadius: 4, background: T.re }} />Urgent</button>}
         <div style={{ position: 'relative', flex: 1, minWidth: 200, maxWidth: 340 }}>
           <svg viewBox="0 0 24 24" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, opacity: 0.5, pointerEvents: 'none' }}><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search ORD-0012, customer, phone, SKU…" style={{ ...S.fSearch, width: '100%' }} />
@@ -119,8 +124,9 @@ export default function PendingOrders({ canEdit, onConvert, addToast }: {
             cta={canEdit && tab === 'pending' && !search ? '+ New order' : undefined} onCta={() => setForm({ open: true, editing: null })} />
         </div>
       )}
+      {shown && shown.length === 0 && rows && rows.length > 0 && <div style={{ padding: 30, textAlign: 'center', color: T.tx3, fontSize: 12 }}>No pending order is marked urgent.</div>}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {rows?.map(o => {
+        {shown?.map(o => {
           const busy = busyId === o.id;
           const sent = deliveredCount(o), total = pieceCount(o), nums = challansOf(o);
           const part = sent > 0 && sent < total;
@@ -128,7 +134,7 @@ export default function PendingOrders({ canEdit, onConvert, addToast }: {
             <div key={o.id} onClick={() => setViewing(o)} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: 12, opacity: busy ? 0.6 : 1, cursor: 'pointer' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 11, fontFamily: T.mono, fontWeight: 600, color: T.ac2 }}>{fmtOrderNo(o.order_number)}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}><span style={{ fontSize: 11, fontFamily: T.mono, fontWeight: 600, color: T.ac2 }}>{fmtOrderNo(o.order_number)}</span><UrgentPill row={o} /></div>
                   <div style={{ fontSize: 14, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.customer_name}</div>
                   <div style={{ fontSize: 11, color: T.tx3, marginTop: 2 }}>
                     {o.items.length} item{o.items.length === 1 ? '' : 's'} · {total} pcs · <span style={o.status === 'pending' ? { color: ageColor(daysOld(o.created_at)), fontWeight: daysOld(o.created_at) > 7 ? 600 : 400 } : undefined}>{o.status === 'pending' && daysOld(o.created_at) > 7 ? `waiting ${daysOld(o.created_at)} days` : ago(o.created_at)}</span>{o.customer_phone ? ` · ${o.customer_phone}` : ''}
@@ -151,6 +157,7 @@ export default function PendingOrders({ canEdit, onConvert, addToast }: {
                 })}
               </div>
               {nums.length > 0 && <div style={{ marginTop: 6, fontSize: 11, color: T.tx3 }}>On challan{nums.length === 1 ? '' : 's'} <span style={{ color: T.gr, fontWeight: 600 }}>{nums.map(x => `#${x}`).join(' · ')}</span></div>}
+              {o.is_urgent && o.urgent_reason && <div style={{ marginTop: 6, fontSize: 11, color: T.tx2 }}><b style={{ color: T.re }}>Urgent:</b> {o.urgent_reason}</div>}
               {o.notes && <div style={{ marginTop: 6, fontSize: 11, color: T.tx3, whiteSpace: 'pre-wrap' }}>{o.notes}</div>}
               {/* Desktop: natural-width buttons, right-aligned, primary last (house card
                   layout). Mobile (.order-actions in index.css): Make challan spans
@@ -172,7 +179,8 @@ export default function PendingOrders({ canEdit, onConvert, addToast }: {
 
       {canEdit && createPortal(<button className="fab" aria-label="New order" onClick={() => setForm({ open: true, editing: null })}>+</button>, document.body)}
       {form.open && <PendingOrderForm editing={form.editing} onClose={() => setForm({ open: false, editing: null })} onSaved={() => { setForm({ open: false, editing: null }); load(); }} addToast={addToast} />}
-      {viewing && <OrderDetail order={viewing} canEdit={canEdit} addToast={addToast} onClose={() => setViewing(null)} onMake={() => pick(viewing)} />}
+      {viewing && <OrderDetail order={viewing} canEdit={canEdit} addToast={addToast} onClose={() => setViewing(null)} onMake={() => pick(viewing)}
+        onChanged={async () => { load(); try { const fresh = await fetchOrder(viewing.id); if (fresh) setViewing(fresh); } catch (e) { addToast(friendlyError(e), 'error'); } }} />}
       {picking && <OrderPickSheet order={picking} onClose={() => setPicking(null)} onPick={picks => { const o = picking; setPicking(null); onConvert(o, picks); }} />}
       <ConfirmModal {...modalProps} />
     </div>

@@ -5,12 +5,13 @@
 // set_jobwork_status; payments are a plain RLS-gated insert.
 
 // --- jobwork_orders (22 cols) ---
+import type { Urgent } from './urgency';
 export type JobworkStatus = 'open' | 'closed' | 'cancelled';
 /** What a job is counted in: whole pieces, or meters (up to 2 decimals). */
 export type JobworkQtyUnit = 'pcs' | 'm';
 export const JOBWORK_STATUSES: JobworkStatus[] = ['open', 'closed', 'cancelled'];
 
-export interface JobworkOrder {
+export interface JobworkOrder extends Urgent {
   id: string;
   jw_number: number;
   /** po_vendors row — jobworkers share the Purchase Orders vendor master. */
@@ -44,7 +45,7 @@ export interface JobworkOrder {
 export interface JobworkSummary extends Pick<JobworkOrder,
   'id' | 'jw_number' | 'vendor_id' | 'vendor_name' | 'vendor_phone' | 'job_type' | 'sku' | 'component' |
   'costing_product_id' | 'pieces' | 'qty_unit' | 'rate' | 'job_date' | 'expected_date' | 'status' | 'notes' | 'close_reason' |
-  'created_at' | 'updated_at' | 'po_id'> {
+  'created_at' | 'updated_at' | 'po_id' | 'is_urgent' | 'urgent_reason' | 'urgent_by' | 'urgent_at'> {
   /** The source PO's number (joined), null when the job was not started from a PO. */
   po_number: number | null;
   pcs_ok: number;

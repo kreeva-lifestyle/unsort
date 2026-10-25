@@ -3,6 +3,7 @@
 // which re-exports everything here — import from either.
 // ─── Purchase Orders ────────────────────────────────────────────────────
 // Vendor master (only name + phone are mandatory).
+import type { Urgent } from './urgency';
 export interface POVendor {
   id: string;
   name: string;
@@ -32,7 +33,7 @@ export type PurchaseOrderStatus =
 export type PurchaseOrderType = 'fabric' | 'job_work' | 'material';
 
 // purchase_orders header. Money fields are recomputed server-side in the RPCs.
-export interface PurchaseOrder {
+export interface PurchaseOrder extends Urgent {
   id: string;
   po_number: number;
   vendor_id: string | null;

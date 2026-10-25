@@ -10,6 +10,7 @@ import { PO_TYPE_LABELS, PO_STATUS_LABELS } from '../../types/database';
 import { exportName } from '../../lib/exportName';
 import { friendlyError } from '../../lib/friendlyError';
 import { itemLabel } from './poItemLabel';
+import { dayText } from '../../lib/urgency';
 
 const inr = (n: unknown) => Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtDate = (d: string | null | undefined) => d ? new Date(d + (d.length <= 10 ? 'T00:00:00' : '')).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
@@ -46,6 +47,7 @@ export function renderPoImage(po: PurchaseOrder, allItems: PurchaseOrderItem[], 
   ctx.fillText('Arya Designs', PAD, y);
   ctx.fillStyle = '#6B7280'; ctx.font = `400 12px ${SANS}`;
   ctx.fillText('Purchase Order', PAD, y + 18);
+  if (po.is_urgent) { ctx.fillStyle = '#B91C1C'; ctx.font = `700 12px ${SANS}`; ctx.fillText(`URGENT${po.urgent_by ? ` — needed by ${dayText(po.urgent_by)}` : ''}`, PAD, y + 40); }
   ctx.textAlign = 'right'; ctx.fillStyle = '#111827'; ctx.font = `700 18px ${SANS}`;
   ctx.fillText(`PO #${po.po_number}${po.revision > 1 ? ` · Rev ${po.revision}` : ''}`, W - PAD, y);
   ctx.fillStyle = '#6B7280'; ctx.font = `400 12px ${SANS}`;

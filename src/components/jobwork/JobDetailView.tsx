@@ -20,8 +20,9 @@ import JobForm from './JobForm';
 import { loadJob, loadJobActivity, costingImage, deleteEntry, deletePayment, setStatus } from './jobworkApi';
 import { shareJob, shareVendor } from './jobworkShare';
 import { materialBalances, rejectedHeld, inr, per, type JobDetail, type TimelineRow, type JobActivityRow } from './jobworkModel';
+import UrgentSheet from '../ui/UrgentSheet';
 
-type Sheet = null | 'out' | 'in' | 'pay' | 'close' | 'edit' | 'share' | 'more';
+type Sheet = null | 'out' | 'in' | 'pay' | 'close' | 'edit' | 'share' | 'more' | 'urgent';
 
 export default function JobDetailView({ id, onBack, onChanged, addToast }: {
   id: string;
@@ -134,7 +135,7 @@ export default function JobDetailView({ id, onBack, onChanged, addToast }: {
         ...(boss ? [{ label: `All open jobs of ${job.vendor_name} — with dues`, onClick: () => share('vendor', true) }] : []),
       ]} />
       <ActionSheet open={sheet === 'more'} title={`JW #${job.jw_number}`} onClose={() => setSheet(null)} actions={[
-        ...(open ? [{ label: 'Edit job', onClick: () => setSheet('edit') }, { label: 'Close job', onClick: () => setSheet('close') }] : []),
+        ...(open ? [{ label: 'Edit job', onClick: () => setSheet('edit') }, { label: job.is_urgent ? 'Urgent — change or clear' : 'Mark urgent', onClick: () => setSheet('urgent') }, { label: 'Close job', onClick: () => setSheet('close') }] : []),
         ...(!open && boss ? [{ label: 'Reopen job', onClick: () => status('open') }] : []),
         ...(open && boss && job.out_count === 0 && job.pcs_ok + job.pcs_rejected === 0 && Number(job.paid) === 0 ? [{ label: 'Cancel job', onClick: () => status('cancelled'), danger: true }] : []),
       ]} />
@@ -142,6 +143,7 @@ export default function JobDetailView({ id, onBack, onChanged, addToast }: {
       {sheet === 'pay' && <PaymentModal job={job} onClose={() => setSheet(null)} onSaved={done} addToast={addToast} />}
       {sheet === 'close' && <CloseJobModal job={job} onClose={() => setSheet(null)} onSaved={done} addToast={addToast} />}
       {sheet === 'edit' && <JobForm edit={d} onClose={() => setSheet(null)} onSaved={done} addToast={addToast} />}
+      {sheet === 'urgent' && <UrgentSheet module="jobwork" id={job.id} title={`JW #${job.jw_number}`} row={job} onClose={() => setSheet(null)} onSaved={done} addToast={addToast} />}
       <ConfirmModal {...modalProps} />
     </div>
   );
