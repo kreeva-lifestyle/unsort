@@ -1,4 +1,4 @@
-// Admin-only card: pick which Claude model and how much effort every AI
+// Admin-only card: pick which Claude model and how much effort every AI (except Size Summariser, which has its own)
 // feature uses (Listing AI, product details, pricing suggestions, buyer
 // finder). Stored server-side (app_secrets via the listing-ai function's
 // set_model / set_effort actions) so every device uses the same choice.
@@ -94,7 +94,7 @@ export default function ModelCard({ model: savedModel, effort, onSaved, addToast
       </div>
       <div style={{ fontSize: 11, color: T.tx3, marginTop: 6, lineHeight: 1.5 }}>{EFFORTS.find(e => e.id === effort)?.desc}</div>
       <div style={{ fontSize: 10, color: T.tx3, marginTop: 8, lineHeight: 1.5 }}>
-        The model and effort apply to every AI feature: listings, product details, pricing suggestions and the buyer finder. AI Suggest on the Bulk Teach page always uses Haiku at low effort — its picks are checked against the marketplace lists either way.
+        The model and effort apply to every AI feature: listings, product details, pricing suggestions and the buyer finder. AI Suggest on the Bulk Teach page always uses Haiku at low effort — its picks are checked against the marketplace lists either way. Size Summariser (tailor sheets) has its own model and effort under Settings → Size Summariser — it reads 25 page pictures per form, so its choice is made separately.
       </div>
     </div>
   );
