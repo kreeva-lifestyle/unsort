@@ -15,6 +15,10 @@ scheduled check in `docs/PROBLEM-REPORTS.md`): open the PR and stop. Merge
 only after an admin has approved it in the app (`status = 'approved'`). The
 owner decided this on 2026-10-20; never merge such a PR otherwise.
 
+## Owner's reminders
+When the owner asks to be reminded about a task, schedule it for **1:00 PM
+IST (07:30 UTC)** on the day they name, unless they give another time.
+
 ## Pre-merge self-review — MANDATORY
 Before creating the PR, re-read the full diff (`git diff main...HEAD`) as a
 reviewer, not the author, and check:
