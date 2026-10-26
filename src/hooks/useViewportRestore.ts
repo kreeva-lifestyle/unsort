@@ -40,9 +40,19 @@ const isTextField = (el: Element | null): boolean => {
 
 const IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const standalone = (): boolean => (navigator as Navigator & { standalone?: boolean }).standalone === true || window.matchMedia('(display-mode: standalone)').matches;
-/** The height the page should have when the OS shrank it by a status bar; 0 when nothing says it did. */
+/** The status bar's height when the page runs under it (black-translucent); 0 when it starts below it (index.html now asks for "black"). */
+const topInset = (): number => {
+  const probe = document.createElement('div');
+  probe.style.cssText = 'position:fixed;left:-9999px;top:0;padding-top:env(safe-area-inset-top,0px);';
+  document.body.appendChild(probe);
+  const v = parseFloat(getComputedStyle(probe).paddingTop) || 0;
+  probe.remove();
+  return v;
+};
+/** The height the page should have when the OS shrank it by a status bar; 0 when nothing says it did.
+ *  Only meaningful when the page runs under the status bar: laid out below it, inner < screen is the normal state. */
 const screenTarget = (): number => {
-  if (!IOS || !standalone()) return 0;
+  if (!IOS || !standalone() || topInset() === 0) return 0;
   const gap = window.screen.height - window.innerHeight;
   return gap > 0 && gap <= 80 ? window.screen.height : 0;
 };
