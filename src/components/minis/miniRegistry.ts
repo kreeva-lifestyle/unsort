@@ -19,7 +19,7 @@ export const MINI_TILES: { id: MiniView; title: string; desc: string }[] = [
   { id: 'cbazaar', title: 'Cbazaar Import', desc: 'Import Cbazaar vendor Excel, generate ARYA SKU column, export as CSV' },
   { id: 'odette', title: 'Odette Import', desc: 'Aggregate SKU quantities across multiple vendor sheets' },
   { id: 'indya', title: 'Indya Import', desc: 'Fill Indya’s product master with stock from your vendor sheets — same flow as Odette, the file goes back exactly as it came' },
-  { id: 'address', title: 'LabelMaker', desc: 'Save addresses, print 4x6 inch courier label stickers' },
+  { id: 'address', title: 'LabelMaker', desc: 'Save addresses, print 4x6 inch courier label stickers; print a Mirraw label PDF on one' },
   { id: 'trackly', title: 'Trackly', desc: 'Shorten URLs and track clicks — device, browser, location, timing analytics' },
   { id: 'return_labels', title: 'Product QC Labels', desc: 'Print QC assured & return stickers — same size as brand tag labels' },
   { id: 'ratecard', title: 'Vendor Studio', desc: 'Everything for vendors in one place — rate cards (Excel, manual or from master), catalog downloads, catalog maker and product details, shared as images' },
