@@ -33,6 +33,7 @@ const DropboxUploader = retryImport(() => import('../components/minis/uploader/D
 const ProductCosting = retryImport(() => import('../components/minis/costing/ProductCosting'));
 const PriceProjector = retryImport(() => import('../components/minis/pricing/PriceProjector'));
 const OtpInbox = retryImport(() => import('../components/minis/OtpInbox'));
+const SizeSummariser = retryImport(() => import('../components/minis/sizesummariser/SizeSummariser'));
 const toolFallback = <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40 }}><div className="spinner" /></div>;
 
 
@@ -306,7 +307,7 @@ export default function Minis({ navigateTo, active = true }: { navigateTo?: (tab
     address: <AddressPrinter addToast={addToast} />, return_labels: <ReturnLabels addToast={addToast} />,
     dropbox_links: <DropboxLinkGenerator addToast={addToast} />, forward_dropbox: <ForwardDropbox addToast={addToast} onBack={goHome} />,
     otp: <OtpInbox addToast={addToast} />, costing: <ProductCosting addToast={addToast} />, dropbox_upload: <DropboxUploader addToast={addToast} />,
-    client_finder: <ClientFinder addToast={addToast} />, ratecard: <VendorStudio addToast={addToast} />,
+    client_finder: <ClientFinder addToast={addToast} />, ratecard: <VendorStudio addToast={addToast} />, size_summariser: <SizeSummariser addToast={addToast} />,
   };
   if (simple[view]) return (
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>

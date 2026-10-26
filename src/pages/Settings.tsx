@@ -14,10 +14,11 @@ import PaymentQR from '../components/settings/PaymentQR';
 import ErrorLogs from '../components/settings/ErrorLogs';
 import ProblemReports from '../components/settings/ProblemReports';
 import ListingAISettings from '../components/settings/ListingAISettings';
+import SizeSummariserSettings from '../components/settings/SizeSummariserSettings';
 import PricingSettings from '../components/settings/PricingSettings';
 import PackCamSettings from '../components/settings/packcam/PackCam';
 
-const TAB_ICONS: Record<string, string> = { myprofile: 'user', categories: 'grid', locations: 'pin', brands: 'tag', users: 'users', packtime: 'scan', packcam: 'layers', reports: 'alert', printers: 'print', listingai: 'cpu', pricing: 'receipt' };
+const TAB_ICONS: Record<string, string> = { myprofile: 'user', categories: 'grid', locations: 'pin', brands: 'tag', users: 'users', packtime: 'scan', packcam: 'layers', reports: 'alert', printers: 'print', listingai: 'cpu', pricing: 'receipt', sizesummariser: 'file' };
 
 export default function Settings({ profile, addToast, active = true }: { profile: any; addToast: (msg: string, type?: string) => void; active?: boolean }) {
   const isAdmin = profile?.role === 'admin';
@@ -27,7 +28,7 @@ export default function Settings({ profile, addToast, active = true }: { profile
   // needs it regardless of role, so it lives in the base tab list.
   const tabs = [{ id: 'myprofile', label: 'My Profile' }, { id: 'printers', label: 'Printers' }];
   if (canManage) tabs.push({ id: 'categories', label: 'Categories' }, { id: 'locations', label: 'Locations' }, { id: 'brands', label: 'Brands' }, { id: 'pricing', label: 'Pricing' });
-  if (isAdmin) tabs.push({ id: 'users', label: 'Users' }, { id: 'packtime', label: 'PackStation' }, { id: 'packcam', label: 'Pack Cam' }, { id: 'payment', label: 'Payment QR' }, { id: 'listingai', label: 'Listing AI' }, { id: 'reports', label: 'Problem reports' }, { id: 'errorlogs', label: 'Error Logs' });
+  if (isAdmin) tabs.push({ id: 'users', label: 'Users' }, { id: 'packtime', label: 'PackStation' }, { id: 'packcam', label: 'Pack Cam' }, { id: 'payment', label: 'Payment QR' }, { id: 'listingai', label: 'Listing AI' }, { id: 'sizesummariser', label: 'Size Summariser' }, { id: 'reports', label: 'Problem reports' }, { id: 'errorlogs', label: 'Error Logs' });
   const [tab, setTab] = useState('myprofile');
   // Back returns to My Profile instead of leaving Settings entirely.
   useBackClose(tab !== 'myprofile', () => setTab('myprofile'));
@@ -56,6 +57,7 @@ export default function Settings({ profile, addToast, active = true }: { profile
       {tab === 'printers' && <PrinterSettings addToast={addToast} />}
       {tab === 'payment' && isAdmin && <PaymentQR addToast={addToast} />}
       {tab === 'listingai' && isAdmin && <ListingAISettings addToast={addToast} />}
+      {tab === 'sizesummariser' && isAdmin && <SizeSummariserSettings addToast={addToast} />}
       {tab === 'reports' && isAdmin && <ProblemReports addToast={addToast} />}
       {tab === 'errorlogs' && isAdmin && <ErrorLogs addToast={addToast} />}
     </div>
