@@ -5,7 +5,9 @@ import { T, S } from '../../lib/theme';
 import { ClipMarkTag, type ClipMark } from '../packcam/ScanCamStatus';
 
 // In-memory view model for the recent-scans strip. Not a DB row.
-export interface ScanEntry { awb: string; time: string; success: boolean; pending?: boolean; at?: number; id?: string; }
+export interface ScanEntry { awb: string; time: string; success: boolean; /** phone = on this phone, saved = in the app, sheet = in the Google Sheet too */ state?: 'phone' | 'saved' | 'sheet'; at?: number; id?: string; }
+
+const STATE: Record<NonNullable<ScanEntry['state']>, { label: string; color: string }> = { phone: { label: '· on phone', color: T.yl }, saved: { label: '· saved', color: T.tx3 }, sheet: { label: '· in sheet', color: T.gr } };
 
 interface Props {
   scans: ScanEntry[]; successCount: number; open: boolean; markOf: (awb: string) => ClipMark | undefined;
@@ -35,11 +37,11 @@ export default function RecentScans({ scans, successCount, open, markOf, onToggl
               <div style={{ fontSize: 9, color: T.tx3, marginTop: 1 }}>
                 {s.time}
                 {!s.success && <span style={{ color: T.re, fontWeight: 700, marginLeft: 6 }}>· DUPLICATE</span>}
-                {s.success && s.pending && <span style={{ color: T.yl, fontWeight: 600, marginLeft: 6 }}>· syncing</span>}
+                {s.success && s.state && <span style={{ color: STATE[s.state].color, fontWeight: 600, marginLeft: 6 }}>{STATE[s.state].label}</span>}
                 {s.success && <ClipMarkTag mark={markOf(s.awb)} />}
               </div>
             </div>
-            {s.success && !s.pending && i === 0 && <button type="button" className="touch44" onClick={(e) => { e.stopPropagation(); onUndo(); }} style={{ ...S.btnGhost, ...S.btnSm, display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>↩ Undo</button>}
+            {s.success && i === 0 && <button type="button" className="touch44" onClick={(e) => { e.stopPropagation(); onUndo(); }} style={{ ...S.btnGhost, ...S.btnSm, display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>↩ Undo</button>}
           </div>
         ))}
       </div>}
