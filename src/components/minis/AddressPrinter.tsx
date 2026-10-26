@@ -1,10 +1,12 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase, currentUserId } from '../../lib/supabase';
 import { friendlyError } from '../../lib/friendlyError';
 import { T, S } from '../../lib/theme';
 import { useBackClose } from '../../hooks/useBackClose';
 import { printOrQueue } from '../../lib/printQueue';
+import PrintPreview from '../ui/PrintPreview';
+import MirrawLabel from './MirrawLabel';
 import SwipeRow from '../ui/SwipeRow';
 import { docTitle, fileDate } from '../../lib/exportName';
 import ConfirmModal, { useConfirm } from '../ui/ConfirmModal';
@@ -45,7 +47,6 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: '', phone: '', address: '', city: '', state: '', pincode: '' });
   const [printHtml, setPrintHtml] = useState<string | null>(null);
-  const printFrameRef = useRef<HTMLIFrameElement | null>(null);
   const [copies, setCopies] = useState<Record<string, number>>({});
   const getCopies = (id: string) => copies[id] || 1;
   const setCopy = (id: string, v: number) => setCopies(prev => ({ ...prev, [id]: Math.max(1, v) }));
@@ -110,6 +111,7 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
           {selected.size > 0 && <div onClick={printBulk} style={{ ...S.btnSuccess, cursor: 'pointer' }}>Print {selected.size} Label{selected.size > 1 ? 's' : ''}</div>}
+          <MirrawLabel addToast={addToast} />
           <div onClick={openAdd} style={S.btnPrimary}>+ Add Address</div>
         </div>
       </div>
@@ -201,21 +203,8 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
         </div>
       </div>, document.body)}
 
-      {/* Print Preview */}
-      {printHtml && createPortal(
-        <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: T.bg, display: 'flex', flexDirection: 'column', overscrollBehavior: 'contain' }}>
-          <div style={{ padding: '12px 16px', paddingTop: 'max(12px, env(safe-area-inset-top))', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,.08)', background: 'rgba(8,11,20,.95)', backdropFilter: 'blur(20px)' }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>Label Preview</span>
-            <button onClick={() => setPrintHtml(null)} style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.04)', color: T.tx2, cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Close">&#215;</button>
-          </div>
-          <iframe ref={printFrameRef} title="Address label preview" srcDoc={printHtml} style={{ flex: 1, border: 'none', width: '100%', background: '#fff' }} />
-          <div style={{ padding: '10px 16px', paddingBottom: 'max(10px, env(safe-area-inset-bottom))', background: 'rgba(8,11,20,.95)', borderTop: '1px solid rgba(255,255,255,.08)', display: 'flex', gap: 10, justifyContent: 'center' }}>
-            <button onClick={() => setPrintHtml(null)} style={{ padding: '10px 24px', borderRadius: 8, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.04)', color: T.tx2, fontSize: 13, cursor: 'pointer', fontWeight: 500, flex: 1, maxWidth: 200 }}>Close</button>
-            <button onClick={() => printOrQueue('label_large', printHtml!, { width: 4, height: 6 }, 'Address Labels', undefined, addToast, printFrameRef.current)} style={{ ...S.btnPrimary, padding: '10px 24px', fontSize: 13, flex: 1, maxWidth: 200 }}>Print</button>
-          </div>
-        </div>,
-        document.body
-      )}
+      {printHtml && <PrintPreview title="Label Preview" html={printHtml} onClose={() => setPrintHtml(null)}
+        onPrint={frame => printOrQueue('label_large', printHtml, { width: 4, height: 6 }, 'Address Labels', undefined, addToast, frame)} />}
     </div>
   );
 }
