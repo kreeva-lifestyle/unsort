@@ -29,7 +29,7 @@ export async function loadSettings(): Promise<SummariserSettings> {
   };
 }
 export async function saveSettings(s: SummariserSettings): Promise<void> {
-  const { error } = await supabase.from('app_settings').upsert({ key: 'size_summariser', value: s, updated_at: new Date().toISOString() });
+  const { error } = await supabase.from('app_settings').upsert({ key: 'size_summariser', value: s, updated_at: new Date().toISOString() }, { onConflict: 'key' });
   if (error) throw error;
 }
 
