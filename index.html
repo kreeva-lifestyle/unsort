@@ -15,7 +15,16 @@
     <meta name="theme-color" content="#060810" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <!-- "black", not "black-translucent": translucent runs the page under the
+         status bar (frame at 0, full 852pt tall) and iOS 17–26 has a bug where,
+         after the first keyboard, it re-lays the web view out at the
+         below-status-bar height (852 − 59 = 793) while leaving it at the top —
+         a 59pt dead band under the bottom nav that no page code can grow back
+         (owner's phone, 2026-10-25: screen 852, page 793, six repairs refused).
+         With "black" the page starts below the status bar from the outset, so
+         there is no taller layout to fall from; the status-bar strip is painted
+         black by iOS, which on this dark header is invisible. -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <meta name="apple-mobile-web-app-title" content="DailyOffice" />
     <link rel="manifest" href="/manifest.json" />
     <link rel="apple-touch-icon" href="/icon-192.png" />
