@@ -1,15 +1,14 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { BarcodeDetector } from 'barcode-detector/ponyfill';
-import { supabase, SUPABASE_ANON_KEY } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { useNotifications } from '../hooks/useNotifications';
 import { useBreadcrumb } from '../hooks/useBreadcrumb';
 import { useBackClose } from '../hooks/useBackClose';
 import { friendlyError } from '../lib/friendlyError';
 
-const EDGE_FN = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/packtime';
 
-import { T, S, alpha } from '../lib/theme';
+import { T, S } from '../lib/theme';
 import DateInput from '../components/ui/DateInput';
 import { SkeletonRows } from '../components/ui/Skeleton';
 import SwipeRow from '../components/ui/SwipeRow';
@@ -17,29 +16,32 @@ import HistoryStats from '../components/packtime/HistoryStats';
 import { useScanClips, ScanVideoButton } from '../components/packcam/ScanVideo';
 import { usePackcamLive, CamStatusLine } from '../components/packcam/ScanCamStatus';
 import RecentScans, { type ScanEntry } from '../components/packtime/RecentScans';
-import { sendScan, failedDbScans, persistFailed, cancelScan } from '../components/packtime/scanSend';
+import { callEdge, getAuthHeaders, EDGE_FN } from '../components/packtime/edge';
+import { enqueueScan, enqueueUndo, drainOutbox, subscribeOutbox, subscribeSaved, getOutboxState, type OutboxState } from '../components/packtime/outbox';
+import { useConnection } from '../components/packtime/connection';
+import { saveInit, loadInit, ageText } from '../components/packtime/initCache';
+import SyncBanner from '../components/packtime/SyncBanner';
+import SheetCheck from '../components/packtime/SheetCheck';
+import { useAuth } from '../hooks/useAuth';
 import { beep, beepOk, beepErr } from '../components/packtime/beep';
 import type {
   Brand,
   PackTimeCourier,
   PackTimeCamera,
   PackTimeScan,
-  PackTimeScanInsert,
   PackTimeShortcut,
 } from '../types/database';
 import { exportName, fileRange, fileDate } from '../lib/exportName';
 import { downloadFile } from '../lib/downloadFile';
-import { registerBeforeSignOut } from '../lib/beforeSignOut';
-import { logSwallowed } from '../lib/errorLogger';
 import { useModalLock } from '../hooks/useModalLock';
 
 // ── Beep ────────────────────────────────────────────────────────────────────────
 
-// ── Timestamp helper ────────────────────────────────────────────────────────────
-function pad(n: number) { return n < 10 ? '0' + n : String(n); }
-function formatTimestamp(d: Date) {
-  return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-}
+/** Where a history row stands with the Google Sheet (old-app rows wrote the sheet themselves: no record). */
+const sheetState = (r: PackTimeScan) => r.sheet_synced_at ? <span style={{ color: T.gr }}>in sheet</span>
+  : r.sheet_by_server ? <span style={{ color: r.sheet_error ? T.re : T.yl }} title={r.sheet_error || 'waiting for the server to write it'}>{r.sheet_error ? 'retrying' : 'queued'}</span>
+  : <span style={{ color: T.tx3 }}>—</span>;
+
 
 // LOCAL calendar date as YYYY-MM-DD. toISOString().slice(0,10) is the UTC
 // date — before 05:30 IST that is *yesterday*, which made "Today" filters
@@ -58,148 +60,9 @@ function csvCell(v: unknown): string {
   return '"' + s.replace(/"/g, '""') + '"';
 }
 
-// ── Background write queue ──────────────────────────────────────────────────────
-type QueueItem = { rows: unknown[][]; sheetName: string; retries: number; };
-const writeQueue: QueueItem[] = [];
-let flushing = false;
-// Failed batches that exceeded retries — components subscribe via the listeners
-// list and show a prominent UI alert so the operator knows scans were lost.
-const droppedBatches: { rows: unknown[][]; sheetName: string; ts: number }[] = [];
-const droppedListeners = new Set<() => void>();
-const notifyDropped = () => { droppedListeners.forEach(fn => { try { fn(); } catch {} }); };
-function getDroppedBatches() { return droppedBatches; }
-function clearDroppedBatches() { droppedBatches.length = 0; notifyDropped(); }
-
-
-async function flushQueue() {
-  if (flushing || writeQueue.length === 0) return;
-  flushing = true;
-  while (writeQueue.length > 0) {
-    const batch: unknown[][] = [];
-    const sheetName = writeQueue[0].sheetName;
-    let batchRetries = 0;
-    while (writeQueue.length > 0 && writeQueue[0].sheetName === sheetName && batch.length < 20) {
-      const item = writeQueue.shift()!;
-      batchRetries = Math.max(batchRetries, item.retries);
-      batch.push(...item.rows);
-    }
-    try {
-      const headers = await getAuthHeaders();
-      // Timeout like callEdge has: a half-open socket (wifi AP dying without a
-      // RST) left this await hanging forever, `flushing` stuck true, and the
-      // queue grew silently with no retry and no dropped-scan warning.
-      const ctl = new AbortController();
-      const t = setTimeout(() => ctl.abort(), 20000);
-      try {
-        const resp = await fetch(EDGE_FN, {
-          method: 'POST', headers,
-          body: JSON.stringify({ action: 'batch', rows: batch, sheetName }),
-          signal: ctl.signal,
-        });
-        if (!resp.ok) throw new Error('HTTP ' + resp.status);
-      } finally { clearTimeout(t); }
-    } catch {
-      const retries = batchRetries + 1;
-      if (retries <= 3) {
-        writeQueue.unshift({ rows: batch, sheetName, retries });
-        // Escalating gaps (2s → 8s → 20s, ~30s total) instead of 3×2s: the
-        // old ~6s window was shorter than a typical iOS network stall during
-        // an active phone call, so real scans dropped to the manual-Retry
-        // banner for blips that would have healed themselves seconds later.
-        await new Promise(r => setTimeout(r, [2000, 8000, 20000][retries - 1] || 2000));
-      }
-      if (retries > 3) {
-        droppedBatches.push({ rows: batch, sheetName, ts: Date.now() });
-        notifyDropped();
-      }
-    }
-  }
-  flushing = false;
-}
-
-// Sign-out drains the queue under the signing-out user's token (see
-// beforeSignOut.ts). Waits for an in-flight flush first, bounded by the
-// runner's cap, so a wifi stall cannot hold the sign-out button hostage.
-registerBeforeSignOut(async () => {
-  for (let i = 0; i < 30 && flushing; i++) await new Promise(r => setTimeout(r, 200));
-  await flushQueue();
-});
-
-function enqueueWrite(rows: unknown[][], sheetName: string) {
-  writeQueue.push({ rows, sheetName, retries: 0 });
-  flushQueue();
-}
-
-if (typeof window !== 'undefined') {
-  window.addEventListener('beforeunload', (e) => {
-    if (writeQueue.length > 0) {
-      flushing = false;
-      const pending = writeQueue.splice(0);
-      for (const item of pending) {
-        // sendBeacon can't send Authorization headers → edge function 401s.
-        // fetch+keepalive works during unload and sends auth; payloads are
-        // tiny. Uses the cached session token (getSession is async and unload
-        // handlers can't await) — the edge verifies the caller now, so the
-        // anon key alone would be rejected.
-        const body = JSON.stringify({ action: 'batch', rows: item.rows, sheetName: item.sheetName });
-        fetch(EDGE_FN, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${lastAccessToken || SUPABASE_ANON_KEY}`, 'apikey': SUPABASE_ANON_KEY }, body, keepalive: true }).catch(e => logSwallowed('Sheet sync on unload', e));
-      }
-      e.returnValue = '';
-    }
-  });
-}
-
-// The packtime Edge Function verifies the CALLER, not just the header: it
-// resolves the Bearer token to a signed-in active profile (gateway verify_jwt
-// is off, so ES256 session tokens are fine — same pattern as odette-export
-// and client-finder). Sending the anon key here would 401: the anon key
-// proves nothing about who is scanning, and it ships in the JS bundle.
-let lastAccessToken = '';
-const getAuthHeaders = async () => {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (session?.access_token) lastAccessToken = session.access_token;
-  return {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${session?.access_token || SUPABASE_ANON_KEY}`,
-    'apikey': SUPABASE_ANON_KEY,
-  };
-};
-
-// POST to the packtime Edge Function with a timeout and a single retry on
-// transient network failures. Returns a parsed body plus diagnostic fields so
-// the UI can show real error text instead of a generic "Cannot connect".
-async function callEdge(body: unknown, timeoutMs = 20000): Promise<any> {
-  let lastDetails = '';
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const ctl = new AbortController();
-    const t = setTimeout(() => ctl.abort(), timeoutMs);
-    try {
-      const headers = await getAuthHeaders();
-      const resp = await fetch(EDGE_FN, { method: 'POST', headers, body: JSON.stringify(body), signal: ctl.signal });
-      clearTimeout(t);
-      const text = await resp.text();
-      let parsed: any = null;
-      try { parsed = text ? JSON.parse(text) : null; } catch { /* non-JSON response */ }
-      if (resp.ok) return parsed ?? { ok: false, error: 'Empty response from server.' };
-      const gatewayMsg = parsed?.error || parsed?.message || parsed?.msg || text.slice(0, 180);
-      lastDetails = `HTTP ${resp.status}${gatewayMsg ? ` — ${gatewayMsg}` : ''}`;
-      return { ok: false, error: resp.status >= 500 ? 'Server error. Try again in a moment.' : 'Request rejected by server.', details: lastDetails };
-    } catch (err: any) {
-      clearTimeout(t);
-      const isTimeout = err?.name === 'AbortError';
-      lastDetails = isTimeout ? `timeout after ${timeoutMs}ms` : (err?.message || 'network error');
-      if (attempt === 0) { await new Promise(r => setTimeout(r, 1500)); continue; }
-      return { ok: false, error: isTimeout ? 'Server timed out. Try again.' : 'Cannot connect to server. Try again.', details: lastDetails };
-    }
-  }
-  return { ok: false, error: 'Cannot connect to server. Try again.', details: lastDetails };
-}
-
 // ── Component ───────────────────────────────────────────────────────────────────
 export default function PackTime({ active }: { active?: boolean } = {}) {
   const { addToast } = useNotifications();
-  const [isOffline, setIsOffline] = useState(!navigator.onLine);
-  const [droppedCount, setDroppedCount] = useState(0);
   // Config from Supabase
   const [couriers, setCouriers] = useState<PackTimeCourier[]>([]);
   const [cameras, setCameras] = useState<Pick<PackTimeCamera, 'id' | 'number' | 'is_active' | 'created_at'>[]>([]);
@@ -215,6 +78,12 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
   const [shortcuts, setShortcuts] = useState<PackTimeShortcut[]>([]);
 
   const [started, setStarted] = useState(false);
+  // The connection as it really is (heartbeat while scanning) and the on-phone outbox.
+  const conn = useConnection(started);
+  const [outbox, setOutbox] = useState<OutboxState>(getOutboxState);
+  useEffect(() => subscribeOutbox(setOutbox), []);
+  const { profile } = useAuth();
+  const boss = profile?.role === 'admin' || profile?.role === 'manager';
 
   // Verify
   const [verifying, setVerifying] = useState(false);
@@ -224,13 +93,14 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
   const [awbInput, setAwbInput] = useState('');
   const [sessionCount, setSessionCount] = useState(0);
   const [recentScans, setRecentScans] = useState<ScanEntry[]>([]);
+  const recentRef = useRef<ScanEntry[]>([]);
+  useEffect(() => { recentRef.current = recentScans; }, [recentScans]);
   const successScans = useMemo(() => recentScans.filter(s => s.success), [recentScans]);
   const [flash, setFlash] = useState<'success' | 'error' | null>(null);
   const [confirmChangeSetup, setConfirmChangeSetup] = useState(false);
   const [sessionListOpen, setSessionListOpen] = useState(true);
   const [duplicateAwb, setDuplicateAwb] = useState('');
   const [showComplete, setShowComplete] = useState(false);
-  const [pendingWrites, setPendingWrites] = useState(0);
   const [lastScanned, setLastScanned] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
@@ -261,14 +131,10 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
   const sessionIdRef = useRef('');
   const sessionStartRef = useRef(Date.now());
   const userIdRef = useRef<string | null>(null);
-  const [dbFails, setDbFails] = useState(failedDbScans.length);
   // Duplicates hit this session — the summary's Duplicates tile read from
   // recentScans, which duplicates are deliberately never added to, so it was
   // hard-coded zero in effect.
   const [dupCount, setDupCount] = useState(0);
-  // Lets effects declared earlier (online/offline) reach the retry callback
-  // defined later without reordering half the component.
-  const retryFailedRef = useRef<() => void>(() => {});
 
   // Camera scanner
   const [cameraOpen, setCameraOpen] = useState(false);
@@ -300,49 +166,35 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     return () => { subscription.unsubscribe(); };
   }, []);
 
-  // ── Offline detection ─────────────────────────────────────────────────────
-  useEffect(() => {
-    const goOff = () => setIsOffline(true);
-    // Actually sync on reconnect — this toast used to fire with no retry
-    // behind it, while flushQueue had already given up after ~6s of downtime.
-    const goOn = () => { setIsOffline(false); addToast('Back online — syncing...', 'success'); flushQueue(); retryFailedRef.current(); };
-    window.addEventListener('offline', goOff);
-    window.addEventListener('online', goOn);
-    return () => { window.removeEventListener('offline', goOff); window.removeEventListener('online', goOn); };
-  }, [addToast]);
-
-  // ── Dropped batch alerts (after 3 retries) ────────────────────────────────
-  useEffect(() => {
-    const update = () => {
-      const all = getDroppedBatches();
-      const total = all.reduce((s, b) => s + b.rows.length, 0);
-      if (total > droppedCount) addToast(`${total - droppedCount} scan(s) failed to sync after retries — check connection`, 'error');
-      setDroppedCount(total);
-    };
-    droppedListeners.add(update);
-    return () => { droppedListeners.delete(update); };
-  }, [droppedCount, addToast]);
-
   // ── Focus ───────────────────────────────────────────────────────────────────
   const focusInput = useCallback(() => { setTimeout(() => inputRef.current?.focus(), 50); }, []);
   useEffect(() => { if (started && !cameraOpen) focusInput(); }, [started, cameraOpen, focusInput]);
   useEffect(() => { if (flash) { const t = setTimeout(() => setFlash(null), 400); return () => clearTimeout(t); } }, [flash]);
   useEffect(() => { if (duplicateAwb) { const t = setTimeout(() => { setDuplicateAwb(''); focusInput(); }, 1500); return () => clearTimeout(t); } }, [duplicateAwb, focusInput]);
 
-  // Single interval to check sync status for all pending scans
+  // A scan's state as it travels: on phone → saved (the outbox got the server's
+  // confirmation) → in sheet (the server's sync wrote the row; polled every 30 s).
+  // A duplicate the server refused (another phone had it first) comes back out.
+  useEffect(() => subscribeSaved((id, how) => {
+    if (how === 'saved') { setRecentScans(p => p.map(s => (s.id === id && s.state === 'phone' ? { ...s, state: 'saved' } : s))); return; }
+    const hit = recentRef.current.find(s => s.id === id);
+    if (!hit) return;
+    setRecentScans(p => p.filter(s => s.id !== id));
+    setDuplicateAwb(hit.awb); beepErr(); setDupCount(n => n + 1);
+    setSessionCount(n => Math.max(0, n - 1)); setSheetTotal(n => Math.max(0, n - 1));
+    rowCountRef.current = Math.max(0, rowCountRef.current - 1);
+    setLastScanned(prev => (prev === hit.awb ? '' : prev));
+  }), []);
   useEffect(() => {
     if (!started) return;
-    const interval = setInterval(() => {
-      if (writeQueue.length === 0 && !flushing) {
-        setRecentScans(p => { const hasP = p.some(s => s.pending); return hasP ? p.map(s => s.pending ? { ...s, pending: false } : s) : p; });
-        setPendingWrites(0);
-      } else { setPendingWrites(writeQueue.length); }
-      // Reconcile the failed-scans banner with the module array — the ad-hoc
-      // inc/dec bookkeeping drifted (a session restart reset the counter to 0
-      // while parked scans remained, stranding them with no visible Retry).
-      setDbFails(failedDbScans.length);
-    }, 1000);
-    return () => clearInterval(interval);
+    const iv = setInterval(async () => {
+      const ids = recentRef.current.filter(s => s.state === 'saved' && s.id).map(s => s.id!).slice(0, 50);
+      if (!ids.length) return;
+      const { data } = await supabase.from('packtime_scans').select('id').in('id', ids).not('sheet_synced_at', 'is', null);
+      const inSheet = new Set(((data as { id: string }[] | null) || []).map(r => r.id));
+      if (inSheet.size) setRecentScans(p => p.map(s => (s.id && inSheet.has(s.id) ? { ...s, state: 'sheet' } : s)));
+    }, 30000);
+    return () => clearInterval(iv);
   }, [started]);
 
   // ── Camera scanner (barcode-detector ZXing-WASM polyfill — works on all browsers) ──
@@ -381,7 +233,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     stopCam(); setCameraOpen(false); setStarted(false); setSessionCount(0); setRecentScans([]); setVerifyResult(null); setLastScanned(''); setShowComplete(false); setDupCount(0);
     // "· synced" was unconditional — it fired even with rows still queued for
     // the sheet or parked DB failures. Say what is actually true.
-    const unsynced = writeQueue.length > 0 || flushing || failedDbScans.length > 0;
+    const unsynced = getOutboxState().waiting > 0;
     if (count > 0) addToast(`Session ended · ${count} AWB${count !== 1 ? 's' : ''} scanned${unsynced ? ' · some rows still syncing in the background' : ' · synced'}`, unsynced ? 'info' : 'success');
   }, [sessionCount, stopCam, addToast]);
 
@@ -470,7 +322,14 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     setCourierSheet(c.sheet_name);
     setCourierBrand(selectedBrand || c.brand || 'FUSIONIC');
     setVerifying(true); setVerifyResult(null);
-    const data = await callEdge({ action: 'init', sheetName: c.sheet_name });
+    let data = await callEdge({ action: 'init', sheetName: c.sheet_name });
+    // Weak Wi-Fi at the start of a shift: begin from the last good copy of the
+    // sheet's numbers (≤ 24 h) rather than not at all — the database still
+    // refuses a duplicate across phones and the scan comes back out.
+    if (!data.ok) {
+      const cached = loadInit(c.sheet_name);
+      if (cached) { data = { ok: true, awbs: cached.awbs, totalRows: cached.totalRows, columnsOk: true }; addToast(`Could not reach the sheet — starting from the copy saved ${ageText(cached.at)}`, 'info'); }
+    } else if (data.columnsOk !== false) saveInit(c.sheet_name, data.awbs || [], data.totalRows || 0);
     setVerifyResult(data);
     if (data.ok && data.columnsOk !== false) {
       const sheetAwbs = (data.awbs || []).map((a: string) => a.trim().toUpperCase());
@@ -489,13 +348,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       // which made the CSV's Session ID column meaningless and widened
       // undoLast's session-scope guard to "anything this device ever scanned".
       sessionIdRef.current = crypto.randomUUID();
-      // The queue is NOT cleared here: items carry their own sheetName, and
-      // flushQueue batches per sheet — clearing silently threw away the
-      // previous session's unsent sheet rows (they were in the DB but never
-      // reached Google). Leftovers drain alongside the new session's writes.
-      // `flushing` is likewise left alone: forcing it false while a flush was
-      // mid-await let a second concurrent loop start over the same array.
-      flushQueue();
+      void drainOutbox();
       setStarted(true); setSessionCount(0); setRecentScans([]); setLastScanned(''); setDupCount(0);
       sessionStartRef.current = Date.now();
       const finalBrand = selectedBrand || c.brand || 'FUSIONIC';
@@ -537,103 +390,32 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     if (navigator.vibrate) navigator.vibrate(100);
     awbSetRef.current.add(key);
     rowCountRef.current++;
-    const count = rowCountRef.current;
     const now = new Date(); const scanId = crypto.randomUUID();   // the id lets the packer add time to this scan's video
-    const timestamp = formatTimestamp(now);
 
     setLastScanned(trimmed);
     setSessionCount(p => p + 1);
     setSheetTotal(p => p + 1);
-    setRecentScans(p => [{ awb: trimmed, time: now.toLocaleTimeString('en-IN'), success: true, pending: true, at: now.getTime(), id: scanId }, ...p].slice(0, 30));
+    setRecentScans(p => [{ awb: trimmed, time: now.toLocaleTimeString('en-IN'), success: true, state: 'phone' as const, at: now.getTime(), id: scanId }, ...p].slice(0, 30));
 
-    // Save to Supabase DB first, then Sheet
-    const scanRow: PackTimeScanInsert = { id: scanId, session_id: sessionIdRef.current, awb: trimmed, courier, camera, brand: courierBrand, sheet_name: courierSheet, user_id: userIdRef.current };
-    const row = [count, trimmed, timestamp, camera, courierBrand];
-    const at = now.getTime();
-    sendScan(scanRow, at).then(({ error, cancelled }) => {
-      if (cancelled) return;
-      if (error) {
-        if (error.code === '23505') {
-          // Duplicate AWB in DB — roll back local count and remove from recent scans
-          setSessionCount(p => Math.max(0, p - 1));
-          setSheetTotal(p => Math.max(0, p - 1));
-          rowCountRef.current = Math.max(0, rowCountRef.current - 1);
-          setRecentScans(p => p.filter(s => s.awb !== trimmed));
-          setDuplicateAwb(trimmed); beepErr(); setFlash('error'); setDupCount(p => p + 1);
-          if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-          // Functional update — the closed-over `lastScanned` was stale (it's
-          // not in this callback's deps), so the banner kept showing the
-          // REJECTED AWB with a live Undo. That Undo then fired a sheet
-          // delete for an AWB whose row belongs to another operator's
-          // session, wiping their legitimate scan out of the Google Sheet.
-          setLastScanned(prev => (prev === trimmed ? '' : prev));
-          return;
-        }
-        // DB insert failed — retry once after 2s; if that fails too, park the
-        // scan in failedDbScans for the banner's "Retry" button. (The old code
-        // double-counted dbFails and never sent the sheet row on retry success.)
-        setDbFails(p => p + 1);
-        setTimeout(() => {
-          sendScan(scanRow, at).then(({ error: e2, cancelled: undone }) => {
-            if (undone) setDbFails(p => Math.max(0, p - 1));
-            else if (!e2 || e2.code === '23505') {
-              setDbFails(p => Math.max(0, p - 1));
-              enqueueWrite([row], courierSheet);
-              setPendingWrites(p => p + 1);
-            } else {
-              failedDbScans.push({ scanRow, sheetRow: row, sheetName: courierSheet, at });
-              persistFailed();
-            }
-          });
-        }, 2000);
-        return;
-      }
-      // Only write to Sheet after DB success
-      enqueueWrite([row], courierSheet);
-      setPendingWrites(p => p + 1);
-    });
+    // On the phone first; the outbox sends it and the server carries it to the sheet.
+    enqueueScan({ id: scanId, session_id: sessionIdRef.current, awb: trimmed, courier, camera, brand: courierBrand, sheet_name: courierSheet, user_id: userIdRef.current }, now.getTime());
 
     focusInput();
   }, [camera, courier, courierSheet, courierBrand, focusInput]);
 
-  // Re-attempt every parked DB-failed scan (banner "Retry" button). Successes
-  // also get their sheet row enqueued — they never made it that far before.
-  const retryFailedDbScans = useCallback(() => {
-    const pending = failedDbScans.splice(0);
-    persistFailed();
-    if (pending.length === 0) return;
-    for (const f of pending) {
-      sendScan(f.scanRow, f.at).then(({ error, cancelled: undone }) => {
-        if (undone) setDbFails(p => Math.max(0, p - 1));
-        else if (!error || error.code === '23505') {
-          setDbFails(p => Math.max(0, p - 1));
-          enqueueWrite([f.sheetRow], f.sheetName);
-          setPendingWrites(p => p + 1);
-        } else {
-          failedDbScans.push(f); // still failing — keep for the next retry
-          persistFailed();
-        }
-      });
-    }
-  }, []);
-
   // Keep submitRef in sync for camera callback
   useEffect(() => { submitRef.current = submitAwb; }, [submitAwb]);
-  useEffect(() => { retryFailedRef.current = retryFailedDbScans; }, [retryFailedDbScans]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); const v = awbInput.trim(); if (v) submitAwb(v); } };
 
-  // ── Undo last scan (removes from local + Google Sheet) ──────────────────────
+  // ── Undo last scan ──────────────────────────────────────────────────────────
+  // The outbox takes it back: dropped if it is still on the phone, else a
+  // delete the server turns into a sheet clear. Nothing to wait for.
   const undoLast = useCallback(() => {
     if (!lastScanned) return;
-    // Undoing while the sheet write is still in flight would race the append —
-    // tell the operator instead of silently ignoring the tap.
-    if (writeQueue.length > 0) { addToast('Still syncing the last scan — try Undo again in a few seconds', 'error'); return; }
     const awb = lastScanned;
-    const key = awb.toUpperCase();
-    const undoneId = recentScans.find(s => s.success && s.awb === awb)?.id;   // a send still to come is called off
-    if (undoneId && cancelScan(undoneId)) setDbFails(p => Math.max(0, p - 1));
-    awbSetRef.current.delete(key);
+    const undoneId = recentScans.find(s => s.success && s.awb === awb)?.id;
+    awbSetRef.current.delete(awb.toUpperCase());
     setRecentScans(p => p.filter(s => s.awb !== awb));
     setSessionCount(p => Math.max(0, p - 1));
     setSheetTotal(p => Math.max(0, p - 1));
@@ -641,11 +423,8 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     setLastScanned('');
     beep(500, 0.15);
     focusInput();
-    // Background delete from Google Sheet + Supabase DB
-    getAuthHeaders().then(headers => fetch(EDGE_FN, { method: 'POST', headers, body: JSON.stringify({ action: 'delete', awb, sheetName: courierSheet }) })
-      .then(r => r.json()).then(() => {})).catch(() => addToast(`Undo could not remove ${awb} from the sheet — delete that row by hand`, 'error'));
-    (undoneId ? supabase.from('packtime_scans').delete().eq('id', undoneId) : supabase.from('packtime_scans').delete().eq('awb', awb).eq('session_id', sessionIdRef.current)).then(({ error: e }) => { if (e) addToast(`Undo failed for ${awb} — ${friendlyError(e)}`, 'error'); });
-  }, [lastScanned, recentScans, courierSheet, focusInput, addToast]);
+    if (undoneId) enqueueUndo(undoneId, awb);
+  }, [lastScanned, recentScans, focusInput]);
 
 
   // ── Fetch today's summary across all couriers ──────────────────────────────
@@ -669,7 +448,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     setHistoryLoading(true);
     // 'estimated' like every other pager — 'exact' forced a full count scan
     // of the app's largest table on every history view.
-    let query = supabase.from('packtime_scans').select('id, session_id, awb, courier, camera, sheet_name, scanned_at, user_id, brand, received_at', { count: 'estimated' })
+    let query = supabase.from('packtime_scans').select('id, session_id, awb, courier, camera, sheet_name, scanned_at, user_id, brand, received_at, sheet_by_server, sheet_synced_at, sheet_error', { count: 'estimated' })
       .gte('scanned_at', new Date(historyDateFrom + 'T00:00:00').toISOString())
       .lte('scanned_at', new Date(historyDateTo + 'T23:59:59.999').toISOString());
     if (historySearch) query = query.ilike('awb', `%${historySearch.replace(/[%_]/g, '\\$&')}%`);
@@ -701,7 +480,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
   const deleteHistoryScan = async (id: string) => {
     const record = historyData.find(r => r.id === id);
     let sheetDeleted = true;
-    if (record && record.sheet_name) {
+    if (record && record.sheet_name && !record.sheet_by_server) {   // a new-app scan: the server clears its own sheet row
       try {
         const headers = await getAuthHeaders();
         const resp = await fetch(EDGE_FN, {
@@ -774,6 +553,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           <button onClick={() => { setShowHistory(false); }} style={{ ...S.btnGhost, minHeight: 44 }}>← Back</button>
+          {boss && <SheetCheck day={historyDateTo || historyDateFrom} addToast={addToast} />}
           <button onClick={() => { setExporting(true); exportHistory().finally(() => setExporting(false)); }} disabled={exporting || !historyDateFrom || !historyDateTo} title={!historyDateFrom || !historyDateTo ? 'Select a date range first' : 'Export filtered records to CSV'} style={{ ...S.btnGhost, minHeight: 44, opacity: exporting || !historyDateFrom || !historyDateTo ? 0.4 : 1, cursor: exporting || !historyDateFrom || !historyDateTo ? 'not-allowed' : 'pointer', pointerEvents: exporting || !historyDateFrom || !historyDateTo ? 'none' : 'auto' }}>{exporting ? 'Exporting...' : 'Export'}</button>
         </div>
       </div>
@@ -832,18 +612,19 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
         <div className="table-wrap" style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead><tr>
-              {['AWB · Courier', 'Cam', 'Brand', 'Time', ''].map(h => <th key={h} style={S.thStyle}>{h}</th>)}
+              {['AWB · Courier', 'Cam', 'Brand', 'Time', 'Sheet', ''].map(h => <th key={h} style={S.thStyle}>{h}</th>)}
             </tr></thead>
             <tbody>
-              {(!historyDateFrom || !historyDateTo) && <tr><td colSpan={5} style={{ padding: 30, textAlign: 'center', color: T.tx3, fontSize: 12 }}>Select a date range above to view scans.</td></tr>}
-              {historyDateFrom && historyDateTo && historyLoading && <tr><td colSpan={5}><SkeletonRows rows={3} /></td></tr>}
-              {historyDateFrom && historyDateTo && !historyLoading && historyData.length === 0 && <tr><td colSpan={5} style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No scans found in this date range.</td></tr>}
+              {(!historyDateFrom || !historyDateTo) && <tr><td colSpan={6} style={{ padding: 30, textAlign: 'center', color: T.tx3, fontSize: 12 }}>Select a date range above to view scans.</td></tr>}
+              {historyDateFrom && historyDateTo && historyLoading && <tr><td colSpan={6}><SkeletonRows rows={3} /></td></tr>}
+              {historyDateFrom && historyDateTo && !historyLoading && historyData.length === 0 && <tr><td colSpan={6} style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No scans found in this date range.</td></tr>}
               {historyData.map(r => (
                 <tr key={r.id} style={{ transition: 'background .1s' }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.015)')} onMouseLeave={e => (e.currentTarget.style.background = '')}>
                   <td style={S.tdStyle}><div style={{ fontFamily: T.mono, fontWeight: 600 }}>{r.awb}</div><div style={{ fontSize: 11, color: T.tx3, marginTop: 2 }}>{r.courier}</div></td>
                   <td style={{ ...S.tdStyle, fontFamily: T.mono, color: T.tx3 }}>{r.camera}</td>
                   <td style={{ ...S.tdStyle, color: T.gr, fontWeight: 600 }}>{r.brand || '—'}</td>
                   <td style={{ ...S.tdStyle, fontFamily: T.mono, color: T.tx3, fontSize: 11 }}>{r.scanned_at ? new Date(r.scanned_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
+                  <td style={{ ...S.tdStyle, fontSize: 11, whiteSpace: 'nowrap' }}>{sheetState(r)}</td>
                   <td style={{ ...S.tdStyle, width: 40, whiteSpace: 'nowrap' }}>
                     <ScanVideoButton v={scanClips[r.id]} />
                     <button type="button" onClick={() => setConfirmDeleteId(r.id)} style={{ padding: 0, border: 'none', background: 'none', cursor: 'pointer', opacity: 0.4, transition: 'opacity .15s' }} onMouseEnter={e => (e.currentTarget.style.opacity = '1')} onMouseLeave={e => (e.currentTarget.style.opacity = '0.4')} aria-label="Delete">
@@ -870,7 +651,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontFamily: T.mono, fontSize: 13, fontWeight: 600, color: T.tx }}>{r.awb}</div>
-                  <div style={{ fontSize: 11, color: T.tx3, marginTop: 2 }}>{r.courier} · Cam {r.camera}</div>
+                  <div style={{ fontSize: 11, color: T.tx3, marginTop: 2 }}>{r.courier} · Cam {r.camera} · {sheetState(r)}</div>
                 </div>
                 <div style={{ textAlign: 'right', flexShrink: 0 }}>
                   <div style={{ fontSize: 12, fontWeight: 600, color: T.gr }}>{r.brand || '—'}</div>
@@ -938,7 +719,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     <div className="page-pad" style={{ fontFamily: T.sans, color: T.tx }}>
       <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 14 }}>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          {dbFails > 0 && <span style={{ fontSize: 9, color: T.re, fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: 'oklch(0.63 0.22 25 / .1)', border: '1px solid oklch(0.63 0.22 25 / .2)' }}>{dbFails} DB save failed</span>}
+          {outbox.waiting > 0 && <span style={{ fontSize: 9, color: T.yl, fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: 'oklch(0.78 0.18 75 / .10)', border: '1px solid oklch(0.78 0.18 75 / .18)' }}>{outbox.waiting} waiting to send</span>}
           <button onClick={() => { const d = new Date(); setHistoryDateTo(localISODate(d)); d.setDate(d.getDate()-6); setHistoryDateFrom(localISODate(d)); setShowHistory(true); }} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer', fontFamily: T.sans }}>History</button>
         </div>
       </div>
@@ -1070,23 +851,8 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       {/* Flash */}
       {flash && <div style={{ position: 'fixed', inset: 0, zIndex: 300, pointerEvents: 'none', background: flash === 'success' ? 'oklch(0.72 0.19 145 / .08)' : 'oklch(0.63 0.22 25 / .10)', animation: 'fi .15s ease' }} />}
 
-      {/* Offline indicator */}
-      {isOffline && started && (
-        <div style={{ margin: '0 0 10px', padding: '10px 12px', borderRadius: 8, background: alpha(T.re, 0.1), border: `1px solid ${T.re}`, color: T.re, fontSize: 12, lineHeight: 1.4, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ width: 8, height: 8, borderRadius: '50%', background: T.re, flexShrink: 0, animation: 'subtlePulse 2s ease-in-out infinite' }} />
-          <span>No internet on this phone — connect to Wi-Fi. Scans are kept here and sent with their real scan time once it is back (packing videos stay correct).</span>
-        </div>
-      )}
-
-      {/* Dropped scans alert — scans that failed all 3 retries */}
-      {droppedCount > 0 && started && (
-        <div style={{ margin: '0 14px 8px', padding: '10px 14px', borderRadius: 6, background: 'oklch(0.63 0.22 25 / .1)', border: '1px solid oklch(0.63 0.22 25 / .3)', color: T.re, fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ width: 8, height: 8, borderRadius: '50%', background: T.re, animation: 'subtlePulse 1.5s ease-in-out infinite' }} />
-          <span style={{ flex: 1 }}>{droppedCount} scan(s) failed to sync to Google Sheets after retries — they ARE saved in the app, just missing from the sheet. Check connection, then tap Retry.</span>
-          <button onClick={() => { const batches = getDroppedBatches().slice(); clearDroppedBatches(); for (const b of batches) enqueueWrite(b.rows, b.sheetName); }} style={{ ...S.btnDanger, ...S.btnSm, fontWeight: 700 }}>Retry sync</button>
-          <button onClick={() => { clearDroppedBatches(); setDroppedCount(0); }} style={{ ...S.btnGhost, ...S.btnSm, color: T.re, borderColor: 'oklch(0.63 0.22 25 / .3)' }}>Dismiss</button>
-        </div>
-      )}
+      {/* How the phone is doing: offline / weak / sending / failing — and the numbers still here */}
+      <SyncBanner conn={conn} outbox={outbox} onRetry={() => { void drainOutbox(); }} />
 
       {/* Duplicate — non-blocking banner (audit P0: let operator keep scanning); below the header, which grows by the notch height in the installed app */}
       {duplicateAwb && (
@@ -1098,18 +864,6 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
               <div style={{ fontSize: 12, fontFamily: T.mono, color: '#fff', wordBreak: 'break-all' }}>{duplicateAwb}</div>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Write-queue stall warning — sync is lagging (audit P2). Non-blocking so operator keeps going. */}
-      {(pendingWrites > 5 || dbFails > 0) && (
-        <div style={{ background: 'oklch(0.78 0.18 75 / .08)', border: '1px solid oklch(0.78 0.18 75 / .25)', borderRadius: 8, padding: '8px 12px', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontSize: 16 }}>⏳</span>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: T.yl, textTransform: 'uppercase', letterSpacing: 1 }}>Sync lagging — keep scanning</div>
-            <div style={{ fontSize: 11, color: T.tx2, marginTop: 2 }}>{pendingWrites} scan{pendingWrites === 1 ? '' : 's'} waiting to sync{dbFails > 0 ? `. ${dbFails} failed to save — tap Retry` : '. Retrying in the background'}.</div>
-          </div>
-          {dbFails > 0 && <button onClick={retryFailedDbScans} style={{ ...S.btnWarn, ...S.btnSm, fontWeight: 700, flexShrink: 0 }}>Retry failed</button>}
         </div>
       )}
 
@@ -1243,7 +997,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
 
       {/* AWB Input */}
       <div style={{ marginBottom: 12 }}>
-        {pendingWrites > 0 && <div style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, background: 'oklch(0.78 0.18 75 / .10)', border: '1px solid oklch(0.78 0.18 75 / .18)', color: T.yl, fontWeight: 600, display: 'inline-block', marginBottom: 6 }}>Syncing {pendingWrites}</div>}
+        {outbox.waiting > 0 && <div style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, background: 'oklch(0.78 0.18 75 / .10)', border: '1px solid oklch(0.78 0.18 75 / .18)', color: T.yl, fontWeight: 600, display: 'inline-block', marginBottom: 6 }}>Sending {outbox.waiting}</div>}
         <div style={{ position: 'relative' }}>
           <input ref={inputRef} type="text" inputMode="text" autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false}
             value={awbInput} onChange={e => setAwbInput(e.target.value)} onKeyDown={handleKeyDown}
