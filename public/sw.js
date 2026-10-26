@@ -9,6 +9,15 @@ const CACHE = 'dailyoffice-__BUILD_TS__';
 // cannot grow without bound — the oldest entries go first.
 const IMG_CACHE = 'dailyoffice-images-v1';
 const IMG_MAX = 200;
+// Hashed build output (/assets/<name>-<hash>.js|css) is immutable: the URL
+// changes whenever the content does. It lives in a cache of its own that is
+// NOT build-stamped, so a deploy re-downloads only the chunks that changed
+// instead of the whole app (five deploys in a day meant five full ~2 MB
+// downloads per phone). Capped; the oldest entries go first.
+const ASSET_CACHE = 'dailyoffice-assets-v1';
+const ASSET_MAX = 160;
+const trimAssets = cache => cache.keys().then(keys =>
+  Promise.all(keys.slice(0, Math.max(0, keys.length - ASSET_MAX)).map(k => cache.delete(k))));
 // IMAGES only: an <img>/CSS request, or a url in one of the three photo
 // buckets. Other public objects (program voice notes are <audio> — Safari
 // fetches those with Range headers and needs the real 206) go to the
@@ -24,12 +33,19 @@ self.addEventListener('install', e => {
   // serve when the app is launched offline. The cache name is build-stamped,
   // so every deploy installs a fresh copy and activate drops the old one.
   e.waitUntil(caches.open(CACHE).then(c => c.add('/index.html')).catch(() => {}));
+  // Warm the new build's entry chunks (the script and modulepreload links in
+  // index.html) now, in the background, so the "Update Now" reload opens
+  // from the cache instead of downloading while the packer waits.
+  e.waitUntil(fetch('/index.html', { cache: 'no-store' }).then(r => r.text()).then(html => {
+    const urls = [...new Set(Array.from(html.matchAll(/["'](\/assets\/[^"']+\.(?:js|css))["']/g), m => m[1]))];
+    return caches.open(ASSET_CACHE).then(cache => Promise.all(urls.map(u => cache.match(u).then(hit => hit || cache.add(u).catch(() => {})))));
+  }).catch(() => {}));
   self.skipWaiting();
 });
 
 self.addEventListener('activate', e => {
   e.waitUntil(
-    caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE && k !== IMG_CACHE).map(k => caches.delete(k))))
+    caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE && k !== IMG_CACHE && k !== ASSET_CACHE).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
       .then(() => self.clients.matchAll({ type: 'window' }).then(clients => {
         clients.forEach(c => c.postMessage({ type: 'SW_UPDATED' }));
@@ -69,16 +85,14 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // Hashed build output (/assets/<name>-<hash>.js|css): the URL changes
-  // whenever the content does, so a cached copy can never be stale. Serve
-  // it from the build-stamped cache and fetch only on a miss. index.html
-  // stays network-first above — that is what moves a device to new hashes
-  // (and the activate handler drops the old cache on each deploy).
+  // Hashed build output: cache-first in ASSET_CACHE (see above), fetched only
+  // on a miss. index.html stays network-first above — that is what moves a
+  // device to new hashes; chunks that did not change are already here.
   if (url.pathname.startsWith('/assets/')) {
-    e.respondWith(caches.match(e.request).then(c => c || fetch(e.request).then(r => {
-      if (r.ok) { const clone = r.clone(); caches.open(CACHE).then(cache => cache.put(e.request, clone)); }
+    e.respondWith(caches.open(ASSET_CACHE).then(cache => cache.match(e.request).then(c => c || fetch(e.request).then(r => {
+      if (r.ok) { const clone = r.clone(); cache.put(e.request, clone).then(() => trimAssets(cache)).catch(() => {}); }
       return r;
-    })));
+    }))));
     return;
   }
 
