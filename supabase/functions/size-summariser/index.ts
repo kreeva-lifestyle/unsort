@@ -8,16 +8,19 @@
 // extraction and returns it. The one-page Hindi sheet is rendered by the app.
 //
 //   POST { action: 'status' }                                   -> { ok, hasKey, model, effort, prompt_version }
-//   POST { action: 'extract', pages: [{ n, text, image? }], file_name, form_type, page_count,
-//          source_path?, diagrams?, parent_id?, model?, effort? }  -> { ok, id, extraction, usage, est_usd, model }
+//   POST { action: 'extract', pages: [{ n, text, image?, textless? }], file_name, form_type, page_count,
+//          source_path?, diagrams?: [{ page, k, top, area, hash }], parent_id?, model?, effort? }
+//          -> { ok, id, extraction, usage, est_usd, model, verified }
 //
 // Nothing that is data lives here: model, effort, prompt (+ version), order
 // number regex, measurement range, required fields per garment, sheet
-// title and footer come from app_settings.size_summariser (edited in
-// Settings → Size Summariser). The Anthropic key is app_secrets.anthropic_api_key.
+// title and footer, and the second-read model + prompt for picture-only
+// pages, come from app_settings.size_summariser (edited in Settings → Size
+// Summariser). The Anthropic key is app_secrets.anthropic_api_key.
 
 // deno-lint-ignore-file no-explicit-any
 import { SCHEMA, piiValues, validate, type Page, type Settings } from './validate.ts';
+import { transcribe, assignDiagrams, type DiagramRef } from './verify.ts';
 interface Usage { input_tokens: number; output_tokens: number; cache_read_input_tokens: number; cache_creation_input_tokens: number }
 
 const SB_URL = Deno.env.get('SUPABASE_URL') ?? '';
@@ -76,10 +79,12 @@ async function getSettings(): Promise<Settings> {
     sheet_title: String(v.sheet_title || ''),
     footer_text: String(v.footer_text || ''),
     raster_only_option_pages: !!v.raster_only_option_pages,
+    verify_model: MODELS[v.verify_model] ? v.verify_model : '',
+    verify_prompt: String(v.verify_prompt || ''),
   };
 }
 
-// ── The tool schema the model must fill ─────────────────────────────────────
+// ── The model calls ─────────────────────────────────────────────────────────
 function claudeRequest(apiKey: string, model: string, effort: string, body: Record<string, unknown>): RequestInit {
   const fallback = model !== 'claude-haiku-5-5';
   return {
@@ -97,17 +102,23 @@ async function extract(apiKey: string, s: Settings, model: string, effort: strin
     if (p.image) content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: p.image } });
   }
   content.push({ type: 'text', text: `That is the whole form (${pages.length} pages). Call the tailor_sheet tool exactly once with everything a tailor needs.${retryNote ? `\n\nYour previous answer was rejected: ${retryNote}. Fix it and call the tool again.` : ''}` });
-  const r = await fetch('https://api.anthropic.com/v1/messages', claudeRequest(apiKey, model, effort, {
+  const body = await post(apiKey, model, effort, {
     max_tokens: 12000,
     system: [{ type: 'text', text: s.prompt, cache_control: { type: 'ephemeral' } }],
     tools: [{ name: 'tailor_sheet', description: 'The complete, PII-free extraction for the one-page Hindi tailor sheet.', input_schema: SCHEMA }],
     messages: [{ role: 'user', content }],
-  }));
-  const body = await r.json().catch(() => null);
-  if (!r.ok) throw new Error(`Claude ${r.status}: ${body?.error?.message || 'unknown'}`);
+  });
   const tool = (body?.content || []).find((b: any) => b.type === 'tool_use' && b.name === 'tailor_sheet');
   if (!tool?.input) throw new Error('The model did not fill the tailor sheet');
   return { data: tool.input, usage: body.usage, model: body.model || model };
+}
+
+/** POST one Messages request; the parsed body, or an error naming the status. */
+async function post(apiKey: string, model: string, effort: string, body: Record<string, unknown>): Promise<any> {
+  const r = await fetch('https://api.anthropic.com/v1/messages', claudeRequest(apiKey, model, effort, body));
+  const out = await r.json().catch(() => null);
+  if (!r.ok) throw new Error(`Claude ${r.status}: ${out?.error?.message || 'unknown'}`);
+  return out;
 }
 
 const estUsd = (model: string, u: Usage) => {
@@ -130,36 +141,47 @@ Deno.serve(async (req) => {
     if (!['admin', 'manager', 'operator'].includes(who.role)) return fail(403, 'Only operators and above can run the summariser', req);
     const apiKey = await getSecret('anthropic_api_key');
     if (!apiKey) return fail(503, 'No Anthropic API key is set (Settings → Listing AI)', req);
-    const pages: Page[] = Array.isArray(body.pages) ? body.pages.filter((p: any) => p && Number.isInteger(p.n)).map((p: any) => ({ n: p.n, text: String(p.text || '').slice(0, 6000), image: typeof p.image === 'string' && p.image.length > 100 ? p.image : undefined })) : [];
+    const pages: Page[] = Array.isArray(body.pages) ? body.pages.filter((p: any) => p && Number.isInteger(p.n)).map((p: any) => ({ n: p.n, text: String(p.text || '').slice(0, 6000), image: typeof p.image === 'string' && p.image.length > 100 ? p.image : undefined, textless: !!p.textless })) : [];
     if (!pages.length) return fail(400, 'No pages were sent', req);
     if (pages.length > 60) return fail(400, 'More than 60 pages — not a measurement form', req);
     if (!pages.some(p => p.image)) return fail(400, 'Page images are required to read the ticked options', req);
     const model = MODELS[body.model] ? String(body.model) : s.model;
     const effort = ['low', 'medium', 'high', 'xhigh', 'max'].includes(body.effort) ? String(body.effort) : s.effort;
-    const piiList = piiValues(pages);
+    // Picture-only pages (no text layer) get a second, independent read that stands in for their text.
+    const textless = pages.filter(p => p.textless && p.image);
+    const second = textless.length && s.verify_model && s.verify_prompt
+      ? transcribe((m, b) => post(apiKey, m, 'low', b), s.verify_model, s.verify_prompt, textless).catch(e => { console.error('size-summariser verify:', (e as Error)?.message); return null; })
+      : Promise.resolve(null);
+    const [first, read2] = await Promise.all([extract(apiKey, s, model, effort, pages), second]);
+    const checked: Page[] = pages.map(p => (p.textless && read2?.texts.has(p.n) ? { ...p, text: read2.texts.get(p.n) || '' } : p));
+    const piiList = piiValues(checked);
 
-    let result = await extract(apiKey, s, model, effort, pages);
-    let v = validate(result.data, pages, s, piiList);
+    let result = first;
+    let v = validate(result.data, checked, s, piiList);
     const usage: Usage = { ...result.usage };
     if (v.errors.length) {
       // One retry with the checker's complaint; whatever comes back is used.
       const again = await extract(apiKey, s, model, effort, pages, v.errors.join('; '));
       for (const k of Object.keys(usage) as (keyof Usage)[]) usage[k] = (usage[k] || 0) + (again.usage?.[k] || 0);
-      result = again; v = validate(again.data, pages, s, piiList);
+      result = again; v = validate(again.data, checked, s, piiList);
     }
     const data = v.data;
+    if (!data?.measurements?.length) return fail(422, 'No measurements found — is this a stitching measurement form?', req, v.errors.join('; '));
+    const refs: DiagramRef[] = Array.isArray(body.diagrams) ? body.diagrams.slice(0, 400) : [];
+    assignDiagrams(data.measurements, refs);
+    const cost = estUsd(result.model, usage) + (read2 ? estUsd(read2.model, read2.usage) : 0);
     const low = data.measurements.filter((m: any) => m.confidence === 'low').length + data.choices.filter((c: any) => c.confidence === 'low').length;
     const row = {
       order_no: data.order?.order_no || null, form_type: String(body.form_type || data.order?.garment_type || 'unknown'), model: result.model, effort: effort || null,
-      prompt_version: s.prompt_version, extraction: data, diagrams: body.diagrams && typeof body.diagrams === 'object' ? body.diagrams : {},
+      prompt_version: s.prompt_version, extraction: data, diagrams: refs,
       warnings_count: data.warnings.length, low_confidence_count: low, pii_detected: v.pii,
       source_path: body.source_path ? String(body.source_path) : null, file_name: body.file_name ? String(body.file_name).slice(0, 200) : null,
-      page_count: Number(body.page_count) || pages.length, parent_id: body.parent_id || null, usage, est_usd: estUsd(result.model, usage), created_by: who.id,
+      page_count: Number(body.page_count) || pages.length, parent_id: body.parent_id || null, usage: read2 ? { ...usage, verify: { model: read2.model, ...read2.usage } } : usage, est_usd: Math.round(cost * 10000) / 10000, created_by: who.id,
     };
     const ins = await fetch(`${SB_URL}/rest/v1/stitching_extractions`, { method: 'POST', headers: { ...svcHeaders, prefer: 'return=representation' }, body: JSON.stringify(row) });
     const saved = (await ins.json().catch(() => []))?.[0];
     if (!ins.ok || !saved?.id) return fail(500, 'Could not save the extraction', req, JSON.stringify(saved).slice(0, 300));
-    return json({ ok: true, id: saved.id, extraction: data, usage, est_usd: row.est_usd, model: result.model, prompt_version: s.prompt_version, pii_detected: v.pii, unresolved: v.errors }, req);
+    return json({ ok: true, id: saved.id, extraction: data, usage: row.usage, est_usd: row.est_usd, verified: !!read2, model: result.model, prompt_version: s.prompt_version, pii_detected: v.pii, unresolved: v.errors }, req);
   } catch (e) {
     const msg = (e as Error)?.message || 'Server error';
     console.error('size-summariser error:', msg);

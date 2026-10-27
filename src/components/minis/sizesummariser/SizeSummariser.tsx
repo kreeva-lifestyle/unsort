@@ -31,10 +31,9 @@ export default function SizeSummariser({ addToast }: { addToast: (m: string, t?:
   useEffect(() => { loadSettings().then(setSettings).catch(e => addToast(friendlyError(e), 'error')); reload(); }, [addToast, reload]);
 
   /** Build and open the sheet for an extraction (fitted to one page). */
-  const open = useCallback(async (ex: Extraction, diagrams: Record<string, string>) => {
+  const open = useCallback(async (ex: Extraction) => {
     const s = settings || await loadSettings();
-    const urlOf = (page: number) => (diagrams[String(page)] ? diagramUrl(diagrams[String(page)]) : null);
-    const { html, fits } = await fitToOnePage(fit => sheetHtml({ ex, diagramUrl: urlOf, title: s.sheet_title || 'सिलाई नाप — सारांश', footer: s.footer_text, fit }));
+    const { html, fits } = await fitToOnePage(fit => sheetHtml({ ex, diagramUrl: m => (m.diagram ? diagramUrl(m.diagram) : null), title: s.sheet_title || 'सिलाई नाप — सारांश', footer: s.footer_text, fit }));
     if (!fits) addToast('The sheet is still longer than one page — print and check', 'error');
     setSheet({ html, title: `${ex.order.order_no} · ${ex.order.product_name}`, fits, order: ex.order.order_no });
   }, [settings, addToast]);
@@ -48,13 +47,13 @@ export default function SizeSummariser({ addToast }: { addToast: (m: string, t?:
       setPhase({ step: 'Saving the form and its pictures…', pct: 65 });
       const source_path = parent?.row.source_path || await uploadSource(file);
       const diagrams = await storeDiagrams(form.diagrams, form.formType);
-      setPhase({ step: `Reading ${form.pages.filter(p => p.isAnswer).length} pages with the model — up to a minute…`, pct: 75 });
+      setPhase({ step: `Reading ${form.pages.filter(p => p.isAnswer).length} pages with the model${form.textless ? ' (this PDF is pictures only — read twice)' : ''} — up to a minute…`, pct: 75 });
       const r = await extract({ pages: form.pages, file_name: file.name, form_type: form.formType, page_count: form.pageCount, source_path, diagrams, parent_id: parent?.row.id, model: parent?.model });
       if (!r.ok || !r.extraction) throw new Error(r.details || r.error || 'Extraction failed');
-      const mismatches = await labelDiagrams(diagrams, r.extraction);
+      const mismatches = await labelDiagrams(r.extraction);
       for (const m of mismatches) r.extraction.warnings.push({ severity: 'check', text_hi: m });
       setPhase({ step: 'Laying out the sheet…', pct: 92 });
-      await open(r.extraction, diagrams);
+      await open(r.extraction);
       const warn = r.extraction.warnings.filter(w => w.severity !== 'info').length;
       addToast(`${r.extraction.order.order_no}: ${r.extraction.measurements.length} measurements, ${r.extraction.choices.length} choices${warn ? `, ${warn} to check` : ''}${r.pii_detected ? ' · customer details left out' : ''}`, warn ? 'info' : 'success');
       reload();
@@ -102,7 +101,7 @@ export default function SizeSummariser({ addToast }: { addToast: (m: string, t?:
           </div>
         )}
       </div>
-      <ExtractionList rows={rows} onOpen={row => { void open(row.extraction, row.diagrams || {}); }} onRerun={rerun} busy={!!phase} />
+      <ExtractionList rows={rows} onOpen={row => { void open(row.extraction); }} onRerun={rerun} busy={!!phase} />
       {sheet && <PrintPreview title={`${sheet.title}${sheet.fits ? '' : ' · ⚠ longer than one page'}`} html={sheet.html} onClose={() => setSheet(null)} onPrint={print} busy={sending} printLabel="Print A4" />}
     </div>
   );

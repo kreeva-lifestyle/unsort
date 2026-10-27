@@ -1,5 +1,6 @@
 // Settings → Size Summariser (admins): everything the summariser treats as
-// data — the model and effort, the extraction prompt (every edit bumps its
+// data — the model and effort, the second-read model and prompt for
+// picture-only forms, the extraction prompt (every edit bumps its
 // version so old runs can be compared), the order-number pattern, the sane
 // measurement range, the required measurements per garment, the sheet's
 // title and footer, and the cost-cutting switch. Saved in
@@ -30,6 +31,7 @@ export default function SizeSummariserSettings({ addToast }: { addToast: (m: str
     if (saving) return;
     try { new RegExp(s.order_no_regex); } catch { addToast('The order-number pattern is not a valid regular expression', 'error'); return; }
     if (!s.prompt.trim()) { addToast('The prompt cannot be empty', 'error'); return; }
+    if (s.verify_model && !s.verify_prompt.trim()) { addToast('The second-read prompt cannot be empty while a second-read model is chosen', 'error'); return; }
     setSaving(true);
     const next = { ...s, prompt_version: orig && s.prompt !== orig.prompt ? (orig.prompt_version || 1) + 1 : s.prompt_version };
     try { await saveSettings(next); setS(next); setOrig(next); addToast(`Saved${next.prompt_version !== s.prompt_version ? ` — prompt is now v${next.prompt_version}` : ''} · applies from the next run`, 'success'); }
@@ -48,6 +50,16 @@ export default function SizeSummariserSettings({ addToast }: { addToast: (m: str
           </div>); })}
         <label style={S.fLabel}>Effort</label>
         <select value={s.effort} onChange={e => set('effort', e.target.value)} style={{ ...S.fInput, width: 200 }}>{EFFORTS.map(e => <option key={e} value={e}>{e || 'model default'}</option>)}</select>
+      </div>
+      <div style={card}>{head('Second read (picture-only forms)')}
+        <div style={{ fontSize: 11, color: T.tx3, marginBottom: 8, lineHeight: 1.5 }}>Some PDFs have no text at all ("Microsoft Print to PDF", phone scans). Their pages are read a second time by this model, on its own, and every number on the sheet must match both reads — otherwise it is marked ❓. Costs well under a rupee per form on Haiku.</div>
+        <label style={S.fLabel}>Model</label>
+        <select value={s.verify_model} onChange={e => set('verify_model', e.target.value)} style={{ ...S.fInput, width: 240, marginBottom: 8 }}>
+          <option value="">Off — read once, numbers not double-checked</option>
+          {MODELS.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+        </select>
+        <label style={S.fLabel}>Prompt</label>
+        <textarea value={s.verify_prompt} onChange={e => set('verify_prompt', e.target.value)} rows={5} style={{ ...S.fInput, width: '100%', height: 'auto', fontFamily: T.mono, fontSize: 12, lineHeight: 1.5, resize: 'vertical' }} />
       </div>
       <div style={card}>{head(`Extraction prompt · v${s.prompt_version}`)}
         <textarea value={s.prompt} onChange={e => set('prompt', e.target.value)} rows={14} style={{ ...S.fInput, width: '100%', height: 'auto', fontFamily: T.mono, fontSize: 12, lineHeight: 1.5, resize: 'vertical' }} />

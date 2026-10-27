@@ -5,11 +5,14 @@
 // storage.
 
 // deno-lint-ignore-file no-explicit-any
-export interface Page { n: number; text: string; image?: string }
+import { shows } from './verify.ts';
+
+export interface Page { n: number; text: string; image?: string; textless?: boolean }
 export interface Settings {
   model: string; effort: string; prompt: string; prompt_version: number; order_no_regex: string;
   measurement_min: number; measurement_max: number; required_fields: Record<string, string[]>;
   sheet_title: string; footer_text: string; raster_only_option_pages: boolean;
+  verify_model: string; verify_prompt: string;
 }
 
 export const SCHEMA = {
@@ -34,6 +37,9 @@ export const SCHEMA = {
           label_en: { type: 'string' }, label_hi: { type: 'string' },
           hint_hi: { type: 'string', description: '<= 8 words, where it is measured' },
           value: { type: ['number', 'null'] }, unit: { type: 'string', enum: ['inch', 'cm', 'unknown'] },
+          value_text_en: { type: 'string', description: 'when the answer is words, not a number: the answer as shown' },
+          value_text_hi: { type: 'string', description: 'the same, short, in Hindi (e.g. कढ़ाई के अनुसार)' },
+          y_on_page: { type: 'number', description: 'where the question starts on its page image, 0 = top, 1 = bottom' },
           section: { type: 'string', enum: ['upper', 'lower', 'other'] },
           page: { type: 'integer' }, confidence: { type: 'string', enum: ['high', 'low'] },
         },
@@ -60,15 +66,19 @@ export const SCHEMA = {
 const normText = (t: string) => t.toLowerCase().replace(/\s+/g, ' ').trim();
 const numText = (v: number) => (Number.isInteger(v) ? String(v) : String(v).replace(/0+$/, ''));
 
-/** Customer-detail values the form itself tells us: the answers on pages whose question is a name / phone / email / address. */
+/** Customer-detail values the form itself tells us: the line after every short question line that asks for a name / phone / email / address.
+ *  Works however many questions share a page (the text is "question\nanswer" lines, from the PDF or from the second read). */
+const PII_Q = /\b(name|phone|mobile|whatsapp|contact|e-?mail|address|city|pincode|pin code|zip|country|state)\b/i;
 export function piiValues(pages: Page[]): string[] {
   const out: string[] = [];
   for (const p of pages) {
     const lines = (p.text || '').split('\n').map(l => l.trim()).filter(Boolean);
-    if (!lines.length) continue;
-    const q = lines[0];
-    if (!/\b(name|phone|mobile|whatsapp|contact|e-?mail|address|city|pincode|pin code|country|state)\b/i.test(q)) continue;
-    for (const l of lines.slice(1)) if (l.length >= 3 && !/^\*|^\(|required/i.test(l)) out.push(l);
+    for (let i = 0; i < lines.length - 1; i++) {
+      const q = lines[i].replace(/\*\s*$/, '').trim();
+      if (q.length > 60 || !PII_Q.test(q) || /measure|size|length|neck|order/i.test(q)) continue;
+      const a = lines[i + 1];
+      if (a.length >= 3 && !/^\*|^\(|required/i.test(a) && !PII_Q.test(a.replace(/[:*]/g, ''))) out.push(a);
+    }
   }
   return out;
 }
@@ -76,6 +86,7 @@ export function piiValues(pages: Page[]): string[] {
 export function validate(data: any, pages: Page[], s: Settings, piiList: string[]): { data: any; pii: boolean; errors: string[] } {
   const errors: string[] = [];
   if (!data?.order || !Array.isArray(data.measurements) || !Array.isArray(data.choices)) return { data, pii: false, errors: ['missing order / measurements / choices'] };
+  if (!data.measurements.length) errors.push('no measurements found — every measurement question on the form must be listed, with value null and value_text_en when the answer is words');
   data.notes = Array.isArray(data.notes) ? data.notes : [];
   data.warnings = Array.isArray(data.warnings) ? data.warnings : [];
   const texts = new Map(pages.map(p => [p.n, p.text || '']));
@@ -97,8 +108,8 @@ export function validate(data: any, pages: Page[], s: Settings, piiList: string[
     if (typeof v === 'string') {
       let out = v;
       for (const pv of piiList) { const n = normText(pv); if (n.length >= 3 && !keep.has(n) && normText(out).includes(n)) { out = out.replace(new RegExp(pv.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), ''); pii = true; } }
-      for (const re2 of patterns) if (re2.test(out)) { out = out.replace(re2, ''); pii = true; }
-      return out.replace(/\s{2,}/g, ' ').trim();
+      for (const re2 of patterns) { re2.lastIndex = 0; if (re2.test(out)) { out = out.replace(re2, ''); pii = true; } }   // global regexes keep a position between calls
+      return out === v ? v : out.replace(/\s{2,}/g, ' ').replace(/[\s\-—–,:;|·]+$/, '').replace(/^[\s\-—–,:;|·]+/, '').trim();   // nothing dangling where a detail was cut
     }
     if (Array.isArray(v)) return v.map(scrub);
     if (v && typeof v === 'object') { const o: any = {}; for (const [k, x] of Object.entries(v)) o[k] = scrub(x); return o; }
@@ -106,14 +117,17 @@ export function validate(data: any, pages: Page[], s: Settings, piiList: string[
   };
   data = scrub(data);
 
-  // Every number must really be on its page.
+  // Every number must really be on its page (the PDF's text, or the second read of a picture-only page).
+  let unchecked = 0;
   for (const m of data.measurements) {
     if (m.value === null || m.value === undefined) continue;
     const t = texts.get(Number(m.page)) || '';
-    if (!t.includes(numText(Number(m.value)))) { m.confidence = 'low'; data.warnings.push({ severity: 'check', text_hi: `${m.label_hi || m.key} ${numText(Number(m.value))}" पेज ${m.page} के टेक्स्ट में नहीं मिला — जाँचें`, text_en: `${m.key} ${m.value} not found in the text of page ${m.page}` }); }
+    if (!t) { unchecked++; continue; }
+    if (!shows(t, Number(m.value))) { m.confidence = 'low'; data.warnings.push({ severity: 'check', text_hi: `${m.label_hi || m.key} ${numText(Number(m.value))}" पेज ${m.page} पर पक्का नहीं हुआ — मूल फ़ॉर्म से मिलाएँ`, text_en: `${m.key} ${m.value} not confirmed on page ${m.page}` }); }
   }
+  if (unchecked) data.warnings.push({ severity: 'info', text_hi: `${unchecked} नाप सिर्फ़ फ़ॉर्म की तस्वीर से पढ़े गए, दोबारा जाँचे नहीं गए`, text_en: `${unchecked} values read from page pictures only, not double-checked` });
   // Required fields for this garment.
-  const present = new Set(data.measurements.filter((m: any) => m.value !== null && m.value !== undefined).map((m: any) => m.key));
+  const present = new Set(data.measurements.filter((m: any) => (m.value !== null && m.value !== undefined) || String(m.value_text_en || m.value_text_hi || '').trim()).map((m: any) => m.key));
   for (const k of s.required_fields[data.order.garment_type] || []) {
     if (!present.has(k)) data.warnings.push({ severity: 'blocker', text_hi: `ज़रूरी माप नहीं मिला: ${k.replace(/_/g, ' ')} — ग्राहक से पूछें`, text_en: `required measurement missing: ${k}` });
   }

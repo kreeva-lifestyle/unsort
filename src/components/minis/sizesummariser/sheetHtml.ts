@@ -15,16 +15,18 @@ export const FIT_START: Fit = { imgH: 122, font: 14, hints: true, notesMax: null
 /** The ladder, one step at a time: pictures smaller → type smaller → hints off → notes shortened. Never a column or a field. */
 export const FIT_STEPS: Partial<Fit>[] = [{ imgH: 104 }, { imgH: 88 }, { imgH: 72 }, { font: 13 }, { font: 12 }, { hints: false }, { notesMax: 160 }];
 
-export interface SheetInput { ex: Extraction; diagramUrl: (page: number) => string | null; title: string; footer: string; fit?: Fit }
+export interface SheetInput { ex: Extraction; diagramUrl: (m: Measurement) => string | null; title: string; footer: string; fit?: Fit }
 
 const LOWER = new Set(['waist', 'hip', 'lehenga_length', 'skirt_length', 'bottom_length', 'bottom_round', 'thigh', 'knee', 'calf', 'ankle', 'inseam', 'crotch']);
 const isLower = (m: Measurement) => m.section === 'lower' || (m.section !== 'upper' && LOWER.has(m.key));
-const val = (m: Measurement) => (m.value === null || m.value === undefined ? '—' : `${m.value}${m.unit === 'cm' ? ' cm' : '"'}`);
+const hasNum = (m: Measurement) => m.value !== null && m.value !== undefined;
+const val = (m: Measurement) => (hasNum(m) ? `${m.value}${m.unit === 'cm' ? ' cm' : '"'}` : '—');
 const UNANSWERED = 'ग्राहक ने नहीं चुना — मॉडल फ़ोटो / एम्ब्रॉयडरी के अनुसार रखें';
 
 function card(m: Measurement, url: string | null, fit: Fit): string {
   const low = m.confidence === 'low' ? '<span class="chk">❓ जाँचें</span>' : '';
-  return `<div class="card">${url ? `<img src="${escHtml(url)}" alt="">` : '<div class="noimg"></div>'}<div class="lbl">${escHtml(m.label_hi)}</div>${fit.hints && m.hint_hi ? `<div class="hint">${escHtml(m.hint_hi)}</div>` : ''}<div class="val">${escHtml(val(m))}${low}</div></div>`;
+  const v = hasNum(m) || !m.value_text_hi ? `<div class="val">${escHtml(val(m))}${low}</div>` : `<div class="val txt">${escHtml(m.value_text_hi)}${low}</div>`;
+  return `<div class="card">${url ? `<img src="${escHtml(url)}" alt="">` : '<div class="noimg"></div>'}<div class="lbl">${escHtml(m.label_hi)}</div>${fit.hints && m.hint_hi ? `<div class="hint">${escHtml(m.hint_hi)}</div>` : ''}${v}</div>`;
 }
 
 function choiceRow(c: Choice): string {
@@ -35,10 +37,13 @@ function choiceRow(c: Choice): string {
 
 export function sheetHtml({ ex, diagramUrl, title, footer, fit = FIT_START }: SheetInput): string {
   const origin = typeof location !== 'undefined' ? location.origin : '';
-  const sleeveless = ex.choices.some(c => /sleeve/i.test(c.key) && /sleeveless/i.test(`${c.value_en} ${c.value_hi}`)) || ex.measurements.some(m => /^sleeve/.test(m.key) && m.value === null && ex.choices.some(c => /sleeveless/i.test(c.value_en)));
+  // One "sleeveless" card replaces the sleeve cards only when every sleeve answer agrees (a number or another answer keeps them, and the contradiction stays visible).
+  const sleeves = ex.measurements.filter(m => /^sleeve/.test(m.key));
+  const saysSleeveless = (t?: string) => /sleeveless|स्लीवलेस/i.test(t || '');
+  const sleeveless = ex.choices.some(c => /sleeve/i.test(c.key) && saysSleeveless(`${c.value_en} ${c.value_hi}`)) && sleeves.every(m => !hasNum(m) && (!m.value_text_en || saysSleeveless(`${m.value_text_en} ${m.value_text_hi}`)));
   const upper = ex.measurements.filter(m => !isLower(m) && !(sleeveless && /^sleeve/.test(m.key)));
   const lower = ex.measurements.filter(isLower);
-  const upperCards = upper.map(m => card(m, diagramUrl(m.page), fit)).join('') + (sleeveless ? '<div class="card sl"><div class="val">स्लीवलेस</div><div class="hint">बिना बाँह</div></div>' : '');
+  const upperCards = upper.map(m => card(m, diagramUrl(m), fit)).join('') + (sleeveless ? '<div class="card sl"><div class="val">स्लीवलेस</div><div class="hint">बिना बाँह</div></div>' : '');
   const n = upper.length + (sleeveless ? 1 : 0);
   const cols = n >= 9 ? 5 : n >= 7 ? 4 : 3; // no row of one lonely card
   const notes = ex.notes.map(n => {
@@ -47,7 +52,8 @@ export function sheetHtml({ ex, diagramUrl, title, footer, fit = FIT_START }: Sh
   }).join('');
   const warn = ex.warnings.filter(w => w.severity !== 'info');
   const info = ex.warnings.filter(w => w.severity === 'info');
-  const tier = ex.order.stitching_tier_hi || ex.order.stitching_tier;
+  const tierRaw = ex.order.stitching_tier_hi || ex.order.stitching_tier;
+  const tier = /^(none|unknown|n\/?a|not (stated|given|mentioned).*)?$/i.test((tierRaw || '').trim()) ? '' : tierRaw;   // no pill when the form does not say
   return `<!DOCTYPE html><html lang="hi"><head><meta charset="utf-8"><title>${escHtml(ex.order.order_no)} tailor sheet</title><style>
 @font-face{font-family:'Noto Sans Devanagari';font-weight:400;src:url(${origin}/fonts/noto-sans-devanagari-devanagari-400-normal.woff2) format('woff2')}
 @font-face{font-family:'Noto Sans Devanagari';font-weight:700;src:url(${origin}/fonts/noto-sans-devanagari-devanagari-700-normal.woff2) format('woff2')}
@@ -66,6 +72,7 @@ h2{font-size:.8em;font-weight:700;text-transform:uppercase;letter-spacing:.06em;
 .card img,.card .noimg{display:block;width:100%;height:${fit.imgH}px;object-fit:contain;margin:0 auto 2px}
 .card .noimg{height:${Math.round(fit.imgH * 0.35)}px}
 .card .lbl{font-weight:700;font-size:.95em}.card .hint{font-size:.72em;color:#666}.card .val{font-size:1.55em;font-weight:700;line-height:1.2;margin-top:1px}
+.card .val.txt{font-size:.95em;line-height:1.25;padding:2px 0}
 .card.sl .val{font-size:1.2em;padding-top:${Math.round(fit.imgH * 0.4)}px}
 table{width:100%;border-collapse:collapse;margin-top:2px}th,td{border:1px solid #bbb;padding:3px 6px;vertical-align:top;text-align:left;font-size:.92em}th{width:34%;background:#f3f3f3;font-weight:700}
 .en{font-size:.78em;color:#666}.unans{color:#8a5a00;font-weight:700}.chk{color:#b00;font-weight:700;font-size:.72em;margin-left:4px;white-space:nowrap}
@@ -76,7 +83,7 @@ table{width:100%;border-collapse:collapse;margin-top:2px}th,td{border:1px solid 
 <div class="head"><div><h1>${escHtml(title)}</h1><div class="sub">${escHtml(ex.order.form_title || '')}${ex.order.garment_type ? ` · ${escHtml(GARMENT_HI[ex.order.garment_type] || ex.order.garment_type)}` : ''}</div></div>
 <div class="ord"><div class="no">${escHtml(ex.order.order_no)}</div><div class="prod">${escHtml(ex.order.product_name)}</div>${tier ? `<span class="pill">${escHtml(tier)}</span>` : ''}</div></div>
 ${upper.length || sleeveless ? `<h2>ऊपरी नाप</h2><div class="grid">${upperCards}</div>` : ''}
-${lower.length ? `<h2>निचली नाप</h2><div class="grid lower">${lower.map(m => card(m, diagramUrl(m.page), fit)).join('')}</div>` : ''}
+${lower.length ? `<h2>निचली नाप</h2><div class="grid lower">${lower.map(m => card(m, diagramUrl(m), fit)).join('')}</div>` : ''}
 ${ex.choices.length || notes ? `<h2>डिज़ाइन और निर्देश</h2><table>${ex.choices.map(choiceRow).join('')}${notes}</table>` : ''}
 ${warn.length ? `<div class="warn${warn.some(w => w.severity === 'blocker') ? ' block' : ''}">${warn.map(w => `<div><b>${w.severity === 'blocker' ? '⛔' : '⚠'}</b>${escHtml(w.text_hi)}</div>`).join('')}</div>` : ''}
 ${info.length ? `<div class="warn" style="border-color:#999;background:#f6f6f6">${info.map(w => `<div><b>ℹ</b>${escHtml(w.text_hi)}</div>`).join('')}</div>` : ''}
