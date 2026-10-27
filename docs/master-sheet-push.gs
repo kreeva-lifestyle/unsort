@@ -9,14 +9,14 @@
  *
  * What it sends: nothing from the sheet. It only says "the sheet changed";
  * the app then reads the sheet itself, exactly as before. The key below is
- * the app's public key (the same one every phone running the app has) and
- * can do nothing except ask for that sync.
+ * the project's publishable key (public by design — short, so it survives
+ * copy-paste) and can do nothing except ask for that sync.
  *
  * Server side: supabase/migrations/20261027120000_master_sheet_push.sql.
  */
 
 var PUSH_URL = 'https://ulphprdnswznfztawbvg.supabase.co/rest/v1/rpc/master_sheet_touch';
-var APP_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVscGhwcmRuc3d6bmZ6dGF3YnZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzNjE4NzYsImV4cCI6MjA4OTkzNzg3Nn0.RRNY3KQhYnkJzSfh-GRoTCgdhDQNhE7kJJrpTq2n_K0';
+var APP_KEY = 'sb_publishable_Z67R9KK8U_UFStsrBxNz5A_XrhWGoYw';
 
 /** Runs on every change to the sheet (set up by installPush). */
 function onSheetChange(e) {
@@ -44,7 +44,7 @@ function tellApp_() {
       method: 'post',
       contentType: 'application/json',
       payload: '{}',
-      headers: { apikey: APP_KEY, Authorization: 'Bearer ' + APP_KEY },
+      headers: { apikey: APP_KEY },
       muteHttpExceptions: true,
     });
     var code = r.getResponseCode();
