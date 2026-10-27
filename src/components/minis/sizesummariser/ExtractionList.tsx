@@ -18,7 +18,7 @@ function Compare({ a, b, onClose }: { a: ExtractionRow; b: ExtractionRow; onClos
   useModalLock();
   const rowsOf = (ex: Extraction) => {
     const m = new Map<string, string>();
-    for (const x of ex.measurements) m.set(x.key, x.value === null ? 'null' : `${x.value}${x.unit === 'cm' ? 'cm' : '"'}`);
+    for (const x of ex.measurements) m.set(x.key, x.value === null || x.value === undefined ? (x.value_text_en || x.value_text_hi || '—') : `${x.value}${x.unit === 'cm' ? 'cm' : '"'}`);
     for (const x of ex.choices) m.set(x.key, x.answered ? x.value_en || x.value_hi : '(unanswered)');
     return m;
   };
