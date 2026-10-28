@@ -1,6 +1,6 @@
 // The Jobwork sheets and pages loaded on demand: the list is what someone
-// opens the page for, so the job page, the job form, Share pending and
-// Received on are fetched when first needed — and quietly in the background
+// opens the page for, so the job page, the job form, Share pending,
+// Received on and the Ledger are fetched when first needed — and quietly in the background
 // once the list is on screen (prefetchJobworkParts). Render inside <Suspense>.
 import { lazy } from 'react';
 
@@ -9,11 +9,13 @@ const load = {
   form: () => import('./JobForm'),
   share: () => import('./PendingShareModal'),
   received: () => import('./ReceivedByDate'),
+  ledger: () => import('./JobworkerLedger'),
 };
 export const JobDetailView = lazy(load.detail);
 export const JobForm = lazy(load.form);
 export const PendingShareModal = lazy(load.share);
 export const ReceivedByDate = lazy(load.received);
+export const JobworkerLedger = lazy(load.ledger);
 
 let started = false;
 /** Fetch every part's code once; a failure only means it loads on first use. */

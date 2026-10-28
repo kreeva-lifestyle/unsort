@@ -15,7 +15,8 @@ import type { JobworkSummary } from '../../types/database';
 import JobCard from './JobCard';
 import JobTable from './JobTable';
 import JobStats from './JobStats';
-import { JobForm, JobDetailView, PendingShareModal, ReceivedByDate, prefetchJobworkParts } from './jobworkLazy';
+import { JobForm, JobDetailView, PendingShareModal, ReceivedByDate, JobworkerLedger, prefetchJobworkParts } from './jobworkLazy';
+import { LEDGER_START, type LedgerView } from './jobworkLedger';
 import { whenIdle } from '../../lib/idle';
 import { logSwallowed } from '../../lib/errorLogger';
 import { listJobs, tabCounts, tabOf, FILTERS, type JobFilter, type JobTab } from './jobworkApi';
@@ -38,6 +39,8 @@ export default function Jobwork({ addToast }: { addToast: (m: string, t?: string
   const [openId, setOpenId] = useState<string | null>(null);
   // "Received on" (what came back on one date) — its own page, like a job.
   const [byDate, setByDate] = useState(false);
+  // Ledger: one account per jobworker — its own page; which account/period is kept here so a job opened from it comes back to it.
+  const [ledger, setLedger] = useState<LedgerView | null>(null);
   const [counts, setCounts] = useState<Record<JobTab, number> | null>(null);
   const [creating, setCreating] = useState(false);
   // Drafts tab, the draft being finished, and a counter bumped after any draft change.
@@ -57,6 +60,7 @@ export default function Jobwork({ addToast }: { addToast: (m: string, t?: string
   const [version, setVersion] = useState(0);
   useBackClose(!!openId, () => setOpenId(null));
   useBackClose(byDate && !openId, () => setByDate(false));
+  useBackClose(!!ledger && !openId, () => setLedger(null));
 
   const load = useCallback(async () => {
     const r = await listJobs({ search, filter, page, perPage, vendor });
@@ -77,6 +81,7 @@ export default function Jobwork({ addToast }: { addToast: (m: string, t?: string
 
   if (openId) return <Suspense fallback={wait}><JobDetailView id={openId} onBack={() => setOpenId(null)} onChanged={changed} addToast={addToast} /></Suspense>;
   if (byDate) return <Suspense fallback={wait}><ReceivedByDate onBack={() => setByDate(false)} onOpen={setOpenId} addToast={addToast} /></Suspense>;
+  if (ledger) return <Suspense fallback={wait}><JobworkerLedger view={ledger} onView={setLedger} onBack={() => setLedger(null)} onOpen={setOpenId} addToast={addToast} /></Suspense>;
 
   const pages = Math.max(1, Math.ceil(count / perPage));
   const chip = (on: boolean): React.CSSProperties => ({ ...S.btnGhost, ...S.btnSm, minHeight: 32, borderRadius: 999, padding: '5px 14px', fontSize: 11, flexShrink: 0, ...(on ? { borderColor: T.ac, color: T.ac2, background: T.ac3 } : {}) });
@@ -84,9 +89,10 @@ export default function Jobwork({ addToast }: { addToast: (m: string, t?: string
     <div className="jw-list">
       {/* Same frame as Purchase Orders: the app header already names the page,
           so one quiet line + the actions, and the content uses the full width. */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, gap: 12 }}>
-        <div style={{ fontSize: 12, color: T.tx3, minWidth: 0 }}>Work given outside · what went out, came back, is pending and paid</div>
-        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ fontSize: 12, color: T.tx3, minWidth: 0, flex: '1 1 220px' }}>Work given outside · what went out, came back, is pending and paid</div>
+        <div style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap' }}>
+          <button type="button" className="jw-share-btn" onClick={() => setLedger(LEDGER_START)} style={S.btnGhost}>Ledger</button>
           <button type="button" className="jw-share-btn" onClick={() => setByDate(true)} style={S.btnGhost}>Received on…</button>
           <button type="button" className="jw-share-btn" onClick={() => setSharing(true)} style={S.btnGhost}>Share pending</button>
           <button type="button" className="desktop-only" onClick={() => setCreating(true)} style={S.btnPrimary}>+ New job</button>
