@@ -15,7 +15,7 @@ export const normHeader = (h: string) => h.toLowerCase().replace(/[^a-z0-9]/g, '
 // Image-slot columns (same rule as the edge fn): filled with Dropbox links
 // in code at zero AI cost, so bulk actions should never skip them.
 export const isImageColumn = (h: string) =>
-  /(front|side|back|additional)\s*image|image\s*\d|look\s*shot|detail\s*angle|^\s*image\s*$/i.test(h) && !/certificate|\bbis\b|document/i.test(h);
+  /(front|side|back|additional)\s*images?|images?\s*(url|link)?\s*\d|look\s*shot|detail\s*angle|^\s*images?\s*$/i.test(h) && !/certificate|\bbis\b|document/i.test(h);
 
 export interface ParsedTemplate {
   sheetName: string;
