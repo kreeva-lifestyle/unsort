@@ -1,4 +1,9 @@
-// listing-ai Edge Function - AI Listing Module backend (v39).
+// listing-ai Edge Function - AI Listing Module backend (v40).
+//
+// v40: IMAGE_COL_RE accepts the PLURAL spelling ("Images 1", "Images3") and
+// "Image URL 1". House of Indya's template mixes "Image", "Images 1..3" and
+// "Image 4..6": the three plural columns were not seen as photo slots, went
+// to the AI as text and came back as file names instead of Dropbox links.
 //
 // v39: `spellcheck` action - deterministic master-sheet spelling report for
 // the Master Assistant. Flags garment/fabric words typed within 1-2 edits of
@@ -769,7 +774,7 @@ const DIRECT_MAP: [RegExp, string][] = [
 // literally named "image" — without it the column fell through to a master
 // same-name copy and got the sheet's dl=0 Dropbox PAGE link instead of a
 // direct raw= photo link like its image1..3 siblings.
-const IMAGE_COL_RE = /(front|side|back|additional)\s*image|image\s*\d|look\s*shot|detail\s*angle|^\s*image\s*$/i;
+const IMAGE_COL_RE = /(front|side|back|additional)\s*images?|images?\s*(url|link)?\s*\d|look\s*shot|detail\s*angle|^\s*images?\s*$/i;
 const NOT_IMAGE_COL_RE = /certificate|\bbis\b|document/i;
 
 // Creative fields stay AI-written even when a same-named master column
