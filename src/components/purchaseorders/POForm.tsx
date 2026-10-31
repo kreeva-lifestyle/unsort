@@ -24,7 +24,7 @@ import { useModalLock } from '../../hooks/useModalLock';
 
 export type EditingPO = PurchaseOrder & { items?: PurchaseOrderItem[] };
 /** A pre-filled NEW order (e.g. raised from a costing sheet's purchase plan): any header fields plus draft lines. */
-export type POPrefill = Partial<PurchaseOrder> & { items?: Array<Pick<PurchaseOrderItem, 'sku' | 'item_name' | 'fabric_code' | 'quantity' | 'unit' | 'rate'> & Partial<Pick<PurchaseOrderItem, 'id' | 'received_qty' | 'cancelled_at'>>> };
+export type POPrefill = Partial<PurchaseOrder> & { items?: Array<Pick<PurchaseOrderItem, 'sku' | 'item_name' | 'fabric_code' | 'quantity' | 'unit' | 'rate'> & Partial<Pick<PurchaseOrderItem, 'id' | 'received_qty' | 'cancelled_at' | 'buffer_qty'>>> };
 
 const localToday = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 
@@ -56,7 +56,7 @@ export default function POForm({ editing, duplicateFrom, prefill, onClose, onSav
   // A cancelled line stays as it is (not on the form, not on a duplicate); an edited line keeps its id.
   const [items, setItems] = useState<FormItem[]>(() => {
     const lines = (src?.items ?? []).filter(it => !it.cancelled_at);
-    return lines.length ? lines.map(it => ({ ...(editing && it.id ? { id: it.id, received: Number(it.received_qty || 0), ordered: Number(it.quantity) } : {}), sku: it.sku ?? '', item_name: it.item_name ?? '', fabric_code: it.fabric_code ?? '', quantity: String(it.quantity), unit: it.unit ?? '', rate: it.rate == null ? '' : String(it.rate) })) : [blankItem()];
+    return lines.length ? lines.map(it => ({ ...(editing && it.id ? { id: it.id, received: Number(it.received_qty || 0), ordered: Number(it.quantity) } : {}), sku: it.sku ?? '', item_name: it.item_name ?? '', fabric_code: it.fabric_code ?? '', quantity: String(it.quantity), buffer: Number(it.buffer_qty || 0), unit: it.unit ?? '', rate: it.rate == null ? '' : String(it.rate) })) : [blankItem()];
   });
   const [showCharges, setShowCharges] = useState(!!(src?.discount_value || src?.tax_percent || src?.other_charges));
   const [charges, setCharges] = useState<Charges>({ discountType: src?.discount_type ?? 'flat', discountValue: src?.discount_value ? String(src.discount_value) : '', taxPercent: src?.tax_percent ? String(src.tax_percent) : '', otherCharges: src?.other_charges ? String(src.other_charges) : '' });
@@ -157,7 +157,7 @@ export default function POForm({ editing, duplicateFrom, prefill, onClose, onSav
             forPieces={forPieces} onPieces={setForPieces} lumpSum={lumpSum} onLumpSum={setLumpSum} piecesMissing={!!error && !lumpSum && !forPieces.trim()} addToast={addToast} />
 
           <label style={S.fLabel}>Items *</label>
-          <POItemRows items={items} poType={poType} onChange={setItem} onRemove={removeRow} onAdd={addRow} />
+          <POItemRows items={items} poType={poType} forPieces={lumpSum ? '' : forPieces} onChange={setItem} onRemove={removeRow} onAdd={addRow} />
 
           <POFormCharges show={showCharges} onToggle={() => setShowCharges(s => !s)} charges={charges} onCharges={c => setCharges(prev => ({ ...prev, ...c }))}
             notes={notes} onNotes={setNotes} totals={{ subtotal, discAmt, taxAmt, other: num(charges.otherCharges), grand }} />

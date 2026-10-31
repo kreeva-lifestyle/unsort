@@ -21,7 +21,7 @@ export interface POFormState {
 
 export interface POPayload {
   p_po: Record<string, unknown>;
-  p_items: Array<{ id?: string; item_name: string; sku: string | null; fabric_code: string | null; quantity: number; unit: string | null; rate: number | null }>;
+  p_items: Array<{ id?: string; item_name: string; sku: string | null; fabric_code: string | null; quantity: number; buffer_qty: number; unit: string | null; rate: number | null }>;
 }
 
 /** The first problem with the form, or the payload to save. A revision keeps each line's id (amend_po updates it in place). */
@@ -73,7 +73,8 @@ export function poPayload(f: POFormState, subtotal: number, keepIds: boolean): {
   const p_items = clean.map(({ it }) => ({
     ...(keepIds && it.id ? { id: it.id } : {}),
     item_name: it.item_name.trim(), sku: it.sku.trim() || null, fabric_code: f.poType === 'fabric' ? it.fabric_code.trim() || null : null,
-    quantity: num(it.quantity), unit: it.unit.trim() || null, rate: it.rate === '' ? null : num(it.rate),
+    // Buffer (from Raise POs) is part of the quantity, never more than it.
+    quantity: num(it.quantity), buffer_qty: Math.min(it.buffer ?? 0, num(it.quantity)), unit: it.unit.trim() || null, rate: it.rate === '' ? null : num(it.rate),
   }));
   return { p_po, p_items };
 }

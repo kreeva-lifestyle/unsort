@@ -90,6 +90,8 @@ export interface PurchaseOrderItem {
   rate: number | null;
   amount: number | null;
   received_qty: number;
+  /** Part of `quantity` ordered as buffer over the costing plan (Raise POs); planned = quantity - buffer_qty. 0 = none. */
+  buffer_qty: number;
   sort_order: number | null;
   created_at: string | null;
   /** A cancelled line keeps what arrived: `quantity` drops to the received amount and the balance is here. */

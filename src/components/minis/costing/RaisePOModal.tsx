@@ -7,7 +7,8 @@
 // id, so the PO remembers where it came from. The user reviews and saves;
 // nothing is written until they do. Each line takes an optional buffer in
 // its own unit (e.g. +10 Meter for wastage); it is added to the PO quantity
-// and the cost — pieces to make stay the same.
+// and the cost — pieces to make stay the same — and saved on the PO line
+// (buffer_qty), so the PO shows "N for 48 pcs + buffer" from then on.
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../../../lib/supabase';
@@ -39,7 +40,7 @@ export default function RaisePOModal({ product, pieces, onClose, addToast }: {
   const lines = plan.lines.map((l, idx) => {
     const extra = Math.max(0, num(buffer[idx]));
     const totalQty = Math.round((l.totalQty + extra) * 100) / 100;
-    return { ...l, idx, extra, totalQty, cost: Math.round(totalQty * l.rate * 100) / 100 };
+    return { ...l, idx, extra, planQty: l.totalQty, totalQty, cost: Math.round(totalQty * l.rate * 100) / 100 };
   });
   // Vendor list is small by nature; one fetch, matched case-insensitively.
   const [vendors, setVendors] = useState<Map<string, Vendor> | null>(null);
@@ -80,7 +81,7 @@ export default function RaisePOModal({ product, pieces, onClose, addToast }: {
       vendor_id: v?.id ?? null, vendor_name: v?.name ?? sup, vendor_phone: v?.phone ?? null,
       po_type: rows.every(l => FABRIC_UNITS.has(l.unit)) ? 'fabric' : 'material',
       for_pieces: pieces, costing_product_id: product.id,
-      items: rows.map(l => ({ sku: product.sku, item_name: l.sub, fabric_code: l.materialCode || null, quantity: l.totalQty, unit: l.unit, rate: l.rate > 0 ? l.rate : null })),
+      items: rows.map(l => ({ sku: product.sku, item_name: l.sub, fabric_code: l.materialCode || null, quantity: l.totalQty, buffer_qty: l.extra, unit: l.unit, rate: l.rate > 0 ? l.rate : null })),
     };
   };
 
@@ -126,7 +127,7 @@ export default function RaisePOModal({ product, pieces, onClose, addToast }: {
                         style={{ ...S.fInput, width: 84, fontSize: 12, padding: '4px 8px', textAlign: 'right' }} />}
                       <div style={{ fontFamily: T.mono, color: T.tx2, whiteSpace: 'nowrap', textAlign: 'right' }}>
                         {qty(l.totalQty)} {l.unit} × {money(l.rate)}
-                        {l.extra > 0 && <div style={{ fontSize: 10, color: T.ac2 }}>incl. +{qty(l.extra)} {l.unit} buffer</div>}
+                        {l.extra > 0 && <div style={{ fontSize: 10, color: T.ac2 }}>{qty(l.planQty)} for {pieces} pcs + {qty(l.extra)} buffer</div>}
                       </div>
                     </div>
                   </div>

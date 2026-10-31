@@ -136,7 +136,7 @@ export default function PODetail({ po: livePo, items: liveItems, receipts: liveR
             {rev && <POReviseNotice key={rev.id} po={po} items={items} rev={rev} onDone={() => { void onChanged(); }} addToast={addToast} />}
             <POHeaderInfo po={po} costingSku={costingSku} names={names} jobs={jw.jobs} />
 
-            <POLineTable items={items} canCancel={open && canManage && !holding} busy={!!busy} onCancel={setCancelling} />
+            <POLineTable items={items} forPieces={po.lump_sum ? null : po.for_pieces} canCancel={open && canManage && !holding} busy={!!busy} onCancel={setCancelling} />
 
             {/* Totals */}
             <div style={{ marginLeft: 'auto', maxWidth: 260, display: 'flex', flexDirection: 'column', gap: 3, marginBottom: 16 }}>

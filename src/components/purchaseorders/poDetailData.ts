@@ -8,7 +8,7 @@
 import { supabase } from '../../lib/supabase';
 import type { PurchaseOrder, PurchaseOrderItem, PurchaseOrderReceipt, PurchaseOrderRevision, AuditLog } from '../../types/database';
 
-export const ITEM_COLS = 'id, po_id, item_name, sku, fabric_code, quantity, unit, rate, amount, received_qty, sort_order, created_at, cancelled_qty, cancelled_at, cancelled_by, cancel_reason';
+export const ITEM_COLS = 'id, po_id, item_name, sku, fabric_code, quantity, unit, rate, amount, received_qty, buffer_qty, sort_order, created_at, cancelled_qty, cancelled_at, cancelled_by, cancel_reason';
 /** A revision with the name of whoever made it (embedded, one round trip). */
 export type PORevisionRow = PurchaseOrderRevision & { creator?: { full_name: string | null } | null };
 const REV_COLS = 'id, po_id, revision, kind, changes, reason, created_by, created_at, notified_at, notified_by, notified_how, creator:profiles!purchase_order_revisions_created_by_fkey(full_name)';
