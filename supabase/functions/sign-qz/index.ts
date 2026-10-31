@@ -5,7 +5,12 @@
 // Deployed with verify_jwt: true — only authenticated app users can request
 // signatures. The private key lives ONLY in the QZ_PRIVATE_KEY function secret.
 //
-// Source of truth: this file mirrors the deployed function (v2). If you change
+// v4 (security audit 2026-10-31): verify_jwt alone also admits the PUBLIC anon
+// key (it is a validly signed project JWT), which made this an open signing
+// oracle. The caller is now resolved and must be an active admin/manager/
+// operator before anything is signed.
+//
+// Source of truth: this file mirrors the deployed function (v4). If you change
 // it, redeploy via the Supabase MCP deploy_edge_function (keep verify_jwt on).
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -16,12 +21,35 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
+const SB_URL = Deno.env.get('SUPABASE_URL') ?? '';
+const SB_SVC = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+
+// The bearer must be a real user session (not the anon key) whose profile is
+// an active admin, manager or operator.
+async function isActiveStaff(req: Request): Promise<boolean> {
+  const token = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
+  if (!token) return false;
+  const u = await fetch(`${SB_URL}/auth/v1/user`, { headers: { authorization: `Bearer ${token}`, apikey: SB_SVC } });
+  if (!u.ok) return false;
+  const user = await u.json().catch(() => null);
+  if (!user?.id) return false;
+  const p = await fetch(`${SB_URL}/rest/v1/profiles?id=eq.${user.id}&select=role,is_active`, { headers: { apikey: SB_SVC, authorization: `Bearer ${SB_SVC}` } });
+  const prof = (await p.json().catch(() => []))?.[0];
+  return !!prof && prof.is_active !== false && ['admin', 'manager', 'operator'].includes(prof.role);
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
+    if (!(await isActiveStaff(req))) {
+      return new Response(JSON.stringify({ error: 'Sign in to DailyOffice first' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
     const { toSign } = await req.json();
     if (!toSign || typeof toSign !== 'string') {
       return new Response(JSON.stringify({ error: 'Missing toSign field' }), {
@@ -65,7 +93,8 @@ Deno.serve(async (req: Request) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (err) {
-    return new Response(JSON.stringify({ error: (err as Error).message }), {
+    console.error('sign-qz error:', (err as Error).message);
+    return new Response(JSON.stringify({ error: 'Signing failed' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

@@ -159,9 +159,14 @@ export async function catalogList(body: any, req: Request, d: Deps): Promise<Res
 
 /** Seller-link callers may only touch catalogs the master sheet knows — no
  *  free-text folder search, no pack folders named by an outsider. */
-async function onSheet(d: Deps, catalog: string): Promise<boolean> {
+// Returns the sheet's own spelling of the catalog (or null). The product
+// lookups below filter with an exact `catalog=eq.` match, so a seller-link
+// caller must use this canonical name: a case variant used to pass the loose
+// check here, match no sheet rows, and fall into the "not on the sheet —
+// take every folder" branch (security audit 2026-10-31).
+async function onSheet(d: Deps, catalog: string): Promise<string | null> {
   const { catalogs } = await loadCatalogs(d);
-  return !!catalogs && catalogs.some(c => normName(c.name) === normName(catalog));
+  return catalogs?.find(c => normName(c.name) === normName(catalog))?.name ?? null;
 }
 
 /** One recursive listing of a folder: its direct sub-folders with file
@@ -196,10 +201,14 @@ async function listSubfolders(d: Deps, token: string, path: string, cacheable = 
 export async function catalogFolder(body: any, req: Request, d: Deps): Promise<Response> {
   const g = await authed(body, req, d, 'cf', 20); if (g.denied) return g.denied;
   const det = (s?: string) => (g.session ? s : undefined);
-  const catalog = String(body?.catalog || '').trim().slice(0, 120);
+  let catalog = String(body?.catalog || '').trim().slice(0, 120);
   const picked = String(body?.path || '').trim().toLowerCase();
   if (!catalog) return d.fail(400, 'Pick a catalog first', req);
-  if (!g.session && !(await onSheet(d, catalog))) return d.fail(403, 'That catalog is not on the master sheet', req);
+  if (!g.session) {
+    const canon = await onSheet(d, catalog);
+    if (!canon) return d.fail(403, 'That catalog is not on the master sheet', req);
+    catalog = canon;
+  }
   let token = '';
   try { token = await d.getDropboxToken(); } catch { return d.json({ ok: false, error: 'dropbox_not_connected' }, req, 409); }
   const roots = await d.resolveGenRootPaths(token);
@@ -208,6 +217,7 @@ export async function catalogFolder(body: any, req: Request, d: Deps): Promise<R
   let folder: { name: string; path: string } | null = null;
   if (picked) {
     if (!inside(picked, roots)) return d.fail(403, 'That folder is outside the configured search folders', req);
+    if (!g.session && roots.includes(picked)) return d.fail(403, 'Pick the catalog folder, not a whole search folder', req);
     const meta = await d.dbx(token, 'files/get_metadata', { path: picked });
     if (meta.status >= 400 || meta.data?.['.tag'] !== 'folder') return d.fail(404, 'That folder no longer exists in Dropbox', req);
     folder = { name: String(meta.data.name), path: String(meta.data.path_lower) };
@@ -240,6 +250,8 @@ export async function catalogFolder(body: any, req: Request, d: Deps): Promise<R
   const out = classifyFolders(folders, sheet, d.nameMatchesSku, d.normSku);
   // A book that is not on the master sheet (owner's ask): nothing to filter
   // by, so every folder counts and the pack takes them all.
+  // Seller links only ever see catalogs that are on the sheet (checked above).
+  if (sheet.length === 0 && !g.session) return d.fail(403, 'That catalog is not on the master sheet', req);
   if (sheet.length === 0) out.totals = { active: out.items.length, files: out.items.reduce((t, i) => t + i.files, 0), bytes: out.items.reduce((t, i) => t + i.bytes, 0) };
   return d.json({ ok: true, folder, ...out, loose, sheetCount: sheet.length, truncated }, req);
 }
@@ -273,19 +285,24 @@ async function packLink(token: string, packPath: string, req: Request, d: Deps, 
 export async function catalogPack(body: any, req: Request, d: Deps): Promise<Response> {
   const g = await authed(body, req, d, 'cp', 10); if (g.denied) return g.denied;
   const det = (s?: string) => (g.session ? s : undefined);
-  const catalog = String(body?.catalog || '').trim().slice(0, 120);
+  let catalog = String(body?.catalog || '').trim().slice(0, 120);
   const path = String(body?.path || '').trim().toLowerCase();
   const jobId = String(body?.jobId || '').trim();
-  let packPath = `${PACK_ROOT}/${packName(catalog)}`;
   if (!catalog || !path.startsWith('/')) return d.fail(400, 'Pick a catalog first', req);
-  if (!g.session && !(await onSheet(d, catalog))) return d.fail(403, 'That catalog is not on the master sheet', req);
+  if (!g.session) {
+    const canon = await onSheet(d, catalog);
+    if (!canon) return d.fail(403, 'That catalog is not on the master sheet', req);
+    catalog = canon;
+  }
+  let packPath = `${PACK_ROOT}/${packName(catalog)}`;
   let token = '';
   try { token = await d.getDropboxToken(); } catch { return d.json({ ok: false, error: 'dropbox_not_connected' }, req, 409); }
 
   // Polling a copy that was still running (the pack path travels with it).
   if (jobId) {
     const given = String(body?.packPath || '').trim();
-    if (given.toLowerCase().startsWith(PACK_ROOT.toLowerCase() + '/')) packPath = given;
+    // Staff may poll any pack; a seller link only the pack of its own catalog.
+    if (g.session && given.toLowerCase().startsWith(PACK_ROOT.toLowerCase() + '/')) packPath = given;
     const ck = await d.dbx(token, 'files/copy_batch/check_v2', { async_job_id: jobId });
     if (ck.status >= 400) return d.fail(502, 'Dropbox lost track of the copy — try again', req, det(JSON.stringify(ck.data).slice(0, 200)));
     const tag = ck.data?.['.tag'];
@@ -296,6 +313,7 @@ export async function catalogPack(body: any, req: Request, d: Deps): Promise<Res
 
   const roots = await d.resolveGenRootPaths(token);
   if (!inside(path, roots)) return d.fail(403, 'That folder is outside the configured search folders', req);
+  if (!g.session && roots.includes(path)) return d.fail(403, 'Pick the catalog folder, not a whole search folder', req);
   const meta = await d.dbx(token, 'files/get_metadata', { path });
   if (meta.status >= 400 || meta.data?.['.tag'] !== 'folder') return d.fail(404, 'That folder no longer exists in Dropbox', req);
   const listed = await listSubfolders(d, token, path, true);
@@ -303,6 +321,8 @@ export async function catalogPack(body: any, req: Request, d: Deps): Promise<Res
   const sr = await fetch(`${d.sbUrl}/rest/v1/product_catalog?catalog=eq.${encodeURIComponent(catalog)}&select=sku,sku_norm,is_active&limit=2000`, { headers: { apikey: d.sbSvc, authorization: `Bearer ${d.sbSvc}` } });
   if (!sr.ok) return d.fail(502, 'Could not read the master mirror for that catalog', req);
   const sheet: SheetRow[] = await sr.json().catch(() => []);
+  // "Not on the sheet → every folder" is a staff-only convenience.
+  if (sheet.length === 0 && !g.session) return d.fail(403, 'That catalog is not on the master sheet', req);
   const out = classifyFolders([...listed.sub.values()], sheet, d.nameMatchesSku, d.normSku);
   // Not on the master sheet → every folder; on the sheet → active only.
   const active = sheet.length === 0 ? out.items : out.items.filter(i => i.status === 'active');

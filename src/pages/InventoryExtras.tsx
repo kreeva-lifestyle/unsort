@@ -28,7 +28,7 @@ const SIZES = ['N/A', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'Semi-Stitched'];
 import { isDupatta, isLehenga, isBottomType, isBlouse, mfrFromSku } from '../lib/garmentHelpers';
 import { exportName, docTitle, fileDate } from '../lib/exportName';
 import { useModalLock } from '../hooks/useModalLock';
-import { escHtml } from '../lib/escape';
+import { escHtml, csvCell } from '../lib/escape';
 
 // View model: narrowed inventory_items row for the matching UI.
 type InventoryItemMatch = Pick<InventoryItem, 'id' | 'batch_number' | 'serial_number' | 'size' | 'location' | 'status'>;
@@ -372,8 +372,7 @@ export default function InventoryExtras() {
           <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, background: 'rgba(14,18,30,.97)', backdropFilter: 'blur(20px)', border: `1px solid ${T.bd2}`, borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,.4)', zIndex: 150, minWidth: 160, overflow: 'hidden' }}>
             <button onClick={() => {
               if (filtered.length === 0) { addToast('No data to export', 'error'); setShowExportMenu(false); return; }
-              const q = (s: unknown) => `"${String(s ?? '').replace(/"/g, '""')}"`;
-              const csv = 'SKU,Category,Component,Size,Qty\n' + filtered.map(ex => `${q(ex.sku)},${q(ex.product_name)},${q(ex.component_name)},${q(ex.size)},${ex.quantity}`).join('\n');
+              const csv = 'SKU,Category,Component,Size,Qty\n' + filtered.map(ex => [ex.sku, ex.product_name, ex.component_name, ex.size, ex.quantity].map(csvCell).join(',')).join('\n');
               const blob = new Blob([csv], { type: 'text/csv' });
               const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = exportName('Spare-Parts', [fileDate()], 'csv'); a.click(); URL.revokeObjectURL(a.href);
               setShowExportMenu(false);

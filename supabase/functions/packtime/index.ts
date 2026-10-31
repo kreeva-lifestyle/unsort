@@ -131,6 +131,12 @@ async function sheetsGet(range: string): Promise<string[][]> {
   return (data.values as string[][] | undefined) || [];
 }
 
+// USER_ENTERED parses text starting with = + - @ as a formula. Cells written
+// on behalf of a scan (AWB, camera, brand) must land as plain text, so such
+// text gets a leading apostrophe. Numbers and dates pass unchanged.
+const plainCell = (v: unknown): unknown =>
+  typeof v === 'string' && /^[=+\-@\t\r]/.test(v) && !/^-?\d+(\.\d+)?$/.test(v) ? `'${v}` : v;
+
 /** Appends and returns the first row number the rows landed on (1-based). */
 async function sheetsAppend(sheetName: string, rows: unknown[][]): Promise<number> {
   const token = await getGoogleToken();
@@ -138,7 +144,7 @@ async function sheetsAppend(sheetName: string, rows: unknown[][]): Promise<numbe
   const r = await fetch(url, {
     method: 'POST',
     headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
-    body: JSON.stringify({ values: rows }),
+    body: JSON.stringify({ values: rows.map(r => r.map(plainCell)) }),
   });
   const data = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(`Sheets append ${r.status}: ${data.error?.message || 'unknown'}`);
@@ -162,18 +168,18 @@ async function sheetsClearRow(sheetName: string, rowNumber: number): Promise<voi
 // The Bearer token must belong to a signed-in, active profile (same real
 // verification client-finder and odette-export use). The scheduler instead
 // presents the shared secret from app_secrets.
-async function caller(req: Request): Promise<{ id: string } | null> {
+async function caller(req: Request): Promise<{ id: string; role: string } | null> {
   const token = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
   if (!token) return null;
   const u = await fetch(`${SB_URL}/auth/v1/user`, { headers: { authorization: `Bearer ${token}`, apikey: SB_SVC } });
   if (!u.ok) return null;
   const user = await u.json().catch(() => null);
   if (!user?.id) return null;
-  const p = await fetch(`${SB_URL}/rest/v1/profiles?id=eq.${user.id}&select=is_active`, { headers: svcHeaders });
+  const p = await fetch(`${SB_URL}/rest/v1/profiles?id=eq.${user.id}&select=is_active,role`, { headers: svcHeaders });
   const rows = await p.json().catch(() => []);
   const prof = rows?.[0];
   if (!prof || prof.is_active === false) return null;
-  return { id: user.id };
+  return { id: user.id, role: String(prof.role || '') };
 }
 
 function secretOk(given: string, expected: string): boolean {
@@ -352,7 +358,12 @@ Deno.serve(async (req) => {
   if (!action) return fail(400, 'Missing action', req);
 
   const fromScheduler = await schedulerOk(req);
-  if (!fromScheduler && !(await caller(req))) return fail(401, 'Sign in to DailyOffice first', req);
+  const who = fromScheduler ? null : await caller(req);
+  if (!fromScheduler && !who) return fail(401, 'Sign in to DailyOffice first', req);
+  // Writing scan rows needs the same authority as writing the scan itself
+  // (packtime_scans is operator+): the legacy batch/delete actions used to be
+  // open to any signed-in role. Security audit 2026-10-31.
+  const canWrite = fromScheduler || ['admin', 'manager', 'operator'].includes(who?.role || '');
 
   try {
     if (action === 'sync') return json({ ok: true, ...(await runSync()) }, req);
@@ -375,6 +386,7 @@ Deno.serve(async (req) => {
       const awbs = rows.slice(1).map(r => r[1]).filter(Boolean).map(String);
       return json({ ok: true, awbs, totalRows: Math.max(0, rows.length - 1), columnsOk: col.ok, columnsInfo: col.info }, req);
     }
+    if ((action === 'batch' || action === 'delete') && !canWrite) return fail(403, 'Only PackStation staff can change the courier sheet', req);
     if (action === 'batch') {   // old app versions only
       if (!Array.isArray(body.rows) || body.rows.length === 0) return fail(400, 'rows missing or empty', req);
       await sheetsAppend(sheetName, body.rows);

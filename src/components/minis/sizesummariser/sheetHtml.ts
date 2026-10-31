@@ -47,7 +47,7 @@ export function sheetHtml({ ex, diagramUrl, title, footer, fit = FIT_START }: Sh
   const n = upper.length + (sleeveless ? 1 : 0);
   const cols = n >= 9 ? 5 : n >= 7 ? 4 : 3; // no row of one lonely card
   const notes = ex.notes.map(n => {
-    const t = fit.notesMax && n.text_hi.length > fit.notesMax ? `${n.text_hi.slice(0, fit.notesMax)}… <span class="en">पूरा नोट मूल फ़ॉर्म में</span>` : escHtml(n.text_hi);
+    const t = fit.notesMax && n.text_hi.length > fit.notesMax ? `${escHtml(n.text_hi.slice(0, fit.notesMax))}… <span class="en">पूरा नोट मूल फ़ॉर्म में</span>` : escHtml(n.text_hi);
     return `<tr><th>ग्राहक का नोट</th><td>${t}${n.text_original && n.text_original !== n.text_hi && !fit.notesMax ? `<div class="en">${escHtml(n.text_original)}</div>` : ''}</td></tr>`;
   }).join('');
   const warn = ex.warnings.filter(w => w.severity !== 'info');

@@ -38,7 +38,7 @@ const canAlterSize = (a: string, b: string): boolean => {
 import { isDupatta, isLehenga, isBottomType, mfrFromSku } from '../lib/garmentHelpers';
 import { exportName, docTitle, fileDate } from '../lib/exportName';
 import { useModalLock } from '../hooks/useModalLock';
-import { escHtml } from '../lib/escape';
+import { escHtml, csvCell } from '../lib/escape';
 
 export default function Inventory({ openItemId, onItemOpened, active }: { openItemId?: string | null; onItemOpened?: () => void; active?: boolean }) {
   const [stage, setStage] = useState<'pending' | 'completed'>('pending');
@@ -748,7 +748,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
               </button>
               <button onClick={() => {
                 if (filtered.length === 0) { addToast('Nothing to export — no items match the current filters', 'error'); setShowExportMenu(false); return; }
-                const csv = 'Batch,SKU,Category,Size,Status,Location,Missing,Damaged\n' + filtered.map(i => `${i.batch_number || ''},${i.serial_number || ''},"${i.products?.name || ''}",${i.size || ''},${i.status},${i.location || ''},"${(itemMissing[i.id] || []).join('; ')}","${(itemDamaged[i.id] || []).join('; ')}"`).join('\n');
+                const csv = 'Batch,SKU,Category,Size,Status,Location,Missing,Damaged\n' + filtered.map(i => [i.batch_number, i.serial_number, i.products?.name, i.size, i.status, i.location, (itemMissing[i.id] || []).join('; '), (itemDamaged[i.id] || []).join('; ')].map(csvCell).join(',')).join('\n');
                 const blob = new Blob([csv], { type: 'text/csv' });
                 const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = exportName('Inventory', [stage, fileDate()], 'csv'); a.click(); URL.revokeObjectURL(a.href);
                 setShowExportMenu(false);

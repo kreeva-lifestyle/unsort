@@ -5,6 +5,7 @@ import { T, S } from '../../lib/theme';
 import { numericKeyDown } from '../../lib/numericInput';
 import { exportName, fileDate } from '../../lib/exportName';
 import ConfirmModal, { useConfirm } from '../ui/ConfirmModal';
+import { csvCell } from '../../lib/escape';
 
 const STOCK_LIMIT = 1000;
 
@@ -86,7 +87,7 @@ export default function VirtualStock({ setStock, addToast }: { stock: Record<str
   const exportCSV = () => {
     if (rows.length === 0) { addToast('No data to export', 'error'); return; }
     const header = 'SKU,Quantity';
-    const csv = [header, ...rows.map(r => `${r.sku},${r.quantity}`)].join('\n');
+    const csv = [header, ...rows.map(r => `${csvCell(r.sku)},${csvCell(r.quantity)}`)].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
