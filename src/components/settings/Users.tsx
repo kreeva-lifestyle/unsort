@@ -149,24 +149,19 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
     if (!profile || profile.role !== 'admin') { addToast('Only admins can invite users', 'error'); return; }
     setInviting(true);
     const password = inviteForm.password || generatePassword();
-    const { data, error } = await supabase.auth.signUp({
-      email: inviteForm.email,
-      password,
-      options: { data: { full_name: inviteForm.full_name } }
+    // Created server-side by the admin-users function (public sign-up is
+    // closed): the account is confirmed and its role set in one step.
+    const { data, error } = await supabase.functions.invoke('admin-users', {
+      body: { action: 'create', email: inviteForm.email, password, full_name: inviteForm.full_name, role: inviteForm.role },
     });
-    if (error) {
-      addToast(friendlyError(error), 'error');
+    // A non-2xx reply carries the reason (e.g. email already registered) in its body.
+    const failure = error ? ((await (error as { context?: Response }).context?.json().catch(() => null))?.error || error.message) as string : (data?.error as string | undefined);
+    if (failure) {
+      addToast(friendlyError({ message: failure }), 'error');
       setInviting(false);
       return;
     }
-    // Auto-confirm email + update role
-    if (data.user) {
-      const { error: confErr } = await supabase.rpc('confirm_user_email', { target_user_id: data.user.id });
-      if (confErr) addToast('User created but email auto-confirmation failed — they may need to confirm via email link first.', 'error');
-      if (inviteForm.role !== 'viewer') {
-        await supabase.from('profiles').update({ role: inviteForm.role }).eq('id', data.user.id);
-      }
-    }
+    if (data?.warning) addToast(String(data.warning), 'error');
     // The password is shown exactly once — it must stay on screen until the
     // admin explicitly taps Done (a timer or a stray backdrop tap used to
     // wipe it mid-copy, leaving no way to recover it).
