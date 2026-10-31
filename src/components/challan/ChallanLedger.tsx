@@ -1,7 +1,10 @@
 // Customer ledger list + detail — extracted from CashChallan.tsx for
 // god-component split (audit P0). Parent owns the data fetch; this
-// component just renders.
+// component just renders. The customer detail is a statement
+// (ChallanStatement): to collect, the sum that gets there, day by day.
+import { useEffect, useState } from 'react';
 import { T, S, Icon } from '../../lib/theme';
+import ChallanStatement from './ChallanStatement';
 import DateInput from '../ui/DateInput';
 import type { CashChallan } from '../../types/database';
 import { exportName, fileDate } from '../../lib/exportName';
@@ -21,7 +24,7 @@ export default function ChallanLedger({
   onSearchSubmit,
   onOpenCustomer,
   onOpenChallan,
-  onExportPdf,
+  onStatementPdf,
   onLoadMore,
   truncated,
   statusColors,
@@ -40,7 +43,7 @@ export default function ChallanLedger({
   onSearchSubmit: (v: string) => void;
   onOpenCustomer: (cust: { id: string | null; name: string }) => void;
   onOpenChallan: (c: Challan) => void;
-  onExportPdf: (name: string) => void;
+  onStatementPdf: (html: string, name: string) => void;
   onLoadMore: () => void;
   truncated?: boolean;
   statusColors: Record<string, { bg: string; color: string }>;
@@ -50,26 +53,21 @@ export default function ChallanLedger({
   onDateToChange: (v: string) => void;
   onDateApply: (from?: string, to?: string) => void;
 }) {
+  // The statement follows the APPLIED range, not the half-typed dates.
+  const [applied, setApplied] = useState({ from: '', to: '' });
+  useEffect(() => { setApplied({ from: '', to: '' }); }, [detailId, detailName]);
+
   // Detail screen
   if (detailName) {
     const cust = customers.find(c => (detailId ? c.id === detailId : c.name === detailName));
-    // When a date range is applied, scope the KPI figures to the in-range
-    // challans. Credit model: a return reduces net billed; amount_paid on a
-    // return = credit already refunded to the customer (cash OUT, so it counts
-    // NEGATIVE in paid and the balance owed goes back up).
-    const filtered = !!(dateFrom || dateTo);
-    const total = filtered ? detailChallans.reduce((s, c) => s + (c.is_return ? -1 : 1) * Number(c.total), 0) : (cust?.total ?? 0);
-    const paid = filtered ? detailChallans.reduce((s, c) => s + (c.is_return ? -1 : 1) * Number(c.amount_paid || 0), 0) : (cust?.paid ?? 0);
-    const outstanding = filtered ? Math.round((total - paid) * 100) / 100 : (cust?.outstanding ?? 0);
+    const filtered = !!(applied.from || applied.to);
+    const outstanding = cust?.outstanding ?? 0;
     return (
       <div className="page-pad" style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <div>
             <span style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora }}>{detailName}</span>
-            {cust && <div style={{ fontSize: 10, color: T.tx3, marginTop: 2 }}>{filtered ? `${detailChallans.length} in range` : `${cust.count} challans`} | Outstanding: <span style={{ color: outstanding > 0 ? T.re : T.gr, fontWeight: 600 }}>₹{outstanding.toLocaleString('en-IN')}</span></div>}
-          </div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button onClick={() => onExportPdf(detailName)} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, cursor: 'pointer', fontFamily: T.sans }}>Export PDF</button>
+            {cust && <div style={{ fontSize: 10, color: T.tx3, marginTop: 2 }}>{filtered ? `${detailChallans.length} in range` : `${cust.count} challans`} | Outstanding today: <span style={{ color: outstanding > 0 ? T.re : T.gr, fontWeight: 600 }}>₹{outstanding.toLocaleString('en-IN')}</span></div>}
           </div>
         </div>
         <div className="challan-ledger-dates" style={{ display: 'flex', gap: 6, marginBottom: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
@@ -81,25 +79,11 @@ export default function ChallanLedger({
             <label style={{ fontSize: 8, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase' }}>To</label>
             <DateInput value={dateTo} onChange={e => onDateToChange(e.target.value)} />
           </div>
-          <button onClick={() => onDateApply()} style={{ ...S.btnPrimary, whiteSpace: 'nowrap' as const }}>Apply</button>
-          {(dateFrom || dateTo) && <button onClick={() => { onDateFromChange(''); onDateToChange(''); onDateApply('', ''); }} style={{ padding: '8px 12px', borderRadius: 8, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 12, cursor: 'pointer', height: 36 }}>Clear</button>}
+          <button onClick={() => { setApplied({ from: dateFrom, to: dateTo }); onDateApply(); }} style={{ ...S.btnPrimary, whiteSpace: 'nowrap' as const }}>Apply</button>
+          {(dateFrom || dateTo) && <button onClick={() => { onDateFromChange(''); onDateToChange(''); setApplied({ from: '', to: '' }); onDateApply('', ''); }} style={{ padding: '8px 12px', borderRadius: 8, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 12, cursor: 'pointer', height: 36 }}>Clear</button>}
         </div>
-        {cust && (
-          <div className="challan-ledger-kpis" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 12 }}>
-            <div style={{ background: T.ac3, border: `1px solid ${T.bd2}`, borderRadius: 8, padding: '8px 10px', textAlign: 'center' as const }}>
-              <div style={{ fontSize: 7, color: T.ac2, letterSpacing: 1, textTransform: 'uppercase' as const, fontWeight: 600, marginBottom: 2 }}>Total Billed</div>
-              <div style={{ fontSize: 16, fontWeight: 800, fontFamily: T.sora, color: T.ac2 }}>₹{total.toLocaleString('en-IN')}</div>
-            </div>
-            <div style={{ background: 'oklch(0.72 0.19 145 / .06)', border: '1px solid oklch(0.72 0.19 145 / .12)', borderRadius: 8, padding: '8px 10px', textAlign: 'center' as const }}>
-              <div style={{ fontSize: 7, color: T.gr, letterSpacing: 1, textTransform: 'uppercase' as const, fontWeight: 600, marginBottom: 2 }}>Paid</div>
-              <div style={{ fontSize: 16, fontWeight: 800, fontFamily: T.sora, color: T.gr }}>₹{paid.toLocaleString('en-IN')}</div>
-            </div>
-            <div style={{ background: outstanding > 0 ? 'oklch(0.63 0.22 25 / .06)' : 'oklch(0.72 0.19 145 / .06)', border: `1px solid ${outstanding > 0 ? 'oklch(0.63 0.22 25 / .12)' : 'oklch(0.72 0.19 145 / .12)'}`, borderRadius: 8, padding: '8px 10px', textAlign: 'center' as const }}>
-              <div style={{ fontSize: 7, color: outstanding > 0 ? T.re : T.gr, letterSpacing: 1, textTransform: 'uppercase' as const, fontWeight: 600, marginBottom: 2 }}>Outstanding</div>
-              <div style={{ fontSize: 16, fontWeight: 800, fontFamily: T.sora, color: outstanding > 0 ? T.re : T.gr }}>₹{outstanding.toLocaleString('en-IN')}</div>
-            </div>
-          </div>
-        )}
+        <ChallanStatement customerId={detailId} customerName={detailName} from={applied.from} to={applied.to}
+          onPdf={html => onStatementPdf(html, detailName)} refreshOn={detailChallans} challanList={
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
           {detailChallans.map(c => {
             const sc = statusColors[c.status] || statusColors.unpaid;
@@ -127,6 +111,7 @@ export default function ChallanLedger({
           })}
           {detailChallans.length === 0 && <div style={{ padding: 16, textAlign: 'center' as const, color: T.tx3, fontSize: 11 }}>No challans found.</div>}
         </div>
+        } />
       </div>
     );
   }

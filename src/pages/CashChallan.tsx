@@ -851,71 +851,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     setReminderChallan(null);
   };
 
-  // ── Export customer ledger PDF ─────────────────────────────────────────────
+  // The customer ledger PDF is the statement (components/challan/statementPdf.ts).
   const escHtml = escHtmlShared;
-  const exportLedgerPDF = (customerName: string) => {
-    if (ledgerChallans.length === 0) return;
-    const safeName = escHtml(customerName);
-    // Credit model: a return reduces net billed; amount_paid on a return is
-    // credit already refunded to the customer (cash OUT → negative paid).
-    const totalBilled = ledgerChallans.filter(c => !c.is_return).reduce((s, c) => s + Number(c.total), 0);
-    const totalReturns = ledgerChallans.filter(c => c.is_return).reduce((s, c) => s + Number(c.total), 0);
-    const netTotal = Math.round((totalBilled - totalReturns) * 100) / 100;
-    const totalPaid = ledgerChallans.reduce((s, c) => s + (c.is_return ? -1 : 1) * Number(c.amount_paid || 0), 0);
-    const outstanding = Math.round((netTotal - totalPaid) * 100) / 100;
-    const rows = ledgerChallans.map(c => {
-      const isRet = c.is_return;
-      // Return: paid = refund handed back (−); balance = unsettled credit only.
-      const paidCell = isRet ? `−₹${Number(c.amount_paid || 0).toLocaleString('en-IN')}` : `₹${Number(c.amount_paid || 0).toLocaleString('en-IN')}`;
-      const balanceCell = isRet ? `−₹${Math.max(0, Number(c.total) - Number(c.amount_paid || 0)).toLocaleString('en-IN')}` : `₹${(Number(c.total) - Number(c.amount_paid || 0)).toLocaleString('en-IN')}`;
-      return `<tr>
-        <td>#${escHtml(c.challan_number)}</td>
-        <td>${new Date(c.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
-        <td>${isRet ? '<span style="color:#e53e3e">Return</span>' : 'Sale'}</td>
-        <td style="text-align:right">${isRet ? '−' : ''}₹${Number(c.total).toLocaleString('en-IN')}</td>
-        <td style="text-align:right">${paidCell}</td>
-        <td style="text-align:right">${balanceCell}</td>
-        <td><span style="padding:1px 6px;border-radius:3px;font-size:10px;font-weight:600;text-transform:uppercase;background:${c.status === 'paid' ? '#d4edda' : c.status === 'partial' ? '#fff3cd' : '#f8d7da'};color:${c.status === 'paid' ? '#155724' : c.status === 'partial' ? '#856404' : '#721c24'}">${escHtml(c.status)}</span></td>
-      </tr>`;
-    }).join('');
-    const html = `<!DOCTYPE html><html><head><title>${escHtml(docTitle('Ledger', customerName))}</title>
-      <style>
-        body{font-family:'Inter',sans-serif;padding:24px;color:#1a202c;font-size:12px;margin:0}
-        h2{margin:0 0 4px;font-size:18px} .sub{color:#718096;font-size:11px;margin-bottom:16px}
-        .stats{display:flex;gap:12px;margin-bottom:16px}
-        .stat{flex:1;border:1px solid #e2e8f0;border-radius:8px;padding:10px;text-align:center}
-        .stat .label{font-size:9px;text-transform:uppercase;letter-spacing:1px;color:#a0aec0;font-weight:600;margin-bottom:4px}
-        .stat .val{font-size:18px;font-weight:800}
-        table{width:100%;border-collapse:collapse;margin-bottom:16px}
-        th{text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:#a0aec0;padding:8px 10px;border-bottom:2px solid #e2e8f0;font-weight:600}
-        td{padding:8px 10px;border-bottom:1px solid #edf2f7;font-size:11px}
-        .totals{margin-top:8px;border-top:2px solid #2d3748;padding-top:8px}
-        .totals div{display:flex;justify-content:space-between;padding:3px 0;font-size:12px}
-        .totals .final{font-weight:800;font-size:14px;color:${outstanding > 0 ? '#e53e3e' : '#38a169'}}
-        .footer{margin-top:20px;text-align:center;font-size:9px;color:#a0aec0}
-        @media print{body{padding:12px}@page{margin:12mm}}
-      </style></head><body>
-      <h2>Customer Ledger</h2>
-      <div class="sub">${safeName} | Generated: ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
-      <div class="stats">
-        <div class="stat"><div class="label">Net Billed</div><div class="val" style="color:#6366f1">₹${netTotal.toLocaleString('en-IN')}</div></div>
-        <div class="stat"><div class="label">Received</div><div class="val" style="color:#38a169">₹${totalPaid.toLocaleString('en-IN')}</div></div>
-        <div class="stat"><div class="label">Outstanding</div><div class="val" style="color:${outstanding > 0 ? '#e53e3e' : '#38a169'}">₹${outstanding.toLocaleString('en-IN')}</div></div>
-      </div>
-      <table><thead><tr><th>Challan</th><th>Date</th><th>Type</th><th style="text-align:right">Amount</th><th style="text-align:right">Paid</th><th style="text-align:right">Balance</th><th>Status</th></tr></thead>
-      <tbody>${rows}</tbody></table>
-      <div class="totals">
-        <div><span>Gross Billed</span><span>₹${totalBilled.toLocaleString('en-IN')}</span></div>
-        ${totalReturns > 0 ? `<div><span>Returns (credit)</span><span style="color:#e53e3e">−₹${totalReturns.toLocaleString('en-IN')}</span></div>` : ''}
-        ${totalReturns > 0 ? `<div><span>Net Billed</span><span>₹${netTotal.toLocaleString('en-IN')}</span></div>` : ''}
-        <div><span>Received</span><span style="color:#38a169">₹${totalPaid.toLocaleString('en-IN')}</span></div>
-        <div class="final"><span>Outstanding</span><span>₹${outstanding.toLocaleString('en-IN')}</span></div>
-      </div>
-      <div class="footer">Powered by DailyOffice</div>
-    </body></html>`;
-    setLedgerPdfTitle(customerName);
-    setLedgerPdfHtml(html);
-  };
 
   // ── Open edit ──────────────────────────────────────────────────────────────
   const openEdit = async (c: Challan) => {
@@ -1361,7 +1298,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       onSearchSubmit={searchLedgerCustomer}
       onOpenCustomer={fetchLedgerDetail}
       onOpenChallan={openEdit}
-      onExportPdf={exportLedgerPDF}
+      onStatementPdf={(html, name) => { setLedgerPdfTitle(name); setLedgerPdfHtml(html); }}
       onLoadMore={() => { const newLimit = ledgerFetchLimit + 500; setLedgerFetchLimit(newLimit); fetchLedger(newLimit); }}
       truncated={ledgerTruncated}
       statusColors={STATUS_COLORS}
