@@ -5,7 +5,9 @@
 // product SKU on every line, sub-material as item name, material code as
 // fabric code, buy quantity, unit, costing rate, pieces — and the costing
 // id, so the PO remembers where it came from. The user reviews and saves;
-// nothing is written until they do.
+// nothing is written until they do. Each line takes an optional buffer in
+// its own unit (e.g. +10 Meter for wastage); it is added to the PO quantity
+// and the cost — pieces to make stay the same.
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../../../lib/supabase';
@@ -13,7 +15,8 @@ import { T, S } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
 import { useModalLock } from '../../../hooks/useModalLock';
 import { useBackClose } from '../../../hooks/useBackClose';
-import { CostingProduct, purchasePlan, money } from './costingModel';
+import { CostingProduct, purchasePlan, money, num } from './costingModel';
+import { numericKeyDown } from '../../../lib/numericInput';
 import { loadInhouse, saveInhouse, isInhouse } from './inhouse';
 import type { POPrefill } from '../../purchaseorders/POForm';
 
@@ -29,7 +32,15 @@ export default function RaisePOModal({ product, pieces, onClose, addToast }: {
   onClose: () => void;
   addToast: (m: string, t?: string) => void;
 }) {
-  const { lines, suppliers } = purchasePlan(product.components, pieces);
+  const plan = purchasePlan(product.components, pieces);
+  const { suppliers } = plan;
+  // Buffer per plan line (keyed by its index), in that line's unit.
+  const [buffer, setBuffer] = useState<Record<number, string>>({});
+  const lines = plan.lines.map((l, idx) => {
+    const extra = Math.max(0, num(buffer[idx]));
+    const totalQty = Math.round((l.totalQty + extra) * 100) / 100;
+    return { ...l, idx, extra, totalQty, cost: Math.round(totalQty * l.rate * 100) / 100 };
+  });
   // Vendor list is small by nature; one fetch, matched case-insensitively.
   const [vendors, setVendors] = useState<Map<string, Vendor> | null>(null);
   const [raised, setRaised] = useState<Record<string, number>>({});
@@ -106,10 +117,18 @@ export default function RaisePOModal({ product, pieces, onClose, addToast }: {
                       : <button onClick={() => setOpenFor(sup)} disabled={vendors === null} style={{ ...S.btnPrimary, minHeight: 36, whiteSpace: 'nowrap', opacity: vendors === null ? 0.5 : 1 }}>Create draft PO</button>}
                   </div>
                 </div>
-                {rows.map((l, i) => (
-                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 11, padding: '4px 0', borderTop: `1px solid ${T.bd}` }}>
-                    <span style={{ color: T.tx, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.sub}{l.materialCode && <span style={{ color: T.tx3, fontFamily: T.mono }}> · {l.materialCode}</span>}<span style={{ color: T.tx3 }}> ({l.component})</span></span>
-                    <span style={{ fontFamily: T.mono, color: T.tx2, whiteSpace: 'nowrap' }}>{qty(l.totalQty)} {l.unit} × {money(l.rate)}</span>
+                {rows.map(l => (
+                  <div key={l.idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '4px 8px', fontSize: 11, padding: '4px 0', borderTop: `1px solid ${T.bd}` }}>
+                    <span style={{ color: T.tx, minWidth: 0, flex: '1 1 140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.sub}{l.materialCode && <span style={{ color: T.tx3, fontFamily: T.mono }}> · {l.materialCode}</span>}<span style={{ color: T.tx3 }}> ({l.component})</span></span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>
+                      {!done && <input aria-label={`Buffer ${l.unit} for ${l.sub}`} inputMode="decimal" placeholder="+ buffer" value={buffer[l.idx] ?? ''} onKeyDown={e => numericKeyDown(e)}
+                        onChange={e => setBuffer(b => ({ ...b, [l.idx]: e.target.value.replace(/[^0-9.]/g, '') }))}
+                        style={{ ...S.fInput, width: 84, fontSize: 12, padding: '4px 8px', textAlign: 'right' }} />}
+                      <div style={{ fontFamily: T.mono, color: T.tx2, whiteSpace: 'nowrap', textAlign: 'right' }}>
+                        {qty(l.totalQty)} {l.unit} × {money(l.rate)}
+                        {l.extra > 0 && <div style={{ fontSize: 10, color: T.ac2 }}>incl. +{qty(l.extra)} {l.unit} buffer</div>}
+                      </div>
+                    </div>
                   </div>
                 ))}
                 <div style={{ display: 'flex', justifyContent: 'flex-end', fontSize: 11, fontFamily: T.mono, color: T.tx2, paddingTop: 6, borderTop: `1px solid ${T.bd}` }}>{money(total)}</div>
