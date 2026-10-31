@@ -8,6 +8,7 @@
 // row (sheet_status / sheet_file) so staff see it live; failures never block
 // the OTP itself, which is already stored when this runs.
 import { parseSheet, buildPdf } from './sheetPdf.ts';
+import { safeFetchBytes, UnsafeLink } from './safeFetch.ts';
 
 const SB_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SB_SVC = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
@@ -101,11 +102,13 @@ export async function processDeliverySheet(rowId: string, text: string): Promise
     if (!courier) return;                                // link but no known courier — leave it alone
     const folder = (await getSetting('otp_delivery_sheet_folder')).trim().replace(/\/+$/, '');
     if (!folder) { await report({ sheet_status: 'Delivery sheet found — set the Dropbox folder in OTP Inbox settings to save it automatically' }); return; }
-    const res = await fetch(link, { redirect: 'follow' });
+    // Guarded fetch: public web hosts only, redirects re-checked, 20 s timeout,
+    // stops reading past 4 MB (safeFetch.ts). The SMS text is untrusted.
+    const res = await safeFetchBytes(link, 4_000_000);
     if (!res.ok) { await report({ sheet_status: `Could not open the ${courier} link (${res.status})` }); return; }
-    const ctype = res.headers.get('content-type') || '';
-    const raw = new Uint8Array(await res.arrayBuffer());
-    if (raw.byteLength > 4_000_000) { await report({ sheet_status: 'Sheet too large to save' }); return; }
+    if (res.tooLarge || !res.bytes) { await report({ sheet_status: 'Sheet too large to save' }); return; }
+    const ctype = res.ctype;
+    const raw = res.bytes;
     // Trust the bytes, not the server's label: Delhivery serves a real PDF
     // but without a pdf content-type, which made this save as ".html".
     const magicPdf = raw.length > 4 && raw[0] === 0x25 && raw[1] === 0x50 && raw[2] === 0x44 && raw[3] === 0x46 && raw[4] === 0x2d; // %PDF-
@@ -126,6 +129,11 @@ export async function processDeliverySheet(rowId: string, text: string): Promise
     }
     await report({ sheet_file: saved, sheet_status: null as unknown as string });
   } catch (e) {
-    await report({ sheet_status: `Delivery sheet not saved — ${String((e as Error)?.message || e).slice(0, 140)}` });
+    // Never echo raw network errors (they name hosts and ports) to the staff-visible column.
+    const why = e instanceof UnsafeLink ? `link refused (${e.message})`
+      : (e as Error)?.name === 'TimeoutError' ? 'the courier link took too long'
+      : /^Dropbox/.test(String((e as Error)?.message)) ? String((e as Error).message).slice(0, 140)
+      : 'could not open the link — save it by hand';
+    await report({ sheet_status: `Delivery sheet not saved — ${why}` });
   }
 }

@@ -851,6 +851,10 @@ Deno.serve(async (req) => {
       const op = body?.op || 'list';
       if (op === 'list') { const roots = await loadGenRoots(); return json({ ok: true, roots, isAdmin: role === 'admin' }, req); }
       if (op === 'save') {
+        // These roots bound what a public seller link can reach in Dropbox and
+        // where uploads may go, so changing them is an admin decision (as
+        // dropbox_exchange already is). Security audit 2026-10-31.
+        if (role !== 'admin') return fail(403, 'Only an admin can change the search folders', req);
         const input = Array.isArray(body?.roots) ? body.roots.slice(0, 12) : [];
         const roots = input.map((r: any) => ({ label: String(r?.label || '').slice(0, 60), url: String(r?.url || '').trim(), enabled: r?.enabled !== false })).filter((r: any) => r.url);
         for (const r of roots) { if (!/^https:\/\/(www\.)?dropbox\.com\//i.test(r.url)) return fail(400, `Not a Dropbox folder link: ${r.url.slice(0, 60)}`, req); }
@@ -1230,7 +1234,15 @@ Deno.serve(async (req) => {
       const rows = body.rows;
       if (!Array.isArray(rows) || rows.length === 0) return fail(400, 'rows missing or empty', req);
       const qtyMap: Record<string, string | number> = {};
-      for (const r of rows) qtyMap[String(r[0] || '').toUpperCase()] = r[1] ?? 0;
+      // Values are written USER_ENTERED, so text starting with = + - @ would be
+      // stored as a live spreadsheet formula. Numbers pass as numbers; any
+      // other text gets a leading apostrophe so Sheets keeps it as plain text.
+      const cell = (v: unknown): string | number => {
+        if (typeof v === 'number') return v;
+        const t = String(v ?? 0);
+        return /^[=+\-@\t\r]/.test(t) && !/^-?\d+(\.\d+)?$/.test(t) ? `'${t}` : t;
+      };
+      for (const r of rows) qtyMap[String(r[0] || '').toUpperCase()] = cell(r[1] ?? 0);
       const token = await getGoogleToken();
       const sid = getSheetId();
 
