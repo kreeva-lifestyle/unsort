@@ -184,7 +184,7 @@ export function buildLibrary(products: CostingProduct[]): CostingLibrary {
 
 export interface PlanLine {
   supplier: string; materialCode: string; component: string; sub: string;
-  unit: string; perPc: number; totalQty: number; rate: number; cost: number;
+  unit: string; perPc: number; totalQty: number; rate: number; cost: number; ci: number; si: number;
 }
 
 /** Purchase plan for N pieces: every sub-component's qty × N, priced at the
@@ -193,8 +193,8 @@ export interface PlanLine {
  *  you to buy slightly more fabric is right; one that comes up short is not. */
 export function purchasePlan(components: CostingComponent[], pieces: number): { lines: PlanLine[]; suppliers: string[] } {
   const lines: PlanLine[] = [];
-  for (const c of components) {
-    for (const s of c.subs) {
+  for (const [ci, c] of components.entries()) {
+    for (const [si, s] of c.subs.entries()) {
       const sel = selectedSupplier(s);
       if (!sel) continue;
       const perPc = num(s.qty);
@@ -203,7 +203,7 @@ export function purchasePlan(components: CostingComponent[], pieces: number): { 
       lines.push({
         supplier: sel.name.trim() || '(no supplier)', materialCode: sel.materialCode.trim(),
         component: c.name.trim(), sub: s.name.trim(), unit: s.unit,
-        perPc, totalQty, rate, cost: Math.round(totalQty * rate * 100) / 100,
+        perPc, totalQty, rate, cost: Math.round(totalQty * rate * 100) / 100, ci, si,
       });
     }
   }

@@ -6,14 +6,19 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { T, S, alpha } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
-import { loadStatement, closingLabel, dayLabel, inr, type Statement } from './statementData';
+import { loadStatement, closingLabel, dayLabel, inr, statementWhatsApp, type Statement } from './statementData';
+import { waLink, waPhone } from '../../lib/whatsapp';
+import { supabase } from '../../lib/supabase';
+import { logSwallowed } from '../../lib/errorLogger';
 import { statementPdfHtml } from './statementPdf';
 
 type Tab = 'days' | 'open' | 'all';
 
-export default function ChallanStatement({ customerId, customerName, from, to, challanList, onPdf, refreshOn }: {
+export default function ChallanStatement({ customerId, customerName, phone, from, to, challanList, onPdf, refreshOn }: {
   customerId: string | null;
   customerName: string;
+  /** Customer's mobile (customer record, else the latest challan); none → WhatsApp asks which chat. */
+  phone: string | null;
   /** The APPLIED range ('' = open-ended). */
   from: string;
   to: string;
@@ -26,6 +31,20 @@ export default function ChallanStatement({ customerId, customerName, from, to, c
   const [err, setErr] = useState('');
   const [tab, setTab] = useState<Tab>('days');
   const [reload, setReload] = useState(0);
+  // The customer record's phone wins (reminders save it there); best-effort —
+  // without it the link still opens WhatsApp and asks which chat.
+  const [savedPhone, setSavedPhone] = useState<string | null>(null);
+  useEffect(() => {
+    setSavedPhone(null);
+    if (!customerId) return;
+    let alive = true;
+    supabase.from('cash_challan_customers').select('phone').eq('id', customerId).maybeSingle().then(({ data, error }) => {
+      if (!alive) return;
+      if (error) { logSwallowed('statement customer phone', error); return; }
+      setSavedPhone((data as { phone: string | null } | null)?.phone ?? null);
+    });
+    return () => { alive = false; };
+  }, [customerId]);
 
   useEffect(() => {
     let alive = true;
@@ -72,7 +91,12 @@ export default function ChallanStatement({ customerId, customerName, from, to, c
               {st.unusedCredit > 0.009 ? ` · ${inr(st.unusedCredit)} return credit not used yet` : ''}
             </div>
           </div>
-          <button type="button" onClick={() => onPdf(statementPdfHtml(customerName, st))} style={{ ...S.btnGhost, minHeight: 44 }}>Print / share statement</button>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {/* A real anchor: the one way that reliably opens WhatsApp from the installed app (lib/whatsapp.ts). */}
+            <a href={waLink(statementWhatsApp(customerName, st), waPhone(savedPhone) ? savedPhone : phone)} target="_blank" rel="noopener noreferrer"
+              style={{ ...S.btnPrimary, minHeight: 44, display: 'inline-flex', alignItems: 'center', textDecoration: 'none', boxSizing: 'border-box' }}>Send on WhatsApp</a>
+            <button type="button" onClick={() => onPdf(statementPdfHtml(customerName, st))} style={{ ...S.btnGhost, minHeight: 44 }}>Print / share</button>
+          </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, borderTop: `1px solid ${T.bd}`, paddingTop: 10 }}>
           {st.from && line(`Pending on ${dayLabel(st.from)}`, inr(st.opening))}

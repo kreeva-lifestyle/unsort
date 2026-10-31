@@ -20,6 +20,7 @@ import { CostingProduct, purchasePlan, money, num } from './costingModel';
 import { numericKeyDown } from '../../../lib/numericInput';
 import { loadInhouse, saveInhouse, isInhouse } from './inhouse';
 import type { POPrefill } from '../../purchaseorders/POForm';
+import VendorSwitch from './VendorSwitch';
 
 const POForm = lazy(() => import('../../purchaseorders/POForm'));
 
@@ -27,11 +28,13 @@ type Vendor = { id: string; name: string; phone: string };
 const FABRIC_UNITS = new Set(['Meter', 'Yard']);
 const qty = (n: number) => n.toLocaleString('en-IN', { maximumFractionDigits: 2 });
 
-export default function RaisePOModal({ product, pieces, onClose, addToast }: {
+export default function RaisePOModal({ product, pieces, onClose, addToast, onPickSupplier }: {
   product: CostingProduct;
   pieces: number;
   onClose: () => void;
   addToast: (m: string, t?: string) => void;
+  /** Makes supplier k the default of component ci / sub si (saved on the costing). */
+  onPickSupplier: (ci: number, si: number, k: number) => Promise<void>;
 }) {
   const plan = purchasePlan(product.components, pieces);
   const { suppliers } = plan;
@@ -130,6 +133,7 @@ export default function RaisePOModal({ product, pieces, onClose, addToast }: {
                         {l.extra > 0 && <div style={{ fontSize: 10, color: T.ac2 }}>{qty(l.planQty)} for {pieces} pcs + {qty(l.extra)} buffer</div>}
                       </div>
                     </div>
+                    {!done && <VendorSwitch suppliers={product.components[l.ci]?.subs[l.si]?.suppliers ?? []} onPick={k => onPickSupplier(l.ci, l.si, k)} />}
                   </div>
                 ))}
                 <div style={{ display: 'flex', justifyContent: 'flex-end', fontSize: 11, fontFamily: T.mono, color: T.tx2, paddingTop: 6, borderTop: `1px solid ${T.bd}` }}>{money(total)}</div>

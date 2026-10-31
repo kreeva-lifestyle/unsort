@@ -99,7 +99,7 @@ export default function CostingEditor({ product, saved, library, topSubs, onSave
       {s.doc === 'sheet' && (
         <PrintPreview title={`Product costing — ${p.sku}`} html={costingSheetHtml(p)} onClose={s.closeDoc} onShare={() => shareCostingImage(p, addToast)} />
       )}
-      {s.doc === 'raise' && <RaisePOModal product={p} pieces={s.pcs} onClose={s.closeDoc} addToast={addToast} />}
+      {s.doc === 'raise' && <RaisePOModal product={p} pieces={s.pcs} onClose={s.closeDoc} addToast={addToast} onPickSupplier={s.pickSupplier} />}
       <ConfirmModal {...modalProps} />
     </div>
   );
