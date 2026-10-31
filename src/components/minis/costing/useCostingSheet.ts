@@ -19,6 +19,7 @@ import { canonicalizeNames } from './costingNames';
 import { uploadProductPhoto } from './costingThumbs';
 import { untouched, nameOnly, missingFromMaster, componentFor } from './masterIncludes';
 import { sameComponent } from '../../../lib/componentNames';
+import { withDefault, saveDefaultSupplier } from './supplierDefault';
 
 export type DocKind = 'sheet' | 'plan' | 'raise';
 type Ask = (o: { title: string; message?: string; confirmLabel?: string; danger?: boolean }) => Promise<boolean>;
@@ -158,10 +159,19 @@ export function useCostingSheet({ product, saved, library, onSaved, addToast, as
   const patchComp = (i: number, next: CostingComponent) => setP(prev => ({ ...prev, components: prev.components.map((c, j) => (j === i ? next : c)) }));
   const addComp = () => setP(prev => ({ ...prev, components: [...prev.components, blankComponent()] }));
   const removeComp = (i: number) => setP(prev => ({ ...prev, components: prev.components.filter((_, j) => j !== i) }));
+  // Raise POs → "Change vendor": the picked supplier becomes the default, saved straight away.
+  const pickSupplier = async (ci: number, si: number, k: number) => {
+    const comp = p.components[ci]; const sub = comp?.subs[si]; const sup = sub?.suppliers[k];
+    if (!comp || !sub || !sup) return;
+    const err = await saveDefaultSupplier(p.id, comp.name, sub.name, sup.name);
+    if (err) { addToast(friendlyError(err), 'error'); return; }
+    setP(prev => ({ ...prev, components: withDefault(prev.components, ci, si, k) }));
+    addToast(`${sub.name.trim()}: ${sup.name.trim()} is now the default vendor`, 'success');
+  };
 
   return {
     p, patch, errors, errVersion, errorComps, saving, deleting, uploading, pieces, setPieces, pcs, total, masterPrice,
     doc, closeDoc: () => setDoc(null), save, openDoc, deleteCosting, uploadImage, patchComp, addComp, removeComp,
-    masterComps, missingComps, addMasterComp,
+    masterComps, missingComps, addMasterComp, pickSupplier,
   };
 }

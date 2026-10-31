@@ -73,3 +73,25 @@ export function buildStatement(s: RawStatement, from: string, to: string): State
 
 /** "To collect" for a period that reaches today; otherwise the balance on its last day. */
 export const closingLabel = (s: Statement) => s.current ? (s.closing < 0 ? 'Customer has credit' : 'To collect') : `Balance on ${dayLabel(s.to)}`;
+
+/** The statement as a WhatsApp message to the customer: the sum, then the bills still open. */
+export function statementWhatsApp(customer: string, st: Statement): string {
+  const yr = (st.to || istToday()).slice(0, 4);
+  const period = st.from || st.to ? `${st.from ? dayLabel(st.from, '-') : 'start'} – ${st.to ? dayLabel(st.to, '-') : 'today'}` : 'all bills';
+  const sum = [
+    ...(st.from ? [`Pending on ${dayLabel(st.from)}: ${inr(st.opening)}`] : []),
+    `+ Bills (${st.bills.n}): ${inr(st.bills.sum)}`,
+    ...(st.returns.n ? [`− Goods returned (${st.returns.n}): ${inr(st.returns.sum)}`] : []),
+    ...(st.received ? [`− Payment received: ${inr(st.received)}`] : []),
+    ...(st.refunds ? [`+ Refund paid to you: ${inr(st.refunds)}`] : []),
+  ];
+  const open = st.open.slice(0, 30).map(b => `#${b.no} (${b.date}) – ${inr(b.due)}`);
+  if (st.open.length > 30) open.push(`…and ${st.open.length - 30} more`);
+  const close = st.closing > 0.009 ? `*${st.current ? 'Amount due' : `Balance on ${dayLabel(st.to, yr)}`}: ${inr(st.closing)}*`
+    : st.closing < -0.009 ? `*Credit in your favour: ${inr(-st.closing)}*` : '*Nothing is due — thank you!*';
+  return [
+    `Hi ${customer},`, `Your account statement (${period}):`, '', ...sum, close,
+    ...(open.length && st.closing > 0.009 ? ['', 'Bills still open:', ...open] : []),
+    '', ...(st.closing > 0.009 ? ['Please arrange the payment at the earliest.'] : []), '— Arya Designs',
+  ].join('\n');
+}

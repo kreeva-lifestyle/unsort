@@ -83,6 +83,7 @@ export default function ChallanLedger({
           {(dateFrom || dateTo) && <button onClick={() => { onDateFromChange(''); onDateToChange(''); setApplied({ from: '', to: '' }); onDateApply('', ''); }} style={{ padding: '8px 12px', borderRadius: 8, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 12, cursor: 'pointer', height: 36 }}>Clear</button>}
         </div>
         <ChallanStatement customerId={detailId} customerName={detailName} from={applied.from} to={applied.to}
+          phone={detailChallans.find(c => c.customer_phone)?.customer_phone ?? null}
           onPdf={html => onStatementPdf(html, detailName)} refreshOn={detailChallans} challanList={
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
           {detailChallans.map(c => {
