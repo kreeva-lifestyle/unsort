@@ -12,8 +12,10 @@ import type { PurchaseOrderItem } from '../../types/database';
 const inr = (n: unknown) => Number(n || 0).toLocaleString('en-IN');
 const n = (v: unknown) => Number(v || 0);
 
-export default function POLineTable({ items, canCancel, busy, onCancel }: {
+export default function POLineTable({ items, forPieces, canCancel, busy, onCancel }: {
   items: PurchaseOrderItem[];
+  /** The order's "for how many pcs" (null on a lump sum) — names what the planned part was for. */
+  forPieces: number | null;
   /** The order is open and the user may cancel a line (admin / manager). */
   canCancel: boolean;
   busy: boolean;
@@ -37,12 +39,19 @@ export default function POLineTable({ items, canCancel, busy, onCancel }: {
               const cancelled = !!it.cancelled_at;
               const got = n(it.received_qty), qty = n(it.quantity);
               const rem = Math.max(0, qty - got);
+              // Buffer is part of what was ordered; a cancel can drop the order below it.
+              const buf = cancelled ? 0 : Math.min(n(it.buffer_qty), qty);
               return (
                 <tr key={it.id} style={{ borderBottom: `1px solid ${T.bd}` }}>
                   <td style={S.tdStyle}>
                     <span style={{ fontSize: 13, color: cancelled ? T.tx3 : T.tx, textDecoration: cancelled && got === 0 ? 'line-through' : undefined }}>{itemLabel(it)}</span>
                     {it.unit && <span style={{ fontSize: 10, color: T.tx3, marginLeft: 4 }}>/{it.unit}</span>}
                     {it.sku && <div style={{ fontSize: 10, color: T.tx3, fontFamily: T.mono, marginTop: 1 }}>{it.sku}</div>}
+                    {buf > 0 && (
+                      <div style={{ fontSize: 11, color: T.ac2, marginTop: 3 }}>
+                        {fmtQty(qty - buf)} for {forPieces ? `${forPieces} pcs` : 'the plan'} + {fmtQty(buf)} buffer
+                      </div>
+                    )}
                     {cancelled && (
                       <div style={{ fontSize: 11, color: T.re, marginTop: 3 }}>
                         Cancelled {fmtQty(n(it.cancelled_qty))}{got > 0 ? ' (the balance)' : ''}{it.cancel_reason ? <span style={{ color: T.tx3 }}> · {it.cancel_reason}</span> : null}

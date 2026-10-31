@@ -13,15 +13,18 @@ import SuggestInput from '../ui/SuggestInput';
 import ItemNameChips, { useRecentItemNames } from './ItemNameChips';
 import type { PurchaseOrderType } from '../../types/database';
 
-/** `id` / `received` / `ordered`: an existing line on a revision — it keeps its id, and a cut stops at what arrived on it. */
-export type FormItem = { id?: string; received?: number; ordered?: number; sku: string; item_name: string; fabric_code: string; quantity: string; unit: string; rate: string };
+/** `id` / `received` / `ordered`: an existing line on a revision — it keeps its id, and a cut stops at what arrived on it.
+ *  `buffer`: the part of the quantity ordered as buffer over the costing plan (set in Raise POs, kept on edits). */
+export type FormItem = { id?: string; received?: number; ordered?: number; buffer?: number; sku: string; item_name: string; fabric_code: string; quantity: string; unit: string; rate: string };
 export const blankItem = (): FormItem => ({ sku: '', item_name: '', fabric_code: '', quantity: '1', unit: '', rate: '' });
 const UNIT_OPTIONS = ['Meter', 'Piece', 'Dozen'];
 const num = (s: string) => { const n = parseFloat(s); return isNaN(n) ? 0 : n; };
+const fmt = (n: number) => n.toLocaleString('en-IN', { maximumFractionDigits: 3 });
 
-export default function POItemRows({ items, poType, onChange, onRemove, onAdd }: {
+export default function POItemRows({ items, poType, forPieces, onChange, onRemove, onAdd }: {
   items: FormItem[];
   poType: PurchaseOrderType | '';
+  forPieces: string;
   onChange: (i: number, patch: Partial<FormItem>) => void;
   onRemove: (i: number) => void;
   onAdd: () => void;
@@ -78,6 +81,11 @@ export default function POItemRows({ items, poType, onChange, onRemove, onAdd }:
                 </select>
                 <input value={it.rate} onChange={e => onChange(i, { rate: e.target.value })} onKeyDown={e => numericKeyDown(e)} inputMode="decimal" placeholder="Rate" style={{ ...S.fInput, width: '100%', minWidth: 0, fontFamily: T.mono }} />
               </div>
+              {!!it.buffer && num(it.quantity) > 0 && (
+                <div style={{ fontSize: 12, color: T.ac2, marginTop: 6 }}>
+                  {fmt(Math.max(0, num(it.quantity) - it.buffer))} {it.unit} for {forPieces.trim() ? `${forPieces} pcs` : 'the plan'} + {fmt(Math.min(it.buffer, num(it.quantity)))} buffer = {fmt(num(it.quantity))} {it.unit}
+                </div>
+              )}
               {(!!it.received || amt > 0) && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12, marginTop: 6 }}>
                   <span style={{ color: T.gr }}>{it.received ? `${it.received} already received — a cut stops there` : ''}</span>
