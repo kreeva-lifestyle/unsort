@@ -47,6 +47,8 @@ type Props = {
   onFromChange: (v: string) => void;
   onToChange: (v: string) => void;
   onApply: () => void;
+  /** Tap a breakup row → the challans paid in that mode (ModePaymentsSheet). */
+  onOpenMode: (mode: string) => void;
 };
 
 const pctChange = (curr: number, prev: number | undefined): { label: string; color: string } | null => {
@@ -57,7 +59,7 @@ const pctChange = (curr: number, prev: number | undefined): { label: string; col
   return { label: `${rounded > 0 ? '▲' : '▼'} ${Math.abs(rounded)}%`, color: rounded > 0 ? T.gr : T.re };
 };
 
-export default function ChallanAnalytics({ analytics, from, to, onFromChange, onToChange, onApply }: Props) {
+export default function ChallanAnalytics({ analytics, from, to, onFromChange, onToChange, onApply, onOpenMode }: Props) {
   const revChange = pctChange(analytics.totalRevenue, analytics.prevRevenue);
   const salesChange = pctChange(analytics.count, analytics.prevCount);
   return (
@@ -100,16 +102,17 @@ export default function ChallanAnalytics({ analytics, from, to, onFromChange, on
             correctly. Without the caption and total, that reads as a bug. */}
         <div style={{ padding: '8px 12px', borderBottom: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
           <span style={{ fontSize: 10, fontWeight: 600, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1 }}>Payment Mode Breakup</span>
-          <span style={{ fontSize: 9, color: T.tx3 }}>money collected in this range — unpaid billed amounts are not here</span>
+          <span style={{ fontSize: 9, color: T.tx3 }}>money collected in this range — tap a mode to see its challans</span>
         </div>
         {/* Write-off (a short payment forgiven) and Return Credit (a return
             set against a bill) settle bills but bring in no money, so they
             are listed but kept out of "Total collected". */}
         {Object.entries(analytics.byMode).map(([mode, amount]) => (
-          <div key={mode} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', borderBottom: `1px solid ${T.bd}` }}>
+          <button key={mode} type="button" onClick={() => onOpenMode(mode)} title={`Show the ${mode} challans`}
+            style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: '8px 12px', minHeight: 44, border: 'none', borderBottom: `1px solid ${T.bd}`, background: 'transparent', cursor: 'pointer', fontFamily: T.sans, textAlign: 'left' }}>
             <span style={{ fontSize: 12, color: NOT_MONEY.has(mode) ? T.tx3 : T.tx }}>{mode}{NOT_MONEY.has(mode) ? ' · not money' : ''}</span>
-            <span style={{ fontSize: 12, fontFamily: T.mono, color: NOT_MONEY.has(mode) ? T.tx3 : T.ac2, fontWeight: 600 }}>₹{Number(amount).toLocaleString('en-IN')}</span>
-          </div>
+            <span style={{ fontSize: 12, fontFamily: T.mono, color: NOT_MONEY.has(mode) ? T.tx3 : T.ac2, fontWeight: 600 }}>₹{Number(amount).toLocaleString('en-IN')} <span style={{ color: T.tx3, fontFamily: T.sans }} aria-hidden="true">›</span></span>
+          </button>
         ))}
         {Object.keys(analytics.byMode).length > 0 && (
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(255,255,255,0.02)' }}>
