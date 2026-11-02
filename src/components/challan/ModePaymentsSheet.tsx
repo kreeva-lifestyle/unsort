@@ -1,6 +1,6 @@
 // Analytics → Payment Mode Breakup → tap a mode (owner's ask, 2026-11-02):
 // every challan that money came in on in that mode over the range, from
-// challan_mode_payments() — the same rule as the breakup row, so the list
+// challan_mode_receipts() — the same rule as the breakup row, so the list
 // adds up to it. A refund on a return shows as money out. Tap a row to open
 // that challan; closing it comes back here. Each row says who received the
 // money (the staff member on the payment); the chips on top total it per
