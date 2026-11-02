@@ -13,6 +13,7 @@ export default function Sidebar({ activeTab, setActiveTab, profile, collapsed }:
     { id: 'challan', icon: 'file', label: 'Cash Challan' },
     { id: 'purchaseorders', icon: 'receipt', label: 'Purchase Orders' },
     { id: 'jobwork', icon: 'layers', label: 'Jobwork' },
+    { id: 'flow', icon: 'flow', label: 'Flow' },
     { id: 'listingai', icon: 'cpu', label: 'Listing AI' },
     { id: 'attendance', icon: 'clock', label: 'Attendance' },
     { id: 'minis', icon: 'sparkles', label: 'Minis' },
