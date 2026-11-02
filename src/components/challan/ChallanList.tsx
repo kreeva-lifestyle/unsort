@@ -1,5 +1,6 @@
 // Challan list — search/filter row + collapsible filter bar + per-row table.
 // Extracted from CashChallan.tsx; parent owns state & action callbacks.
+import { PAYMENT_MODES } from './PaymentFields';
 import { T, S, Icon, alpha } from '../../lib/theme';
 import { fmtOrderNo, orderNoOf } from './pendingOrdersModel';
 import Empty from '../ui/Empty';
@@ -53,6 +54,9 @@ interface Props {
   // Inventory deducted
   invFilter: string;
   onInvFilterChange: (v: string) => void;
+  /** Challans with a payment in this mode ('' = any). */
+  modeFilter: string;
+  onModeFilterChange: (v: string) => void;
   onToggleInventoryDeducted: (id: string, value: boolean) => void;
   // Pagination
   page: number;
@@ -61,7 +65,7 @@ interface Props {
 }
 
 export default function ChallanList(p: Props) {
-  const filterActive = p.statusFilter || p.tagFilter || p.dateFrom || p.dateTo || p.invFilter;
+  const filterActive = p.statusFilter || p.tagFilter || p.dateFrom || p.dateTo || p.invFilter || p.modeFilter;
   const idToNum = new Map(p.challans.map(c => [c.id, c.challan_number]));
   const srcNum = (c: Challan) => c.source_challan_id ? idToNum.get(c.source_challan_id) ?? null : null;
   return (
@@ -74,7 +78,7 @@ export default function ChallanList(p: Props) {
         <div className="challan-filter-btns" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           <button onClick={p.onToggleFilters} style={{ ...S.btnGhost, color: p.showFilters || filterActive ? T.ac2 : T.tx3, borderColor: p.showFilters || filterActive ? T.ac3 : T.bd2, background: p.showFilters ? T.ac3 : 'rgba(255,255,255,0.03)', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
             <svg viewBox="0 0 24 24" style={{ width: 13, height: 13, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" /></svg>
-            Filters{filterActive ? ` (${[p.statusFilter, p.tagFilter, p.dateFrom, p.dateTo, p.invFilter].filter(Boolean).length})` : ''}
+            Filters{filterActive ? ` (${[p.statusFilter, p.tagFilter, p.dateFrom, p.dateTo, p.invFilter, p.modeFilter].filter(Boolean).length})` : ''}
           </button>
           {/* On mobile Export lives in the Filters panel (challan-export-btn is hidden there) so search + Filters + Select fit on one line. */}
           <button onClick={p.onExport} className="challan-export-btn" style={{ ...S.btnGhost, color: T.gr, borderColor: 'oklch(0.72 0.19 145 / .25)', background: 'oklch(0.72 0.19 145 / .06)' }}>Export</button>
@@ -111,6 +115,12 @@ export default function ChallanList(p: Props) {
               <label style={S.fLabel}>Inventory</label>
               <select value={p.invFilter} onChange={e => { p.onInvFilterChange(e.target.value); p.onResetPage(); }} style={S.fInput}>
                 <option value="">All</option><option value="yes">Yes</option><option value="no">No</option>
+              </select>
+            </div>
+            <div>
+              <label style={S.fLabel}>Payment mode</label>
+              <select value={p.modeFilter} onChange={e => { p.onModeFilterChange(e.target.value); p.onResetPage(); }} style={S.fInput}>
+                <option value="">All</option>{[...PAYMENT_MODES, 'Return Credit'].map(m => <option key={m} value={m}>{m}</option>)}
               </select>
             </div>
             <div className="challan-perpage">

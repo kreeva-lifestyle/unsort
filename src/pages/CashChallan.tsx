@@ -12,6 +12,7 @@ import { useBreadcrumb } from '../hooks/useBreadcrumb';
 import { useBackClose } from '../hooks/useBackClose';
 import Contacts from '../components/contacts/Contacts';
 import ChallanAnalytics from '../components/challan/ChallanAnalytics';
+import ModePaymentsSheet from '../components/challan/ModePaymentsSheet';
 import ChallanLedger from '../components/challan/ChallanLedger';
 import ChallanForm from '../components/challan/ChallanForm';
 import ChallanDetail from '../components/challan/ChallanDetail';
@@ -44,6 +45,9 @@ import { useModalLock } from '../hooks/useModalLock';
 import { escHtml as escHtmlShared, csvCell } from '../lib/escape';
 import { fetchPaged } from '../lib/fetchPaged';
 
+// The list's columns (explicit, house rule) — also used to open one challan by id.
+const CHALLAN_SELECT = `id, challan_number, customer_id, customer_name, customer_phone, status, subtotal, discount_type, discount_value, discount_amount, round_off, total, amount_paid, payment_mode, payment_date, notes, tags, shipping_charges, is_return, source_challan_id, handover_id, inventory_deducted, created_by, modified_by, voided_by, voided_at, created_at, updated_at, cash_challan_items(id, sku, quantity, price, discount_type, discount_value, discount_amount, total), handover:cash_handovers!handover_id(handover_number), ${CHALLAN_ORDER_EMBED}`;
+const MODE_EMBED = 'mode_pay:cash_challan_payments!cash_challan_payments_challan_id_fkey!inner(payment_mode, is_reversal)';
 const waPhone = (raw: string) => { const d = raw.replace(/\D/g, ''); return '91' + (d.startsWith('91') && d.length > 10 ? d.slice(2) : d); };
 // Strip the country code only when it IS a country code (>10 digits) — a
 // genuine 10-digit mobile starting with 91 must not lose its first digits.
@@ -98,6 +102,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [invFilter, setInvFilter] = useState('');
+  const [modeFilter, setModeFilter] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   // Bulk pay/unpay
   const [bulkMode, setBulkMode] = useState(false);
@@ -156,6 +161,11 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const [printHtml, setPrintHtml] = useState<string | null>(null);
   const printIframeRef = useRef<HTMLIFrameElement | null>(null);
   const [viewingChallan, setViewingChallan] = useState<Challan | null>(null);
+  // Analytics → payment mode → challan: closing the challan goes back to that list.
+  const [analyticsMode, setAnalyticsMode] = useState<string | null>(null);
+  const fromAnalyticsRef = useRef(false);
+  useEffect(() => { if (!viewingChallan) fromAnalyticsRef.current = false; }, [viewingChallan]);
+  const closeViewing = () => { const back = fromAnalyticsRef.current; setViewingChallan(null); if (back) setShowAnalytics(true); };
   const [showOrders, setShowOrders] = useState(false); const [convertingOrder, setConvertingOrder] = useState<{ id: string; number: number } | null>(null); // Orders view + the order a challan is being made from (kept on the draft)
   const [paymentQrUrl, setPaymentQrUrl] = useState<string | null>(null);
   const [paymentUpiId, setPaymentUpiId] = useState<string | null>(null);
@@ -242,12 +252,22 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   // hand (manualRoundOff !== null). See challanTotals.ts.
   const { subtotal, totalDiscount, clampedShipping, roundOff, grandTotal } = challanTotals(items, shippingCharges, isReturn, manualRoundOff);
 
+  // Analytics → mode list → one challan: open its detail over the list; closing returns to the mode list.
+  const openChallanFromAnalytics = async (id: string) => {
+    const { data, error } = await supabase.from('cash_challans').select(CHALLAN_SELECT).eq('id', id).maybeSingle();
+    if (error || !data) { addToast(error ? friendlyError(error) : 'That challan no longer exists', 'error'); return; }
+    fromAnalyticsRef.current = true;
+    setShowAnalytics(false);
+    setViewingChallan(data as unknown as Challan);
+  };
+
   // ── Fetch challans ─────────────────────────────────────────────────────────
   const fetchChallans = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     // Explicit columns (house rule — no select-* on growable tables): same
     // list the ledger fetch at ~:576 uses, so nothing the UI reads is missing.
-    let query = supabase.from('cash_challans').select(`id, challan_number, customer_id, customer_name, customer_phone, status, subtotal, discount_type, discount_value, discount_amount, round_off, total, amount_paid, payment_mode, payment_date, notes, tags, shipping_charges, is_return, source_challan_id, handover_id, inventory_deducted, created_by, modified_by, voided_by, voided_at, created_at, updated_at, cash_challan_items(id, sku, quantity, price, discount_type, discount_value, discount_amount, total), handover:cash_handovers!handover_id(handover_number), ${CHALLAN_ORDER_EMBED}`, { count: 'estimated' });
+    // Payment mode filter: challans with a (non-reversed) payment in that mode.
+    let query = supabase.from('cash_challans').select(modeFilter ? `${CHALLAN_SELECT}, ${MODE_EMBED}` : CHALLAN_SELECT, { count: 'estimated' });
     if (debouncedSearch) {
       const s = debouncedSearch.replace(/[%_,().]/g, '');
       const num = parseInt(s);
@@ -272,13 +292,14 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     if (dateTo) query = query.lte('created_at', new Date(dateTo + 'T23:59:59').toISOString());
     if (invFilter === 'yes') query = query.eq('inventory_deducted', true);
     else if (invFilter === 'no') query = query.eq('inventory_deducted', false);
+    if (modeFilter) query = query.eq('mode_pay.payment_mode', modeFilter).eq('mode_pay.is_reversal', false);
     query = query.order('created_at', { ascending: false }).range(page * pageSize, (page + 1) * pageSize - 1);
     const { data, count, error } = await query;
     if (error) { addToast(friendlyError(error), 'error'); if (!silent) setLoading(false); return; }
-    setChallans((data as Challan[] | null) || []);
+    setChallans((data as unknown as Challan[] | null) || []);
     setTotalCount(count || 0);
     if (!silent) setLoading(false);
-  }, [debouncedSearch, statusFilter, tagFilter, dateFrom, dateTo, invFilter, page, pageSize]);
+  }, [debouncedSearch, statusFilter, tagFilter, dateFrom, dateTo, invFilter, modeFilter, page, pageSize]);
 
   useEffect(() => { fetchChallans(); }, [fetchChallans]);
 
@@ -298,7 +319,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   useBackClose(showContacts, () => setShowContacts(false));
   useBackClose(showOrders, () => setShowOrders(false));
   useBackClose(!!ledgerDetail, () => setLedgerDetail(null));
-  useBackClose(!!viewingChallan, () => setViewingChallan(null));
+  useBackClose(!!viewingChallan, closeViewing);
   // Back closes the form but KEEPS the auto-saved draft: closeModal() calls
   // clearDraft(), which wiped a half-typed challan (and the 24h restore safety
   // net) on one reflex gesture. Discard stays explicit.
@@ -997,7 +1018,9 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const exportChallansCSV = async () => {
     if (!dateFrom || !dateTo) { addToast('Select a date range in Filters before exporting', 'error'); setShowFilters(true); return; }
     const build = () => {
-      let q = supabase.from('cash_challans').select('challan_number, customer_name, status, subtotal, discount_amount, shipping_charges, round_off, total, amount_paid, payment_mode, payment_date, is_return, notes, tags, created_at, cash_challan_items(sku, description, quantity, price, discount_type, discount_value, discount_amount, total)').neq('status', 'voided');
+      const cols = 'challan_number, customer_name, status, subtotal, discount_amount, shipping_charges, round_off, total, amount_paid, payment_mode, payment_date, is_return, notes, tags, created_at, cash_challan_items(sku, description, quantity, price, discount_type, discount_value, discount_amount, total)';
+      let q = supabase.from('cash_challans').select(modeFilter ? `${cols}, ${MODE_EMBED}` : cols).neq('status', 'voided');
+      if (modeFilter) q = q.eq('mode_pay.payment_mode', modeFilter).eq('mode_pay.is_reversal', false);
       if (search) { const s = search.replace(/[%_,().]/g, ''); const num = parseInt(s); if (!isNaN(num)) q = q.or(`challan_number.eq.${num},customer_name.ilike.%${s.trim()}%`); else if (s.trim()) q = q.ilike('customer_name', `%${s}%`); }
       if (statusFilter) q = q.eq('status', statusFilter);
       if (tagFilter) q = q.contains('tags', [tagFilter]);
@@ -1279,7 +1302,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       onFromChange={setAnalyticsFrom}
       onToChange={setAnalyticsTo}
       onApply={fetchAnalytics}
-    /></>
+      onOpenMode={setAnalyticsMode}
+    />{analyticsMode && <ModePaymentsSheet mode={analyticsMode} from={analyticsFrom} to={analyticsTo} onClose={() => setAnalyticsMode(null)} onOpenChallan={openChallanFromAnalytics} />}</>
   );
 
   // ── Orders — components/challan/PendingOrders.tsx; "Make challan" pre-fills the form above with the picked lines (prices blank) and saveChallan records what the challan delivered ──
@@ -1358,7 +1382,9 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         invFilter={invFilter}
         onInvFilterChange={setInvFilter}
         onToggleInventoryDeducted={toggleInventoryDeducted}
-        onClearFilters={() => { setStatusFilter(''); setTagFilter(''); setDateFrom(''); setDateTo(''); setInvFilter(''); setPage(0); }}
+        modeFilter={modeFilter}
+        onModeFilterChange={setModeFilter}
+        onClearFilters={() => { setStatusFilter(''); setTagFilter(''); setDateFrom(''); setDateTo(''); setInvFilter(''); setModeFilter(''); setPage(0); }}
         onExport={exportChallansCSV}
         onResetPage={() => setPage(0)}
         bulkMode={bulkMode}
@@ -1434,7 +1460,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       {/* Challan Detail View — read-only, opens before edit */}
       {viewingChallan && (() => { const idx = challans.findIndex(ch => ch.id === viewingChallan.id); return <ChallanDetail
         challan={viewingChallan}
-        onClose={() => setViewingChallan(null)}
+        onClose={closeViewing}
         onEdit={() => { const c = viewingChallan; setViewingChallan(null); openEdit(c); }}
         onPrint={() => printChallan(viewingChallan)}
         onRemind={() => { const c = viewingChallan; setViewingChallan(null); sendReminder(c); }}
@@ -1442,9 +1468,9 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         onVoid={() => { const c = viewingChallan; setViewingChallan(null); setConfirmAction({ type: 'void', id: c.id, challanNumber: c.challan_number, inventoryDeducted: !!c.inventory_deducted, isReturn: !!c.is_return }); }}
         onSettled={() => { fetchChallans(); }}
         onPatched={(patch) => { const id = viewingChallan.id; const p = patch as Partial<Challan>; setChallans(cs => cs.map(ch => (ch.id === id ? { ...ch, ...p } : ch))); setViewingChallan(v => (v && v.id === id ? { ...v, ...p } : v)); }}
-        hasNext={idx < challans.length - 1}
+        hasNext={idx >= 0 && idx < challans.length - 1}
         hasPrev={idx > 0}
-        onNext={() => { if (idx < challans.length - 1) setViewingChallan(challans[idx + 1]); }}
+        onNext={() => { if (idx >= 0 && idx < challans.length - 1) setViewingChallan(challans[idx + 1]); }}
         onPrev={() => { if (idx > 0) setViewingChallan(challans[idx - 1]); }}
         qrUrl={paymentQrUrl}
         upiId={paymentUpiId}
