@@ -621,7 +621,7 @@ export type UserRole = NonNullable<Profile['role']>;
 export type CashChallanStatus = NonNullable<CashChallan['status']>;
 export type CashHandoverStatus = NonNullable<CashHandover['status']>;
 
-// ─── cash_challan_payments (10 cols) ─────────────────────────────────────
+// ─── cash_challan_payments (12 cols) ─────────────────────────────────────
 export interface CashChallanPayment {
   id: string;
   challan_id: string;
@@ -635,6 +635,8 @@ export interface CashChallanPayment {
   batch_id: string | null;
   /** Return-credit legs: the challan on the other side of the credit (sale ↔ return). */
   settled_against: string | null;
+  /** The signed cash handover that counted this payment (set only by the confirm trigger). */
+  handover_id: string | null;
 }
 
 export type CashChallanPaymentInsert = {

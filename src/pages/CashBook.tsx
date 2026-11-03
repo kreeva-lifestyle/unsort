@@ -314,30 +314,18 @@ export default function CashBook() {
     fetchData();
   };
 
-  // Compute available cash for a date range (auto-calc for handover)
+  // Available cash for a handover period, worked out by handover_breakdown()
+  // — the same function the confirm trigger uses, so the form and the signed
+  // handover can never disagree. Each payment counts on the day it was
+  // received (every money mode; return credit and write-offs are adjustments,
+  // not money), minus refunds and expenses; anything already in a signed
+  // handover is skipped. Owner's rule, 2026-11-03.
   const computeBreakdown = useCallback(async (from: string, to: string): Promise<Breakdown> => {
-    // Only UN-HANDED cash counts as available: challans/expenses already
-    // stamped with a handover_id can't be handed over again. This per-item
-    // exclusion replaces the old "subtract overlapping handover amounts"
-    // heuristic — precise, and robust to edited payment dates / backdated sales.
-    const [balR, expR, chR] = await Promise.all([
-      supabase.from('cash_book_balances').select('opening_balance').eq('date', from).maybeSingle(),
-      supabase.from('cash_expenses').select('amount').is('handover_id', null).gte('date', from).lte('date', to),
-      supabase.from('cash_challans').select('amount_paid, is_return, status').is('handover_id', null).in('status', ['paid', 'partial']).gte('payment_date', from).lte('payment_date', to),
-    ]);
-    const fetchErr = balR.error || expR.error || chR.error;
-    if (fetchErr) addToast('Cash flow calculation may be incomplete: ' + friendlyError(fetchErr), 'error');
-    const bal = balR.data; const exp = expR.data; const ch = chR.data;
-    const opening = Number(bal?.opening_balance || 0);
-    const openingIsSet = bal !== null && bal !== undefined;
-    type ChRow = Pick<CashChallan, 'amount_paid' | 'is_return' | 'status'>;
-    type ExpRow = Pick<CashExpense, 'amount'>;
-    const cashSales = ((ch as ChRow[] | null) || []).filter((r) => !r.is_return).reduce((s, r) => s + Number(r.amount_paid || 0), 0);
-    const cashReturns = ((ch as ChRow[] | null) || []).filter((r) => r.is_return).reduce((s, r) => s + Number(r.amount_paid || 0), 0);
-    const expensesTotal = ((exp as ExpRow[] | null) || []).reduce((s, r) => s + Number(r.amount), 0);
-    const previousHandovers = 0; // superseded by the handover_id exclusion above
-    const available = opening + cashSales - cashReturns - expensesTotal - previousHandovers;
-    return { opening, openingIsSet, cashSales, cashReturns, expenses: expensesTotal, previousHandovers, available, periodFrom: from, periodTo: to };
+    const { data, error } = await supabase.rpc('handover_breakdown', { p_from: from, p_to: to });
+    if (error) addToast('Cash flow calculation may be incomplete: ' + friendlyError(error), 'error');
+    const b = (data || {}) as Partial<Breakdown>;
+    const n = (v: unknown) => Number(v || 0);
+    return { opening: n(b.opening), openingIsSet: !!b.openingIsSet, cashSales: n(b.cashSales), cashReturns: n(b.cashReturns), expenses: n(b.expenses), previousHandovers: 0, available: n(b.available), periodFrom: from, periodTo: to };
   }, [addToast]);
 
   // Recompute when range changes in modal + load recent handovers
@@ -882,8 +870,8 @@ export default function CashBook() {
                 )}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 4, fontFamily: T.mono }}>
                   <span style={{ color: T.tx2 }}>Opening Balance</span><span style={{ color: T.tx2 }}>₹{handBreakdown.opening.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
-                  <span style={{ color: T.gr }}>+ Cash Sales</span><span style={{ color: T.gr }}>+₹{handBreakdown.cashSales.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
-                  {handBreakdown.cashReturns > 0 && <><span style={{ color: T.re }}>− Cash Returns</span><span style={{ color: T.re }}>−₹{handBreakdown.cashReturns.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span></>}
+                  <span style={{ color: T.gr }}>+ Payments received</span><span style={{ color: T.gr }}>+₹{handBreakdown.cashSales.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
+                  {handBreakdown.cashReturns > 0 && <><span style={{ color: T.re }}>− Refunds paid</span><span style={{ color: T.re }}>−₹{handBreakdown.cashReturns.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span></>}
                   <span style={{ color: T.re }}>− Cash Expenses</span><span style={{ color: T.re }}>−₹{handBreakdown.expenses.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
                   {handBreakdown.previousHandovers > 0 && <><span style={{ color: T.yl }}>− Previous Handovers</span><span style={{ color: T.yl }}>−₹{handBreakdown.previousHandovers.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span></>}
                   <span style={{ fontWeight: 700, color: T.tx, borderTop: `1px solid ${T.bd}`, paddingTop: 4 }}>= Available Cash</span>
