@@ -36,7 +36,7 @@ const PackTime = retryImport(() => import('./pages/PackTime'));
 const CashChallan = retryImport(() => import('./pages/CashChallan'));
 const PurchaseOrders = retryImport(() => import('./pages/PurchaseOrders'));
 const JobworkPage = retryImport(() => import('./pages/Jobwork'));
-const Attendance = retryImport(() => import('./pages/Attendance'));
+const FlowPage = retryImport(() => import('./pages/Flow'));
 const SettingsPage = retryImport(() => import('./pages/Settings'));
 const Inventory = retryImport(() => import('./pages/Inventory'));
 const Minis = retryImport(() => import('./pages/Minis'));
@@ -175,7 +175,7 @@ const MainApp = () => {
 
   // Lazy mount: only mount a page once its tab is selected
   useEffect(() => { setMounted(prev => { if (prev.has(tab)) return prev; const next = new Set(prev); next.add(tab); return next; }); }, [tab]);
-  const titles: Record<string, string> = { dashboard: 'Dashboard', inventory: 'Inventory', brandtag: 'Brand Tags', packtime: 'PackStation', challan: 'Cash Challan', purchaseorders: 'Purchase Orders', jobwork: 'Jobwork', listingai: 'Listing AI', minis: 'Minis', printstation: 'Print Station', attendance: 'Attendance', settings: 'Settings' };
+  const titles: Record<string, string> = { dashboard: 'Dashboard', inventory: 'Inventory', brandtag: 'Brand Tags', packtime: 'PackStation', challan: 'Cash Challan', purchaseorders: 'Purchase Orders', jobwork: 'Jobwork', flow: 'Flow', listingai: 'Listing AI', minis: 'Minis', printstation: 'Print Station', settings: 'Settings' };
   const handleNotifClick = (n: any) => {
     if (n.entity_id) { setTab('inventory'); setNotifItemId(n.entity_id); }
   };
@@ -228,8 +228,8 @@ const MainApp = () => {
         {mounted.has('challan') && checkTab('challan') && <div style={{ display: tab === 'challan' ? 'block' : 'none' }}><CashChallan active={tab === 'challan'} /></div>}
         {mounted.has('purchaseorders') && checkTab('purchaseorders') && <div style={{ display: tab === 'purchaseorders' ? 'block' : 'none' }}><PurchaseOrders active={tab === 'purchaseorders'} /></div>}
         {mounted.has('jobwork') && checkTab('jobwork') && <div style={{ display: tab === 'jobwork' ? 'block' : 'none' }}><JobworkPage /></div>}
+        {mounted.has('flow') && checkTab('flow') && <div style={{ display: tab === 'flow' ? 'block' : 'none' }}><FlowPage active={tab === 'flow'} /></div>}
         {mounted.has('listingai') && checkTab('listingai') && <div style={{ display: tab === 'listingai' ? 'block' : 'none' }}><ListingAIPage active={tab === 'listingai'} /></div>}
-        {mounted.has('attendance') && checkTab('attendance') && <div style={{ display: tab === 'attendance' ? 'block' : 'none' }}><Attendance active={tab === 'attendance'} /></div>}
         {mounted.has('minis') && checkTab('minis') && <div style={{ display: tab === 'minis' ? 'block' : 'none' }}><Minis navigateTo={setTab} active={tab === 'minis'} /></div>}
         {mounted.has('printstation') && checkTab('printstation') && <div style={{ display: tab === 'printstation' ? 'block' : 'none' }}><PrintStation active={tab === 'printstation'} /></div>}
         {mounted.has('settings') && <div style={{ display: tab === 'settings' ? 'block' : 'none' }}><SettingsPage profile={profile} addToast={addToast} active={tab === 'settings'} /></div>}

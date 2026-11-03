@@ -5,7 +5,7 @@
 // user cannot open. Minis tools are reached by handing the hub a pending
 // view through sessionStorage, the way the challan deep link already works.
 import { TAB_IDS, MODULE_LABELS, canAccessTab } from './tabs';
-import { MINI_TILES, MINI_LABELS, type MiniView } from '../components/minis/miniRegistry';
+import { MINI_TILES, MINI_LABELS, MINI_MODULE, type MiniView } from '../components/minis/miniRegistry';
 
 export type ShortcutKind = 'module' | 'mini';
 export interface Shortcut { id: string; kind: ShortcutKind; label: string; tab: string; mini?: MiniView }
@@ -21,11 +21,16 @@ const BY_ID = new Map(SHORTCUTS.map(s => [s.id, s]));
 
 type Who = { role?: string | null; module_access?: Record<string, boolean> | null } | null | undefined;
 
-export const canUseShortcut = (s: Shortcut, who: Who): boolean => canAccessTab(who?.role, s.tab, who?.module_access);
+/** A Minis tool opens for whoever can open Minis — plus, for a tool with its
+ *  own module (Attendance), that module's permission too. */
+export const canOpenMini = (m: MiniView, who: Who): boolean =>
+  canAccessTab(who?.role, 'minis', who?.module_access) && (!MINI_MODULE[m] || canAccessTab(who?.role, MINI_MODULE[m]!, who?.module_access));
+
+export const canUseShortcut = (s: Shortcut, who: Who): boolean => s.mini ? canOpenMini(s.mini, who) : canAccessTab(who?.role, s.tab, who?.module_access);
 
 /** The saved ids resolved to shortcuts, dropping unknown ids and anything the user may no longer open. */
 export const resolveChips = (ids: unknown, who: Who): Shortcut[] =>
-  (Array.isArray(ids) ? ids : []).map(id => BY_ID.get(String(id))).filter((s): s is Shortcut => !!s && canUseShortcut(s, who)).slice(0, MAX_QUICK_CHIPS);
+  (Array.isArray(ids) ? ids : []).map(id => BY_ID.get(String(id) === 'tab:attendance' ? 'mini:attendance' : String(id))).filter((s): s is Shortcut => !!s && canUseShortcut(s, who)).slice(0, MAX_QUICK_CHIPS);
 
 /** Sensible first chips per role, until the user picks their own. */
 export const defaultChips = (who: Who): Shortcut[] => {

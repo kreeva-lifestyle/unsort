@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo, Suspense } from 'react';
 import { saveWorkbook } from '../lib/xlsxDownload';
-import { retryImport } from '../lib/retryImport';
 import { T, S, alpha } from '../lib/theme';
 import { SUPABASE_ANON_KEY, supabase, currentUserId } from '../lib/supabase';
 import { useNotifications } from '../hooks/useNotifications';
@@ -8,37 +7,19 @@ import { friendlyError } from '../lib/friendlyError';
 import { useBreadcrumb } from '../hooks/useBreadcrumb';
 import { useBackClose, closeTopLayer } from '../hooks/useBackClose';
 import { MINI_LABELS, MINI_TILES, type MiniView } from '../components/minis/miniRegistry';
-import { takePendingMini } from '../lib/shortcuts';
+import { takePendingMini, canOpenMini } from '../lib/shortcuts';
+import { useAuth } from '../hooks/useAuth';
 import VirtualStock from '../components/minis/VirtualStock';
 import { exportName } from '../lib/exportName';
 import { exportUtsavXls, UTSAV_SIZE_MAP as SIZE_MAP, type UtsavRow } from '../components/minis/utsavExport';
 
-// Every tool is its own chunk, fetched the first time it is tapped. Opening
-// the tab used to download and parse all seventeen (plus the Excel library)
-// before the tile grid could paint — about 940 KB on the owner's phone.
-const AddressPrinter = retryImport(() => import('../components/minis/AddressPrinter'));
-const CbazaarImport = retryImport(() => import('../components/minis/CbazaarImport'));
-const OdetteImport = retryImport(() => import('../components/minis/OdetteImport'));
-const OdetteCoverageCheck = retryImport(() => import('../components/minis/OdetteCoverageCheck'));
-const IndyaImport = retryImport(() => import('../components/minis/indya/IndyaImport'));
-const MasterLinkCheck = retryImport(() => import('../components/minis/LinkCheck'));
-const Trackly = retryImport(() => import('../components/minis/Trackly'));
-const ReturnLabels = retryImport(() => import('../components/minis/ReturnLabels'));
-const VendorStudio = retryImport(() => import('../components/minis/vendorstudio/VendorStudio'));
-const MasterAssistant = retryImport(() => import('../components/listingai/assistant/MasterAssistant'));
-const DropboxLinkGenerator = retryImport(() => import('../components/minis/dropboxlinks/DropboxLinkGenerator'));
-const ForwardDropbox = retryImport(() => import('../components/minis/forward/ForwardDropbox'));
-const ClientFinder = retryImport(() => import('../components/minis/clientfinder/ClientFinder'));
-const DropboxUploader = retryImport(() => import('../components/minis/uploader/DropboxUploader'));
-const ProductCosting = retryImport(() => import('../components/minis/costing/ProductCosting'));
-const PriceProjector = retryImport(() => import('../components/minis/pricing/PriceProjector'));
-const OtpInbox = retryImport(() => import('../components/minis/OtpInbox'));
-const SizeSummariser = retryImport(() => import('../components/minis/sizesummariser/SizeSummariser'));
+import { AddressPrinter, CbazaarImport, OdetteImport, OdetteCoverageCheck, IndyaImport, MasterLinkCheck, Trackly, ReturnLabels, VendorStudio, MasterAssistant, DropboxLinkGenerator, ForwardDropbox, ClientFinder, DropboxUploader, ProductCosting, PriceProjector, OtpInbox, SizeSummariser, Attendance } from '../components/minis/miniLazy';
 const toolFallback = <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40 }}><div className="spinner" /></div>;
 
 
 export default function Minis({ navigateTo, active = true }: { navigateTo?: (tab: string) => void; active?: boolean }) {
   const { addToast } = useNotifications();
+  const { profile } = useAuth();
   const [view, setViewState] = useState<MiniView>('home');
   const fileRef = useRef<HTMLInputElement>(null);
   const [rows, setRows] = useState<UtsavRow[]>([]);
@@ -308,6 +289,7 @@ export default function Minis({ navigateTo, active = true }: { navigateTo?: (tab
     dropbox_links: <DropboxLinkGenerator addToast={addToast} />, forward_dropbox: <ForwardDropbox addToast={addToast} onBack={goHome} />,
     otp: <OtpInbox addToast={addToast} />, costing: <ProductCosting addToast={addToast} />, dropbox_upload: <DropboxUploader addToast={addToast} />,
     client_finder: <ClientFinder addToast={addToast} />, ratecard: <VendorStudio addToast={addToast} />, size_summariser: <SizeSummariser addToast={addToast} />,
+    ...(canOpenMini('attendance', profile) ? { attendance: <Attendance /> } : {}),
   };
   if (simple[view]) return (
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
@@ -476,7 +458,7 @@ export default function Minis({ navigateTo, active = true }: { navigateTo?: (tab
   return (
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
       <div className="minis-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
-        {MINI_TILES.map(t => (
+        {MINI_TILES.filter(t => canOpenMini(t.id, profile)).map(t => (
           <div key={t.id} onClick={() => setView(t.id)} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '20px 18px', cursor: 'pointer', transition: 'all .15s' }} onMouseEnter={e => { e.currentTarget.style.borderColor = 'oklch(0.55 0.22 265 / .3)'; e.currentTarget.style.background = 'oklch(0.55 0.22 265 / .04)'; }} onMouseLeave={e => { e.currentTarget.style.borderColor = T.bd; e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: T.tx, marginBottom: 4 }}>{t.title}</div>
             <div style={{ fontSize: 11, color: T.tx3, lineHeight: 1.5 }}>{t.desc}</div>

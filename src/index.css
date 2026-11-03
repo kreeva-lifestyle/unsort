@@ -733,3 +733,13 @@ html.launching .brand-slot { opacity: 0; }
 .roll > span { grid-area: 1 / 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .roll > span + span { pointer-events: none; }   /* the outgoing ghost shares the cell, so the old word slides out whole (Motion Lab 06) */
 @media (max-width: 420px) { .po-card .po-rail { margin: 24px 20px 52px; } .po-card-cap .roll > span { white-space: normal; overflow-wrap: anywhere; } }
+
+/* Flow canvas: below tablet width the three columns stack — the palette
+   becomes one scrolling row of steps, the board takes the width, the
+   details panel follows it (no inner scroll cap). */
+@media (max-width: 1024px) {
+  .flow-layout { grid-template-columns: minmax(0, 1fr) !important; }
+  .flow-palette { flex-direction: row !important; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .flow-palette-group { flex-direction: row !important; align-items: center; flex-shrink: 0; }
+  .flow-inspector { max-height: none !important; }
+}

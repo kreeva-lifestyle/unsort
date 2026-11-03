@@ -5,6 +5,7 @@
 const PAGES: Record<string, () => Promise<unknown>> = {
   purchaseorders: () => import('../pages/PurchaseOrders'),
   jobwork: () => import('../pages/Jobwork'),
+  flow: () => import('../pages/Flow'),
 };
 const warmed = new Set<string>();
 export function warmPage(tab: string) {
