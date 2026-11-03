@@ -24,9 +24,9 @@ import type {
   CashHandover,
   CashHandoverInsert,
   CashBookBalanceInsert,
-  CashChallan,
   Profile,
 } from '../types/database';
+import { loadPeriodPayments, type CashSaleRow } from '../components/challan/cashBookPayments';
 import { exportName, docTitle, fileRange } from '../lib/exportName';
 import { downloadFile } from '../lib/downloadFile';
 import { useModalLock } from '../hooks/useModalLock';
@@ -54,7 +54,6 @@ const formatHandoverNo = (n: number | null | undefined) =>
 type ExpenseRow = Pick<CashExpense, 'id' | 'date' | 'amount' | 'category' | 'description' | 'created_at'> & { paid_by?: string | null };
 
 // View model: narrowed cash_challans projection used by the sales tab.
-type CashSaleRow = Pick<CashChallan, 'id' | 'challan_number' | 'customer_name' | 'total' | 'amount_paid' | 'status' | 'is_return' | 'payment_mode' | 'payment_date' | 'created_at'>;
 
 export default function CashBook() {
   const { addToast } = useNotifications();
@@ -146,11 +145,10 @@ export default function CashBook() {
     if (expErr) addToast('Failed to load expenses — ' + friendlyError(expErr), 'error');
     setExpenses((exp || []) as unknown as ExpenseRow[]);
 
-    // Cash sales — filter by payment_date (when cash actually moved), not created_at
-    const { data: ch, error: chErr } = await supabase.from('cash_challans').select('id, challan_number, customer_name, total, amount_paid, status, is_return, payment_mode, payment_date, created_at')
-      .in('status', ['paid', 'partial']).gte('payment_date', fromDate).lte('payment_date', toDate).order('payment_date', { ascending: false });
-    if (chErr) addToast('Failed to load cash sales — ' + friendlyError(chErr), 'error');
-    setSales(ch || []);
+    // Money in: one row per payment, on the day it was received (same rule as the handover).
+    const { rows: pays, error: chErr } = await loadPeriodPayments(fromDate, toDate);
+    if (chErr) addToast('Failed to load payments — ' + friendlyError(chErr), 'error');
+    setSales(pays);
 
     // Handovers in date range
     const { data: ho, error: hoErr } = await supabase.from('cash_handovers').select('id, handover_number, date, amount, from_user_name, to_user_name, status, confirmed_at, created_at, period_from, period_to, breakdown, reason, from_user_id, to_user_id, notes, reject_reason, rejected_at, rejected_by, cancelled_at, cancelled_by').gte('date', fromDate).lte('date', toDate).order('date', { ascending: false }).order('created_at', { ascending: false });
@@ -659,8 +657,8 @@ export default function CashBook() {
       label = 'Expenses';
       csv = 'Date,Amount,Category,Description\n' + filteredExpenses.map(e => `${e.date},${e.amount},${esc(e.category)},${esc(e.description || '')}`).join('\n');
     } else if (tab === 'sales') {
-      label = 'CashSales';
-      csv = 'Challan#,Customer,Amount Paid,Payment Mode,Payment Date,Return\n' + filteredSales.map(s => `${s.challan_number},${esc(s.customer_name)},${s.amount_paid},${esc(s.payment_mode || '')},${s.payment_date || ''},${s.is_return ? 'Yes' : 'No'}`).join('\n');
+      label = 'Payments';
+      csv = 'Challan#,Customer,Amount,Payment Mode,Payment Date,Return\n' + filteredSales.map(s => `${s.challan_number},${esc(s.customer_name)},${s.amount_paid},${esc(s.payment_mode || '')},${s.payment_date || ''},${s.is_return ? 'Yes' : 'No'}`).join('\n');
     } else {
       label = 'Handovers';
       csv = 'Handover#,Date,From,To,Amount,Status\n' + filteredHandovers.map(h => `${h.handover_number},${h.date},${esc(h.from_user_name)},${esc(h.to_user_name)},${h.amount},${h.status}`).join('\n');
@@ -702,10 +700,10 @@ export default function CashBook() {
           ) : (
             <span style={{ fontFamily: T.mono, color: T.tx, fontWeight: 600 }}>₹{openingBalance.toLocaleString('en-IN')}</span>
           )}
-          <span style={{ color: T.gr }}>+ Cash Sales</span>
+          <span style={{ color: T.gr }}>+ Payments received</span>
           <span style={{ fontFamily: T.mono, color: T.gr, fontWeight: 600 }}>+₹{cashInSales.toLocaleString('en-IN')}</span>
           {cashOutReturns > 0 && <>
-            <span style={{ color: T.re }}>− Cash Returns</span>
+            <span style={{ color: T.re }}>− Refunds paid</span>
             <span style={{ fontFamily: T.mono, color: T.re, fontWeight: 600 }}>−₹{cashOutReturns.toLocaleString('en-IN')}</span>
           </>}
           <span style={{ color: T.re }}>− Expenses</span>
@@ -723,7 +721,7 @@ export default function CashBook() {
       <div style={{ display: 'flex', gap: 4, marginBottom: 12, background: 'rgba(255,255,255,0.02)', borderRadius: 8, padding: 3, width: 'fit-content', border: `1px solid ${T.bd}`, flexWrap: 'wrap' }}>
         {([
           { id: 'expenses', label: 'Expenses', count: expenses.length },
-          { id: 'sales', label: 'Cash Sales', count: sales.length },
+          { id: 'sales', label: 'Payments', count: sales.length },
           { id: 'handovers', label: 'Handovers', count: handovers.length },
         ] as const).map(t => {
           const active = tab === t.id;
@@ -775,7 +773,7 @@ export default function CashBook() {
       {tab === 'sales' && (
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
           {loading && sales.length === 0 && <SkeletonRows rows={4} />}
-          {!loading && filteredSales.length === 0 && <div style={{ padding: 14 }}><Empty icon="receipt" title={sq ? 'No matching sales' : 'No cash sales'} message={sq ? 'Try a different search term.' : 'No cash-paid challans in this date range.'} /></div>}
+          {!loading && filteredSales.length === 0 && <div style={{ padding: 14 }}><Empty icon="receipt" title={sq ? 'No matching payments' : 'No payments'} message={sq ? 'Try a different search term.' : 'No payments received in this date range.'} /></div>}
           {filteredSales.map(s => (
             <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderBottom: `1px solid ${T.bd}` }}>
               <div style={{ flex: 1 }}>
@@ -784,9 +782,9 @@ export default function CashBook() {
                   <span style={{ fontSize: 12, fontWeight: 600, color: T.tx }}>{s.customer_name}</span>
                   {s.is_return && <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'oklch(0.63 0.22 25 / .12)', color: T.re, fontWeight: 600, textTransform: 'uppercase' }}>Return</span>}
                 </div>
-                <div style={{ fontSize: 9, color: T.tx3 }}>₹{Number(s.amount_paid).toLocaleString('en-IN')}{s.payment_mode ? ` · ${s.payment_mode}` : ''}{s.payment_date ? ` · ${new Date(s.payment_date + 'T00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}` : ''}</div>
+                <div style={{ fontSize: 9, color: T.tx3 }}>₹{Math.abs(Number(s.amount_paid)).toLocaleString('en-IN')}{s.payment_mode ? ` · ${s.payment_mode}` : ''}{s.payment_date ? ` · ${new Date(s.payment_date + 'T00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}` : ''}</div>
               </div>
-              <div style={{ fontSize: 13, fontWeight: 700, fontFamily: T.mono, color: s.is_return ? T.re : T.gr }}>{s.is_return ? '−' : '+'}₹{Number(s.amount_paid).toLocaleString('en-IN')}</div>
+              {(() => { const v = (s.is_return ? -1 : 1) * Number(s.amount_paid); return <div style={{ fontSize: 13, fontWeight: 700, fontFamily: T.mono, color: v < 0 ? T.re : T.gr }}>{v < 0 ? '−' : '+'}₹{Math.abs(v).toLocaleString('en-IN')}</div>; })()}
             </div>
           ))}
         </div>
