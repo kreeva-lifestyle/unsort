@@ -44,6 +44,8 @@ import { exportName, docTitle, fileRange } from '../lib/exportName';
 import { useModalLock } from '../hooks/useModalLock';
 import { escHtml as escHtmlShared, csvCell } from '../lib/escape';
 import { fetchPaged } from '../lib/fetchPaged';
+import { useProductCatalog } from '../hooks/useProductCatalog';
+import { missingSizeError } from '../components/challan/sizeCheck';
 
 // The list's columns (explicit, house rule) — also used to open one challan by id.
 const CHALLAN_SELECT = `id, challan_number, customer_id, customer_name, customer_phone, status, subtotal, discount_type, discount_value, discount_amount, round_off, total, amount_paid, payment_mode, payment_date, notes, tags, shipping_charges, is_return, source_challan_id, handover_id, inventory_deducted, created_by, modified_by, voided_by, voided_at, created_at, updated_at, cash_challan_items(id, sku, quantity, price, discount_type, discount_value, discount_amount, total), handover:cash_handovers!handover_id(handover_number), ${CHALLAN_ORDER_EMBED}`;
@@ -86,6 +88,7 @@ type Customer = Pick<CashChallanCustomer, 'id' | 'name' | 'phone' | 'address'>;
 export default function CashChallan({ active }: { active?: boolean } = {}) {
   const { profile } = useAuth();
   const { addToast } = useNotifications();
+  const { index: catalog } = useProductCatalog();
   // ── State ──────────────────────────────────────────────────────────────────
   const [challans, setChallans] = useState<Challan[]>([]);
   const [loading, setLoading] = useState(true);
@@ -561,6 +564,9 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     if (items.length === 0) { setFormError('Add at least one item'); return; }
     const emptySkuItem = items.find(it => !it.sku.trim());
     if (emptySkuItem) { setFormError('SKU is required for all items'); return; }
+    // A return against an invoice copies that invoice's lines as they were sold.
+    const sizeErr = isReturn && returnSource ? null : missingSizeError(catalog, items);
+    if (sizeErr) { setFormError(sizeErr); return; }
     const zeroQtyItem = items.find(it => it.quantity <= 0);
     if (zeroQtyItem) { setFormError(`Item "${zeroQtyItem.sku}" has invalid quantity (must be > 0)`); return; }
     const zeroPriceItem = items.find(it => it.price <= 0);
