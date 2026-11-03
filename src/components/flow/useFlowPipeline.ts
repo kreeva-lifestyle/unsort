@@ -1,11 +1,31 @@
 // State and writes for one open Flow pipeline. Every change shows at once
 // (optimistic) and is saved straight away; a failed save says why and reloads
 // the pipeline so the screen never shows something the database does not have.
+// A step linked to a PO / job work takes its "done" from the order itself
+// (received, or pieces back OK) and turns Done when the order is closed —
+// nobody types those numbers twice.
 import { useCallback, useEffect, useState } from 'react';
 import { friendlyError } from '../../lib/friendlyError';
+import { logSwallowed } from '../../lib/errorLogger';
 import * as db from './flowData';
 import { KINDS, freeSpot } from './flowModel';
 import type { FlowPipeline, FlowStep, FlowEdge, FlowAttachment, FlowKind } from '../../types/flow';
+
+// The order's own numbers onto its linked step; changed steps are saved in the
+// background (a failed save is logged; the screen still shows the order's truth).
+function syncFromOrders(steps: FlowStep[], links: Record<string, db.LinkInfo>): FlowStep[] {
+  return steps.map(s => {
+    const l = links[s.po_id || s.jobwork_order_id || ''];
+    if (!l) return s;
+    const patch: Partial<FlowStep> = {};
+    if (l.got != null && Number(s.qty_done) !== l.got) patch.qty_done = l.got;
+    if (l.complete && s.status !== 'done') patch.status = 'done';
+    else if (!l.complete && (l.got ?? 0) > 0 && s.status === 'planned') patch.status = 'active';
+    if (!Object.keys(patch).length) return s;
+    db.updateStep(s.id, patch).catch(e => logSwallowed('flow: sync step from linked order', e));
+    return { ...s, ...patch };
+  });
+}
 
 export function useFlowPipeline(id: string, addToast: (m: string, t?: string) => void) {
   const [pipeline, setPipeline] = useState<FlowPipeline | null>(null);
@@ -19,8 +39,10 @@ export function useFlowPipeline(id: string, addToast: (m: string, t?: string) =>
   const load = useCallback(async () => {
     try {
       const r = await db.loadPipeline(id);
-      setPipeline(r.pipeline); setSteps(r.steps); setEdges(r.edges); setFiles(r.files); setError('');
-      setLinks(await db.loadLinks(r.steps));
+      setPipeline(r.pipeline); setEdges(r.edges); setFiles(r.files); setError('');
+      const l = await db.loadLinks(r.steps);
+      setLinks(l);
+      setSteps(syncFromOrders(r.steps, l));
     } catch (e) { setError(friendlyError(e)); }
   }, [id]);
   useEffect(() => { load(); }, [load]);
@@ -32,7 +54,7 @@ export function useFlowPipeline(id: string, addToast: (m: string, t?: string) =>
     setSteps(next);
     try {
       await db.updateStep(sid, patch);
-      if ('po_id' in patch || 'jobwork_order_id' in patch) setLinks(await db.loadLinks(next));
+      if ('po_id' in patch || 'jobwork_order_id' in patch) { const l = await db.loadLinks(next); setLinks(l); setSteps(syncFromOrders(next, l)); }
     } catch (e) { fail(e); }
   };
   const moveStep = (sid: string, x: number, y: number) => patchStep(sid, { x, y });

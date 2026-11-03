@@ -1,14 +1,18 @@
 // The right-hand panel when no step is selected: the pipeline itself — name,
-// SKU, pieces, size split, due date, status, note — every file attached to it
-// (and to its steps), "Save as template", and Delete for admin / manager.
+// SKU (catalog suggestions, like Cash Challan), pieces, size split, due date,
+// status, note — the design's photos and its POs / job work not on the canvas
+// yet, every file attached, "Save as template", and Delete for admin / manager.
 import { useEffect, useState } from 'react';
 import { T, S } from '../../lib/theme';
 import { numericKeyDown } from '../../lib/numericInput';
 import { PIPE_STATUS, KINDS } from './flowModel';
 import FlowAttachments from './FlowAttachments';
+import SkuInput from '../ui/SkuInput';
+import SkuPanel from './SkuPanel';
+import { skuKey } from './skuFinds';
 import type { FlowPipeline, FlowPipelineStatus, FlowStep, FlowAttachment } from '../../types/flow';
 
-export default function PipelineInspector({ p, steps, files, canDelete, onPatch, onFiles, onSaveTemplate, onDelete, addToast }: {
+export default function PipelineInspector({ p, steps, files, canDelete, onPatch, onFiles, onSaveTemplate, onDelete, onLinked, addToast }: {
   p: FlowPipeline;
   steps: FlowStep[];
   files: FlowAttachment[];
@@ -17,6 +21,8 @@ export default function PipelineInspector({ p, steps, files, canDelete, onPatch,
   onFiles: (next: FlowAttachment[]) => void;
   onSaveTemplate: (name: string) => Promise<void>;
   onDelete: () => void;
+  /** Orders were added to the canvas: reload it. */
+  onLinked: () => void;
   addToast: (m: string, t?: string) => void;
 }) {
   const [f, setF] = useState({ title: p.title, sku: p.sku ?? '', pieces: p.pieces?.toString() ?? '', sizes: p.sizes ?? '', notes: p.notes ?? '' });
@@ -24,7 +30,7 @@ export default function PipelineInspector({ p, steps, files, canDelete, onPatch,
   const [saving, setSaving] = useState(false);
   useEffect(() => { setF({ title: p.title, sku: p.sku ?? '', pieces: p.pieces?.toString() ?? '', sizes: p.sizes ?? '', notes: p.notes ?? '' }); }, [p.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const blur = (key: 'title' | 'sku' | 'sizes' | 'notes') => () => {
-    const v = key === 'sku' ? f.sku.trim().toUpperCase() : f[key].trim();
+    const v = key === 'sku' ? skuKey(f.sku) : f[key].trim();
     if (key === 'title' && !v) { addToast('The pipeline needs a name', 'error'); setF({ ...f, title: p.title }); return; }
     if (v !== ((p[key] as string | null) ?? '')) onPatch({ [key]: key === 'title' ? v : v || null });
   };
@@ -42,7 +48,8 @@ export default function PipelineInspector({ p, steps, files, canDelete, onPatch,
         <input id="fp-title" value={f.title} onChange={e => setF({ ...f, title: e.target.value })} onBlur={blur('title')} style={S.fInput} /></div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
         <div><label style={S.fLabel} htmlFor="fp-sku">SKU</label>
-          <input id="fp-sku" value={f.sku} onChange={e => setF({ ...f, sku: e.target.value })} onBlur={blur('sku')} style={{ ...S.fInput, fontFamily: T.mono, textTransform: 'uppercase' }} /></div>
+          <div onBlur={blur('sku')}><SkuInput id="fp-sku" value={f.sku} sizes={false} onChange={v => setF(prev => ({ ...prev, sku: v }))}
+            onPick={prod => { if (prod.sku !== (p.sku ?? '')) onPatch({ sku: prod.sku }); }} style={{ ...S.fInput, fontFamily: T.mono }} /></div></div>
         <div><label style={S.fLabel} htmlFor="fp-pcs">Pieces</label>
           <input id="fp-pcs" inputMode="numeric" value={f.pieces} onKeyDown={e => numericKeyDown(e)} onChange={e => setF({ ...f, pieces: e.target.value.replace(/\D/g, '') })}
             onBlur={() => { const n = parseInt(f.pieces, 10); const v = isNaN(n) || n <= 0 ? null : n; if (v !== p.pieces) onPatch({ pieces: v }); }} style={{ ...S.fInput, fontFamily: T.mono }} /></div>
@@ -59,6 +66,7 @@ export default function PipelineInspector({ p, steps, files, canDelete, onPatch,
       </div>
       <div><label style={S.fLabel} htmlFor="fp-notes">Note</label>
         <textarea id="fp-notes" rows={2} value={f.notes} onChange={e => setF({ ...f, notes: e.target.value })} onBlur={blur('notes')} style={{ ...S.fInput, height: 'auto', minHeight: 56, resize: 'vertical' }} /></div>
+      <SkuPanel pipelineId={p.id} sku={p.sku} linkedIds={new Set(steps.flatMap(s => [s.po_id, s.jobwork_order_id]).filter(Boolean) as string[])} onLinked={onLinked} addToast={addToast} />
       <FlowAttachments pipelineId={p.id} stepId={null} files={files} stepNames={stepNames} onChange={onFiles} addToast={addToast} />
       <div><label style={S.fLabel} htmlFor="fp-tpl">Save these steps as a template</label>
         <div style={{ display: 'flex', gap: 6 }}>
