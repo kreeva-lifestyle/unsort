@@ -26,7 +26,9 @@ import type {
   CashBookBalanceInsert,
   Profile,
 } from '../types/database';
-import { loadPeriodPayments, type CashSaleRow } from '../components/challan/cashBookPayments';
+import { loadPeriodPayments, loadHandoverPayments, type CashSaleRow } from '../components/challan/cashBookPayments';
+// ± with the sign carried by the value (a period can net negative after an undo).
+const signed = (v: number, plus = '+', minus = '−') => `${v < 0 ? minus : plus}₹${Math.abs(v).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 import { exportName, docTitle, fileRange } from '../lib/exportName';
 import { downloadFile } from '../lib/downloadFile';
 import { useModalLock } from '../hooks/useModalLock';
@@ -101,7 +103,7 @@ export default function CashBook() {
   const [handError, setHandError] = useState('');
   const [handSaving, setHandSaving] = useState(false);
   const [viewingHandover, setViewingHandover] = useState<Handover | null>(null);
-  const [handoverItems, setHandoverItems] = useState<{ challan_number: number; customer_name: string; amount_paid: number; payment_date: string | null; is_return: boolean }[]>([]);
+  const [handoverItems, setHandoverItems] = useState<CashSaleRow[]>([]);
   // Users list (for recipient dropdown)
   const [users, setUsers] = useState<{ id: string; full_name: string; email: string; has_pin: boolean; phone: string | null; role: string }[]>([]);
   const [recentHandovers, setRecentHandovers] = useState<Handover[]>([]);
@@ -217,17 +219,15 @@ export default function CashBook() {
     return () => { supabase.removeChannel(channel); };
   }, [fetchData, debouncedFetch]);
 
-  // Load the exact challans stamped to the handover being viewed (per-challan
-  // handover tracking) — the real itemised contents, not an inferred list.
+  // The exact payments the viewed handover counted (stamped when it was signed).
   useEffect(() => {
     if (!viewingHandover?.id) { setHandoverItems([]); return; }
     let stale = false;
-    supabase.from('cash_challans').select('challan_number, customer_name, amount_paid, payment_date, is_return')
-      .eq('handover_id', viewingHandover.id).order('payment_date', { ascending: true }).then(({ data, error }) => {
-        if (stale) return;
-        if (error) { addToast('Could not load handover items — ' + friendlyError(error), 'error'); return; }
-        setHandoverItems((data as typeof handoverItems) || []);
-      });
+    loadHandoverPayments(viewingHandover.id).then(({ rows, error }) => {
+      if (stale) return;
+      if (error) { addToast('Could not load handover items — ' + friendlyError(error), 'error'); return; }
+      setHandoverItems(rows);
+    });
     return () => { stale = true; };
   }, [viewingHandover?.id, addToast]);
 
@@ -701,10 +701,10 @@ export default function CashBook() {
             <span style={{ fontFamily: T.mono, color: T.tx, fontWeight: 600 }}>₹{openingBalance.toLocaleString('en-IN')}</span>
           )}
           <span style={{ color: T.gr }}>+ Payments received</span>
-          <span style={{ fontFamily: T.mono, color: T.gr, fontWeight: 600 }}>+₹{cashInSales.toLocaleString('en-IN')}</span>
-          {cashOutReturns > 0 && <>
+          <span style={{ fontFamily: T.mono, color: T.gr, fontWeight: 600 }}>{signed(cashInSales)}</span>
+          {cashOutReturns !== 0 && <>
             <span style={{ color: T.re }}>− Refunds paid</span>
-            <span style={{ fontFamily: T.mono, color: T.re, fontWeight: 600 }}>−₹{cashOutReturns.toLocaleString('en-IN')}</span>
+            <span style={{ fontFamily: T.mono, color: T.re, fontWeight: 600 }}>{signed(cashOutReturns, '−', '+')}</span>
           </>}
           <span style={{ color: T.re }}>− Expenses</span>
           <span style={{ fontFamily: T.mono, color: T.re, fontWeight: 600 }}>−₹{totalExpenses.toLocaleString('en-IN')}</span>
@@ -868,8 +868,8 @@ export default function CashBook() {
                 )}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 4, fontFamily: T.mono }}>
                   <span style={{ color: T.tx2 }}>Opening Balance</span><span style={{ color: T.tx2 }}>₹{handBreakdown.opening.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
-                  <span style={{ color: T.gr }}>+ Payments received</span><span style={{ color: T.gr }}>+₹{handBreakdown.cashSales.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
-                  {handBreakdown.cashReturns > 0 && <><span style={{ color: T.re }}>− Refunds paid</span><span style={{ color: T.re }}>−₹{handBreakdown.cashReturns.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span></>}
+                  <span style={{ color: T.gr }}>+ Payments received</span><span style={{ color: T.gr }}>{signed(handBreakdown.cashSales)}</span>
+                  {handBreakdown.cashReturns !== 0 && <><span style={{ color: T.re }}>− Refunds paid</span><span style={{ color: T.re }}>{signed(handBreakdown.cashReturns, '−', '+')}</span></>}
                   <span style={{ color: T.re }}>− Cash Expenses</span><span style={{ color: T.re }}>−₹{handBreakdown.expenses.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
                   {handBreakdown.previousHandovers > 0 && <><span style={{ color: T.yl }}>− Previous Handovers</span><span style={{ color: T.yl }}>−₹{handBreakdown.previousHandovers.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span></>}
                   <span style={{ fontWeight: 700, color: T.tx, borderTop: `1px solid ${T.bd}`, paddingTop: 4 }}>= Available Cash</span>
@@ -995,19 +995,19 @@ export default function CashBook() {
             {viewingHandover.confirmed_at && <div style={{ fontSize: 10, color: T.gr, marginBottom: 10 }}>✓ Signed at {new Date(viewingHandover.confirmed_at).toLocaleString('en-IN')}</div>}
             {viewingHandover.status === 'confirmed' && (
               <div style={{ marginBottom: 10 }}>
-                <div style={{ fontSize: 9, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 700, marginBottom: 6 }}>Challans in this handover ({handoverItems.length})</div>
+                <div style={{ fontSize: 9, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 700, marginBottom: 6 }}>Payments in this handover ({handoverItems.length})</div>
                 {handoverItems.length === 0 ? (
-                  <div style={{ fontSize: 10, color: T.tx3, fontStyle: 'italic' }}>No individual challans linked.</div>
+                  <div style={{ fontSize: 10, color: T.tx3, fontStyle: 'italic' }}>No individual payments linked.</div>
                 ) : (
                   <div style={{ maxHeight: 180, overflowY: 'auto', border: `1px solid ${T.bd}`, borderRadius: 6 }}>
                     {handoverItems.map((it, i) => (
-                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: '6px 10px', borderBottom: i < handoverItems.length - 1 ? `1px solid ${T.bd}` : 'none', fontSize: 11 }}>
+                      <div key={it.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: '6px 10px', borderBottom: i < handoverItems.length - 1 ? `1px solid ${T.bd}` : 'none', fontSize: 11 }}>
                         <div style={{ minWidth: 0 }}>
                           <span style={{ fontFamily: T.mono, color: T.tx3 }}>#{it.challan_number}</span>
                           <span style={{ color: T.tx2, marginLeft: 8 }}>{it.customer_name}</span>
                           {it.is_return && <span style={{ fontSize: 8, color: T.re, marginLeft: 6, fontWeight: 700 }}>RET</span>}
                         </div>
-                        <span style={{ fontFamily: T.mono, color: it.is_return ? T.re : T.gr, fontWeight: 600, flexShrink: 0 }}>{it.is_return ? '−' : ''}₹{Number(it.amount_paid).toLocaleString('en-IN')}</span>
+                        <span style={{ fontFamily: T.mono, color: (it.is_return ? -1 : 1) * it.amount_paid < 0 ? T.re : T.gr, fontWeight: 600, flexShrink: 0 }}>{signed((it.is_return ? -1 : 1) * it.amount_paid, '', '−')}</span>
                       </div>
                     ))}
                   </div>
