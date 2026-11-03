@@ -13,8 +13,10 @@ import type { LinkInfo } from './flowData';
 
 const label = S.fLabel;
 
-export default function StepInspector({ step, steps, edges, links, files, people, onPatch, onRemove, onFiles, addToast }: {
+export default function StepInspector({ step, sku, steps, edges, links, files, people, onPatch, onRemove, onFiles, addToast }: {
   step: FlowStep;
+  /** The pipeline's SKU — the link picker opens on its orders. */
+  sku: string | null;
   steps: FlowStep[];
   edges: FlowEdge[];
   links: Record<string, LinkInfo>;
@@ -47,7 +49,7 @@ export default function StepInspector({ step, steps, edges, links, files, people
       <div><label style={label} htmlFor="fs-title">Name</label>
         <input id="fs-title" value={f.title} onChange={e => setF({ ...f, title: e.target.value })} onBlur={blurText('title')} placeholder={k.label} style={S.fInput} /></div>
       {linkKind && <div><span style={label}>Linked {linkKind === 'po' ? 'purchase order' : 'job work'}</span>
-        <LinkPicker kind={linkKind} linkedId={linkId} info={linkId ? links[linkId] ?? null : null} addToast={addToast}
+        <LinkPicker kind={linkKind} sku={sku} linkedId={linkId} info={linkId ? links[linkId] ?? null : null} addToast={addToast}
           onPick={id => onPatch(linkKind === 'po' ? { po_id: id } : { jobwork_order_id: id })} /></div>}
       <div><label style={label} htmlFor="fs-who">{step.kind === 'stitching' ? 'Tailor' : step.kind === 'cutting' ? 'Cutting master' : 'Who does it'}</label>
         <input id="fs-who" list="flow-people" value={f.assignee} onChange={e => setF({ ...f, assignee: e.target.value })} onBlur={blurText('assignee')} placeholder={step.kind === 'jobwork' || step.kind === 'po' ? 'Vendor' : 'Name'} style={S.fInput} />
@@ -56,9 +58,9 @@ export default function StepInspector({ step, steps, edges, links, files, people
         <div><label style={label} htmlFor="fs-plan">Planned</label>
           <input id="fs-plan" inputMode="decimal" value={f.planned} onKeyDown={e => numericKeyDown(e)} onChange={e => setF({ ...f, planned: e.target.value })}
             onBlur={() => { const v = num(f.planned); if (v !== (step.qty_planned ?? null)) onPatch({ qty_planned: v }); }} style={{ ...S.fInput, fontFamily: T.mono }} /></div>
-        <div><label style={label} htmlFor="fs-done">Done</label>
-          <input id="fs-done" inputMode="decimal" value={f.done} onKeyDown={e => numericKeyDown(e)} onChange={e => setF({ ...f, done: e.target.value })}
-            onBlur={() => { const v = num(f.done) ?? 0; if (v !== Number(step.qty_done)) onPatch({ qty_done: v, ...(step.qty_planned && v >= Number(step.qty_planned) ? { status: 'done' as const } : v > 0 && step.status === 'planned' ? { status: 'active' as const } : {}) }); }} style={{ ...S.fInput, fontFamily: T.mono }} /></div>
+        <div><label style={label} htmlFor="fs-done">{linkId ? 'Done · from the order' : 'Done'}</label>
+          <input id="fs-done" inputMode="decimal" readOnly={!!linkId} value={linkId ? String(step.qty_done ?? 0) : f.done} onKeyDown={e => numericKeyDown(e)} onChange={e => setF({ ...f, done: e.target.value })}
+            onBlur={() => { if (linkId) return; const v = num(f.done) ?? 0; if (v !== Number(step.qty_done)) onPatch({ qty_done: v, ...(step.qty_planned && v >= Number(step.qty_planned) ? { status: 'done' as const } : v > 0 && step.status === 'planned' ? { status: 'active' as const } : {}) }); }} style={{ ...S.fInput, fontFamily: T.mono }} /></div>
         <div><label style={label} htmlFor="fs-unit">Unit</label>
           <input id="fs-unit" value={f.unit} onChange={e => setF({ ...f, unit: e.target.value })} onBlur={blurText('unit')} placeholder={k.unit} style={S.fInput} /></div>
       </div>

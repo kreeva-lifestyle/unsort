@@ -11,7 +11,7 @@ const FILE_COLS = 'id, pipeline_id, step_id, path, name, type, size, uploaded_by
 
 export type PipelineRow = FlowPipeline & { flow_steps: FlowStep[] };
 /** What a step linked to a PO / job work shows about it. */
-export type LinkInfo = { label: string; sub: string; status: string; got?: number; of?: number };
+export type LinkInfo = { label: string; sub: string; status: string; got?: number; of?: number; complete?: boolean };
 
 const must = <T,>(r: { data: T | null; error: unknown }): T => { if (r.error) throw r.error; return r.data as T; };
 
@@ -41,13 +41,14 @@ export async function loadLinks(steps: FlowStep[]): Promise<Record<string, LinkI
     for (const r of rows) {
       const of = r.purchase_order_items.reduce((t, i) => t + Number(i.quantity || 0), 0);
       const got = r.purchase_order_items.reduce((t, i) => t + Number(i.received_qty || 0), 0);
-      out[r.id] = { label: `PO #${r.po_number}`, sub: r.vendor_name, status: r.status.replace(/_/g, ' '), got, of };
+      out[r.id] = { label: `PO #${r.po_number}`, sub: r.vendor_name, status: r.status.replace(/_/g, ' '), got, of, complete: ['completed', 'closed'].includes(r.status) };
     }
   }
   if (jwIds.length) {
-    const rows = must(await supabase.from('jobwork_orders').select('id, jw_number, vendor_name, job_type, status, pieces').in('id', jwIds)) as
-      { id: string; jw_number: number; vendor_name: string; job_type: string | null; status: string; pieces: number | null }[];
-    for (const r of rows) out[r.id] = { label: `Job work #${r.jw_number}`, sub: [r.vendor_name, r.job_type].filter(Boolean).join(' · '), status: r.status, of: r.pieces ?? undefined };
+    // The summary view carries what came back OK, so a linked step's "done" fills itself.
+    const rows = must(await supabase.from('jobwork_order_summary').select('id, jw_number, vendor_name, job_type, status, pieces, pcs_ok').in('id', jwIds)) as
+      { id: string; jw_number: number; vendor_name: string; job_type: string | null; status: string; pieces: number | null; pcs_ok: number | null }[];
+    for (const r of rows) out[r.id] = { label: `Job work #${r.jw_number}`, sub: [r.vendor_name, r.job_type].filter(Boolean).join(' · '), status: r.status, got: Number(r.pcs_ok || 0), of: r.pieces ?? undefined, complete: r.status === 'closed' };
   }
   return out;
 }
@@ -62,6 +63,10 @@ export async function deletePipeline(id: string) { must(await supabase.from('flo
 
 export async function addStep(pipelineId: string, kind: FlowKind, title: string, x: number, y: number, unit: string): Promise<FlowStep> {
   return must(await supabase.from('flow_steps').insert({ pipeline_id: pipelineId, kind, title, x, y, unit }).select(STEP_COLS).single()) as FlowStep;
+}
+/** A step with every field set at once (used when linking orders found for the SKU). */
+export async function insertStep(row: Partial<FlowStep> & { pipeline_id: string; kind: FlowKind }): Promise<FlowStep> {
+  return must(await supabase.from('flow_steps').insert(row).select(STEP_COLS).single()) as FlowStep;
 }
 export async function updateStep(id: string, patch: Partial<FlowStep>) {
   must(await supabase.from('flow_steps').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', id));

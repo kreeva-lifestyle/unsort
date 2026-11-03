@@ -14,6 +14,8 @@ import { useFlowPipeline } from './useFlowPipeline';
 import { deletePipeline } from './flowData';
 import { friendlyError } from '../../lib/friendlyError';
 import { KINDS, PIPE_STATUS, tint } from './flowModel';
+import { useSkuFinds } from './skuFinds';
+import { useSkuPhotos } from './SkuPhotos';
 
 export default function FlowCanvas({ id, onBack, addToast }: { id: string; onBack: () => void; addToast: (m: string, t?: string) => void }) {
   const f = useFlowPipeline(id, addToast);
@@ -24,6 +26,8 @@ export default function FlowCanvas({ id, onBack, addToast }: { id: string; onBac
   const edge = sel?.type === 'edge' ? f.edges.find(e => e.id === sel.id) ?? null : null;
   const people = [...new Set(f.steps.map(s => s.assignee).filter(Boolean))] as string[];
   const canDelete = ['admin', 'manager'].includes(profile?.role || '');
+  const { finds } = useSkuFinds(f.pipeline?.sku);
+  const photo = useSkuPhotos(f.pipeline?.sku, finds?.image ?? null).pics[0]?.thumb;
 
   if (f.error) return (
     <div className="page-pad" style={{ padding: 16 }}>
@@ -50,6 +54,7 @@ export default function FlowCanvas({ id, onBack, addToast }: { id: string; onBac
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
           <button type="button" onClick={onBack} style={S.btnGhost}>← Flow</button>
+          {photo && <img src={photo} alt={p.sku ?? ''} style={{ width: 44, height: 44, borderRadius: 8, objectFit: 'cover', border: `1px solid ${T.bd}`, flexShrink: 0 }} />}
           <div style={{ minWidth: 0 }}>
             <div style={{ fontFamily: T.sora, fontSize: 15, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               <span style={{ fontFamily: T.mono, color: T.tx3, fontSize: 12, marginRight: 6 }}>F-{p.flow_number}</span>{p.title}
@@ -68,7 +73,7 @@ export default function FlowCanvas({ id, onBack, addToast }: { id: string; onBac
         <FlowPalette busy={f.busy} onAdd={async (kind, label) => { const nid = await f.addStepOf(kind, label); if (nid) setSel({ type: 'step', id: nid }); }} />
         <FlowBoard steps={f.steps} edges={f.edges} links={f.links} sel={sel} onSelect={setSel} onMove={f.moveStep} onConnect={f.connect} />
         <aside className="flow-inspector" aria-label="Details" style={{ background: T.glass1, border: `1px solid ${T.bd}`, borderRadius: 10, padding: 14, overflowY: 'auto', maxHeight: 'calc(100dvh - 210px)' }}>
-          {step && <StepInspector step={step} steps={f.steps} edges={f.edges} links={f.links} files={f.files} people={people} addToast={addToast}
+          {step && <StepInspector step={step} sku={p.sku} steps={f.steps} edges={f.edges} links={f.links} files={f.files} people={people} addToast={addToast}
             onPatch={patch => f.patchStep(step.id, patch)} onRemove={removeStep} onFiles={f.setFiles} />}
           {edge && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -80,7 +85,7 @@ export default function FlowCanvas({ id, onBack, addToast }: { id: string; onBac
             </div>
           )}
           {!step && !edge && <PipelineInspector p={p} steps={f.steps} files={f.files} canDelete={canDelete} addToast={addToast}
-            onPatch={f.patchPipeline} onFiles={f.setFiles} onSaveTemplate={f.saveTemplate} onDelete={removePipeline} />}
+            onPatch={f.patchPipeline} onFiles={f.setFiles} onSaveTemplate={f.saveTemplate} onDelete={removePipeline} onLinked={f.load} />}
         </aside>
       </div>
 
