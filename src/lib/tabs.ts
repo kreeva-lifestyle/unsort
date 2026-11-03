@@ -1,4 +1,4 @@
-export const TAB_IDS = ['dashboard', 'inventory', 'brandtag', 'packtime', 'challan', 'purchaseorders', 'jobwork', 'flow', 'listingai', 'attendance', 'minis', 'printstation', 'settings'] as const;
+export const TAB_IDS = ['dashboard', 'inventory', 'brandtag', 'packtime', 'challan', 'purchaseorders', 'jobwork', 'flow', 'listingai', 'minis', 'printstation', 'settings'] as const;
 
 const TAB_TO_MODULE: Record<string, string> = {
   dashboard: 'dashboard', inventory: 'inventory', brandtag: 'brandtag',

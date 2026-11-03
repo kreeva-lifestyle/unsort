@@ -1,4 +1,5 @@
-// Attendance module shell — owns data fetching (employees, month entries,
+// Attendance (a Minis tool since 2026-11-03; Minis supplies the page padding)
+// shell — owns data fetching (employees, month entries,
 // penalties, saved salaries); the three views are presentational children.
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
@@ -82,7 +83,7 @@ export default function Attendance() {
   );
 
   return (
-    <div className="page-pad" style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
+    <div style={{ fontFamily: T.sans, color: T.tx }}>
       <div className="att-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
         <div className="att-tabs" style={{ display: 'inline-flex', gap: 3, alignItems: 'center', background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, padding: 3 }}>
           {tabBtn('timesheet', 'Timesheet')}

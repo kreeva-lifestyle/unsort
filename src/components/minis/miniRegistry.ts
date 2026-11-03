@@ -3,7 +3,7 @@
 // tool no longer grows that file. Array order is the on-screen order.
 // Ids are internal keys (saved dashboard shortcuts use them): 'ratecard' is
 // Vendor Studio, kept so pinned shortcuts keep working after the rename.
-export type MiniView = 'home' | 'utsav' | 'cbazaar' | 'odette' | 'indya' | 'address' | 'trackly' | 'return_labels' | 'ratecard' | 'dropbox_links' | 'forward_dropbox' | 'master_assistant' | 'client_finder' | 'dropbox_upload' | 'costing' | 'otp' | 'pricing' | 'size_summariser';
+export type MiniView = 'home' | 'utsav' | 'cbazaar' | 'odette' | 'indya' | 'address' | 'trackly' | 'return_labels' | 'ratecard' | 'dropbox_links' | 'forward_dropbox' | 'master_assistant' | 'client_finder' | 'dropbox_upload' | 'costing' | 'otp' | 'pricing' | 'size_summariser' | 'attendance';
 
 /** Breadcrumb text per view; null hides the crumb. Record<> so a new view
  *  without a label is a compile error. */
@@ -12,10 +12,15 @@ export const MINI_LABELS: Record<MiniView, string | null> = {
   trackly: 'Trackly', return_labels: 'Product QC Labels', ratecard: 'Vendor Studio', dropbox_links: 'Dropbox Link Generator',
   forward_dropbox: 'Forward → Dropbox', master_assistant: 'Master Assistant', client_finder: 'Client Finder',
   dropbox_upload: 'Dropbox Uploader', costing: 'Product Costing', otp: 'OTP Inbox', pricing: 'Price Projector',
-  size_summariser: 'Size Summariser',
+  size_summariser: 'Size Summariser', attendance: 'Attendance',
 };
 
+/** Tools that also need their own module permission (Settings → module access)
+ *  on top of Minis: Attendance moved here from its own tab on 2026-11-03. */
+export const MINI_MODULE: Partial<Record<MiniView, string>> = { attendance: 'attendance' };
+
 export const MINI_TILES: { id: MiniView; title: string; desc: string }[] = [
+  { id: 'attendance', title: 'Attendance', desc: 'Staff timesheet, salary and employees — monthly entries, penalties, advances and salary payments' },
   { id: 'utsav', title: 'Utsav Import', desc: 'Import vendor Excel, generate ARYA SKU column, export as XLS' },
   { id: 'cbazaar', title: 'Cbazaar Import', desc: 'Import Cbazaar vendor Excel, generate ARYA SKU column, export as CSV' },
   { id: 'odette', title: 'Odette Import', desc: 'Aggregate SKU quantities across multiple vendor sheets' },
