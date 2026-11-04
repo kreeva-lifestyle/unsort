@@ -5,15 +5,19 @@
 import { useEffect, useState } from 'react';
 import { T } from '../../lib/theme';
 import { useProductCatalog, resolveSku } from '../../hooks/useProductCatalog';
-import { call as dbxCall, thumbUrl, explainGen, type GenLink } from '../minis/dropboxlinks/api';
+import { call as dbxCall, thumbSrc, explainGen, type GenLink } from '../minis/dropboxlinks/api';
 import { skuKey } from './skuFinds';
 
 type Pic = { thumb: string; full: string };
 type Photos = { pics: Pic[]; note: string };
 // A Dropbox share link opened as the image itself (raw=1) for the large view;
-// the list uses the edge function's small cached thumbnail.
+// the list uses the edge function's small cached thumbnail (its signed URL,
+// or the full photo if the server sent none).
 const rawUrl = (u: string) => { try { const x = new URL(u); x.searchParams.delete('dl'); x.searchParams.set('raw', '1'); return x.toString(); } catch { return u; } };
-const cache = new Map<string, Promise<Photos>>();
+// Thumbnail URLs are signed and expire 6-12 h after linkgen issues them, so a
+// cached SKU is fetched again after 5 h instead of keeping dead URLs all day.
+const CACHE_MS = 5 * 3600_000;
+const cache = new Map<string, { p: Promise<Photos>; at: number }>();
 
 async function dropboxPhotos(k: string): Promise<Photos> {
   const { status, data } = await dbxCall({ action: 'linkgen', sku: k, mode: 'separate' });
@@ -29,7 +33,7 @@ async function dropboxPhotos(k: string): Promise<Photos> {
 }
 const toPhotos = (links: GenLink[] | undefined): Photos => {
   const ok = (links || []).filter(l => l?.url && !l.error).slice(0, 12);
-  return { pics: ok.map(l => ({ thumb: thumbUrl(l.url), full: rawUrl(l.url) })), note: ok.length ? '' : 'No photos in its Dropbox folder' };
+  return { pics: ok.map(l => ({ thumb: thumbSrc(l) || rawUrl(l.url), full: rawUrl(l.url) })), note: ok.length ? '' : 'No photos in its Dropbox folder' };
 };
 
 /** Photos for a SKU: the costing image, then the Dropbox folder's photos. Waits until the SKU is a real design. */
@@ -42,8 +46,9 @@ export function useSkuPhotos(sku: string | null | undefined, costingImage: strin
     let alive = true;
     const t = setTimeout(() => {
       setState({ for: k, p: null, busy: true });
-      let p = cache.get(k);
-      if (!p) { p = dropboxPhotos(k); cache.set(k, p); }
+      const hit = cache.get(k);
+      let p = hit && Date.now() - hit.at < CACHE_MS ? hit.p : undefined;
+      if (!p) { p = dropboxPhotos(k); cache.set(k, { p, at: Date.now() }); }
       p.then(r => { if (alive) setState({ for: k, p: r, busy: false }); })
         .catch(e => { cache.delete(k); if (alive) setState({ for: k, p: { pics: [], note: (e as Error)?.message || 'Could not load photos' }, busy: false }); });
     }, 350);

@@ -13,7 +13,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { T, S, Icon } from '../../../lib/theme';
 import { useProductCatalog, resolveSku } from '../../../hooks/useProductCatalog';
-import { call as dbxCall, thumbUrl, explainGen, type GenLink, type GenCandidate } from '../dropboxlinks/api';
+import { call as dbxCall, thumbSrc, explainGen, type GenLink, type GenCandidate } from '../dropboxlinks/api';
 
 const DEBOUNCE_MS = 400;
 
@@ -107,6 +107,7 @@ export default function PhotoPicker({
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(72px, 1fr))', gap: 6 }}>
             {shown.map(l => {
               const on = selected.includes(l.url);
+              const src = thumbSrc(l);
               return (
                 <button
                   key={l.url}
@@ -118,13 +119,17 @@ export default function PhotoPicker({
                     border: on ? `2px solid ${T.ac}` : `1px solid ${T.bd}`,
                   }}
                 >
-                  <img
-                    src={thumbUrl(l.url)}
-                    alt={l.name}
-                    loading="lazy"
-                    onError={e => { (e.target as HTMLImageElement).style.opacity = '0.15'; }}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity: on ? 1 : 0.72 }}
-                  />
+                  {src ? (
+                    <img
+                      src={src}
+                      alt={l.name}
+                      loading="lazy"
+                      onError={e => { (e.target as HTMLImageElement).style.opacity = '0.15'; }}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity: on ? 1 : 0.72 }}
+                    />
+                  ) : (
+                    <span style={{ display: 'block', padding: 4, fontSize: 10, color: T.tx3, wordBreak: 'break-all' }}>{l.name}</span>
+                  )}
                   {on && (
                     <span style={{
                       position: 'absolute', top: 3, right: 3, width: 18, height: 18, borderRadius: '50%',

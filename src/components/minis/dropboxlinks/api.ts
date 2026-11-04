@@ -6,7 +6,9 @@ import { friendlyError } from '../../../lib/friendlyError';
 
 export const FN = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/odette-export';
 
-export interface GenLink { name: string; url: string; error?: string }
+// thumb: signed query string for the edge fn's GET thumbnail, issued by
+// linkgen for image links only (expires in 6-12 h). Build the URL with thumbSrc.
+export interface GenLink { name: string; url: string; error?: string; thumb?: string }
 export interface GenCandidate { name: string; path: string; display: string }
 export interface GenResult { ok: boolean; sku: string; mode?: string; folder?: string; links?: GenLink[]; note?: string; error?: string; needsReconnect?: boolean; candidates?: GenCandidate[] }
 export interface WriteResult { ok: boolean; error?: string; count?: number; skuCount?: number; written?: { sku: string; tab: string; cell: string }[]; notFound?: string[]; ambiguous?: string[] }
@@ -24,7 +26,9 @@ export interface GenRoot { label: string; url: string; enabled: boolean; resolve
 
 // Fast, storage-free thumbnails: the edge fn streams Dropbox's pre-generated
 // 256px JPEG for a public shared file link (GET, browser-cached for a day).
-export const thumbUrl = (link: string) => `${FN}?thumb=${encodeURIComponent(link)}&k=${SUPABASE_ANON_KEY}`;
+// The GET only accepts the short-lived signed query linkgen put on the link
+// (the anon key is no longer enough), so there is no thumbnail without one.
+export const thumbSrc = (l: Pick<GenLink, 'thumb'>): string | null => (l.thumb ? `${FN}?${l.thumb}` : null);
 
 export const call = async (body: object): Promise<{ status: number; data: any }> => {
   const { data: { session } } = await supabase.auth.getSession();
