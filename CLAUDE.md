@@ -7,8 +7,15 @@ inside the app (`src/lib/division.ts`, logos in `src/components/brand/`):
   jobwork, POs, Minis…). **This file is DailyWork's rulebook.**
 - **Playbook** — a separate division coded in `src/playbook/`. Its own rules
   live in **`src/playbook/CLAUDE.md`**; read that file before touching
-  anything there. Ask the owner which division a request is for when it is
-  not obvious.
+  anything there.
+- **Which division a request is for — the owner's prefix (2026-11-04):**
+  - A message starting with **`Playbook:`** is Playbook work: read
+    `src/playbook/CLAUDE.md` first and change only `src/playbook/` (plus the
+    shared layer below, only if truly needed and said so in the PR).
+  - **`DailyWork:`** or no prefix is DailyWork work: never touch
+    `src/playbook/`.
+  - No prefix and the request could fit either division → ask which one
+    before writing code.
 - Shared by both (the canonical list; change with care, they affect both):
   `src/lib/theme.tsx`, `src/lib/supabase.ts`, `src/lib/friendlyError.ts`,
   `src/lib/escape.ts`, `src/lib/errorLogger.ts`, `src/lib/retryImport.tsx`,
