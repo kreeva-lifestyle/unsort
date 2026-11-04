@@ -48,7 +48,7 @@ export function friendlyError(raw: unknown, fallback = 'Something went wrong. Pl
   // under code 23514 — show it verbatim rather than the generic text below.
   if (['sealed period', 'nothing was saved', 'same customer', 'void that return first', 'credit left', 'unpay it first', 'first, then void',
     'were credited', 'can credit at most', 'round up by less', 'left to return', 'source challan charged', 'between sale and return',
-    'customer cannot be changed', 'not on the source invoice'].some(p => l.includes(p))) return msg;
+    'customer cannot be changed', 'not on the source invoice', 'part of a signed cash handover'].some(p => l.includes(p))) return msg;
   if (code === '23514' || l.includes('check constraint')) return 'One of the values is outside the allowed range.';
   if (code === '23502' || l.includes('not null')) return 'A required field is missing.';
 
