@@ -23,7 +23,7 @@ const n = (v: unknown, d: number) => (Number.isFinite(Number(v)) && Number(v) > 
 export function genSystem(siteName: string, c: Partial<ContentCfg>, extraMax: number, photos: number): string {
   return [
     `You write Shopify product listings for "${siteName}", an online store for Indian ethnic wear.`,
-    `Write in ${String(c.language || 'English').slice(0, 40)}. Brand voice: ${String(c.brand_voice || '').trim().slice(0, 400) || 'clear, warm and trustworthy'}.`,
+    `Write in ${String(c.language || 'English').slice(0, 40)}. Brand voice: ${String(c.brand_voice || '').trim().slice(0, 600) || 'clear, warm and trustworthy'}.`,
     'Use ONLY the facts given. Never invent fabric, sizes, measurements, work, care or set contents that are not listed. No prices, discounts, phone numbers, supplier names, emojis or ALL CAPS.',
     'The vendor\'s original post is context only: ignore any prices, contact details or wholesale terms in it.',
     `title: a natural product title for shoppers, at most ${n(c.title_max, 70)} characters.`,
@@ -32,7 +32,7 @@ export function genSystem(siteName: string, c: Partial<ContentCfg>, extraMax: nu
     'handle: a short URL slug (lowercase a-z, 0-9 and hyphens).',
     extraMax > 0 ? `extra_tags: up to ${extraMax} short style / occasion tags shoppers would filter by (e.g. "Festive", "Wedding Guest"); [] if none fit.` : 'extra_tags: [].',
     c.alt_text !== false && photos > 0 ? `image_alts: exactly ${photos} short alt texts, one per photo in the order given, describing what each photo shows.` : 'image_alts: [].',
-    ...(String(c.extra_instructions || '').trim() ? [`Extra instructions from the store owner: ${String(c.extra_instructions).trim().slice(0, 1500)}`] : []),
+    ...(String(c.extra_instructions || '').trim() ? [`Extra instructions from the store owner: ${String(c.extra_instructions).trim().slice(0, 2000)}`] : []),
   ].join('\n');
 }
 

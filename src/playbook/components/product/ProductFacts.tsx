@@ -30,11 +30,13 @@ export default function ProductFacts({ product, vendors, categories, onVendorCre
   const changed = (Object.keys(f) as (keyof Form)[]).filter(k => f[k].trim() !== orig[k].trim());
   const set = (k: keyof Form) => (v: string) => setF(x => ({ ...x, [k]: v }));
   const reading = product.status === 'reading'; // the AI reader would overwrite what is typed now
-  const off = saving || !changed.length || reading;
+  // Needs info although cost and category are filled (e.g. the AI reader gave up): saving makes it Ready.
+  const promote = product.status === 'needs_info' && product.cost_price != null && !!product.category;
+  const off = saving || (!changed.length && !promote) || reading;
 
   const save = async (e?: FormEvent) => {
     e?.preventDefault();
-    if (saving || !changed.length || reading) return;
+    if (off) return;
     const cost = f.cost_price.trim() === '' ? null : Number(f.cost_price);
     if (cost != null && (!Number.isFinite(cost) || cost < 0)) { setErr('Cost price must be a number, 0 or more'); return; }
     const patch: Partial<PbProduct> = {};
@@ -54,16 +56,17 @@ export default function ProductFacts({ product, vendors, categories, onVendorCre
     // A ready product whose routing / price inputs changed is checked against the websites again.
     const reroute = product.status === 'ready' && !lostInfo && changed.some(k => ROUTE_KEYS.includes(k));
     const costChanged = product.status === 'ready' && changed.includes('cost_price') && !lostInfo;
-    const live = product.pb_listings.filter(l => l.status === 'published' && !l.locked.includes('price')).length;
+    const kept = product.pb_listings.filter(l => l.status === 'published' && l.locked.includes('price')).length;
     setSaving(true); setErr('');
     try {
       await updateProduct(product, patch, changed);
       if (nowReady || reroute) {
         try {
-          await pbCall('route_product', { product_id: product.id });
-          addToast(nowReady ? 'Saved — sent to the matching websites' : costChanged && live
-            ? `Saved — websites checked again. ${live} published listing${live > 1 ? 's keep' : ' keeps'} the old price: open each and tap Regenerate, then Update on Shopify`
-            : 'Saved — websites checked again (unpublished listings are re-priced and rewritten)', 'success');
+          const r = await pbCall<{ warning?: string; repriced?: number }>('route_product', { product_id: product.id });
+          const done = nowReady ? 'Saved — sent to the matching websites'
+            : `Saved — websites checked again${r.repriced ? ` (${r.repriced} published listing${r.repriced > 1 ? 's' : ''} re-priced and sent to Shopify)` : ''}`
+              + (costChanged && kept ? `. ${kept} listing${kept > 1 ? 's have' : ' has'} a price typed by hand and keep${kept > 1 ? '' : 's'} it` : '');
+          if (r.warning) addToast(`${done}, but: ${r.warning}`, 'error'); else addToast(done, 'success');
         } catch (e2) { addToast(`Saved, but checking the websites failed: ${friendlyError(e2)}`, 'error'); }
       } else addToast(lostInfo ? 'Saved — cost price or category is now missing, so it is back to Needs info' : 'Saved', 'success');
       onSaved();
@@ -111,9 +114,9 @@ export default function ProductFacts({ product, vendors, categories, onVendorCre
       {reading && <div style={{ fontSize: 11, color: T.tx3, marginTop: 10 }}>The AI is reading this product — wait a moment, then reload to edit.</div>}
       <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12 }}>
         {changed.length > 0 && <button type="button" onClick={() => { setF(orig); setErr(''); }} style={{ ...S.btnGhost, minHeight: 44 }}>Undo changes</button>}
-        <button type="submit" disabled={!changed.length || reading}
+        <button type="submit" disabled={off}
           style={{ ...S.btnPrimary, minHeight: 44, opacity: off ? 0.5 : 1, pointerEvents: off ? 'none' : 'auto' }}>
-          {saving ? 'Saving…' : 'Save facts'}
+          {saving ? 'Saving…' : !changed.length && promote ? 'Mark ready' : 'Save facts'}
         </button>
       </div>
     </form>

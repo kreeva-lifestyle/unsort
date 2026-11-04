@@ -37,7 +37,12 @@ export default function ProductPage({ id, onClose, onChanged, addToast, vendors,
   const act = async (key: string, fn: () => Promise<unknown>, done: string) => {
     if (busy) return;
     setBusy(key);
-    try { await fn(); addToast(done, 'success'); refresh(); }
+    try {
+      // read_product / route_product answer ok with a `warning` when part of the job did not happen.
+      const warning = (await fn() as { warning?: string } | undefined)?.warning;
+      if (warning) addToast(`${done}, but: ${warning}`, 'error'); else addToast(done, 'success');
+      refresh();
+    }
     catch (e) { addToast(friendlyError(e), 'error'); }
     finally { setBusy(null); }
   };

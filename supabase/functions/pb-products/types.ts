@@ -82,3 +82,7 @@ export const STALE_MS = 5 * 60_000;
 /** A failed publish is retried after this long, up to MAX_ATTEMPTS. */
 export const RETRY_MS = 10 * 60_000;
 export const MAX_ATTEMPTS = 3;
+/** Listing error written when its product was archived; routing undoes this skip once the product is ready again. */
+export const ARCHIVED = 'The product was archived.';
+/** A listing is not written or published while its product lacks the cost price or category. */
+export const NEEDS_INFO = 'The product needs its cost price and category before it can go to websites — fill them on the product page.';

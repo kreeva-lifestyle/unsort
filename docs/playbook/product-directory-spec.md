@@ -30,8 +30,22 @@ Types: `src/playbook/types.ts` (jsonb shapes documented there).
    categories / fabrics contain the product value (case-insensitive);
    min_cost ≤ cost ≤ max_cost; keywords: any keyword (case-insensitive) in
    name / sku / raw_text / attribute values. Include → upsert `pb_listings`
-   (product, website) with `status='queued'`, `rule_id` — never touch a
-   listing already `published` or `skipped`, or one being worked on.
+   (product, website) with `status='queued'`, `rule_id`: a waiting listing
+   (queued / review / failed, or `publishing` with claimed_at null) is queued
+   again; one skipped by routing itself (error NO_MATCH, or ARCHIVED while
+   the product was archived) and not on Shopify is queued again; a
+   `published` one whose price is not locked is re-priced from the current
+   cost / pricing / rule and set to `publishing` (`review` on review sites) —
+   no new AI call; a listing staff removed (`skipped`) or one a run holds is
+   left alone. Exclude → a waiting listing not on Shopify becomes `skipped`
+   (NO_MATCH); one on Shopify is reported back as `warning`. Routing runs per
+   product (after a read, on save, "Check websites again"); `route_website`
+   sends the Ready products already in the directory to one website (run when
+   it is switched on, or from "Send matching products now").
+   Generate / publish refuse a product in `needs_info` (listing fails with a
+   plain error and is queued again when routing runs on the Ready product);
+   generate re-checks the product facts before saving and re-queues the
+   listing when they changed while the AI wrote.
 3. **Generate** — listings `queued` (or `generating` claimed > 5 min ago):
    claim (`generating`), price, then content:
    - **Price** (₹, from cost): `p = cost × (1 + markup_pct/100) + add_flat`
@@ -53,7 +67,8 @@ Types: `src/playbook/types.ts` (jsonb shapes documented there).
      lowercase, a-z0-9 and '-', max 80, unique-ish (append `-<sku>` or 6
      chars of the product id). description_html: only p, ul, li, strong, em,
      br. Locked fields are kept. Record ai_model, ai_effort, ai_cost_usd,
-     generated_at.
+     generated_at. Hand edits: a field given a value joins `locked`; a field
+     emptied leaves `locked` (handed back to the AI / the pricing).
    - **Tags**: from `tag_rules.templates` (see types.ts), + static, + AI
      extra tags (max ai_extra_max, when ai_extra), apply `case`, trim,
      dedupe (case-insensitive), drop empties, each ≤ 255 chars. Locked
@@ -65,18 +80,27 @@ Types: `src/playbook/types.ts` (jsonb shapes documented there).
    header `X-Shopify-Access-Token`). `productSet(synchronous: true, input)`
    with: id (when shopify_product_id is set, i.e. update) or new; title,
    descriptionHtml, handle, vendor (vendor name), productType, tags, status
-   ACTIVE (live) / DRAFT (draft), seo {title, description},
+   ACTIVE (live) / DRAFT (draft) — on create and "Put back on site" only, so
+   an update keeps the status set in Shopify — seo {title, description},
+   metafield playbook.listing_id (create only: productSet replaces the whole
+   metafield list on update),
    productOptions [{name:"Size", values:[{name}…]}] when sizes, else
    [{name:"Title", values:[{name:"Default Title"}]}]; variants: one per size
    (optionValues [{optionName:"Size", name}], price, compareAtPrice,
    inventoryItem {tracked: track_inventory}, inventoryPolicy CONTINUE when
-   not tracked), files: each photo `{originalSource: <public url>,
+   not tracked, DENY when tracked — new variants only), files: each photo `{originalSource: <public url>,
    alt: image_alts[i], contentType: IMAGE}` (only on create, or when photos
    changed). Then (live only) `publishablePublish` to the "Online Store"
    publication (id cached in pb_website_secrets.online_store_publication_id;
    needs read/write_publications — a missing scope is logged as a warning in
    listing.error but the listing still counts as published). Save
    shopify_product_id, shopify_status, published_at; status `published`.
+   A price typed by hand gets its compare-at from the site's pricing at
+   publish time. A lost create is found again by the listing's handles
+   (current, `-<id6>`, and the ones sent by earlier failed publishes, logged
+   in pb_activity) + the metafield. API version: `pb_websites.api_version`
+   (default 2026-10); one older than the oldest supported (2026-01) is
+   raised to the default.
    Errors: attempts+1, status `failed`, error = short readable text.
    **Credentials**: `auth_mode='token'` → access_token (shpat_… from a legacy
    custom app). `client_credentials` → POST `https://{shop}/admin/oauth/access_token`
@@ -89,8 +113,13 @@ Types: `src/playbook/types.ts` (jsonb shapes documented there).
 5. Every step writes `pb_activity` (action: read, routed, generated,
    published, failed, edited, unpublished…).
 
-Time budget per `work` call: stop starting new items after ~100 s; at most 6
-reads, 8 generations, 10 publishes per call. `pb_settings.automation.paused`
+Time budget per `work` call: stop starting new items after ~100 s; a read
+starts only with 45 s left, a generation with 80 s, a publish with 70 s; at
+most 6 reads, 8 generations, 10 publishes per call. The cron's
+trigger_pb_worker calls the function only when the steps' own filters would
+find work (claims older than 5 min, listings of active websites only).
+A routing failure after a read counts towards the reader's 3 tries; after
+that the product stays Ready with the note. `pb_settings.automation.paused`
 stops the cron (manual actions still work).
 
 ## Edge function `pb-products` (verify_jwt false; does its own auth)
@@ -102,12 +131,13 @@ is_active). Service role for all DB writes. CORS like listing-ai.
 |---|---|---|---|
 | `work` | secret or staff | – | `{ ok, read, routed, generated, published, failed }` |
 | `ingest` | secret | `{ source:'telegram'|'import', source_ref, raw_text, vendor_name?, image_urls?[] }` | `{ ok, product_id, duplicate? }` (downloads images into the bucket) |
-| `read_product` | staff | `{ product_id }` | re-run step 1 now for one product (ignores locked fields) → `{ ok, product }` |
-| `route_product` | staff | `{ product_id }` | step 2 now → `{ ok, listings }` |
+| `read_product` | staff | `{ product_id }` | re-run step 1 now for one product (ignores locked fields) → `{ ok, product, routed, warning? }` |
+| `route_product` | staff | `{ product_id }` | step 2 now → `{ ok, routed, repriced, listings, warning? }` |
+| `route_website` | staff | `{ website_id }` | step 2 for every Ready product on one active website (new listings + auto-skipped ones back) → `{ ok, queued, matched, more }` |
 | `generate_listing` | staff | `{ listing_id }` | step 3 now (keeps locked) → `{ ok, listing }` |
 | `publish_listing` | staff | `{ listing_id }` | step 4 now (from review/failed/published = update) → `{ ok, listing }` |
-| `unpublish_listing` | staff | `{ listing_id }` | set Shopify status DRAFT, listing → `skipped` → `{ ok }` |
-| `save_credentials` | admin/manager | `{ website_id, auth_mode, access_token?, client_id?, client_secret?, shop_domain? }` | stores in pb_website_secrets, then test → `{ ok, shop_name }`. A different `shop_domain` moves the site to that store: needs full new credentials; site switched off; old secrets wiped; non-skipped listings re-queued without Shopify ids |
+| `unpublish_listing` | staff | `{ listing_id }` | claim the listing as `skipped` first (refused while a run holds it), then set Shopify status DRAFT (on failure the listing goes back) → `{ ok }` |
+| `save_credentials` | admin/manager | `{ website_id, auth_mode, access_token?, client_id?, client_secret?, shop_domain? }` | stores in pb_website_secrets, then test → `{ ok, shop_name }`. A different `shop_domain` moves the site to that store: needs full new credentials; site switched off; old secrets wiped; non-skipped listings re-queued without Shopify ids; skipped ones lose their old-store ids |
 | `test_connection` | staff | `{ website_id }` | `{ ok, shop_name, scopes[] , missing_scopes[] }`, sets connected_at / last_error |
 | `preview_price` | staff | `{ website_id, cost, rule_id? }` | `{ price, compare_at }` |
 Errors: HTTP 4xx/5xx with `{ error: '<plain sentence>' }`.

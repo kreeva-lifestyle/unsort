@@ -9,7 +9,7 @@ import Empty from '../../../components/ui/Empty';
 import type { AddToast } from '../PbToasts';
 import type { PbRoutingRule } from '../../types';
 import type { VendorLite } from '../../data/products';
-import { deleteRule, listRules, reorderRules, setRuleEnabled } from '../../data/websites';
+import { deleteRule, listRules, reorderRules, sendMatchingProducts, sentMessage, setRuleEnabled } from '../../data/websites';
 import { rupees } from '../product/status';
 import RuleModal from './RuleModal';
 import { Section, Seg } from './ui';
@@ -65,6 +65,13 @@ export default function RoutingSection({ siteId, draft, set, addToast, vendors, 
     void act(`del-${r.id}`, async () => { await deleteRule(r); setRules(list => list.filter(x => x.id !== r.id)); }, 'Rule deleted');
   };
 
+  const send = async () => {
+    if (busy) return;
+    setBusy('send');
+    try { addToast(sentMessage('this website', await sendMatchingProducts(siteId)), 'success'); }
+    catch (e) { addToast(friendlyError(e), 'error'); } finally { setBusy(''); }
+  };
+
   const small = (key: string) => ({ ...S.btnGhost, minHeight: 44, minWidth: 44, padding: '0 10px', pointerEvents: busy ? 'none' as const : 'auto' as const, opacity: busy === key ? 0.5 : 1 });
   const nextPosition = (rules.reduce((m, r) => Math.max(m, r.position), 0) || 0) + 10;
 
@@ -107,6 +114,12 @@ export default function RoutingSection({ siteId, draft, set, addToast, vendors, 
             ))}
           </div>
         )}
+      </Section>
+
+      <Section title="Products already in the directory" hint="Rules apply to products that arrive or are checked again after a change. This sends every Ready product that matches the saved rules (and the saved “When no rule matches” choice) to this website now. The website must be switched on.">
+        <button type="button" onClick={() => void send()} style={{ ...S.btnGhost, minHeight: 44, pointerEvents: busy ? 'none' : 'auto', opacity: busy ? 0.5 : 1 }}>
+          {busy === 'send' ? 'Sending…' : 'Send matching products now'}
+        </button>
       </Section>
 
       {editing && (

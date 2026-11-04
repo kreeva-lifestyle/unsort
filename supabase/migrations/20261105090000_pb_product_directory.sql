@@ -84,7 +84,7 @@ create table public.pb_websites (
   name text not null,
   shop_domain text not null,
   auth_mode text not null default 'token' check (auth_mode in ('token', 'client_credentials')),
-  api_version text not null default '2025-10',
+  api_version text not null default '2026-10', -- = API_VERSION in pb-products/shopify.ts
   active boolean not null default false,
   publish_mode text not null default 'live' check (publish_mode in ('live', 'draft', 'review')),
   routing_default text not null default 'none' check (routing_default in ('all', 'none')),
@@ -206,14 +206,22 @@ do $$ declare t text; begin
     execute format('create policy "pb staff delete" on public.%I for delete to authenticated using ((select public.app_is_staff()))', t);
   end loop;
 end $$;
--- The activity log is append-only for people.
+-- The activity log is append-only for people, and a person can only write
+-- rows in their own name (the edge function writes as service role).
 drop policy "pb staff update" on public.pb_activity;
 drop policy "pb staff delete" on public.pb_activity;
+drop policy "pb staff insert" on public.pb_activity;
+create policy "pb staff insert" on public.pb_activity for insert to authenticated
+  with check ((select public.app_is_staff()) and (user_id is null or user_id = (select auth.uid())));
 -- Websites: staff edit settings only. The store address, credentials mode,
 -- API version and connection fields are written by the edge function
 -- (save_credentials / test_connection, admin/manager), never by the app.
+-- A new website is only its name + store address; everything else starts
+-- from the column defaults (inactive, not connected).
 revoke update on public.pb_websites from authenticated;
 grant update (name, active, publish_mode, routing_default, track_inventory, pricing, tag_rules, content) on public.pb_websites to authenticated;
+revoke insert on public.pb_websites from authenticated;
+grant insert (name, shop_domain) on public.pb_websites to authenticated;
 alter table public.pb_website_secrets enable row level security;
 revoke all on public.pb_website_secrets from anon, authenticated;
 
@@ -245,10 +253,18 @@ set search_path to 'public', 'extensions', 'vault' as $function$
 declare v_secret text;
 begin
   if coalesce((select (value->>'paused')::boolean from pb_settings where key = 'automation'), false) then return null; end if;
-  if not exists (select 1 from pb_products where status = 'new' or (status = 'reading' and claimed_at < now() - interval '5 minutes'))
-     and not exists (select 1 from pb_listings where status in ('queued', 'publishing')
-                     or (status = 'generating' and claimed_at < now() - interval '5 minutes')
-                     or (status = 'failed' and attempts < 3 and updated_at < now() - interval '10 minutes'))
+  -- Exactly what the function's read / generate / publish steps would pick up
+  -- (reader.ts, generate.ts, publish.ts due()): a claim younger than 5 minutes
+  -- (a run holds it, the ingest photo hold, an AI retry wait) and listings of
+  -- switched-off websites are not work — otherwise the function is called every
+  -- minute for nothing.
+  if not exists (select 1 from pb_products
+                 where (status = 'new' and (claimed_at is null or claimed_at < now() - interval '5 minutes'))
+                    or (status = 'reading' and claimed_at < now() - interval '5 minutes'))
+     and not exists (select 1 from pb_listings l join pb_websites w on w.id = l.website_id and w.active
+                     where (l.status in ('queued', 'publishing') and (l.claimed_at is null or l.claimed_at < now() - interval '5 minutes'))
+                        or (l.status = 'generating' and l.claimed_at < now() - interval '5 minutes')
+                        or (l.status = 'failed' and l.attempts < 3 and l.updated_at < now() - interval '10 minutes'))
   then return null; end if;
   select decrypted_secret into v_secret from vault.decrypted_secrets where name = 'pb_worker_secret';
   if v_secret is null then raise warning 'pb_worker_secret missing from vault'; return null; end if;

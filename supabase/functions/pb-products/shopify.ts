@@ -24,11 +24,14 @@ export function validShop(site: WebsiteRow): string {
   return h;
 }
 
-/** productSet with `identifier` and productByIdentifier need Admin API 2025-01 or newer. */
+/** Admin API version: Shopify supports each for 12 months. Older than the oldest supported one
+ *  (Shopify would silently answer with another) → the current one. Move both together, see the migration default. */
+export const API_VERSION = '2026-10';
+const OLDEST_SUPPORTED = '2026-01';
 export function apiVersion(site: WebsiteRow): string {
-  const v = String(site.api_version || '2025-10').trim();
-  if (!/^\d{4}-\d{2}$/.test(v) || v < '2025-01') throw new HttpError(400, `${site.name}: set the Shopify API version to 2025-01 or newer (it is "${v.slice(0, 20)}").`);
-  return v;
+  const v = String(site.api_version || API_VERSION).trim();
+  if (!/^\d{4}-\d{2}$/.test(v)) throw new HttpError(400, `${site.name}: the Shopify API version "${v.slice(0, 20)}" is not valid (use e.g. ${API_VERSION}).`);
+  return v < OLDEST_SUPPORTED ? API_VERSION : v;
 }
 
 export async function secretsOf(websiteId: string): Promise<SecretsRow | null> {

@@ -10,9 +10,12 @@ import { HttpError, plain } from './http.ts';
 import { aiPhotos } from './photos.ts';
 import { compareAt, computePrice } from './pricing.ts';
 import { buildTags } from './tags.ts';
-import { LISTING_COLS, MAX_ATTEMPTS, PRODUCT_COLS, STALE_MS, WEBSITE_COLS, type Budget, type ListingRow, type ProductRow, type WebsiteRow } from './types.ts';
+import { ARCHIVED, LISTING_COLS, MAX_ATTEMPTS, NEEDS_INFO, PRODUCT_COLS, STALE_MS, WEBSITE_COLS, type Budget, type ListingRow, type ProductRow, type WebsiteRow } from './types.ts';
 
 const MAX_PHOTOS = 8; // photos sent to the writer (alt text for the rest is derived from the title)
+/** Product fields the price, content or tags are made from: if any changes while the AI writes, the result is stale. */
+const FACTS: (keyof ProductRow)[] = ['status', 'cost_price', 'category', 'fabric', 'color', 'name', 'sku', 'sizes', 'vendor_id', 'attributes', 'raw_text'];
+const factsOf = (x: ProductRow) => JSON.stringify(FACTS.map(k => x[k] ?? null));
 
 const due = () => {
   const t = ago(STALE_MS);
@@ -37,9 +40,10 @@ export async function generateOne(l: ListingRow, o: { manual: boolean; prevStatu
     ]);
     if (!p || !site) throw new HttpError(404, 'The product or website for this listing no longer exists.');
     if (p.status === 'archived') {
-      const r = await patch<ListingRow>('pb_listings', `id=eq.${enc(l.id)}&status=eq.generating`, { status: 'skipped', error: 'The product was archived.', claimed_at: null }, LISTING_COLS);
+      const r = await patch<ListingRow>('pb_listings', `id=eq.${enc(l.id)}&status=eq.generating`, { status: 'skipped', error: ARCHIVED, claimed_at: null }, LISTING_COLS);
       return r[0] ?? l;
     }
+    if (p.status === 'needs_info') throw new HttpError(400, NEEDS_INFO);
     if (p.cost_price === null || p.cost_price === undefined) throw new HttpError(400, 'The product has no cost price yet — add it on the product page.');
     const [vendor, imgs, rule] = await Promise.all([
       p.vendor_id ? one<{ name: string; code: string | null }>(`pb_vendors?id=eq.${enc(p.vendor_id)}&select=name,code`) : Promise.resolve(null),
@@ -83,6 +87,13 @@ export async function generateOne(l: ListingRow, o: { manual: boolean; prevStatu
       ai_model: ai.model, ai_effort: ai.effort || null, ai_cost_usd: ai.usd, generated_at: nowIso(),
       status: site.publish_mode === 'review' ? 'review' : 'publishing', attempts: 0, error: null, claimed_at: null,
     };
+    // Staff changed the product while the AI was writing (e.g. a new cost): write it again from the new facts.
+    const now = await one<ProductRow>(`pb_products?id=eq.${enc(p.id)}&select=${PRODUCT_COLS}`);
+    if (!now || factsOf(now) !== factsOf(p)) {
+      const r = await patch<ListingRow>('pb_listings', `id=eq.${enc(l.id)}&status=eq.generating`, { status: 'queued', error: null, claimed_at: null }, LISTING_COLS);
+      if (o.manual) throw new HttpError(409, 'The product changed while this listing was being written — it is queued to be written again from the new details.');
+      return r[0] ?? l;
+    }
     const saved = await patch<ListingRow>('pb_listings', `id=eq.${enc(l.id)}&status=eq.generating`, set, LISTING_COLS);
     if (!saved[0]) throw new HttpError(409, 'The listing changed while it was being written — open it again.');
     await logActivity({ product_id: l.product_id, website_id: l.website_id, listing_id: l.id, action: 'generated', details: { model: ai.model, effort: ai.effort, usd: ai.usd, price, next: set.status }, user_id: o.userId });

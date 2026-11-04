@@ -4,11 +4,13 @@
 // "Read again" refreshes every field that is not locked). Then: cost or
 // category missing → needs_info; else ready → route (step 2).
 // AI error: back to 'new' with ai_error, claimed_at kept so it retries after
-// 5 min; the third error in a row → needs_info. The count rides in ai_error
+// 5 min; the third error in a row → needs_info, or ready (and routed) when
+// cost and category are already filled. The count rides in ai_error
 // ("… (attempt 2 of 3)"), written in the same update as the status, so it
 // never depends on a best-effort activity row.
 // Routing runs after the read is saved and has its own error handling: a
-// routing failure is not a read failure (see routeAfterRead).
+// routing failure is not a read failure (see routeAfterRead), but it counts
+// towards the same 3 tries.
 import { askClaude } from './ai.ts';
 import { ago, enc, getSettings, logActivity, nowIso, one, patch, sel } from './db.ts';
 import { HttpError, plain } from './http.ts';
@@ -101,28 +103,39 @@ export async function readOne(p: ProductRow, o: { manual: boolean; prevStatus?: 
     }
     const n = Number(TRY_RE.exec(p.ai_error || '')?.[1] || 0) + 1;
     const giveUp = n >= MAX_ATTEMPTS;
+    const complete = p.cost_price !== null && p.cost_price !== undefined && !!String(p.category || '').trim();
+    if (giveUp && complete) { // staff already gave what websites need: ready anyway, the error stays as a note
+      const r = await patch<ProductRow>('pb_products', `id=eq.${enc(p.id)}&status=eq.reading`, { status: 'ready', ai_error: msg.slice(0, 300), claimed_at: null }, PRODUCT_COLS);
+      if (r[0]) await routeAfterRead(r[0], o, p.ai_error);
+      throw e;
+    }
     // claimed_at stays: a 'new' product is retried only once it is 5 minutes old.
     await patch('pb_products', `id=eq.${enc(p.id)}&status=eq.reading`,
       { status: giveUp ? 'needs_info' : 'new', ai_error: giveUp ? msg : `${msg.slice(0, 260)} (attempt ${n} of ${MAX_ATTEMPTS})` });
     throw e;
   }
   if (product.status !== 'ready') return { product, routed: 0 };
-  return await routeAfterRead(product, o);
+  return await routeAfterRead(product, o, p.ai_error);
 }
 
 /** Route a product that was just read. On failure: logged as a 'route' failure (not a read
  *  failure); a manual read reports a warning (staff can route it again), the worker puts the
- *  product back to 'new' so the next run (after 5 min) reads and routes it again. */
-async function routeAfterRead(product: ProductRow, o: { manual: boolean; userId: string | null }): Promise<{ product: ProductRow; routed: number; warning?: string }> {
+ *  product back to 'new' so the next run (after 5 min) reads and routes it again — counted with
+ *  the read errors in ai_error (`prevErr` = ai_error before this read), so after 3 tries in all it
+ *  stays Ready with the note and "Check websites again" routes it. */
+async function routeAfterRead(product: ProductRow, o: { manual: boolean; userId: string | null }, prevErr: string | null): Promise<{ product: ProductRow; routed: number; warning?: string }> {
   try {
-    return { product, routed: (await routeProduct(product, o.userId)).routed };
+    const r = await routeProduct(product, o.userId);
+    return { product, routed: r.routed, ...(r.warning ? { warning: r.warning } : {}) };
   } catch (e) {
     const msg = plain(e);
     await logActivity({ product_id: product.id, action: 'failed', details: { step: 'route', error: msg }, user_id: o.userId });
     const warning = `Read, but it could not be sent to the websites: ${msg}`;
     if (o.manual) return { product, routed: 0, warning };
-    const back = await patch<ProductRow>('pb_products', `id=eq.${enc(product.id)}&status=eq.ready`,
-      { status: 'new', ai_error: warning.slice(0, 300), claimed_at: nowIso() }, PRODUCT_COLS)
+    const n = Number(TRY_RE.exec(prevErr || '')?.[1] || 0) + 1;
+    const back = await patch<ProductRow>('pb_products', `id=eq.${enc(product.id)}&status=eq.ready`, n >= MAX_ATTEMPTS
+      ? { ai_error: warning.slice(0, 300) }
+      : { status: 'new', ai_error: `${warning.slice(0, 260)} (attempt ${n} of ${MAX_ATTEMPTS})`, claimed_at: nowIso() }, PRODUCT_COLS)
       .catch((w) => { console.error(`pb-products route-retry reset ${product.id}: ${plain(w)}`); return [] as ProductRow[]; });
     return { product: back[0] ?? product, routed: 0, warning };
   }

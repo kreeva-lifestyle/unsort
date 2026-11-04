@@ -51,7 +51,7 @@ export const CONNECT: GuideSection[] = [
         'Finish Steps 2 to 6 below for this website. Then come back to **Connection** and switch **Active** on.',
       ),
       list(
-        '**Active** can only be switched on after a successful connection. Off = nothing new is sent to this store; products already there stay.',
+        '**Active** can only be switched on after a successful connection. Switching it on also sends the Ready products already in the directory that match this website\'s rules. Off = nothing new is sent to this store; products already there stay.',
         'Credentials are kept on the server only and are never shown again — the boxes stay empty. Leave them empty to keep what is saved; type only to replace.',
         'With **Client ID + secret** the app renews its Shopify access by itself. Nothing to do.',
         'Moving a website to a different Shopify store: change **Store domain**, enter that store\'s credentials and tap **Save credentials**. The website is switched off, the old store\'s keys are deleted, and its products are queued to be sent again to the new store. Products already on the old store stay there.',

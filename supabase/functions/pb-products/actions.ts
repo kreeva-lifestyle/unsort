@@ -1,6 +1,6 @@
 // Product / listing actions run by staff from the app (and 'work' / 'ingest').
 // Each returns the JSON body; failures throw HttpError with a plain sentence.
-import { enc, getSettings, one } from './db.ts';
+import { enc, getSettings, one, patch } from './db.ts';
 import { claimGenerate, generateOne } from './generate.ts';
 import { HttpError } from './http.ts';
 import { ingest } from './ingest.ts';
@@ -48,7 +48,7 @@ export async function routeOne(b: Body, userId: string | null) {
   if (p.status === 'archived') throw new HttpError(400, 'This product is archived.');
   if (p.status !== 'ready') throw new HttpError(400, 'Add the cost price and category first — only ready products go to websites.');
   const r = await routeProduct(p, userId);
-  return { ok: true, routed: r.routed, listings: r.listings };
+  return { ok: true, routed: r.routed, repriced: r.repriced, listings: r.listings, ...(r.warning ? { warning: r.warning } : {}) };
 }
 
 export async function generateListing(b: Body, userId: string | null) {
@@ -80,7 +80,7 @@ export async function publishListing(b: Body, userId: string | null) {
       ? 'This listing is waiting for the AI to write it — try again in a minute.'
       : 'This listing is being published right now — try again in a minute.');
   }
-  return { ok: true, listing: await publishOne(l, { manual: true, userId, budget: newBudget() }) };
+  return { ok: true, listing: await publishOne(l, { manual: true, putBack: cur.status === 'skipped', userId, budget: newBudget() }) };
 }
 
 export async function unpublishListing(b: Body, userId: string | null) {

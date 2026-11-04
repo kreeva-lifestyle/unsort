@@ -35,7 +35,7 @@ export const RULES: GuideSection[] = [
       list(
         'A rule with no conditions matches every product (the app warns you).',
         'The switch on a rule turns it off without deleting it.',
-        'A change applies to products that arrive or are checked again after it. For older products, open the product and tap **Check websites again**.',
+        'A change applies to products that arrive or are checked again after it. For the products already in the directory, tap **Send matching products now** under the rules (or open one product and tap **Check websites again**).',
         'Deleting a rule never removes products that are already listed.',
       ),
     ],
@@ -69,7 +69,7 @@ export const RULES: GuideSection[] = [
       h('A rule\'s own price'),
       p('The "Bridal lehengas" rule above uses +150% + ₹200. Cost ₹6,000: 6,000 × 2.5 + 200 = 15,200 → Ends in 99 → **₹15,299**. Rounding, compare-at and the minimum still come from the Pricing tab.'),
       tip('Use the **Preview** box: type a **Sample cost ₹** to see the price, the struck-out price and your margin before you tap **Save changes**.'),
-      p('New pricing applies to listings written from now on. A listing already on Shopify keeps its price until you open it and tap **Regenerate** (or type a new price yourself).'),
+      p('New pricing applies to listings written from now on. A listing already on Shopify keeps its price until its product is checked again: open the product and tap **Check websites again** — the new price goes to Shopify and the text stays. A price typed by hand (**kept**) never changes on its own.'),
     ],
   },
 ];

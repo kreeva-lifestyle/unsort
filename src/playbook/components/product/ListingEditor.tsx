@@ -8,6 +8,7 @@ import type { AddToast } from '../PbToasts';
 import { shopifyAdminUrl } from '../../data/pbFunctions';
 import type { WebsiteLite } from '../../data/products';
 import { listingBusy, updateListing, type ListingFull } from '../../data/listings';
+import { compareAtPrice } from '../../data/websites';
 import PbModal from './PbModal';
 import ListingActions from './ListingActions';
 import { Dot, LISTING_STATUS, numKey, rupees, shortDate, splitList } from './status';
@@ -29,7 +30,7 @@ export default function ListingEditor({ listing, site, onClose, onChanged, addTo
   const orig = toForm(l);
   const changed = (Object.keys(f) as (keyof Form)[]).filter(k => f[k].trim() !== orig[k].trim());
   const set = (k: keyof Form) => (v: string) => setF(x => ({ ...x, [k]: v }));
-  const locked = listingBusy(l.status); // the worker holds it: edits would be overwritten or published stale
+  const locked = listingBusy(l); // a run holds it: edits would be overwritten or published stale
   const reset = (next: ListingFull) => { setL(next); setF(toForm(next)); };
 
   /** Save edits (if any). Returns false when they could not be saved. */
@@ -42,7 +43,10 @@ export default function ListingEditor({ listing, site, onClose, onChanged, addTo
     if (handle && !/^[a-z0-9-]{1,80}$/.test(handle)) { setErr('Handle: only a–z, 0–9 and "-", up to 80 characters'); return false; }
     const patch: Partial<ListingFull> = {};
     for (const k of changed) {
-      if (k === 'price') patch.price = price;
+      if (k === 'price') { // compare-at follows the typed price, as the server works it out
+        patch.price = price;
+        patch.compare_at_price = price != null && site?.pricing ? compareAtPrice(price, site.pricing) : null;
+      }
       else if (k === 'tags') patch.tags = splitList(f.tags).map(t => t.slice(0, 255));
       else if (k === 'handle') patch.handle = handle || null;
       else if (k === 'description_html') patch.description_html = cleanDescriptionHtml(f.description_html) || null;

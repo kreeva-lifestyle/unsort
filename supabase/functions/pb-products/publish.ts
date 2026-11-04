@@ -6,10 +6,11 @@
 // productSet returns. Unpublish lives in unpublish.ts.
 import { ago, enc, logActivity, nowIso, one, patch, sel } from './db.ts';
 import { HttpError, plain } from './http.ts';
+import { compareAt } from './pricing.ts';
 import { buildProductInput, PRODUCT_SET, PUBLISH, STOCK_WARNING } from './productInput.ts';
 import { gql, onlineStoreId } from './shopify.ts';
 import { adoptable, type Existing, existingProduct } from './shopifyProduct.ts';
-import { LISTING_COLS, MAX_ATTEMPTS, PRODUCT_COLS, RETRY_MS, STALE_MS, WEBSITE_COLS, type Budget, type ListingRow, type ProductRow, type WebsiteRow } from './types.ts';
+import { ARCHIVED, LISTING_COLS, MAX_ATTEMPTS, NEEDS_INFO, PRODUCT_COLS, RETRY_MS, STALE_MS, WEBSITE_COLS, type Budget, type ListingRow, type ProductRow, type WebsiteRow } from './types.ts';
 
 /** Time a publish needs left before it starts: lookups + a slow productSet + the Online Store step. */
 export const PUBLISH_NEEDS_MS = 60_000;
@@ -32,7 +33,8 @@ export async function claimPublish(id: string, manual: boolean): Promise<Listing
 
 interface SetReply { productSet: { product: { id: string; status: string; handle: string } | null; userErrors: { field: string[] | null; message: string; code: string | null }[] } }
 
-export async function publishOne(l: ListingRow, o: { manual: boolean; userId: string | null; budget: Budget }): Promise<ListingRow> {
+/** `putBack`: staff tapped "Put back on site" on a removed listing — the only update that sets the Shopify status again. */
+export async function publishOne(l: ListingRow, o: { manual: boolean; putBack?: boolean; userId: string | null; budget: Budget }): Promise<ListingRow> {
   const mine = `id=eq.${enc(l.id)}&status=eq.publishing`;
   if (!l.generated_at) { // never written (should not happen) — send it back to the writer
     const r = await patch<ListingRow>('pb_listings', mine, { status: 'queued', claimed_at: null }, LISTING_COLS);
@@ -46,36 +48,45 @@ export async function publishOne(l: ListingRow, o: { manual: boolean; userId: st
     if (o.manual) throw new HttpError(503, 'The server ran out of time for this — tap Publish again.');
     return r[0] ?? l;
   }
+  const sent: string[] = []; // handles sent to productSet, kept on a failure so a lost create is found again
   try {
-    const [p, site, imgs, last] = await Promise.all([
+    const [p, site, imgs, last, tried] = await Promise.all([
       one<ProductRow>(`pb_products?id=eq.${enc(l.product_id)}&select=${PRODUCT_COLS}`),
       one<WebsiteRow>(`pb_websites?id=eq.${enc(l.website_id)}&select=${WEBSITE_COLS}`),
       sel<{ path: string }>(`pb_product_images?product_id=eq.${enc(l.product_id)}&select=path&order=position.asc&limit=20`),
       one<{ details: { photos?: string[] } }>(`pb_activity?product_id=eq.${enc(l.product_id)}&listing_id=eq.${enc(l.id)}&action=eq.published&select=details&order=created_at.desc`),
+      sel<{ details: { handles?: string[] } }>(`pb_activity?product_id=eq.${enc(l.product_id)}&listing_id=eq.${enc(l.id)}&action=eq.failed&select=details&order=created_at.desc&limit=5`),
     ]);
     if (!p || !site) throw new HttpError(404, 'The product or website for this listing no longer exists.');
     if (p.status === 'archived') {
-      const r = await patch<ListingRow>('pb_listings', mine, { status: 'skipped', error: 'The product was archived.', claimed_at: null }, LISTING_COLS);
+      const r = await patch<ListingRow>('pb_listings', mine, { status: 'skipped', error: ARCHIVED, claimed_at: null }, LISTING_COLS);
       if (o.manual) throw new HttpError(400, 'This product is archived.');
       return r[0] ?? l;
     }
+    if (p.status === 'needs_info') throw new HttpError(400, NEEDS_INFO);
     if (!String(l.title || '').trim()) throw new HttpError(400, 'This listing has no title — regenerate it or type one.');
     if (!(Number(l.price) > 0)) throw new HttpError(400, 'This listing has no price — regenerate it or type one.');
     const vendor = p.vendor_id ? await one<{ name: string }>(`pb_vendors?id=eq.${enc(p.vendor_id)}&select=name`) : null;
     const paths = imgs.map(i => i.path);
     const live = site.publish_mode !== 'draft'; // review sites go live once a person approved
     const altHandle = (h: string | null) => `${String(h || 'product').slice(0, 72)}-${l.id.slice(0, 6)}`;
+    // A price typed by hand keeps its compare-at in step with the site's pricing.
+    const compare = (l.locked || []).includes('price') ? compareAt(Number(l.price), site.pricing || {}) : l.compare_at_price;
+    const earlier = tried.flatMap(t => (Array.isArray(t.details?.handles) ? t.details.handles : []));
 
     // What the store already has: the known product, else one this listing made before (lost id).
     let existing: Existing | null = l.shopify_product_id ? await existingProduct(site, l.shopify_product_id, ms(30_000)) : null;
-    const adopted = !existing ? await adoptable(site, l.id, [l.handle || '', altHandle(l.handle)], ms(30_000)) : null;
+    const adopted = !existing ? await adoptable(site, l.id, [l.handle || '', altHandle(l.handle), ...earlier], ms(30_000)) : null;
     existing = existing || adopted;
     const photosChanged = !existing || !!adopted || (last?.details?.photos || []).join('|') !== paths.join('|');
 
-    const run = (handle: string | null) => gql<SetReply>(site, PRODUCT_SET, {
-      input: buildProductInput({ l: { ...l, handle }, p, site, vendor: vendor?.name || '', paths, withFiles: photosChanged, live, existing }),
+    // Status goes out on a create (and a recovered lost create) and on Put back; a plain update leaves
+    // whatever people set in Shopify (e.g. a draft site's product made visible there).
+    const sendStatus = !existing || !!adopted || !!o.putBack;
+    const run = (handle: string | null) => { if (handle) sent.push(handle); return gql<SetReply>(site, PRODUCT_SET, {
+      input: buildProductInput({ l: { ...l, handle, compare_at_price: compare }, p, site, vendor: vendor?.name || '', paths, withFiles: photosChanged, live, sendStatus, existing }),
       identifier: existing ? { id: existing.id } : null,
-    }, ms(SET_MS));
+    }, ms(SET_MS)); };
     let handle = l.handle;
     let res = await run(handle);
     let errs = res.productSet.userErrors || [];
@@ -86,7 +97,9 @@ export async function publishOne(l: ListingRow, o: { manual: boolean; userId: st
     if (errs.length || !res.productSet.product) throw new HttpError(400, `${site.name}: Shopify said "${errs.map(e => e.message).join('; ').slice(0, 250) || 'the product was not saved'}".`);
     const prod = res.productSet.product;
     // Saved at once, whatever happens next, so a retry updates this product instead of making another.
-    await patch('pb_listings', `id=eq.${enc(l.id)}`, { shopify_product_id: prod.id, shopify_status: prod.status, handle: prod.handle || handle });
+    // Only while this run still holds the listing (a store move or takeover re-queued it meanwhile).
+    const held = await patch('pb_listings', mine, { shopify_product_id: prod.id, shopify_status: prod.status, handle: prod.handle || handle, compare_at_price: compare });
+    if (!held.length) throw new HttpError(409, 'The listing changed while it was being published — open it again.');
 
     const warnings: string[] = [];
     if (site.track_inventory && !existing) warnings.push(STOCK_WARNING);
@@ -114,7 +127,7 @@ export async function publishOne(l: ListingRow, o: { manual: boolean; userId: st
     const msg = plain(e);
     if (!(e instanceof HttpError && e.status === 409)) {
       const r = await patch('pb_listings', mine, { status: 'failed', attempts: (l.attempts || 0) + 1, error: msg, claimed_at: null });
-      if (r.length) await logActivity({ product_id: l.product_id, website_id: l.website_id, listing_id: l.id, action: 'failed', details: { step: 'publish', error: msg }, user_id: o.userId });
+      if (r.length) await logActivity({ product_id: l.product_id, website_id: l.website_id, listing_id: l.id, action: 'failed', details: { step: 'publish', error: msg, ...(sent.length ? { handles: [...new Set(sent)] } : {}) }, user_id: o.userId });
     }
     throw e instanceof HttpError ? e : new HttpError(502, msg);
   }

@@ -58,14 +58,15 @@ export async function getProduct(id: string): Promise<ProductDetail> {
 }
 
 /** Save facts staff typed; every field named in `changed` joins `locked` so the AI reader keeps it.
- *  A status change only applies while the product is still in `p.status` (no race with the AI reader). */
+ *  Refused while the AI reader holds the product (it would overwrite what was typed with what it read);
+ *  a status change only applies while the product is still in `p.status`. */
 export async function updateProduct(p: Pick<PbProduct, 'id' | 'locked' | 'status'>, patch: Partial<PbProduct>, changed: string[]) {
   const locked = Array.from(new Set([...p.locked, ...changed.filter(c => c !== 'status' && c !== 'vendor_id')]));
-  let q = supabase.from('pb_products').update({ ...patch, locked }).eq('id', p.id);
+  let q = supabase.from('pb_products').update({ ...patch, locked }).eq('id', p.id).neq('status', 'reading');
   if (patch.status) q = q.eq('status', p.status);
   const { data, error } = await q.select('id');
   if (error) throw error;
-  if (!data?.length) throw new Error('This product changed meanwhile (the AI may have just read it) — reload it and save again.');
+  if (!data?.length) throw new Error('The AI is reading this product right now, or it changed meanwhile — wait a minute, reload it and save again.');
   if (changed.length) logActivity({ product_id: p.id, action: 'edited', details: { fields: changed } });
 }
 
@@ -133,9 +134,9 @@ export async function createProduct(id: string, p: NewProduct, files: File[]): P
 }
 
 // ── small lookups ──
-export type WebsiteLite = Pick<PbWebsite, 'id' | 'name' | 'shop_domain' | 'active' | 'publish_mode' | 'content'>;
+export type WebsiteLite = Pick<PbWebsite, 'id' | 'name' | 'shop_domain' | 'active' | 'publish_mode' | 'content' | 'pricing'>;
 export async function listWebsitesLite(): Promise<WebsiteLite[]> {
-  const { data, error } = await supabase.from('pb_websites').select('id,name,shop_domain,active,publish_mode,content').order('name').limit(200);
+  const { data, error } = await supabase.from('pb_websites').select('id,name,shop_domain,active,publish_mode,content,pricing').order('name').limit(200);
   if (error) throw error;
   return (data ?? []) as WebsiteLite[];
 }

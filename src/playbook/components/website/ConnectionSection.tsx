@@ -11,7 +11,7 @@ import Toggle from '../../../components/ui/Toggle';
 import ConfirmModal, { useConfirm } from '../../../components/ui/ConfirmModal';
 import type { AddToast } from '../PbToasts';
 import type { PbAuthMode, PbWebsite } from '../../types';
-import { cleanDomain, domainProblem, getWebsite, saveCredentials, setWebsiteActive, testConnection, type ConnectionResult } from '../../data/websites';
+import { cleanDomain, domainProblem, getWebsite, saveCredentials, sendMatchingProducts, sentMessage, setWebsiteActive, testConnection, type ConnectionResult } from '../../data/websites';
 import { shortDate } from '../product/status';
 import { Field, Grid2, Section, Seg, input44 } from './ui';
 import type { Draft, SetDraft } from './WebsiteEditor';
@@ -74,7 +74,10 @@ export default function ConnectionSection({ site, draft, set, onSaved, addToast 
     setDoing('active'); setErr('');
     try {
       onSaved(await setWebsiteActive(site.id, next));
-      addToast(next ? `${site.name} is on — matching products will be sent` : `${site.name} is off — nothing new is sent`, 'success');
+      if (!next) { addToast(`${site.name} is off — nothing new is sent`, 'success'); return; }
+      // Routing runs per product, so the products already in the directory are sent from here.
+      try { addToast(`${site.name} is on. ${sentMessage(site.name, await sendMatchingProducts(site.id))}`, 'success'); }
+      catch (e2) { addToast(`${site.name} is on, but sending the products already in the directory failed: ${friendlyError(e2)} — use "Send matching products now" under Routing`, 'error'); }
     } catch (e) { const m = friendlyError(e); setErr(m); addToast(m, 'error'); } finally { setDoing(''); }
   };
 
@@ -140,7 +143,7 @@ export default function ConnectionSection({ site, draft, set, onSaved, addToast 
 
       <Section title="Active" hint="Off = nothing new is sent to this store (products already there stay). It can only be switched on after a successful connection."
         right={<span style={{ ...busy(doing === 'active'), display: 'inline-flex', alignItems: 'center' }}><Toggle on={site.active} onToggle={() => void toggleActive()} label={`${site.name} active`} /></span>}>
-        <div style={{ fontSize: 12, color: site.active ? T.gr : T.tx3 }}>{site.active ? 'On — matching products are sent automatically.' : site.connected_at ? 'Off.' : 'Off — connect the store first.'}</div>
+        <div style={{ fontSize: 12, color: site.active ? T.gr : T.tx3 }}>{site.active ? 'On — new and re-checked products that match are sent automatically.' : site.connected_at ? 'Off.' : 'Off — connect the store first.'}</div>
       </Section>
       {err && <div style={{ ...S.errorBox, marginBottom: 14 }}>{err}</div>}
       <ConfirmModal {...modalProps} />

@@ -16,10 +16,10 @@ export default function PublishingSection({ draft, set }: { draft: Draft; set: S
       <Section title="Publishing mode" hint="What happens after the AI has written a listing for this store.">
         <Seg label="Publishing mode" value={draft.publish_mode} onChange={v => set({ publish_mode: v })} options={MODES} />
       </Section>
-      <Section title="Track stock" hint="On: Shopify counts stock and stops selling at 0 (the app needs write_inventory). Off: always available to order."
+      <Section title="Track stock" hint="On: Shopify counts stock and stops selling at 0 — new products start at 0, so set the quantities in Shopify (the app needs write_inventory). Off: always available to order."
         right={<Toggle on={draft.track_inventory} onToggle={() => set({ track_inventory: !draft.track_inventory })} label="Track stock in Shopify" />}>
         <div style={{ fontSize: 12, color: draft.track_inventory ? T.tx2 : T.tx3 }}>
-          {draft.track_inventory ? 'Stock is tracked — set quantities in Shopify after publishing.' : 'Not tracked — products stay orderable (made to order).'}
+          {draft.track_inventory ? 'Stock is tracked — new products cannot be bought until you set their quantities in Shopify.' : 'Not tracked — products stay orderable (made to order).'}
         </div>
       </Section>
     </>

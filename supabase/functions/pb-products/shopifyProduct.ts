@@ -3,7 +3,7 @@
 //   existingProduct → handle, options and variants of a known product id;
 //   adoptable       → a product this listing made earlier whose id was lost
 //                     (timeout, crash), found by handle + the playbook.listing_id
-//                     metafield that every productSet writes.
+//                     metafield written when Playbook creates a product.
 import { gql } from './shopify.ts';
 import type { WebsiteRow } from './types.ts';
 
@@ -46,7 +46,7 @@ export async function existingProduct(site: WebsiteRow, id: string, ms: number):
 /** A product on this store that THIS listing created before (same metafield), looked up by each
  *  handle it may have been given, in one request. */
 export async function adoptable(site: WebsiteRow, listingId: string, handles: string[], ms: number): Promise<Existing | null> {
-  const hs = [...new Set(handles.filter(Boolean))].slice(0, 4);
+  const hs = [...new Set(handles.filter(Boolean))].slice(0, 6);
   if (!hs.length) return null;
   const q = `query PbByHandle(${hs.map((_, i) => `$h${i}: String!`).join(', ')}) {
     ${hs.map((_, i) => `p${i}: productByIdentifier(identifier: { handle: $h${i} }) { ${FIELDS} }`).join('\n    ')}

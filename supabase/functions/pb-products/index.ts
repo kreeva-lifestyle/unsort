@@ -15,7 +15,8 @@
 //   ingest             secret         { source:'telegram'|'import', source_ref, raw_text, vendor_name?, image_urls?[] }
 //                                                                          → { ok, product_id, duplicate?, images?, warnings? }
 //   read_product       staff          { product_id }                      → { ok, product, routed, warning? }
-//   route_product      staff          { product_id }                      → { ok, routed, listings }
+//   route_product      staff          { product_id }                      → { ok, routed, repriced, listings, warning? }
+//   route_website      staff          { website_id }                      → { ok, queued, matched, more }
 //   generate_listing   staff          { listing_id }                      → { ok, listing }
 //   publish_listing    staff          { listing_id }                      → { ok, listing }
 //   unpublish_listing  staff          { listing_id }                      → { ok }
@@ -27,10 +28,11 @@
 // Pipeline (worker.ts): read (reader.ts) → route (route.ts / routing.ts) →
 // generate (generate.ts: pricing.ts, content.ts, tags.ts) → publish
 // (publish.ts / productInput.ts / shopifyProduct.ts / shopify.ts). Every step writes pb_activity.
-// Shopify requests go only to a …myshopify.com host on Admin API 2025-01+ (shopify.ts).
+// Shopify requests go only to a …myshopify.com host on a supported Admin API version (shopify.ts).
 import * as A from './actions.ts';
 import { userOf, whoIs } from './auth.ts';
 import { HttpError, corsHeaders, fail, json, plain } from './http.ts';
+import { routeWebsite } from './routeSite.ts';
 import { previewPrice, saveCredentials, testSite } from './siteActions.ts';
 import type { Caller } from './types.ts';
 
@@ -40,6 +42,7 @@ const ACTIONS: Record<string, { who: Who; run: (b: A.Body, c: Caller) => Promise
   ingest: { who: 'secret', run: (b) => A.doIngest(b) },
   read_product: { who: 'staff', run: (b, c) => A.readProduct(b, userOf(c)) },
   route_product: { who: 'staff', run: (b, c) => A.routeOne(b, userOf(c)) },
+  route_website: { who: 'staff', run: (b, c) => routeWebsite(b, userOf(c)) },
   generate_listing: { who: 'staff', run: (b, c) => A.generateListing(b, userOf(c)) },
   publish_listing: { who: 'staff', run: (b, c) => A.publishListing(b, userOf(c)) },
   unpublish_listing: { who: 'staff', run: (b, c) => A.unpublishListing(b, userOf(c)) },

@@ -87,6 +87,12 @@ export const saveCredentials = (websiteId: string, c: Credentials) =>
 export const testConnection = (websiteId: string) =>
   pbCall<ConnectionResult>('test_connection', { website_id: websiteId });
 
+/** Send the Ready products already in the directory that match this (active) website's saved rules. */
+export type SendResult = { queued: number; matched: number; more: boolean };
+export const sendMatchingProducts = (websiteId: string) => pbCall<SendResult>('route_website', { website_id: websiteId });
+export const sentMessage = (name: string, r: SendResult) =>
+  `${r.queued ? `${r.queued} matching product${r.queued > 1 ? 's' : ''} queued for ${name}` : `No new matching products for ${name}`}${r.more ? ' — there are more: tap "Send matching products now" again' : ''}`;
+
 // ── price preview: the SAME formula as supabase/functions/pb-products/pricing.ts ──
 const r2 = (n: number) => Math.round(n * 100) / 100;
 const num = (v: unknown, d: number) => {
@@ -102,6 +108,13 @@ export function roundPrice(p: number, rounding: string): number {
     default: return x;
   }
 }
+/** The "was" price for a final selling price, or null when compare-at is off (= compareAt in pricing.ts). */
+export function compareAtPrice(price: number, pricing: Partial<PbPricing>): number | null {
+  const pct = num(pricing.compare_at_pct, 0);
+  if (pct <= 0 || !(price > 0)) return null;
+  const c = roundPrice(price * (1 + pct / 100), String(pricing.rounding || 'none'));
+  return c > price ? c : null;
+}
 /** p = cost × (1 + markup/100) + add, rounded, then at least min_price; compare-at = p × (1 + pct/100), same rounding. */
 export function previewPrice(cost: number, pricing: Partial<PbPricing>, override?: PbRoutingRule['price_override']): { price: number; compare_at: number | null } {
   const markup = num(override?.markup_pct, num(pricing.markup_pct, 0));
@@ -111,10 +124,7 @@ export function previewPrice(cost: number, pricing: Partial<PbPricing>, override
   const min = pricing.min_price === null || pricing.min_price === undefined ? NaN : num(pricing.min_price, NaN);
   if (Number.isFinite(min)) p = Math.max(p, min);
   p = r2(p);
-  const pct = num(pricing.compare_at_pct, 0);
-  let compare_at: number | null = null;
-  if (pct > 0 && p > 0) { const c = roundPrice(p * (1 + pct / 100), rounding); compare_at = c > p ? c : null; }
-  return { price: p, compare_at };
+  return { price: p, compare_at: compareAtPrice(p, pricing) };
 }
 
 // ── routing rules ──

@@ -4,8 +4,12 @@
 // they changed (productSet replaces the media list when `files` is given).
 // On update the store's own option / variant ids are passed back, so the
 // variants are updated in place (ids, stock and carts survive); stock policy
-// and tracking are set only on variants Playbook creates. Every product carries
-// the playbook.listing_id metafield, which lets a lost create be found again.
+// and tracking are set only on variants Playbook creates (tracked → DENY: no
+// sale below 0; not tracked → CONTINUE). The playbook.listing_id metafield,
+// which lets a lost create be found again, is written on create only: on an
+// update productSet would delete every metafield not in the input (apps',
+// the merchant's). `status` is sent only when asked (create / Put back), so an
+// update keeps the status people set in Shopify.
 import { cleanHtml } from './content.ts';
 import { publicUrl } from './db.ts';
 import { type Existing, MF_KEY, MF_NAMESPACE, variantKey } from './shopifyProduct.ts';
@@ -24,12 +28,12 @@ export const UNPUBLISH = `mutation PbUnpublish($product: ProductUpdateInput!) {
   productUpdate(product: $product) { product { id status } userErrors { field message } }
 }`;
 
-/** Stock tracking is on, but Playbook sends no quantities: new variants are made sellable. */
-export const STOCK_WARNING = 'Stock tracking is on for this website, but Playbook has no stock counts: the product is set to keep selling when out of stock. Set the quantities in Shopify (and turn "Continue selling when out of stock" off) to limit sales.';
+/** Stock tracking is on, but Playbook sends no quantities: new variants start at 0 and stop selling at 0. */
+export const STOCK_WARNING = 'Stock tracking is on for this website: the product starts with 0 in stock and cannot be bought until you set the quantities in Shopify.';
 
 const money = (n: number | null) => (n === null || n === undefined || !(Number(n) > 0) ? null : Number(n).toFixed(2));
 
-export function buildProductInput(a: { l: ListingRow; p: ProductRow; site: WebsiteRow; vendor: string; paths: string[]; withFiles: boolean; live: boolean; existing: Existing | null }): Record<string, unknown> {
+export function buildProductInput(a: { l: ListingRow; p: ProductRow; site: WebsiteRow; vendor: string; paths: string[]; withFiles: boolean; live: boolean; sendStatus: boolean; existing: Existing | null }): Record<string, unknown> {
   const { l, p, site, existing } = a;
   const tracked = !!site.track_inventory;
   const price = money(l.price);
@@ -43,7 +47,7 @@ export function buildProductInput(a: { l: ListingRow; p: ProductRow; site: Websi
   const variant = (name: string, i: number) => {
     const id = oldVariant.get(variantKey([{ name: optName, value: name }]));
     return {
-      ...(id ? { id } : { inventoryPolicy: 'CONTINUE' }), // an existing variant keeps the stock policy set in Shopify
+      ...(id ? { id } : { inventoryPolicy: tracked ? 'DENY' : 'CONTINUE' }), // an existing variant keeps the stock policy set in Shopify
       optionValues: [{ optionName: optName, name }],
       position: i + 1,
       price, compareAtPrice,
@@ -59,9 +63,9 @@ export function buildProductInput(a: { l: ListingRow; p: ProductRow; site: Websi
     ...(a.vendor ? { vendor: a.vendor } : {}),
     productType: l.product_type || p.category || '',
     tags: l.tags || [],
-    status: a.live ? 'ACTIVE' : 'DRAFT',
+    ...(a.sendStatus ? { status: a.live ? 'ACTIVE' : 'DRAFT' } : {}),
     seo: { title: l.seo_title || l.title, description: l.seo_description || '' },
-    metafields: [{ namespace: MF_NAMESPACE, key: MF_KEY, type: 'single_line_text_field', value: l.id }],
+    ...(existing ? {} : { metafields: [{ namespace: MF_NAMESPACE, key: MF_KEY, type: 'single_line_text_field', value: l.id }] }),
     productOptions: [{
       ...(oldOpt ? { id: oldOpt.id } : {}), name: optName, position: 1,
       values: values.map(name => {
