@@ -38,7 +38,7 @@ const CATEGORIES = ['Office Supplies', 'Rent', 'Salaries', 'Travel', 'Utilities'
 
 // In-memory / jsonb-embedded cash-flow snapshot. Stored in
 // cash_handovers.breakdown as jsonb, read back and cast to this shape.
-interface Breakdown { opening: number; openingIsSet: boolean; cashSales: number; cashReturns: number; expenses: number; previousHandovers: number; available: number; periodFrom: string; periodTo: string; earlier?: number; earlierCount?: number; }
+interface Breakdown { opening: number; openingIsSet: boolean; cashSales: number; cashReturns: number; expenses: number; previousHandovers: number; available: number; periodFrom: string; periodTo: string; earlier?: number; earlierCount?: number; asOf?: string; }
 
 // View model: central CashHandover row but with the jsonb breakdown
 // narrowed to the local Breakdown shape for typed access.
@@ -317,7 +317,7 @@ export default function CashBook() {
     if (error) addToast('Cash flow calculation may be incomplete: ' + friendlyError(error), 'error');
     const b = (data || {}) as Partial<Breakdown>;
     const n = (v: unknown) => Number(v || 0);
-    return { opening: n(b.opening), openingIsSet: !!b.openingIsSet, cashSales: n(b.cashSales), cashReturns: n(b.cashReturns), expenses: n(b.expenses), previousHandovers: 0, available: n(b.available), periodFrom: String(b.periodFrom || to), periodTo: to, earlier: n(b.earlier), earlierCount: n(b.earlierCount) };
+    return { opening: n(b.opening), openingIsSet: !!b.openingIsSet, cashSales: n(b.cashSales), cashReturns: n(b.cashReturns), expenses: n(b.expenses), previousHandovers: 0, available: n(b.available), periodFrom: String(b.periodFrom || to), periodTo: to, earlier: n(b.earlier), earlierCount: n(b.earlierCount), asOf: b.asOf ? String(b.asOf) : undefined };
   }, [addToast]);
 
   // Recompute when range changes in modal + load recent handovers
@@ -345,8 +345,11 @@ export default function CashBook() {
     if (handToId === currentUserId) { setHandError('Cannot hand over cash to yourself'); return; }
     if (!recipient.has_pin) { setHandError(`${recipient.full_name} has no PIN set. They must set it in Settings → Users first.`); return; }
     if (!handBreakdown) { setHandError('Breakdown not loaded — try again'); return; }
-    const handPeriodFrom = handBreakdown.periodFrom;
-    if (handPeriodTo < handPeriodFrom) { setHandError(`Pick a date on or after ${handPeriodFrom} — everything before it is already handed over.`); return; }
+    // A second handover on the last signed day (morning one already signed) covers that same day.
+    const lastSigned = new Date(handBreakdown.periodFrom + 'T00:00:00'); lastSigned.setDate(lastSigned.getDate() - 1);
+    const lastSignedDay = lastSigned.toLocaleDateString('en-CA');
+    if (handPeriodTo < lastSignedDay) { setHandError(`Pick ${lastSignedDay} or later — everything before it is already handed over.`); return; }
+    const handPeriodFrom = handPeriodTo < handBreakdown.periodFrom ? handPeriodTo : handBreakdown.periodFrom;
     if (amt > handBreakdown.available) { setHandError(`Cannot exceed available cash: ₹${handBreakdown.available.toLocaleString('en-IN')}`); return; }
     const amountDiffers = Math.abs(amt - handBreakdown.available) > 0.01;
     if (amountDiffers && !handReason.trim()) { setHandError('Amount differs from available cash. Add a reason in Notes/Reason field.'); return; }
@@ -578,12 +581,10 @@ export default function CashBook() {
 
   const lockedExpenseIds = useMemo(() => {
     const locked = new Set<string>();
-    const active = handovers.filter(h => h.status === 'confirmed' || h.status === 'pending');
-    if (active.length === 0) return locked;
-    // Locked = counted by a signed handover (stamped at signing), not merely dated inside one.
-    for (const e of expenses) if (e.handover_id && active.some(h => h.id === e.handover_id)) locked.add(e.id);
+    // Locked = counted by a signed handover (stamped at signing; cleared if it is cancelled).
+    for (const e of expenses) if (e.handover_id) locked.add(e.id);
     return locked;
-  }, [expenses, handovers]);
+  }, [expenses]);
 
   // Handover covering the currently-picked Add-Expense date (locked if past).
   const addLockH = handoverCovering(entryDate); // informational: a late expense goes into the next handover

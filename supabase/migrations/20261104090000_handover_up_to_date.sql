@@ -13,34 +13,39 @@
 -- "everything not yet handed over, up to TO" they would have gone into the
 -- next handover. They will go into the next one now.
 --
--- 1. handover_breakdown_upto(p_to, p_asof): unstamped money payments (every
---    mode except Return Credit / Write-off; reversals negative; refunds on
---    returns subtract; voided challans out) and unstamped expenses dated
+-- 1. handover_breakdown_upto(p_to, p_asof, p_exclude): unstamped money payments
+--    (every mode except Return Credit / Write-off; reversals negative; refunds
+--    on returns subtract; a voided challan's rows net to zero) and unstamped expenses dated
 --    <= p_to, optionally only rows recorded by p_asof. Opening = the balance
 --    carried to the day after the last signed handover. periodFrom = that
 --    day (kept for the record and the lock rules); 'earlier' / 'earlierCount'
 --    = late-entered rows dated before it, shown to the user.
--- 2. Confirm trigger: re-reads the breakdown as of the moment the handover
---    was CREATED. If it no longer matches what the sender saw (an expense
+-- 2. Confirm trigger: re-reads the breakdown as of the moment the sender's
+--    breakdown was read (asOf, never later than the handover's creation). If it no longer matches what the sender saw (an expense
 --    edited or deleted meanwhile), or the amount exceeds it, signing is
 --    refused ("nothing was saved"). Then stamps exactly those rows — payments
 --    and expenses recorded after the handover was created wait for the next
 --    one. Challans are stamped only when fully paid, so a part-paid bill can
 --    still take its remaining payment later.
--- 3. Date locks are replaced by stamp locks: new payments and expenses may
+-- 3. Expenses get the same stamp guard as payments (no direct link/unlink).
+-- 4. Date locks are replaced by stamp locks: new payments and expenses may
 --    be dated inside an already handed-over period (they flow to the next
 --    handover); what a signed / pending handover counted stays untouchable
 --    (guard_payment_handover for payments; stamped challans and expenses).
 
-create or replace function public.handover_breakdown_upto(p_to date, p_asof timestamptz default null)
+-- p_exclude: the handover being signed (the confirm trigger already sees it as
+-- confirmed). Voided challans are NOT filtered: void_challan writes reversals
+-- that net the challan to zero, so its +/- rows cancel — and a reversal of a
+-- payment an earlier handover counted is subtracted from the next one.
+create or replace function public.handover_breakdown_upto(p_to date, p_asof timestamptz default null, p_exclude uuid default null)
 returns jsonb language sql stable security invoker set search_path = public as $$
   with last as (
-    select max(period_to) as t from cash_handovers where status = 'confirmed'
+    select max(period_to) as t from cash_handovers where status = 'confirmed' and id is distinct from p_exclude
   ), pays as (
     select p.payment_date as d, c.is_return, (case when p.is_reversal then -1 else 1 end) * p.amount as amt
     from cash_challan_payments p
     join cash_challans c on c.id = p.challan_id
-    where p.handover_id is null and c.status <> 'voided'
+    where p.handover_id is null
       and p.payment_mode not in ('Return Credit', 'Write-off')
       and p.payment_date <= p_to
       and (p_asof is null or p.created_at <= p_asof)
@@ -73,11 +78,12 @@ returns jsonb language sql stable security invoker set search_path = public as $
     'periodFrom', (select f from frm),
     'periodTo', p_to,
     'earlier', s.earlier,
-    'earlierCount', s.earlier_n)
+    'earlierCount', s.earlier_n,
+    'asOf', coalesce(p_asof, now()))
   from sums s;
 $$;
-revoke all on function public.handover_breakdown_upto(date, timestamptz) from public, anon;
-grant execute on function public.handover_breakdown_upto(date, timestamptz) to authenticated;
+revoke all on function public.handover_breakdown_upto(date, timestamptz, uuid) from public, anon;
+grant execute on function public.handover_breakdown_upto(date, timestamptz, uuid) to authenticated;
 
 create or replace function public.auto_rollforward_on_handover_confirm()
 returns trigger language plpgsql set search_path to 'public' as $function$
@@ -86,6 +92,7 @@ declare
   next_day date;
   v_now jsonb;
   v_saw numeric;
+  v_asof timestamptz;
   closing numeric;
 begin
   -- Release: a confirmed handover cancelled / disputed hands its cash back.
@@ -106,25 +113,27 @@ begin
   end if;
 
   v_to := coalesce(new.period_to, new.date);
-  -- What the sender saw: everything recorded by the time the handover was created.
-  v_now := handover_breakdown_upto(v_to, new.created_at);
+  -- What the sender saw: everything recorded when their breakdown was read
+  -- (asOf, never later than the handover itself).
+  v_asof := least(coalesce(nullif(new.breakdown->>'asOf', '')::timestamptz, new.created_at), new.created_at);
+  v_now := handover_breakdown_upto(v_to, v_asof, new.id);
   v_saw := nullif(new.breakdown->>'available', '')::numeric;
   if v_saw is not null and abs(v_saw - (v_now->>'available')::numeric) > 0.009 then
-    raise exception 'Cash in HO-% changed after it was created (₹% then, ₹% now) — nothing was saved. Cancel it and create a fresh handover.',
+    raise exception 'Cash in HO-% changed after it was created (₹% then, ₹% now) — nothing was saved. Reject it with this reason so a fresh handover can be sent.',
       lpad(new.handover_number::text, 4, '0'), v_saw, (v_now->>'available')::numeric using errcode = 'P0001';
   end if;
   if new.amount > (v_now->>'available')::numeric + 0.009 then
-    raise exception 'HO-% is for ₹% but only ₹% is available — nothing was saved. Cancel it and create a fresh handover.',
+    raise exception 'HO-% is for ₹% but only ₹% is available — nothing was saved. Reject it with this reason so a fresh handover can be sent.',
       lpad(new.handover_number::text, 4, '0'), new.amount, (v_now->>'available')::numeric using errcode = 'P0001';
   end if;
 
   perform set_config('app.challan_rpc', 'on', true);
   update cash_challan_payments p set handover_id = new.id
     from cash_challans c
-   where c.id = p.challan_id and p.handover_id is null and c.status <> 'voided'
-     and p.payment_date <= v_to and p.created_at <= new.created_at;
+   where c.id = p.challan_id and p.handover_id is null
+     and p.payment_date <= v_to and p.created_at <= v_asof;
   update cash_expenses set handover_id = new.id
-   where handover_id is null and date <= v_to and created_at <= new.created_at;
+   where handover_id is null and date <= v_to and created_at <= v_asof;
   -- Fully paid bills whose money is now all handed over get the badge / lock.
   update cash_challans c set handover_id = new.id
    where c.handover_id is null and c.status = 'paid' and c.payment_date <= v_to
@@ -163,6 +172,9 @@ end $$;
 create or replace function public.prevent_backdated_expense_insert()
 returns trigger language plpgsql set search_path to 'public' as $$
 begin
+  if new.handover_id is not null and current_setting('app.challan_rpc', true) is distinct from 'on' then
+    raise exception 'An expense cannot be created already handed over.' using errcode = '42501';
+  end if;
   return new; -- a late expense goes into the next handover
 end $$;
 
@@ -170,6 +182,10 @@ end $$;
 create or replace function public.prevent_locked_expense_mutation()
 returns trigger language plpgsql set search_path to 'public', 'pg_temp' as $function$
 begin
+  if tg_op = 'UPDATE' and new.handover_id is distinct from old.handover_id
+     and current_setting('app.challan_rpc', true) is distinct from 'on' then
+    raise exception 'An expense''s cash-handover link cannot be changed directly.' using errcode = '42501';
+  end if;
   if tg_op = 'UPDATE' then
     if new.date = old.date and new.amount = old.amount then return new; end if;
   end if;
