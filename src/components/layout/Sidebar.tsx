@@ -3,6 +3,9 @@ import { warmPage } from '../../lib/pageWarm';
 import { T, Icon } from '../../lib/theme';
 import { canAccessTab } from '../../lib/tabs';
 import { useAuth } from '../../hooks/useAuth';
+import { closeAllLayers } from '../../hooks/useBackClose';
+import { setDivision } from '../../lib/division';
+import { PlaybookMark } from '../brand/DivisionLogos';
 
 export default function Sidebar({ activeTab, setActiveTab, profile, collapsed }: { activeTab: string; setActiveTab: (t: string) => void; profile: any; collapsed?: boolean }) {
   const tabs = [
@@ -68,6 +71,12 @@ export default function Sidebar({ activeTab, setActiveTab, profile, collapsed }:
 
       {/* Sign out */}
       <div style={{ padding: '12px 10px 16px', borderTop: `1px solid ${T.bd}`, marginTop: 'auto' }}>
+        <button type="button" onClick={() => { closeAllLayers(); setDivision('playbook'); }} aria-label="Switch to Playbook"
+          style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', minHeight: 44, padding: '11px 12px', marginBottom: 2, borderRadius: 8, cursor: 'pointer', color: T.tx3, fontSize: 13, fontFamily: T.sans, background: 'transparent', border: 'none', textAlign: 'left' }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; e.currentTarget.style.color = T.tx2; }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = T.tx3; }}>
+          <PlaybookMark size={20} decorative />Switch to Playbook
+        </button>
         <div onClick={handleSignOut} role="button" aria-disabled={signingOut} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 12px', borderRadius: 8, cursor: signingOut ? 'default' : 'pointer', color: T.tx3, fontSize: 13, fontWeight: 400, transition: 'all .15s', opacity: signingOut ? 0.5 : 1, pointerEvents: signingOut ? 'none' : 'auto' }}
           onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; e.currentTarget.style.color = T.tx2; }}
           onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = T.tx3; }}>

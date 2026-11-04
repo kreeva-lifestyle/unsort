@@ -1,4 +1,23 @@
-# Project rules for Unsort
+# Project rules for Unsort — DailyWork division
+
+## Divisions (owner, 2026-11-04)
+DailyOffice has two divisions, picked on the login screen and switchable
+inside the app (`src/lib/division.ts`, logos in `src/components/brand/`):
+- **DailyWork** — everything that exists today (inventory, cash, packing,
+  jobwork, POs, Minis…). **This file is DailyWork's rulebook.**
+- **Playbook** — a separate division coded in `src/playbook/`. Its own rules
+  live in **`src/playbook/CLAUDE.md`**; read that file before touching
+  anything there. Ask the owner which division a request is for when it is
+  not obvious.
+- Shared by both (the canonical list; change with care, they affect both):
+  `src/lib/theme.tsx`, `src/lib/supabase.ts`, `src/lib/friendlyError.ts`,
+  `src/lib/escape.ts`, `src/lib/errorLogger.ts`, `src/lib/retryImport.tsx`,
+  `src/lib/division.ts`, `src/hooks/useAuth`, `src/hooks/useBackClose`,
+  `src/hooks/useModalLock`, `src/components/ui/`, `src/components/brand/`,
+  the login page and `App.tsx` routing. DailyWork code must not import from `src/playbook/`, and Playbook
+  must not import DailyWork feature folders.
+- The deploy flow, pre-merge review, post-deploy checks, engineering ethics
+  and database rules below apply to both divisions.
 
 ## Auto-deploy flow
 After every set of changes:

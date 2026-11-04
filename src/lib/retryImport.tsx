@@ -4,7 +4,7 @@
 // forever, looping the page with no explanation. The 30 s guard turns repeat
 // failures into a real screen. Used by App.tsx for every page and by the
 // Minis hub for every tool, so a tool costs its own chunk only when tapped.
-import { lazy } from 'react';
+import { lazy, type ComponentType } from 'react';
 import { T, S } from './theme';
 
 export const ChunkErrorScreen = () => (
@@ -17,13 +17,14 @@ export const ChunkErrorScreen = () => (
   </div>
 );
 
-export const retryImport = (fn: () => Promise<any>) => lazy(() =>
+// `Fallback` replaces the generic screen (Playbook's offers a way back to DailyWork).
+export const retryImport = (fn: () => Promise<any>, Fallback: ComponentType = ChunkErrorScreen) => lazy(() =>
   fn().catch(() => {
     // Offline, a reload cannot fetch anything either — it would only wipe
     // the in-memory state of every mounted tab (a half-filled form, an
     // imported sheet). Show the screen instead; its Reload button is there
     // for when the connection returns.
-    if (!navigator.onLine) return { default: ChunkErrorScreen };
+    if (!navigator.onLine) return { default: Fallback };
     let last = 0;
     try { last = Number(sessionStorage.getItem('chunkReloadedAt')) || 0; } catch {}
     if (Date.now() - last > 30_000) {
@@ -31,6 +32,6 @@ export const retryImport = (fn: () => Promise<any>) => lazy(() =>
       window.location.reload();
       return new Promise<never>(() => {});
     }
-    return { default: ChunkErrorScreen };
+    return { default: Fallback };
   })
 );

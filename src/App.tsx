@@ -45,6 +45,8 @@ const PrintStation = retryImport(() => import('./pages/PrintStation'));
 const LazyTracklyRedirect = retryImport(() => import('./components/minis/TracklyRedirect'));
 const LazyPasswordReset = retryImport(() => import('./pages/PasswordReset'));
 const LazyPublicRateCard = retryImport(() => import('./components/minis/vendorstudio/PublicRateCard'));
+// Playbook division: its own shell, loaded only when picked (src/playbook/).
+const LazyPlaybookApp = retryImport(() => import('./playbook/PlaybookApp'), PlaybookUnavailable);
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import SidebarComponent from './components/layout/Sidebar';
@@ -63,6 +65,8 @@ import HomeLite from './components/dashboard/HomeLite';
 import { initGlobalPrintMode } from './lib/printQueue';
 import { logError } from './lib/errorLogger';
 import { useViewportRestore } from './hooks/useViewportRestore';
+import { useDivision, getDivision } from './lib/division';
+import { PlaybookBoundary, PlaybookUnavailable } from './components/brand/DivisionFallback';
 // Public routes (share links, password reset) render OUTSIDE .main-area, so
 // they don't get <main>'s scroll. #root is a fixed overflow:hidden frame -
 // without their own scroll container, tall public pages clip below the fold.
@@ -125,6 +129,7 @@ const MainApp = () => {
   // Global keyboard shortcuts
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (getDivision() === 'playbook') return;   // DailyWork is hidden behind Playbook: its shortcuts must not fire
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return;
       const mod = e.metaKey || e.ctrlKey;
       if (e.key === 'Escape') {
@@ -290,6 +295,7 @@ export default function App() {
 
 const AppContent = () => {
   const auth = useAuth();
+  const division = useDivision();
 
   // Password recovery callback — Supabase redirects with #access_token=...&type=recovery
   const hash = window.location.hash;
@@ -307,5 +313,19 @@ const AppContent = () => {
 
   if (!auth?.ready && auth?.loading) return <div style={{ minHeight: '100dvh', width: '100%', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 14 }}><div style={{ fontSize: 20, fontWeight: 700, fontFamily: T.sora, letterSpacing: -0.5, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>DailyOffice</div><div className="spinner" /><p style={{ color: T.tx3, fontSize: 9, letterSpacing: 1.5, textTransform: 'uppercase' }}>LOADING</p></div>;
   if (!auth?.user || auth.locked) return <Login signIn={auth.signIn} locked={auth.locked} unlockWithFaceId={auth.unlockWithFaceId} />;
-  return <NotificationProvider><BreadcrumbProvider><MainApp /></BreadcrumbProvider></NotificationProvider>;
+  return <Divisions division={division} />;
+};
+
+// DailyWork stays mounted (hidden) while Playbook is open, once it has been
+// opened: switching must not throw away a half-filled form, a running Listing
+// AI batch or a Brand Tags import. Playbook is lazy and fenced by its own error
+// screen, which always offers the way back to DailyWork.
+const Divisions = ({ division }: { division: 'dailywork' | 'playbook' }) => {
+  const [dwOpened, setDwOpened] = useState(division === 'dailywork');
+  useEffect(() => { if (division === 'dailywork') setDwOpened(true); }, [division]);
+  const pb = division === 'playbook';
+  return <>
+    {dwOpened && <div style={{ display: pb ? 'none' : 'contents' }}><NotificationProvider><BreadcrumbProvider><MainApp /></BreadcrumbProvider></NotificationProvider></div>}
+    {pb && <PlaybookBoundary><Suspense fallback={<div style={{ height: '100%', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="spinner" /></div>}><LazyPlaybookApp /></Suspense></PlaybookBoundary>}
+  </>;
 };
