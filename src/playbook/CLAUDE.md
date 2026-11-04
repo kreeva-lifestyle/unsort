@@ -1,5 +1,9 @@
 # Playbook division — project rules
 
+**When this file applies:** the owner starts a request with **`Playbook:`**
+(e.g. "Playbook: add a targets page"). Only then work here; requests with no
+prefix or `DailyWork:` are for DailyWork and must not touch `src/playbook/`.
+
 Playbook is the second division of DailyOffice (owner, 2026-11-04). It is
 picked on the login screen (`src/lib/division.ts`) and runs its own shell,
 `PlaybookApp.tsx`, instead of DailyWork's sidebar and tabs. Its features and
