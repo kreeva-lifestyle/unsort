@@ -22,6 +22,7 @@ import { logSwallowed } from '../../lib/errorLogger';
 import { listJobs, tabCounts, tabOf, FILTERS, type JobFilter, type JobTab } from './jobworkApi';
 import JobDrafts from './JobDrafts';
 import { draftCount } from './jobworkDrafts';
+import { jobworkerNames } from './jobworkReceived';
 import type { JobworkDraft } from '../../types/database';
 
 export default function Jobwork({ addToast }: { addToast: (m: string, t?: string) => void }) {
@@ -32,8 +33,9 @@ export default function Jobwork({ addToast }: { addToast: (m: string, t?: string
   const [count, setCount] = useState(0);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<JobFilter>('open');
-  // One jobworker, from a tap on the summary's "Where the stock is" bar.
+  // One jobworker: picked in the toolbar, or a tap on the summary's "Where the stock is" bar.
   const [vendor, setVendor] = useState<string | null>(null);
+  const [vendors, setVendors] = useState<string[]>([]);
   const [page, setPage] = useState(0);
   const [perPage, setPerPage] = useState(25);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -58,6 +60,8 @@ export default function Jobwork({ addToast }: { addToast: (m: string, t?: string
   // Bumped after every write so the summary tiles follow; a search or a
   // page flip changes nothing, so it leaves the summary alone.
   const [version, setVersion] = useState(0);
+  // The jobworker picker's names (every jobworker with a job), refreshed after a write.
+  useEffect(() => { jobworkerNames().then(r => { if (r.error) addToast(friendlyError(r.error), 'error'); setVendors(r.names); }); }, [addToast, version]);
   useBackClose(!!openId, () => setOpenId(null));
   useBackClose(byDate && !openId, () => setByDate(false));
   useBackClose(!!ledger && !openId, () => setLedger(null));
@@ -119,16 +123,18 @@ export default function Jobwork({ addToast }: { addToast: (m: string, t?: string
         <svg viewBox="0 0 24 24" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, opacity: 0.5 }}><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" /></svg>
         <input value={search} onChange={e => { setSearch(e.target.value); setPage(0); }} placeholder="Search SKU, jobworker, job type or JW #" aria-label="Search jobs" style={{ ...S.fSearch, width: '100%' }} />
       </div>
+      {!onDrafts && (
+        <select value={vendor ?? ''} onChange={e => { setVendor(e.target.value || null); setPage(0); }} aria-label="Jobworker"
+          style={{ ...S.fInput, flex: '0 1 220px', minWidth: 160, width: 'auto', color: vendor ? T.tx : T.tx3, ...(vendor ? { border: `1px solid ${T.ac}` } : {}) }}>
+          <option value="">All jobworkers</option>
+          {vendor && !vendors.includes(vendor) && <option value={vendor}>{vendor}</option>}
+          {vendors.map(v => <option key={v} value={v}>{v}</option>)}
+        </select>
+      )}
       <div className="jw-filters" style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
         {!onDrafts && tabOf(filter) === 'open' && FILTERS.filter(f => boss || f.id !== 'unpaid').map(f => (
           <button key={f.id} type="button" onClick={() => { setFilter(f.id); setPage(0); }} aria-pressed={filter === f.id} style={chip(filter === f.id)}>{f.label}</button>
         ))}
-        {vendor && !onDrafts && (
-          <button type="button" onClick={() => { setVendor(null); setPage(0); }} aria-label={`Showing ${vendor} only — tap to show every jobworker`}
-            style={{ ...chip(true), display: 'inline-flex', alignItems: 'center', gap: 6, maxWidth: 220 }}>
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{vendor}</span><span aria-hidden style={{ fontSize: 14, lineHeight: 1 }}>&#215;</span>
-          </button>
-        )}
       </div>
       </div>
 
