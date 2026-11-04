@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import DivisionPicker from '../components/brand/DivisionPicker';
 import { T, S } from '../lib/theme';
 import { supabase } from '../lib/supabase';
 import { getFaceIdEnrollment, faceIdOffered as faceIdOfferedNow } from '../lib/faceId';
@@ -124,6 +125,7 @@ export default function Login({ signIn, locked, unlockWithFaceId }: {
             <div style={{ fontSize: 11, color: T.tx3, marginTop: 4 }}>Your Workspace, Simplified</div>
           </div>
 
+          <DivisionPicker />
           <div style={{ marginBottom: 24 }}>
             <div style={{ fontSize: 22, fontWeight: 700, fontFamily: T.sora, color: T.tx, letterSpacing: -0.3 }}>Welcome back</div>
             <div style={{ fontSize: 13, color: T.tx3, marginTop: 4 }}>
