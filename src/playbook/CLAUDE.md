@@ -9,9 +9,18 @@ should do before building it — do not borrow DailyWork features by guess.**
 The root `CLAUDE.md` is DailyWork's rulebook. From it, these apply here
 unchanged: the auto-deploy flow (commit → PR → squash merge → wait for the
 Pages run → smoke steps), the mandatory pre-merge self-review, engineering
-ethics, database sustainability, UI/UX design rules and theme tokens, and the
-patterns to preserve (friendlyError on every toast, RPCs for multi-table
-writes, escHtml/csvCell, no `select('*')` on growing tables).
+ethics, database sustainability, theme tokens, inputs/buttons/modals/tables,
+and the patterns to preserve (friendlyError on every toast, RPCs for
+multi-table writes, escHtml/csvCell, no `select('*')` on growing tables).
+
+Layout rules that do NOT carry over (they assume DailyWork's sidebar and
+bottom nav): `page-pad`, `--nav-h`, the FAB, "desktop Add buttons hidden on
+mobile". Playbook instead:
+- scrolls inside its own container (`PlaybookApp` root: `height: 100%;
+  overflow-y: auto`) — `#root` is a fixed, non-scrolling frame;
+- pads with the safe-area insets (`max(16px, env(safe-area-inset-*))`);
+- keeps actions visible in its header or on the page (no FAB until Playbook
+  has its own navigation).
 
 ## Where Playbook code lives
 - Everything Playbook goes under `src/playbook/`:
@@ -26,15 +35,17 @@ writes, escHtml/csvCell, no `select('*')` on growing tables).
   DailyWork's `src/lib/tabs.ts`, `Sidebar.tsx` or `miniRegistry.ts`.
 
 ## Boundaries with DailyWork
-- Playbook may use the shared layer: `src/lib/theme.tsx` (T, S, Icon),
-  `src/lib/supabase.ts`, `src/lib/friendlyError.ts`, `src/lib/escape.ts`,
-  `src/lib/errorLogger.ts`, `src/hooks/useAuth`, `src/hooks/useBackClose`,
-  `src/hooks/useModalLock`, `src/components/ui/*`, `src/components/brand/*`.
+- Playbook may use the shared layer — the list in the root `CLAUDE.md`
+  "Divisions" section is the one canonical list.
 - Playbook must NOT import from DailyWork feature folders
   (`src/pages/*`, `src/components/{challan,jobwork,inventory,minis,…}`), and
   DailyWork must not import from `src/playbook/`. If both need something, move
   it to the shared layer in its own reviewed change.
 - `App.tsx` only routes to `PlaybookApp` (lazy). Do not put Playbook code in it.
+- While Playbook is open, DailyWork stays mounted but hidden (so open work
+  survives a switch); its global shortcuts are switched off. If it fails to
+  load or crashes, `PlaybookUnavailable` (src/components/brand/DivisionFallback.tsx)
+  offers "Back to DailyWork" — keep that escape hatch working.
 
 ## Database
 - Playbook tables are prefixed **`pb_`** (e.g. `pb_plays`), RPCs `pb_…`,
@@ -42,7 +53,8 @@ writes, escHtml/csvCell, no `select('*')` on growing tables).
   two divisions' data never mix and can be told apart at a glance.
 - Every new table: RLS on in the same migration, at least one policy, staff
   gate with `(select public.app_is_staff())` unless the owner says otherwise.
-  Add the interface to `src/types/database.ts` under a `// Playbook` heading.
+  Put the interfaces in `src/playbook/types.ts` (not `src/types/database.ts`,
+  which is grandfathered and must not grow).
 - Reading DailyWork data (e.g. sales for a dashboard) goes through a view or
   RPC built for Playbook, never by writing to DailyWork tables.
 

@@ -9,10 +9,12 @@ inside the app (`src/lib/division.ts`, logos in `src/components/brand/`):
   live in **`src/playbook/CLAUDE.md`**; read that file before touching
   anything there. Ask the owner which division a request is for when it is
   not obvious.
-- Shared by both (change with care, they affect both): `src/lib/theme.tsx`,
-  `src/lib/supabase.ts`, `src/lib/friendlyError.ts`, `src/hooks/useAuth`,
-  `src/components/ui/`, `src/components/brand/`, the login page and `App.tsx`
-  routing. DailyWork code must not import from `src/playbook/`, and Playbook
+- Shared by both (the canonical list; change with care, they affect both):
+  `src/lib/theme.tsx`, `src/lib/supabase.ts`, `src/lib/friendlyError.ts`,
+  `src/lib/escape.ts`, `src/lib/errorLogger.ts`, `src/lib/retryImport.tsx`,
+  `src/lib/division.ts`, `src/hooks/useAuth`, `src/hooks/useBackClose`,
+  `src/hooks/useModalLock`, `src/components/ui/`, `src/components/brand/`,
+  the login page and `App.tsx` routing. DailyWork code must not import from `src/playbook/`, and Playbook
   must not import DailyWork feature folders.
 - The deploy flow, pre-merge review, post-deploy checks, engineering ethics
   and database rules below apply to both divisions.

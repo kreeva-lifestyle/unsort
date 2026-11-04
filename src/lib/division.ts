@@ -14,11 +14,18 @@ export const DIVISIONS: { id: Division; name: string; tagline: string }[] = [
 const KEY = 'do-division';
 const EVT = 'do-division-change';
 
+// This page's choice. Kept here too, so that when storage is blocked or full
+// every part of the page still agrees on the division until a reload.
+let current: Division | null = null;
+
 export function getDivision(): Division {
-  try { return localStorage.getItem(KEY) === 'playbook' ? 'playbook' : 'dailywork'; } catch { return 'dailywork'; }
+  if (current) return current;
+  try { current = localStorage.getItem(KEY) === 'playbook' ? 'playbook' : 'dailywork'; } catch { current = 'dailywork'; }
+  return current;
 }
 
 export function setDivision(d: Division) {
+  current = d;
   try { localStorage.setItem(KEY, d); } catch { /* private mode: the choice lasts this page only */ }
   window.dispatchEvent(new CustomEvent<Division>(EVT, { detail: d }));
 }
