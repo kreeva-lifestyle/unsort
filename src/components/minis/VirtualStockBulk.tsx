@@ -30,9 +30,9 @@ export function parsePaste(text: string): { list: { sku: string; qty: number }[]
   return { list: [...list].map(([sku, qty]) => ({ sku, qty })), bad };
 }
 
-export default function VirtualStockBulk({ rows, shown, selected, onClear, onDone, ask, addToast }: {
+export default function VirtualStockBulk({ rows, shown, selected, onSelect, onClear, onDone, ask, addToast }: {
   rows: Row[]; shown: Row[]; selected: Set<string>;
-  onClear: () => void; onDone: () => void;
+  onSelect: (ids: Set<string>) => void; onClear: () => void; onDone: () => void;
   ask: (o: { title: string; message?: string; confirmLabel?: string; danger?: boolean }) => Promise<boolean>;
   addToast: (m: string, t?: string) => void;
 }) {
@@ -43,6 +43,14 @@ export default function VirtualStockBulk({ rows, shown, selected, onClear, onDon
   const [busy, setBusy] = useState(false);
   const target = selected.size ? rows.filter(r => selected.has(r.id)) : shown;
   const scope = selected.size ? `${selected.size} ticked` : `all ${shown.length} shown`;
+  // Select all = every SKU the search shows (all pages); tapping again unticks them.
+  const allTicked = shown.length > 0 && shown.every(r => selected.has(r.id));
+  const someTicked = !allTicked && shown.some(r => selected.has(r.id));
+  const toggleAll = () => {
+    const n = new Set(selected);
+    for (const r of shown) { if (allTicked) n.delete(r.id); else n.add(r.id); }
+    onSelect(n);
+  };
 
   const run = async (label: string, work: () => Promise<void>) => {
     if (busy) return;
@@ -107,6 +115,10 @@ export default function VirtualStockBulk({ rows, shown, selected, onClear, onDon
   return (
     <div style={{ background: T.glass1, border: `1px solid ${T.bd}`, borderRadius: 8, padding: '8px 10px', marginBottom: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', minHeight: 28 }}>
+          <input type="checkbox" checked={allTicked} ref={el => { if (el) el.indeterminate = someTicked; }} onChange={toggleAll} aria-label="Select all shown SKUs" style={{ width: 16, height: 16, accentColor: T.ac, cursor: 'pointer' }} />
+          <span style={{ fontSize: 11, color: T.tx2 }}>Select all ({shown.length})</span>
+        </label>
         <span style={{ ...S.fLabel, marginBottom: 0 }}>Bulk change</span>
         <span style={{ fontSize: 11, color: selected.size ? T.ac2 : T.tx3 }}>{scope}</span>
         {selected.size > 0 && <button type="button" onClick={onClear} style={{ ...S.btnSm, border: `1px solid ${T.bd2}`, background: 'transparent', color: T.tx3, cursor: 'pointer' }}>Clear ticks</button>}
