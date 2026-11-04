@@ -1,0 +1,68 @@
+// Guide help: troubleshooting table, FAQ, and what is coming (Telegram intake).
+import { type GuideSection, h, list, p, table } from '../types';
+
+export const HELP: GuideSection[] = [
+  {
+    id: 'trouble',
+    short: 'Troubleshooting',
+    title: 'Troubleshooting',
+    blocks: [
+      table(['What you see', 'Likely reason', 'What to do'],
+        ['**Test connection** fails, or a red "Last problem"', 'Wrong or old token / secret, the app was uninstalled, or the store domain is not the myshopify.com one', 'Copy the details again from Shopify, **Save credentials**, **Test connection**'],
+        ['"Missing permissions: …"', 'The app in Shopify does not have every scope', 'Add the listed scopes to the app, release / reinstall it, test again'],
+        ['Client ID + secret refused although they are right', 'The app is in a different Shopify organisation, or not installed on this store', 'Create the app in the store\'s own organisation and install it on the store'],
+        ['**Active** will not switch on', 'The store has never passed a test', '**Save credentials**, then a green **Test connection**'],
+        ['Products stay **New** for more than a few minutes', 'Automation is paused, or a big batch is being worked through', 'Dashboard banner → **Open Settings** → switch Automation on; or tap **Run now**'],
+        ['Product in **Needs info**', 'Cost price or category missing, or the AI could not read it (red "AI reader" note)', 'Fill the facts → **Save facts**; or **Read again with AI**'],
+        ['Product **Ready** but on no website', 'No rule matched and the website is on **Do not list it**; or the website is Off', 'Check the rules (conditions, order, switches) and **Active**, then **Check websites again**'],
+        ['Product went to the wrong website', 'A wide rule matched first', 'Move a "Keep it off" rule above it; **Remove from site** on the wrong one'],
+        ['Failed: "The AI answer was cut off — try a lower effort setting"', 'Effort too high for the length limits', '**Content & AI** → lower **Effort** → **Save changes** → **Regenerate**'],
+        ['Published, but shoppers cannot see it', 'The website is on **Draft**; or the publications permission is missing (noted in the listing\'s red text)', 'Make it visible in Shopify, or add `read_publications` + `write_publications` and tap **Update on Shopify**'],
+        ['The price is not what you expected', 'Markup, rounding, minimum or a rule\'s own price — or the price is **kept**', 'Try the cost in the **Pricing → Preview** box; check the rule; empty the price box → **Save changes** → **Regenerate**'],
+        ['A tag is missing', 'Its placeholder is empty for this product (e.g. no fabric)', 'Fill that fact on the product → **Save facts** → **Regenerate**'],
+        ['Listing boxes are greyed out', 'It is being written or published right now', 'Close it and open it again in a minute'],
+        ['"Product saved, but the photos did not upload"', 'Weak internet, or the file type', 'On the product tap **+ Add photos** (JPG, PNG or WEBP)'],
+      ),
+    ],
+  },
+  {
+    id: 'faq',
+    short: 'FAQ',
+    title: 'Questions people ask',
+    blocks: [
+      h('Does the app ever delete a product from Shopify?'),
+      p('No. **Remove from site** only sets it to Draft. **Archive** does not touch Shopify at all.'),
+      h('I changed a website\'s pricing / tags / writing. Are old products updated?'),
+      p('Not by themselves. New listings use the new settings. To update one already on Shopify, open it and tap **Regenerate** (and **Update on Shopify** if it does not go by itself).'),
+      h('Can one product have a different price on each website?'),
+      p('Yes. Every website has its own formula, and a rule can give a group of products its own markup.'),
+      h('The vendor\'s post shows a retail price, not our cost. What then?'),
+      p('The app always treats the number as your cost. Type your real cost in **Cost price (₹)** — what you type is kept.'),
+      h('Will the AI make things up?'),
+      p('It is told to use only the facts given and never to invent a fabric or size. Read the first listings of each website; anything you correct is kept.'),
+      h('What does the AI cost?'),
+      p('One AI call reads each product, and one call writes each listing on each website. Haiku is the cheapest; use Sonnet or Opus only where the writing really matters.'),
+      h('Are prices with or without GST?'),
+      p('The app sends the number from your formula. Whether Shopify treats prices as including tax is set in Shopify (Settings → Taxes and duties).'),
+      h('Who can see the Shopify keys?'),
+      p('Nobody. They are stored on the server, used only to talk to Shopify, and never shown again in the app.'),
+      h('What happens when I pause automation?'),
+      p('Nothing runs on its own until you switch it back on; buttons on a product still work. When it is switched on again it carries on from where it stopped.'),
+      h('Two of us edited the same listing. Whose change stays?'),
+      p('The last one saved. Close and reopen a listing before editing if someone else may have just changed it.'),
+    ],
+  },
+  {
+    id: 'next',
+    short: 'Coming next',
+    title: 'What is coming next',
+    blocks: [
+      h('Telegram intake'),
+      p('Soon every product posted in the vendors\' Telegram channel will land in **Products** by itself — photos and text together — and go through exactly the same steps: read, sorted, priced, written, published. The same post arriving twice is ignored.'),
+      list(
+        'Until then, add products with **+ Add product**.',
+        'Nothing to set up for it today: the categories, vendors and website rules you make now are the ones Telegram products will use.',
+      ),
+    ],
+  },
+];

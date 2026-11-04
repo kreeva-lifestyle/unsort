@@ -107,7 +107,7 @@ is_active). Service role for all DB writes. CORS like listing-ai.
 | `generate_listing` | staff | `{ listing_id }` | step 3 now (keeps locked) → `{ ok, listing }` |
 | `publish_listing` | staff | `{ listing_id }` | step 4 now (from review/failed/published = update) → `{ ok, listing }` |
 | `unpublish_listing` | staff | `{ listing_id }` | set Shopify status DRAFT, listing → `skipped` → `{ ok }` |
-| `save_credentials` | admin/manager | `{ website_id, auth_mode, access_token? , client_id?, client_secret? }` | stores in pb_website_secrets, then test → `{ ok, shop_name }` |
+| `save_credentials` | admin/manager | `{ website_id, auth_mode, access_token?, client_id?, client_secret?, shop_domain? }` | stores in pb_website_secrets, then test → `{ ok, shop_name }`. A different `shop_domain` moves the site to that store: needs full new credentials; site switched off; old secrets wiped; non-skipped listings re-queued without Shopify ids |
 | `test_connection` | staff | `{ website_id }` | `{ ok, shop_name, scopes[] , missing_scopes[] }`, sets connected_at / last_error |
 | `preview_price` | staff | `{ website_id, cost, rule_id? }` | `{ price, compare_at }` |
 Errors: HTTP 4xx/5xx with `{ error: '<plain sentence>' }`.

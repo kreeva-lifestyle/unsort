@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Product Directory — User Guide · DailyOffice · Playbook</title>
+<style>
+@page { size: A4; margin: 16mm 15mm 18mm; }
+* { box-sizing: border-box; }
+html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body { margin: 0; font-family: Inter, "Segoe UI", Roboto, "Noto Sans", Arial, sans-serif; font-size: 10.5pt; line-height: 1.55; color: #1d2230; background: #fff; }
+main { max-width: 180mm; margin: 0 auto; }
+.cover { padding: 18mm 0 10mm; border-bottom: 3px solid; border-image: linear-gradient(90deg, #f2b632, #e2483d) 1; margin-bottom: 8mm; }
+.brand { font-size: 9pt; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: #c2410c; }
+h1 { font-size: 26pt; line-height: 1.15; margin: 4mm 0 3mm; letter-spacing: -.02em; }
+.sub { font-size: 12pt; color: #4b5263; margin: 0; }
+.meta { font-size: 9pt; color: #7a8193; margin-top: 4mm; }
+.toc { columns: 2; column-gap: 8mm; padding: 0; list-style: none; margin: 0 0 6mm; }
+.toc li { break-inside: avoid; margin: 0 0 2mm; }
+.toc a { color: #1d2230; text-decoration: none; }
+.n { display: inline-block; min-width: 8mm; font-family: "JetBrains Mono", Menlo, Consolas, monospace; font-size: .8em; color: #c2410c; font-weight: 700; }
+section { margin-top: 9mm; }
+section:first-of-type { break-before: page; margin-top: 0; }
+h2 { break-after: avoid; font-size: 16pt; line-height: 1.25; margin: 0 0 2mm; padding-bottom: 2mm; border-bottom: 1px solid #e3e6ee; }
+h3 { font-size: 11.5pt; margin: 5mm 0 2mm; break-after: avoid; }
+p { margin: 0 0 3mm; }
+.lead { color: #4b5263; font-size: 11pt; break-after: avoid; }
+ul { margin: 0 0 3mm; padding-left: 6mm; }
+li { margin-bottom: 1.5mm; }
+ol.steps { list-style: none; counter-reset: s; padding: 0; margin: 0 0 3mm; }
+ol.steps li { counter-increment: s; position: relative; padding-left: 9mm; margin-bottom: 2mm; break-inside: avoid; }
+ol.steps li::before { content: counter(s); position: absolute; left: 0; top: .1em; width: 6mm; height: 6mm; border-radius: 50%; background: linear-gradient(135deg, #f2b632, #e2483d); color: #fff; font-size: 8.5pt; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+table { width: 100%; border-collapse: collapse; margin: 1mm 0 4mm; font-size: 9.5pt; }
+thead { display: table-header-group; }
+tr { break-inside: avoid; }
+th { text-align: left; background: #f3f4f8; color: #4b5263; font-size: 8pt; text-transform: uppercase; letter-spacing: .06em; padding: 2mm 2.5mm; border: 1px solid #e3e6ee; }
+td { padding: 2mm 2.5mm; border: 1px solid #e3e6ee; vertical-align: top; }
+code { font-family: "JetBrains Mono", Menlo, Consolas, monospace; font-size: .86em; background: #f3f4f8; border: 1px solid #e3e6ee; border-radius: 3px; padding: 0 1.2mm; overflow-wrap: anywhere; }
+strong { font-weight: 650; color: #111522; }
+.box { padding: 2.5mm 3.5mm; border-radius: 2mm; margin: 0 0 3.5mm; break-inside: avoid; }
+.box b { margin-right: 1.5mm; }
+.tip { background: #ecf8f0; border-left: 3px solid #1f9d55; }
+.tip b { color: #157a41; }
+.warn { background: #fff6e0; border-left: 3px solid #d99a00; }
+.warn b { color: #a26c00; }
+.end { margin-top: 8mm; font-size: 9pt; color: #7a8193; text-align: center; }
+@media screen { body { background: #eceef3; } main { background: #fff; padding: 12mm 15mm; margin: 8mm auto; box-shadow: 0 2px 12px rgba(0,0,0,.08); } }
+</style>
+</head>
+<body>
+<main>
+<header class="cover">
+  <div class="brand">DailyOffice · Playbook</div>
+  <h1>Product Directory — User Guide</h1>
+  <p class="sub">Vendor products → the right Shopify websites, priced, written and published automatically.</p>
+  <div class="meta">For the owner and staff · updated November 2026 · also in the app: Playbook → Guide</div>
+</header>
+<h3>Contents</h3>
+<ul class="toc"><li><a href="#what"><span class="n">01</span>What the Product Directory does</a></li><li><a href="#before"><span class="n">02</span>Before you start: categories, the AI reader and vendors</a></li><li><a href="#connect"><span class="n">03</span>Step 1 — Add and connect each Shopify store</a></li><li><a href="#routing"><span class="n">04</span>Step 2 — Decide which products go to this website</a></li><li><a href="#pricing"><span class="n">05</span>Step 3 — Set the selling price</a></li><li><a href="#tags"><span class="n">06</span>Step 4 — Tags in this website&#39;s structure</a></li><li><a href="#content"><span class="n">07</span>Step 5 — Titles, descriptions and SEO</a></li><li><a href="#publishing"><span class="n">08</span>Step 6 — Publishing mode, the Active switch and pausing</a></li><li><a href="#add"><span class="n">09</span>Daily use — adding a product</a></li><li><a href="#status"><span class="n">10</span>What each status means</a></li><li><a href="#listings"><span class="n">11</span>Working with listings</a></li><li><a href="#trouble"><span class="n">12</span>Troubleshooting</a></li><li><a href="#faq"><span class="n">13</span>Questions people ask</a></li><li><a href="#next"><span class="n">14</span>What is coming next</a></li></ul>
+
+<section id="what">
+  <h2><span class="n">01</span>What the Product Directory does</h2>
+  <p class="lead">One place for every product your vendors send — and a robot that puts each one on the right Shopify websites, at the right price, in the right words.</p>
+  <p>Every product a vendor sends lands in <strong>Products</strong>. From there the app works on its own, every minute: it reads the photos and the vendor&#39;s text, decides which of your Shopify websites the product belongs on, works out the selling price for each website, writes a title, description and Google (SEO) text in that website&#39;s own style, adds that website&#39;s tags, and puts the product on the store.</p>
+  <h3>How one product travels</h3>
+  <ol class="steps"><li><strong>Lands</strong> — a product comes in. Today you add it in <strong>Products → + Add product</strong>; soon it will come straight from the Telegram channel. Status: <strong>New</strong>.</li><li><strong>Read</strong> — the AI looks at the photos and the vendor&#39;s post and fills in name, category, fabric, colour, sizes, cost price and other details (work, occasion, wash care…). Status: <strong>Reading</strong>, then <strong>Ready</strong> — or <strong>Needs info</strong> when the cost price or the category is missing.</li><li><strong>Sorted</strong> — each website&#39;s <strong>Routing rules</strong> decide whether the product goes there. Every &quot;yes&quot; becomes a *listing*: one product on one website.</li><li><strong>Priced and written</strong> — for each listing the price is worked out from the cost with that website&#39;s formula, and that website&#39;s AI writer writes the title, description, SEO text, tags and photo descriptions.</li><li><strong>Published</strong> — the listing is sent to Shopify: live, as a draft, or held until someone approves it — whatever that website&#39;s <strong>Publishing mode</strong> says.</li></ol>
+  <div class="box tip"><b>Tip</b> One product can be on several websites, each with its own price, title, description and tags. Changing one website never changes another.</div>
+  <h3>Where things are</h3>
+  <table><thead><tr><th>Page</th><th>What it is for</th></tr></thead><tbody><tr><td><strong>Dashboard</strong></td><td>What needs a person today, products by status, and each website&#39;s numbers (in progress, needs review, published, failed). Tap any tile to see those products.</td></tr><tr><td><strong>Products</strong></td><td>Every product. Add new ones, search and filter, open one to see its facts and its listing on each website.</td></tr><tr><td><strong>Websites</strong></td><td>Your Shopify stores. Each has six tabs: <strong>Connection</strong>, <strong>Publishing</strong>, <strong>Routing rules</strong>, <strong>Pricing</strong>, <strong>Tags</strong>, <strong>Content &amp; AI</strong>.</td></tr><tr><td><strong>Vendors</strong></td><td>The people you buy from — name and a short code.</td></tr><tr><td><strong>Settings</strong></td><td>The AI that reads products, the category list, and the switch that pauses all automation (plus <strong>Run now</strong>).</td></tr><tr><td><strong>Guide</strong></td><td>This guide, with <strong>Download PDF</strong>.</td></tr></tbody></table>
+  <h3>Who can do what</h3>
+  <ul><li>Admins, managers and operators can use every page: add and edit products, approve, publish, change website settings.</li><li>Only an <strong>admin or manager</strong> can save a store&#39;s credentials (the Shopify keys).</li></ul>
+</section>
+
+<section id="before">
+  <h2><span class="n">02</span>Before you start: categories, the AI reader and vendors</h2>
+  <p class="lead">Ten minutes, once. Everything after this depends on it.</p>
+  <h3>Categories</h3>
+  <ol class="steps"><li>Open <strong>Settings → Categories</strong>.</li><li>Type each category you sell and press Enter — for example <code>Saree</code>, <code>Kurta Set</code>, <code>Lehenga</code>, <code>Dupatta</code>, <code>Co-ord Set</code>. You can paste several at once, separated by commas.</li><li>Tap <strong>Save categories</strong>.</li></ol>
+  <p>The AI must pick one of these for every product. A product without a category waits in <strong>Needs info</strong>. Routing rules, tags and the Shopify product type all use the category, so spell each one exactly the way you want it to appear on your websites.</p>
+  <h3>The AI that reads products</h3>
+  <ol class="steps"><li>In <strong>Settings → AI that reads products</strong>, pick a <strong>Model</strong> and an <strong>Effort</strong>. <code>Haiku 5.5</code> with <code>Model default</code> is enough for reading.</li><li>Tap <strong>Save reader</strong>.</li></ol>
+  <p>This AI only reads (fills in the facts). Each website chooses its own writer later, under <strong>Websites → Content &amp; AI</strong>.</p>
+  <h3>Vendors</h3>
+  <ol class="steps"><li>Open <strong>Vendors → + Add vendor</strong>.</li><li><strong>Name</strong>: the vendor as you know them, e.g. <code>Rangoli Creations</code>.</li><li><strong>Short code</strong> (optional): two or three letters, e.g. <code>RG</code>. Tags can use it as <code>{vendor_code}</code>.</li><li>Tap <strong>Save vendor</strong>. Repeat for each vendor.</li></ol>
+  <div class="box tip"><b>Tip</b> Stopped buying from someone? Tap <strong>Deactivate</strong> instead of deleting. Their old products stay; they just stop showing up as a choice for new ones.</div>
+</section>
+
+<section id="connect">
+  <h2><span class="n">03</span>Step 1 — Add and connect each Shopify store</h2>
+  <p class="lead">Do this once for every website. You need the store&#39;s myshopify.com address and a Shopify login that is allowed to install apps (the store owner, or staff with that permission).</p>
+  <h3>Add the website</h3>
+  <ol class="steps"><li>Open <strong>Websites → + Add website</strong>.</li><li><strong>Name</strong>: how you call it, e.g. <code>Indya Ethnic</code>.</li><li><strong>Store domain</strong>: the myshopify.com address, e.g. <code>indya-ethnic.myshopify.com</code> — find it in Shopify admin → Settings → Domains. Not your own .in / .com domain.</li><li>Tap <strong>Add website</strong>. The website opens on its <strong>Connection</strong> tab.</li></ol>
+  <p>A new website starts <strong>Off</strong> with the routing set to <strong>Do not list it</strong>, so nothing is sent until you have finished setting it up.</p>
+  <h3>Which way to connect?</h3>
+  <table><thead><tr><th>Your situation</th><th>What you use</th><th>In the app pick</th></tr></thead><tbody><tr><td>The store already has an older custom app made inside the Shopify admin, with an Admin API access token that starts <code>shpat_</code></td><td>That app&#39;s access token</td><td><strong>Access token</strong></td></tr><tr><td>Anything else — a new store, or no such app</td><td>A new app from the Shopify Dev Dashboard</td><td><strong>Client ID + secret</strong></td></tr></tbody></table>
+  <div class="box warn"><b>Note</b> Shopify stopped letting anyone create new &quot;legacy&quot; custom apps in the store admin on 1 January 2026. Old ones keep working. Every new connection is made in the Shopify Dev Dashboard (Way B).</div>
+  <h3>Way A — an existing custom app (token starting shpat_)</h3>
+  <ol class="steps"><li>In the Shopify admin open Settings → Apps and sales channels → Develop apps, and open the app.</li><li>Check its Admin API scopes include <code>write_products</code>, <code>read_products</code>, <code>write_publications</code>, <code>read_publications</code> — plus <code>write_inventory</code> if this website will track stock. If you add any, save and reinstall the app when Shopify asks.</li><li>Copy the <strong>Admin API access token</strong> (it starts with <code>shpat_</code>). Shopify shows it only once — if nobody saved it, use Way B instead.</li><li>In the app: <strong>Websites →</strong> your website <strong>→ Connection</strong>. Under <strong>How the app signs in</strong> pick <strong>Access token</strong>, paste it into <strong>Admin API access token</strong>, tap <strong>Save credentials</strong>.</li></ol>
+  <h3>Way B — a new app from the Shopify Dev Dashboard</h3>
+  <ol class="steps"><li>Sign in to the Shopify Dev Dashboard (dev.shopify.com) with a Shopify account in the <strong>same organisation as the store</strong>. An app from another organisation cannot connect to the store.</li><li>Create an app, e.g. <code>DailyOffice Product Directory</code>.</li><li>In the app&#39;s access settings add the scopes <code>write_products</code>, <code>read_products</code>, <code>write_publications</code>, <code>read_publications</code> — plus <code>write_inventory</code> if this website will track stock. Release that version.</li><li>Install the app on the store and approve it.</li><li>Open the app&#39;s settings and copy the <strong>Client ID</strong> and the <strong>Client secret</strong>.</li><li>In the app: <strong>Websites →</strong> your website <strong>→ Connection</strong>. Under <strong>How the app signs in</strong> pick <strong>Client ID + secret</strong>, paste both, tap <strong>Save credentials</strong>.</li></ol>
+  <div class="box tip"><b>Tip</b> Shopify renames its screens now and then. If a label above looks different, follow the same idea: create app → give permissions (scopes) → release → install on the store → copy client ID and secret.</div>
+  <h3>Test, then switch on</h3>
+  <ol class="steps"><li>Tap <strong>Test connection</strong>.</li><li>Green <strong>Connected to &lt;store name&gt;. All needed permissions are there.</strong> — done.</li><li>Yellow <strong>Missing permissions: …</strong> — add those scopes to the app in Shopify, reinstall / approve it, then <strong>Test connection</strong> again.</li><li>Red <strong>Last problem: …</strong> — the details are wrong or the app was removed. Copy them again, <strong>Save credentials</strong>, test again.</li><li>Finish Steps 2 to 6 below for this website. Then come back to <strong>Connection</strong> and switch <strong>Active</strong> on.</li></ol>
+  <ul><li><strong>Active</strong> can only be switched on after a successful connection. Off = nothing new is sent to this store; products already there stay.</li><li>Credentials are kept on the server only and are never shown again — the boxes stay empty. Leave them empty to keep what is saved; type only to replace.</li><li>With <strong>Client ID + secret</strong> the app renews its Shopify access by itself. Nothing to do.</li><li>Moving a website to a different Shopify store: change <strong>Store domain</strong>, enter that store&#39;s credentials and tap <strong>Save credentials</strong>. The website is switched off, the old store&#39;s keys are deleted, and its products are queued to be sent again to the new store. Products already on the old store stay there.</li></ul>
+</section>
+
+<section id="routing">
+  <h2><span class="n">04</span>Step 2 — Decide which products go to this website</h2>
+  <p class="lead">Websites → your website → Routing rules.</p>
+  <h3>When no rule matches</h3>
+  <table><thead><tr><th>Choice</th><th>What it means</th></tr></thead><tbody><tr><td><strong>Do not list it</strong> (safe default)</td><td>Nothing goes to this store unless a rule sends it. Recommended.</td></tr><tr><td><strong>List everything</strong></td><td>Every product goes to this store unless a rule keeps it off.</td></tr></tbody></table>
+  <p>This choice is saved with <strong>Save changes</strong> at the bottom of the screen. Rules save on their own.</p>
+  <h3>Add a rule</h3>
+  <ol class="steps"><li>Tap <strong>+ Add rule</strong>.</li><li><strong>Rule name</strong> — for you, e.g. <code>Silk sarees from Rangoli</code> or <code>Nothing under ₹500</code>.</li><li><strong>When a product matches</strong> — <strong>Send it to this store</strong> or <strong>Keep it off this store</strong>.</li><li>Fill only the conditions you need. Every condition you fill must match; empty ones are ignored: <strong>Vendors</strong>, <strong>Categories</strong>, <strong>Fabrics</strong> (any of these, capital letters do not matter), <strong>Cost from ₹</strong> / <strong>Cost up to ₹</strong> (the vendor cost), <strong>Keywords</strong> (any of these words in the name, SKU, details or what the AI read).</li><li>Optional, for &quot;Send&quot; rules: switch on <strong>Own price for these products</strong> and set a <strong>Markup %</strong> and <strong>Add ₹</strong> that replace the website&#39;s own for these products.</li><li>Tap <strong>Save rule</strong>.</li></ol>
+  <h3>Order matters</h3>
+  <p>Rules are checked from the top. The <strong>first</strong> switched-on rule that matches decides, and the rules below it are not looked at. Use the ↑ ↓ buttons to change the order. Put &quot;Keep it off&quot; rules above wide &quot;Send&quot; rules.</p>
+  <table><thead><tr><th>#</th><th>Rule</th><th>Shown as</th></tr></thead><tbody><tr><td>1</td><td>Nothing under ₹300</td><td><strong>KEEP OFF</strong> · cost ₹0–₹300</td></tr><tr><td>2</td><td>Bridal lehengas</td><td><strong>SEND</strong> · Lehenga · words: bridal · own price: +150% + ₹200</td></tr><tr><td>3</td><td>Silk sarees from Rangoli</td><td><strong>SEND</strong> · vendor Rangoli · Saree · fabric Silk</td></tr></tbody></table>
+  <p>With &quot;When no rule matches&quot; set to <strong>Do not list it</strong>: a ₹250 silk saree from Rangoli is stopped by rule 1. A ₹1,800 silk saree from Rangoli is sent by rule 3. A cotton kurta matches no rule, so it is not listed.</p>
+  <ul><li>A rule with no conditions matches every product (the app warns you).</li><li>The switch on a rule turns it off without deleting it.</li><li>A change applies to products that arrive or are checked again after it. For older products, open the product and tap <strong>Check websites again</strong>.</li><li>Deleting a rule never removes products that are already listed.</li></ul>
+</section>
+
+<section id="pricing">
+  <h2><span class="n">05</span>Step 3 — Set the selling price</h2>
+  <p class="lead">Websites → your website → Pricing. The price in the vendor&#39;s post is your COST; each website turns it into its own selling price.</p>
+  <p><strong>Selling price = cost × (1 + Markup % ÷ 100) + Add ₹</strong>, then rounded, and never below the minimum price.</p>
+  <table><thead><tr><th>Box</th><th>What to type</th></tr></thead><tbody><tr><td><strong>Markup %</strong></td><td><code>100</code> doubles the cost, <code>80</code> adds 80%.</td></tr><tr><td><strong>Add ₹ (after markup)</strong></td><td>A fixed amount on top — shipping, packing, payment charges.</td></tr><tr><td><strong>Rounding</strong></td><td>How the final number looks (table below).</td></tr><tr><td><strong>Compare-at % (was price)</strong></td><td><code>0</code> = no struck-out price. <code>30</code> = show a &quot;was&quot; price 30% higher.</td></tr><tr><td><strong>Minimum price ₹</strong></td><td>Never sell below this. Empty = no minimum.</td></tr></tbody></table>
+  <h3>Worked example: cost ₹640, Markup 80%, Add ₹60</h3>
+  <p>640 × 1.8 = 1,152, plus 60 = <strong>₹1,212</strong> before rounding.</p>
+  <table><thead><tr><th>Rounding</th><th>How it works</th><th>₹1,212 becomes</th></tr></thead><tbody><tr><td><strong>No rounding</strong></td><td>Kept as it is (to the paisa)</td><td>₹1,212</td></tr><tr><td><strong>Nearest 10</strong></td><td>To the nearest ten</td><td>₹1,210</td></tr><tr><td><strong>Ends in 99</strong></td><td>Up to the next …99. A price already ending in 99 stays (₹1,299 stays; ₹1,300 → ₹1,399)</td><td>₹1,299</td></tr><tr><td><strong>Ends in 49 / 99</strong></td><td>Up to the next …49 or …99</td><td>₹1,249</td></tr></tbody></table>
+  <h3>Compare-at (the struck-out &quot;was&quot; price)</h3>
+  <p>With <strong>Ends in 99</strong> and <strong>Compare-at %</strong> <code>30</code>: 1,299 × 1.3 = 1,688.70, rounded the same way → shoppers see ₹1,699 struck out next to <strong>₹1,299</strong>.</p>
+  <h3>Minimum price</h3>
+  <p>Cost ₹250: 250 × 1.8 + 60 = 510 → Ends in 99 → ₹599. With <strong>Minimum price ₹</strong> <code>799</code> the website sells it at <strong>₹799</strong>. The minimum is applied after rounding, so choose a &quot;nice&quot; number like 799 or 999.</p>
+  <h3>A rule&#39;s own price</h3>
+  <p>The &quot;Bridal lehengas&quot; rule above uses +150% + ₹200. Cost ₹6,000: 6,000 × 2.5 + 200 = 15,200 → Ends in 99 → <strong>₹15,299</strong>. Rounding, compare-at and the minimum still come from the Pricing tab.</p>
+  <div class="box tip"><b>Tip</b> Use the <strong>Preview</strong> box: type a <strong>Sample cost ₹</strong> to see the price, the struck-out price and your margin before you tap <strong>Save changes</strong>.</div>
+  <p>New pricing applies to listings written from now on. A listing already on Shopify keeps its price until you open it and tap <strong>Regenerate</strong> (or type a new price yourself).</p>
+</section>
+
+<section id="tags">
+  <h2><span class="n">06</span>Step 4 — Tags in this website&#39;s structure</h2>
+  <p class="lead">Websites → your website → Tags. Each store filters and builds collections from tags in its own way — one may use &quot;Fabric_Silk&quot;, another plain &quot;silk&quot;. This tab sets the pattern for this store.</p>
+  <ul><li><strong>Tag templates</strong> — each line becomes one tag. Type it and press Enter. Words in curly brackets are filled from the product.</li><li><strong>Fixed tags</strong> — added to every product sent to this store, e.g. <code>New Arrival</code>.</li><li><strong>Letter case</strong> — <strong>As written</strong>, <strong>lowercase</strong> or <strong>Title Case</strong>.</li><li><strong>AI extra tags</strong> — switch on to let the AI add style / occasion tags it sees in the photos and text, up to <strong>At most</strong> tags.</li></ul>
+  <table><thead><tr><th>Placeholder</th><th>Filled with</th><th>Example</th></tr></thead><tbody><tr><td><code>{category}</code></td><td>The category</td><td>Saree</td></tr><tr><td><code>{fabric}</code></td><td>The fabric</td><td>Banarasi Silk</td></tr><tr><td><code>{color}</code></td><td>The colour</td><td>Maroon</td></tr><tr><td><code>{vendor}</code></td><td>Vendor name</td><td>Rangoli</td></tr><tr><td><code>{vendor_code}</code></td><td>Vendor short code</td><td>RG</td></tr><tr><td><code>{size}</code></td><td>One tag per size</td><td>Size_S, Size_M, Size_L</td></tr><tr><td><code>{sku}</code></td><td>Product code</td><td>RG-101</td></tr><tr><td><code>{attr:occasion}</code></td><td>Any detail the AI read — work, occasion, pattern, set_contents, wash_care…</td><td>Festive</td></tr></tbody></table>
+  <h3>Example</h3>
+  <p>Templates <code>{category}</code>, <code>Fabric_{fabric}</code>, <code>Color_{color}</code>, <code>Size_{size}</code>, <code>Vendor_{vendor_code}</code>, <code>Occasion_{attr:occasion}</code> and the fixed tag <code>New Arrival</code>, for a maroon Banarasi silk saree from Rangoli (RG), Free Size, festive, give:</p>
+  <p><code>Saree</code> <code>Fabric_Banarasi Silk</code> <code>Color_Maroon</code> <code>Size_Free Size</code> <code>Vendor_RG</code> <code>Occasion_Festive</code> <code>New Arrival</code></p>
+  <ul><li>If a placeholder is empty for a product, that tag is skipped — you never get a half tag like &quot;Fabric_&quot;.</li><li>Commas inside a tag become spaces (Shopify splits tags at commas). Repeats are removed, whatever the capital letters.</li><li>The <strong>Example</strong> box at the bottom of the tab shows the tags for a sample product as you type.</li><li>Shopify&#39;s product type is set to the category automatically.</li></ul>
+</section>
+
+<section id="content">
+  <h2><span class="n">07</span>Step 5 — Titles, descriptions and SEO</h2>
+  <p class="lead">Websites → your website → Content &amp; AI. For every listing one AI call writes the title, description, SEO title, SEO description, web address (handle), extra tags and photo descriptions — in this website&#39;s voice.</p>
+  <h3>Model and effort</h3>
+  <table><thead><tr><th>Model</th><th>Good for</th><th>Cost</th></tr></thead><tbody><tr><td><strong>Haiku 5.5</strong></td><td>Fast; good for most listings</td><td>Lowest</td></tr><tr><td><strong>Sonnet 5.5</strong></td><td>Better writing — your main store</td><td>About 20 × Haiku</td></tr><tr><td><strong>Opus 5.5</strong></td><td>The best writing — a premium store</td><td>Highest</td></tr></tbody></table>
+  <p><strong>Effort</strong> (<strong>Model default</strong>, <strong>Low</strong>, <strong>Medium</strong>, <strong>High</strong>, <strong>Extra high</strong>, <strong>Max</strong>) is how hard the model thinks before writing. Higher is slower and costs more. <strong>Model default</strong> suits most listings; models that do not support effort ignore it.</p>
+  <div class="box tip"><b>Tip</b> Start every website on Haiku 5.5 with Model default. Read 10–20 listings. Move a website up to Sonnet only if its writing is not good enough.</div>
+  <h3>The other settings</h3>
+  <table><thead><tr><th>Setting</th><th>What it does</th></tr></thead><tbody><tr><td><strong>Language</strong></td><td><code>English</code>, <code>Hinglish</code>, <code>Hindi</code>…</td></tr><tr><td><strong>Brand voice</strong></td><td>How this store talks, e.g. &quot;premium, elegant, festive — for brides and wedding guests&quot;.</td></tr><tr><td><strong>Image alt text</strong></td><td>On: the AI describes each photo for Google and for screen readers.</td></tr><tr><td><strong>Title pattern</strong></td><td><code>{ai_title}</code> lets the AI write the title. Or build it: <code>{color} {fabric} {category}</code> → &quot;Maroon Banarasi Silk Saree&quot;. Also usable: <code>{vendor}</code>, <code>{sku}</code>, <code>{name}</code>; mix them, e.g. <code>{ai_title} {sku}</code>.</td></tr><tr><td><strong>Length limits</strong></td><td><strong>Title (characters)</strong>, <strong>Description (words)</strong>, <strong>SEO title (characters)</strong> (Google shows about 60), <strong>SEO description (characters)</strong> (about 155).</td></tr><tr><td><strong>Extra instructions</strong></td><td>Anything to always do or avoid, e.g. &quot;Mention free shipping above ₹1,999. Never use the word cheap.&quot;</td></tr></tbody></table>
+  <div class="box warn"><b>Note</b> The AI is told to use only the facts given and never to invent a fabric or size. Still, read the first listings of every new website before you set it to Live.</div>
+  <p>Descriptions use only simple formatting (paragraphs, bullet points, bold, italics, line breaks), so they look right on any Shopify theme. Save the tab with <strong>Save changes</strong>.</p>
+</section>
+
+<section id="publishing">
+  <h2><span class="n">08</span>Step 6 — Publishing mode, the Active switch and pausing</h2>
+  <p class="lead">Websites → your website → Publishing.</p>
+  <table><thead><tr><th>Publishing mode</th><th>What happens</th><th>Use it when</th></tr></thead><tbody><tr><td><strong>Live</strong></td><td>Published and visible on the store straight away</td><td>You trust this website&#39;s setup</td></tr><tr><td><strong>Draft</strong></td><td>Sent to Shopify as a draft — someone makes it visible inside Shopify</td><td>You want a last look inside Shopify</td></tr><tr><td><strong>Review first</strong></td><td>Waits in Products as <strong>Needs review</strong> until someone taps <strong>Approve</strong>, then publishes</td><td>A new website, the first weeks</td></tr></tbody></table>
+  <p><strong>Track stock</strong> — on: Shopify counts stock and stops selling at 0 (the app needs <code>write_inventory</code>); set quantities in Shopify after publishing. Off: always orderable — right for made-to-order or vendor-held stock.</p>
+  <h3>Three ways to stop things</h3>
+  <table><thead><tr><th>Switch</th><th>Where</th><th>What it does</th></tr></thead><tbody><tr><td><strong>Active</strong> (one website)</td><td>Websites → website → Connection</td><td>Off = nothing new is sent to this store. Products already there stay.</td></tr><tr><td>Rule switch (one rule)</td><td>Websites → website → Routing rules</td><td>That rule stops sorting products.</td></tr><tr><td><strong>Automation</strong> (everything)</td><td>Settings → Automation</td><td>Paused = nothing is read, written or published on its own. Buttons like <strong>Publish now</strong> still work. The Dashboard shows a yellow banner.</td></tr></tbody></table>
+  <p><strong>Settings → Run now</strong> does one round straight away (it can take up to 2 minutes) and shows how many products were read, routed, written, published and failed.</p>
+  <h3>A safe first day for a new website</h3>
+  <ol class="steps"><li>Set <strong>Publishing mode</strong> to <strong>Review first</strong> and tap <strong>Save changes</strong>.</li><li>On <strong>Connection</strong>, switch <strong>Active</strong> on.</li><li>Add three or four real products in <strong>Products</strong>.</li><li>Open each one, open this website&#39;s listing, read it, fix anything, tap <strong>Approve</strong>.</li><li>Check the products on the store. Happy? Switch <strong>Publishing mode</strong> to <strong>Live</strong>.</li></ol>
+</section>
+
+<section id="add">
+  <h2><span class="n">09</span>Daily use — adding a product</h2>
+  
+  <ol class="steps"><li>Tap <strong>+ Add product</strong> (on <strong>Products</strong> or on the <strong>Dashboard</strong>).</li><li><strong>Photos</strong> — add one or more (JPG, PNG or WEBP). The first photo is the main one.</li><li><strong>Vendor</strong> — pick one, or create a new vendor right there.</li><li><strong>Cost price (₹)</strong> — the vendor&#39;s price to you.</li><li><strong>SKU</strong> — optional, your product code.</li><li><strong>Details</strong> — paste the vendor&#39;s whole post: fabric, colour, sizes, work, price.</li><li><strong>Category</strong> and <strong>Sizes</strong> — optional. Leave <strong>Let the AI decide</strong> and the AI fills them in.</li><li>Tap <strong>Add product</strong>. The product opens; within a minute the AI reads it and the websites pick it up.</li></ol>
+  <ul><li>You need at least a photo, the details text or a SKU.</li><li>Whatever you type yourself is kept exactly as you wrote it — the AI only fills empty boxes.</li></ul>
+  <div class="box tip"><b>Tip</b> The better the post you paste, the better the listing. Fabric, colour and sizes in the text help the AI more than the photo alone.</div>
+</section>
+
+<section id="status">
+  <h2><span class="n">10</span>What each status means</h2>
+  
+  <h3>Product status</h3>
+  <table><thead><tr><th>Status</th><th>What it means</th><th>What you do</th></tr></thead><tbody><tr><td><strong>New</strong></td><td>Waiting for the AI to read it</td><td>Nothing — within a minute</td></tr><tr><td><strong>Reading</strong></td><td>The AI is reading it now</td><td>Wait; editing is off for a moment</td></tr><tr><td><strong>Needs info</strong></td><td>Cost price or category is missing — or the AI could not read it after 3 tries (red &quot;AI reader&quot; note)</td><td>Open it, fill <strong>Cost price (₹)</strong> / <strong>Category</strong> in <strong>Facts</strong>, tap <strong>Save facts</strong> — it becomes Ready and is sent to the websites</td></tr><tr><td><strong>Ready</strong></td><td>Read, and checked against every website&#39;s rules</td><td>Nothing. See where it went in the <strong>Websites</strong> box</td></tr><tr><td><strong>Archived</strong></td><td>Hidden from the list and not sent anywhere</td><td><strong>Restore</strong> brings it back</td></tr></tbody></table>
+  <h3>Listing status (one product on one website)</h3>
+  <table><thead><tr><th>You see</th><th>Internal name</th><th>What it means</th><th>What you do</th></tr></thead><tbody><tr><td><strong>Queued</strong></td><td><code>queued</code></td><td>Waiting to be written</td><td>Nothing</td></tr><tr><td><strong>Writing</strong></td><td><code>generating</code></td><td>The AI is writing title, description, SEO and tags</td><td>Wait; editing is off</td></tr><tr><td><strong>Needs review</strong></td><td><code>review</code></td><td>Written; this website is on <strong>Review first</strong></td><td>Open, check, edit, <strong>Approve</strong></td></tr><tr><td><strong>Publishing</strong></td><td><code>publishing</code></td><td>Being sent to Shopify</td><td>Wait; editing is off</td></tr><tr><td><strong>Published</strong></td><td><code>published</code></td><td>On Shopify</td><td><strong>Shopify</strong> opens it in the Shopify admin</td></tr><tr><td><strong>Failed</strong></td><td><code>failed</code></td><td>Shopify or the AI refused; the red text says why</td><td>See &quot;Fixing a failed listing&quot;</td></tr><tr><td><strong>Removed</strong></td><td><code>skipped</code></td><td>Taken off this website (Draft on Shopify)</td><td><strong>Put back on site</strong> if needed</td></tr></tbody></table>
+  <p>In the <strong>Products</strong> status filter the listing statuses start with &quot;Listing:&quot;. <strong>Listing: In progress</strong> means Queued, Writing and Publishing together.</p>
+</section>
+
+<section id="listings">
+  <h2><span class="n">11</span>Working with listings</h2>
+  <p class="lead">Open a product, then tap a website in its <strong>Websites</strong> box. The listing opens with its price, title, description, SEO, handle and tags, and the buttons below.</p>
+  <h3>Fixing a failed listing</h3>
+  <ol class="steps"><li>On the <strong>Dashboard</strong> tap <strong>Failed to publish</strong> (or filter Products by <strong>Listing: Failed</strong>).</li><li>Open the product, then the website shown with the red text.</li><li>Read the red text and fix the cause — see <strong>Troubleshooting</strong>.</li><li>Tap <strong>Publish now</strong> (or <strong>Update on Shopify</strong> if it is already there).</li></ol>
+  <p>The app also tries again by itself — up to 3 times, 10 minutes apart — so a short Shopify hiccup clears on its own.</p>
+  <h3>Editing, and &quot;kept&quot; fields</h3>
+  <p>Change any of <strong>Price (₹)</strong>, <strong>Title</strong>, <strong>Description</strong>, <strong>SEO title</strong>, <strong>SEO description</strong>, <strong>Handle (URL)</strong> and <strong>Tags (comma list)</strong>, then tap <strong>Save changes</strong>. Each field you change gets a small <strong>kept</strong> label: <strong>Regenerate</strong> will never touch it. Product <strong>Facts</strong> work the same way — a box you typed is kept and the AI reader never overwrites it.</p>
+  <div class="box tip"><b>Tip</b> To hand a field back to the AI: empty the box, tap <strong>Save changes</strong>, then <strong>Regenerate</strong>. This works for price, title, description and both SEO fields.</div>
+  <ul><li>On a published listing, after <strong>Save changes</strong> tap <strong>Update on Shopify</strong> to send the change.</li><li>While a listing is <strong>Writing</strong> or <strong>Publishing</strong>, editing is off. Close it and open it again in a minute.</li><li>Once a product is on Shopify its web address (handle) never changes, so old links keep working.</li></ul>
+  <h3>The buttons</h3>
+  <table><thead><tr><th>Button</th><th>What it does</th></tr></thead><tbody><tr><td><strong>Regenerate</strong></td><td>Writes the listing again with the website&#39;s current settings and works the price out again. Kept fields stay. On a Live or Draft website it is then sent to Shopify by itself within a minute; on Review first it waits for Approve.</td></tr><tr><td><strong>Approve</strong></td><td>Review first websites: sends the listing to Shopify within a minute.</td></tr><tr><td><strong>Publish now</strong> / <strong>Update on Shopify</strong></td><td>Sends it to Shopify straight away instead of waiting.</td></tr><tr><td><strong>Remove from site</strong></td><td>Sets the product to Draft on Shopify — hidden from shoppers, not deleted. Status <strong>Removed</strong>. It is not re-listed on its own.</td></tr><tr><td><strong>Put back on site</strong></td><td>Sends a removed listing to Shopify again.</td></tr><tr><td><strong>Open in Shopify</strong></td><td>Opens the product in that store&#39;s Shopify admin.</td></tr></tbody></table>
+  <h3>On the product itself</h3>
+  <table><thead><tr><th>Button</th><th>What it does</th></tr></thead><tbody><tr><td><strong>Read again with AI</strong></td><td>The AI reads the photos and text again and refreshes every field it filled. Kept fields stay.</td></tr><tr><td><strong>Check websites again</strong></td><td>Runs every website&#39;s rules again for this product — use it after you change a rule.</td></tr><tr><td><strong>Save facts</strong></td><td>Saves your changes. If the cost, category, vendor, fabric, name, SKU or details changed, the websites are checked again and unpublished listings are re-priced and rewritten. Published listings keep their old price: open each, tap <strong>Regenerate</strong>, then <strong>Update on Shopify</strong>.</td></tr><tr><td><strong>Archive</strong> / <strong>Restore</strong></td><td>Archive hides the product and stops sending it anywhere. Listings already on Shopify stay — use <strong>Remove from site</strong> first if they should go. Restore makes the AI read it again.</td></tr><tr><td><strong>+ Add photos</strong></td><td>Adds more photos to the product.</td></tr></tbody></table>
+</section>
+
+<section id="trouble">
+  <h2><span class="n">12</span>Troubleshooting</h2>
+  
+  <table><thead><tr><th>What you see</th><th>Likely reason</th><th>What to do</th></tr></thead><tbody><tr><td><strong>Test connection</strong> fails, or a red &quot;Last problem&quot;</td><td>Wrong or old token / secret, the app was uninstalled, or the store domain is not the myshopify.com one</td><td>Copy the details again from Shopify, <strong>Save credentials</strong>, <strong>Test connection</strong></td></tr><tr><td>&quot;Missing permissions: …&quot;</td><td>The app in Shopify does not have every scope</td><td>Add the listed scopes to the app, release / reinstall it, test again</td></tr><tr><td>Client ID + secret refused although they are right</td><td>The app is in a different Shopify organisation, or not installed on this store</td><td>Create the app in the store&#39;s own organisation and install it on the store</td></tr><tr><td><strong>Active</strong> will not switch on</td><td>The store has never passed a test</td><td><strong>Save credentials</strong>, then a green <strong>Test connection</strong></td></tr><tr><td>Products stay <strong>New</strong> for more than a few minutes</td><td>Automation is paused, or a big batch is being worked through</td><td>Dashboard banner → <strong>Open Settings</strong> → switch Automation on; or tap <strong>Run now</strong></td></tr><tr><td>Product in <strong>Needs info</strong></td><td>Cost price or category missing, or the AI could not read it (red &quot;AI reader&quot; note)</td><td>Fill the facts → <strong>Save facts</strong>; or <strong>Read again with AI</strong></td></tr><tr><td>Product <strong>Ready</strong> but on no website</td><td>No rule matched and the website is on <strong>Do not list it</strong>; or the website is Off</td><td>Check the rules (conditions, order, switches) and <strong>Active</strong>, then <strong>Check websites again</strong></td></tr><tr><td>Product went to the wrong website</td><td>A wide rule matched first</td><td>Move a &quot;Keep it off&quot; rule above it; <strong>Remove from site</strong> on the wrong one</td></tr><tr><td>Failed: &quot;The AI answer was cut off — try a lower effort setting&quot;</td><td>Effort too high for the length limits</td><td><strong>Content &amp; AI</strong> → lower <strong>Effort</strong> → <strong>Save changes</strong> → <strong>Regenerate</strong></td></tr><tr><td>Published, but shoppers cannot see it</td><td>The website is on <strong>Draft</strong>; or the publications permission is missing (noted in the listing&#39;s red text)</td><td>Make it visible in Shopify, or add <code>read_publications</code> + <code>write_publications</code> and tap <strong>Update on Shopify</strong></td></tr><tr><td>The price is not what you expected</td><td>Markup, rounding, minimum or a rule&#39;s own price — or the price is <strong>kept</strong></td><td>Try the cost in the <strong>Pricing → Preview</strong> box; check the rule; empty the price box → <strong>Save changes</strong> → <strong>Regenerate</strong></td></tr><tr><td>A tag is missing</td><td>Its placeholder is empty for this product (e.g. no fabric)</td><td>Fill that fact on the product → <strong>Save facts</strong> → <strong>Regenerate</strong></td></tr><tr><td>Listing boxes are greyed out</td><td>It is being written or published right now</td><td>Close it and open it again in a minute</td></tr><tr><td>&quot;Product saved, but the photos did not upload&quot;</td><td>Weak internet, or the file type</td><td>On the product tap <strong>+ Add photos</strong> (JPG, PNG or WEBP)</td></tr></tbody></table>
+</section>
+
+<section id="faq">
+  <h2><span class="n">13</span>Questions people ask</h2>
+  
+  <h3>Does the app ever delete a product from Shopify?</h3>
+  <p>No. <strong>Remove from site</strong> only sets it to Draft. <strong>Archive</strong> does not touch Shopify at all.</p>
+  <h3>I changed a website&#39;s pricing / tags / writing. Are old products updated?</h3>
+  <p>Not by themselves. New listings use the new settings. To update one already on Shopify, open it and tap <strong>Regenerate</strong> (and <strong>Update on Shopify</strong> if it does not go by itself).</p>
+  <h3>Can one product have a different price on each website?</h3>
+  <p>Yes. Every website has its own formula, and a rule can give a group of products its own markup.</p>
+  <h3>The vendor&#39;s post shows a retail price, not our cost. What then?</h3>
+  <p>The app always treats the number as your cost. Type your real cost in <strong>Cost price (₹)</strong> — what you type is kept.</p>
+  <h3>Will the AI make things up?</h3>
+  <p>It is told to use only the facts given and never to invent a fabric or size. Read the first listings of each website; anything you correct is kept.</p>
+  <h3>What does the AI cost?</h3>
+  <p>One AI call reads each product, and one call writes each listing on each website. Haiku is the cheapest; use Sonnet or Opus only where the writing really matters.</p>
+  <h3>Are prices with or without GST?</h3>
+  <p>The app sends the number from your formula. Whether Shopify treats prices as including tax is set in Shopify (Settings → Taxes and duties).</p>
+  <h3>Who can see the Shopify keys?</h3>
+  <p>Nobody. They are stored on the server, used only to talk to Shopify, and never shown again in the app.</p>
+  <h3>What happens when I pause automation?</h3>
+  <p>Nothing runs on its own until you switch it back on; buttons on a product still work. When it is switched on again it carries on from where it stopped.</p>
+  <h3>Two of us edited the same listing. Whose change stays?</h3>
+  <p>The last one saved. Close and reopen a listing before editing if someone else may have just changed it.</p>
+</section>
+
+<section id="next">
+  <h2><span class="n">14</span>What is coming next</h2>
+  
+  <h3>Telegram intake</h3>
+  <p>Soon every product posted in the vendors&#39; Telegram channel will land in <strong>Products</strong> by itself — photos and text together — and go through exactly the same steps: read, sorted, priced, written, published. The same post arriving twice is ignored.</p>
+  <ul><li>Until then, add products with <strong>+ Add product</strong>.</li><li>Nothing to set up for it today: the categories, vendors and website rules you make now are the ones Telegram products will use.</li></ul>
+</section>
+<p class="end">DailyOffice · Playbook — Product Directory — User Guide</p>
+</main>
+</body>
+</html>

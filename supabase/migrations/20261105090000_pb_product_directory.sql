@@ -99,6 +99,11 @@ create table public.pb_websites (
   updated_at timestamptz not null default now()
 );
 create unique index pb_websites_domain_key on public.pb_websites (lower(shop_domain));
+-- Only real Shopify addresses: the edge function sends the store's credentials
+-- to this host, so it must never be pointed elsewhere.
+alter table public.pb_websites add constraint pb_websites_domain_shape check (shop_domain ~ '^[a-z0-9][a-z0-9-]*\.myshopify\.com$');
+-- A website can only be switched on once a connection test has passed.
+alter table public.pb_websites add constraint pb_websites_active_needs_connection check (not active or connected_at is not null);
 
 create table public.pb_website_secrets (
   website_id uuid primary key references public.pb_websites(id) on delete cascade,
@@ -204,6 +209,11 @@ end $$;
 -- The activity log is append-only for people.
 drop policy "pb staff update" on public.pb_activity;
 drop policy "pb staff delete" on public.pb_activity;
+-- Websites: staff edit settings only. The store address, credentials mode,
+-- API version and connection fields are written by the edge function
+-- (save_credentials / test_connection, admin/manager), never by the app.
+revoke update on public.pb_websites from authenticated;
+grant update (name, active, publish_mode, routing_default, track_inventory, pricing, tag_rules, content) on public.pb_websites to authenticated;
 alter table public.pb_website_secrets enable row level security;
 revoke all on public.pb_website_secrets from anon, authenticated;
 
