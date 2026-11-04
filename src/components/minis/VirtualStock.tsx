@@ -128,7 +128,7 @@ export default function VirtualStock({ setStock, addToast }: { stock: Record<str
           <input value={search} onChange={e => { setSearch(e.target.value); setPage(0); }} placeholder="Search SKU..." style={S.fSearch} />
         </div>}
 
-        {rows.length > 0 && <VirtualStockBulk rows={rows} shown={filtered} selected={picked} onClear={() => setPicked(new Set())} onDone={fetch} ask={ask} addToast={addToast} />}
+        {rows.length > 0 && <VirtualStockBulk rows={rows} shown={filtered} selected={picked} onSelect={setPicked} onClear={() => setPicked(new Set())} onDone={fetch} ask={ask} addToast={addToast} />}
 
         {/* List */}
         {loading ? <div style={{ padding: 12, textAlign: 'center' }}><div className="spinner" style={{ margin: '0 auto' }} /></div> :
