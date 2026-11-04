@@ -6,6 +6,7 @@ import { numericKeyDown } from '../../lib/numericInput';
 import { exportName, fileDate } from '../../lib/exportName';
 import ConfirmModal, { useConfirm } from '../ui/ConfirmModal';
 import { csvCell } from '../../lib/escape';
+import VirtualStockBulk from './VirtualStockBulk';
 
 const STOCK_LIMIT = 1000;
 
@@ -25,6 +26,8 @@ export default function VirtualStock({ setStock, addToast }: { stock: Record<str
   const [expanded, setExpanded] = useState(false);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const tick = (id: string) => setPicked(p => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
   const fetch = useCallback(async () => {
     const { data, error } = await supabase.from('virtual_stock').select('id, sku, quantity').order('sku').limit(STOCK_LIMIT);
@@ -125,6 +128,8 @@ export default function VirtualStock({ setStock, addToast }: { stock: Record<str
           <input value={search} onChange={e => { setSearch(e.target.value); setPage(0); }} placeholder="Search SKU..." style={S.fSearch} />
         </div>}
 
+        {rows.length > 0 && <VirtualStockBulk rows={rows} shown={filtered} selected={picked} onClear={() => setPicked(new Set())} onDone={fetch} ask={ask} addToast={addToast} />}
+
         {/* List */}
         {loading ? <div style={{ padding: 12, textAlign: 'center' }}><div className="spinner" style={{ margin: '0 auto' }} /></div> :
         filtered.length === 0 ? (rows.length === 0 ? null : <div style={{ padding: 12, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No matches</div>) :
@@ -140,6 +145,7 @@ export default function VirtualStock({ setStock, addToast }: { stock: Record<str
                     <span onClick={() => { setEditId(null); setEditSku(''); setEditQty(''); }} style={{ cursor: 'pointer', color: T.tx3, fontSize: 13 }}>x</span>
                   </div>
                 ) : (<>
+                  <input type="checkbox" checked={picked.has(r.id)} onChange={() => tick(r.id)} aria-label={`Tick ${r.sku}`} style={{ width: 16, height: 16, accentColor: T.ac, flexShrink: 0, cursor: 'pointer' }} />
                   <div style={{ flex: 1, fontFamily: T.mono, fontSize: 12, fontWeight: 600, color: T.tx }}>{r.sku}</div>
                   <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                     <span style={{ fontFamily: T.mono, fontSize: 12, fontWeight: 700, color: T.gr, minWidth: 30, textAlign: 'right' }}>+{r.quantity}</span>
