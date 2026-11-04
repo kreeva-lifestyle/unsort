@@ -16,7 +16,10 @@
 //   fwd_upload { dataUrl, dateStr } — signed-in. Uploads one compressed JPEG
 //      into that folder, named <date>.jpg (same-day → <date> (2).jpg …). Needs
 //      the Dropbox token's files.content.write scope (in the connect URL).
-//   GET ?thumb=<link>&k=<anon key> — streams a 256px JPEG thumbnail (no store)
+//   GET ?thumb=<link>&exp=<unix s>&sig=<hmac> — streams a 256px JPEG thumbnail
+//      (no store). The URL is signed server-side (thumbs.ts) and handed out
+//      as `thumb` on each image link `linkgen` returns to a signed-in caller;
+//      valid 6-12 h. The public anon key is no longer accepted here.
 //   push / reconcile — legacy Google Sheets behaviour
 //
 // Dropbox creds + folder links live in app_secrets (service-role only).
@@ -26,10 +29,12 @@
 // 401 it before this code runs (that is what broke every Dropbox thumbnail
 // in Client Finder and the Link Generator). Auth is done here instead:
 // every POST action re-checks the caller (callerRole / share token via
-// gate()), and the GET accepts only this project's anon key in ?k=.
+// gate()), and the GET accepts only a short-lived HMAC-signed thumb URL that
+// linkgen issued to a signed-in caller (see thumbs.ts).
 
 // deno-lint-ignore-file no-explicit-any
 import { catalogFolder, catalogPack, catalogList, gate } from './catalog.ts';
+import { DROPBOX_LINK_RE, thumbOk, withThumbs } from './thumbs.ts';
 
 const ALLOWED_ORIGINS = [
   'https://dailyoffice.aryadesigns.co.in',
@@ -149,14 +154,6 @@ async function readSkuColumn(sheetId: string, tab: string): Promise<string[]> {
 
 const SB_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SB_SVC = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-
-function isProjectAnonKey(k: string): boolean {
-  try {
-    const payload = JSON.parse(atob(k.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
-    const ref = new URL(SB_URL).hostname.split('.')[0];
-    return payload?.ref === ref && payload?.role === 'anon' && (Number(payload?.exp) || 0) * 1000 > Date.now();
-  } catch { return false; }
-}
 
 async function getSecret(key: string): Promise<string | null> {
   const r = await fetch(`${SB_URL}/rest/v1/app_secrets?key=eq.${encodeURIComponent(key)}&select=value`, {
@@ -440,10 +437,12 @@ Deno.serve(async (req) => {
   if (req.method === 'GET') {
     const u = new URL(req.url);
     const turl = u.searchParams.get('thumb') || '';
-    const k = u.searchParams.get('k') || '';
     if (!turl) return fail(405, 'Method not allowed', req);
-    if (!isProjectAnonKey(k)) return fail(401, 'Unauthorized', req);
-    if (!/^https:\/\/(www\.)?dropbox\.com\//i.test(turl)) return fail(400, 'Not a Dropbox link', req);
+    if (!DROPBOX_LINK_RE.test(turl)) return fail(400, 'Not a Dropbox link', req);
+    let signed = false;
+    try { signed = await thumbOk(turl, u.searchParams.get('exp') || '', u.searchParams.get('sig') || ''); }
+    catch { return fail(500, 'Thumbnail signing unavailable', req); }
+    if (!signed) return fail(401, 'Unauthorized', req);
     let token = '';
     try { token = await getDropboxToken(); } catch { return fail(409, 'dropbox_not_connected', req); }
     const r = await fetch('https://content.dropboxapi.com/2/files/get_thumbnail_v2', {
@@ -451,14 +450,14 @@ Deno.serve(async (req) => {
       headers: { authorization: `Bearer ${token}`, 'Dropbox-API-Arg': asciiArg({ resource: { '.tag': 'link', url: turl }, format: 'jpeg', size: 'w256h256', mode: 'strict' }) },
     });
     if (!r.ok) { try { await r.body?.cancel(); } catch { /* noop */ } return fail(404, 'No thumbnail', req); }
-    return new Response(r.body, { status: 200, headers: { ...corsHeaders(req), 'content-type': 'image/jpeg', 'cache-control': 'public, max-age=86400' } });
+    return new Response(r.body, { status: 200, headers: { ...corsHeaders(req), 'content-type': 'image/jpeg', 'cache-control': 'private, max-age=86400' } });
   }
 
   if (req.method !== 'POST') return fail(405, 'Method not allowed', req);
 
   // Presence of *a* header is not authentication — the public anon key ships in
   // the browser bundle and would pass a bare `if (!auth)` check. Every action
-  // below does its own real verification (callerRole / anon-key-only thumb);
+  // below does its own real verification (callerRole / share token);
   // this is only a fast reject for genuinely header-less requests.
   const auth = req.headers.get('authorization') || req.headers.get('apikey') || '';
   if (!auth) return fail(401, 'Unauthorized — missing auth header', req);
@@ -978,7 +977,9 @@ Deno.serve(async (req) => {
       const links = slots.filter(Boolean) as { name: string; url: string; error?: string }[];
       if (rlError && !needsReconnect) note = `${rlError} — ${links.length} of ${targets.length} links generated`;
       const good = links.filter(l => l.url).length;
-      return json({ ok: good > 0, sku, mode, folder: folder.path_display, links, note, needsReconnect: needsReconnect || undefined, error: good === 0 ? (note || 'Could not create links') : undefined }, req);
+      // Each image link carries its own signed thumbnail URL (query string for
+      // this function's GET) — the only way a browser can get a thumbnail.
+      return json({ ok: good > 0, sku, mode, folder: folder.path_display, links: await withThumbs(links), note, needsReconnect: needsReconnect || undefined, error: good === 0 ? (note || 'Could not create links') : undefined }, req);
     }
 
     if (action === 'linkgen_writesheet') {
