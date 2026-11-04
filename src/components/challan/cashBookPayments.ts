@@ -7,14 +7,14 @@
 import { supabase } from '../../lib/supabase';
 import { fetchPaged } from '../../lib/fetchPaged';
 
-/** amount_paid is this payment's signed amount (named so the list and CSV keep working). */
-export type CashSaleRow = { id: string; challan_number: number; customer_name: string; is_return: boolean; amount_paid: number; payment_mode: string | null; payment_date: string | null };
-type PayRow = { id: string; amount: number; payment_mode: string; payment_date: string; is_reversal: boolean; challan: { challan_number: number; customer_name: string; is_return: boolean } };
+/** amount_paid is this payment's signed amount (named so the list and CSV keep working); ho = the number of the signed handover that counted it. */
+export type CashSaleRow = { id: string; challan_number: number; customer_name: string; is_return: boolean; amount_paid: number; payment_mode: string | null; payment_date: string | null; ho: number | null };
+type PayRow = { id: string; amount: number; payment_mode: string; payment_date: string; is_reversal: boolean; challan: { challan_number: number; customer_name: string; is_return: boolean }; handover: { handover_number: number } | null };
 
 async function load(filter: { from: string; to: string } | { handoverId: string }, newestFirst: boolean): Promise<{ rows: CashSaleRow[]; error: unknown }> {
   const { data, error } = await fetchPaged((a, z) => {
     let q = supabase.from('cash_challan_payments')
-      .select('id, amount, payment_mode, payment_date, is_reversal, challan:cash_challans!cash_challan_payments_challan_id_fkey!inner(challan_number, customer_name, is_return, status)')
+      .select('id, amount, payment_mode, payment_date, is_reversal, challan:cash_challans!cash_challan_payments_challan_id_fkey!inner(challan_number, customer_name, is_return, status), handover:cash_handovers(handover_number)')
       .not('payment_mode', 'in', '("Return Credit","Write-off")').neq('challan.status', 'voided');
     q = 'handoverId' in filter ? q.eq('handover_id', filter.handoverId) : q.gte('payment_date', filter.from).lte('payment_date', filter.to);
     return q.order('payment_date', { ascending: !newestFirst }).order('created_at', { ascending: !newestFirst }).order('id').range(a, z);
@@ -24,6 +24,7 @@ async function load(filter: { from: string; to: string } | { handoverId: string 
     amount_paid: (r.is_reversal ? -1 : 1) * Number(r.amount || 0),
     payment_mode: r.is_reversal ? `${r.payment_mode} · reversed` : r.payment_mode,
     payment_date: r.payment_date,
+    ho: r.handover?.handover_number ?? null,
   }));
   return { rows, error };
 }

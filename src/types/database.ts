@@ -346,6 +346,8 @@ export interface CashExpense {
   description: string | null;
   paid_by: string | null;
   created_at: string | null;
+  /** The signed cash handover that counted this expense (set only by the confirm trigger). */
+  handover_id: string | null;
 }
 
 export type CashExpenseInsert = {

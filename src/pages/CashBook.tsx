@@ -38,7 +38,7 @@ const CATEGORIES = ['Office Supplies', 'Rent', 'Salaries', 'Travel', 'Utilities'
 
 // In-memory / jsonb-embedded cash-flow snapshot. Stored in
 // cash_handovers.breakdown as jsonb, read back and cast to this shape.
-interface Breakdown { opening: number; openingIsSet: boolean; cashSales: number; cashReturns: number; expenses: number; previousHandovers: number; available: number; periodFrom: string; periodTo: string; }
+interface Breakdown { opening: number; openingIsSet: boolean; cashSales: number; cashReturns: number; expenses: number; previousHandovers: number; available: number; periodFrom: string; periodTo: string; earlier?: number; earlierCount?: number; }
 
 // View model: central CashHandover row but with the jsonb breakdown
 // narrowed to the local Breakdown shape for typed access.
@@ -53,7 +53,7 @@ const formatHandoverNo = (n: number | null | undefined) =>
 // PostgREST embed profiles:paid_by(...) was BROKEN because paid_by's FK points
 // at auth.users, not profiles, so the whole query errored and silently returned
 // nothing (expenses vanished while sales/handovers showed fine).
-type ExpenseRow = Pick<CashExpense, 'id' | 'date' | 'amount' | 'category' | 'description' | 'created_at'> & { paid_by?: string | null };
+type ExpenseRow = Pick<CashExpense, 'id' | 'date' | 'amount' | 'category' | 'description' | 'created_at' | 'handover_id'> & { paid_by?: string | null };
 
 // View model: narrowed cash_challans projection used by the sales tab.
 
@@ -97,7 +97,6 @@ export default function CashBook() {
   const [handToId, setHandToId] = useState('');
   const [handNotes, setHandNotes] = useState('');
   const [handReason, setHandReason] = useState('');
-  const [handPeriodFrom, setHandPeriodFrom] = useState(today);
   const [handPeriodTo, setHandPeriodTo] = useState(today);
   const [handBreakdown, setHandBreakdown] = useState<Breakdown | null>(null);
   const [handError, setHandError] = useState('');
@@ -143,7 +142,7 @@ export default function CashBook() {
     setOpeningInput(String(bal?.opening_balance || 0));
 
     // Expenses in date range
-    const { data: exp, error: expErr } = await supabase.from('cash_expenses').select('id, date, amount, category, description, created_at, paid_by').gte('date', fromDate).lte('date', toDate).order('date', { ascending: false }).order('created_at', { ascending: false });
+    const { data: exp, error: expErr } = await supabase.from('cash_expenses').select('id, date, amount, category, description, created_at, paid_by, handover_id').gte('date', fromDate).lte('date', toDate).order('date', { ascending: false }).order('created_at', { ascending: false });
     if (expErr) addToast('Failed to load expenses — ' + friendlyError(expErr), 'error');
     setExpenses((exp || []) as unknown as ExpenseRow[]);
 
@@ -269,12 +268,6 @@ export default function CashBook() {
     if (!amt || amt <= 0) { setFormError('Amount must be greater than 0'); return; }
     if (!category) { setFormError('Category is required'); return; }
     if (entryDate > today) { setFormError('Cannot add future expenses'); return; }
-    // Mirror the DB backdated-expense lock: a past date inside a signed/pending
-    // handover period is closed for new entries. Block cleanly before the insert.
-    if (entryDate < today) {
-      const h = handoverCovering(entryDate);
-      if (h) { setFormError(`This date is locked — ${formatHandoverNo(h.handover_number)} (${h.period_from} → ${h.period_to}) already covers it. Record it as a correction on the handover instead.`); return; }
-    }
     setExpSaving(true);
     const { data: { user } } = await supabase.auth.getUser();
     const payload: CashExpenseInsert = { date: entryDate, amount: amt, category, description: description.trim() || null, paid_by: user?.id ?? null };
@@ -318,25 +311,26 @@ export default function CashBook() {
   // received (every money mode; return credit and write-offs are adjustments,
   // not money), minus refunds and expenses; anything already in a signed
   // handover is skipped. Owner's rule, 2026-11-03.
-  const computeBreakdown = useCallback(async (from: string, to: string): Promise<Breakdown> => {
-    const { data, error } = await supabase.rpc('handover_breakdown', { p_from: from, p_to: to });
+  // No FROM date (owner, 2026-11-04): everything not yet handed over, dated up to `to`.
+  const computeBreakdown = useCallback(async (to: string): Promise<Breakdown> => {
+    const { data, error } = await supabase.rpc('handover_breakdown_upto', { p_to: to });
     if (error) addToast('Cash flow calculation may be incomplete: ' + friendlyError(error), 'error');
     const b = (data || {}) as Partial<Breakdown>;
     const n = (v: unknown) => Number(v || 0);
-    return { opening: n(b.opening), openingIsSet: !!b.openingIsSet, cashSales: n(b.cashSales), cashReturns: n(b.cashReturns), expenses: n(b.expenses), previousHandovers: 0, available: n(b.available), periodFrom: from, periodTo: to };
+    return { opening: n(b.opening), openingIsSet: !!b.openingIsSet, cashSales: n(b.cashSales), cashReturns: n(b.cashReturns), expenses: n(b.expenses), previousHandovers: 0, available: n(b.available), periodFrom: String(b.periodFrom || to), periodTo: to, earlier: n(b.earlier), earlierCount: n(b.earlierCount) };
   }, [addToast]);
 
   // Recompute when range changes in modal + load recent handovers
   useEffect(() => {
     if (showHandover) {
-      computeBreakdown(handPeriodFrom, handPeriodTo).then(b => {
+      computeBreakdown(handPeriodTo).then(b => {
         setHandBreakdown(b);
         if (!handAmount) setHandAmount(String(Math.max(0, b.available)));
       });
       // Load last 5 handovers
       supabase.from('cash_handovers').select('id, handover_number, date, amount, from_user_name, to_user_name, status, confirmed_at, created_at, period_from, period_to, breakdown, reason, from_user_id, to_user_id, notes, reject_reason, rejected_at, rejected_by, cancelled_at, cancelled_by').order('created_at', { ascending: false }).limit(5).then(({ data, error }) => { if (error) addToast('Failed to load recent handovers — ' + friendlyError(error), 'error'); setRecentHandovers((data as Handover[] | null) || []); });
     }
-  }, [showHandover, handPeriodFrom, handPeriodTo, computeBreakdown]);
+  }, [showHandover, handPeriodTo, computeBreakdown]);
 
   const createHandover = async () => {
     setHandError('');
@@ -351,6 +345,8 @@ export default function CashBook() {
     if (handToId === currentUserId) { setHandError('Cannot hand over cash to yourself'); return; }
     if (!recipient.has_pin) { setHandError(`${recipient.full_name} has no PIN set. They must set it in Settings → Users first.`); return; }
     if (!handBreakdown) { setHandError('Breakdown not loaded — try again'); return; }
+    const handPeriodFrom = handBreakdown.periodFrom;
+    if (handPeriodTo < handPeriodFrom) { setHandError(`Pick a date on or after ${handPeriodFrom} — everything before it is already handed over.`); return; }
     if (amt > handBreakdown.available) { setHandError(`Cannot exceed available cash: ₹${handBreakdown.available.toLocaleString('en-IN')}`); return; }
     const amountDiffers = Math.abs(amt - handBreakdown.available) > 0.01;
     if (amountDiffers && !handReason.trim()) { setHandError('Amount differs from available cash. Add a reason in Notes/Reason field.'); return; }
@@ -584,19 +580,13 @@ export default function CashBook() {
     const locked = new Set<string>();
     const active = handovers.filter(h => h.status === 'confirmed' || h.status === 'pending');
     if (active.length === 0) return locked;
-    for (const e of expenses) {
-      const eDate = e.date; // 'YYYY-MM-DD'
-      for (const h of active) {
-        const hFrom = h.period_from || h.date;
-        const hTo = h.period_to || h.date;
-        if (eDate && hFrom && hTo && eDate >= hFrom && eDate <= hTo) { locked.add(e.id); break; }
-      }
-    }
+    // Locked = counted by a signed handover (stamped at signing), not merely dated inside one.
+    for (const e of expenses) if (e.handover_id && active.some(h => h.id === e.handover_id)) locked.add(e.id);
     return locked;
   }, [expenses, handovers]);
 
   // Handover covering the currently-picked Add-Expense date (locked if past).
-  const addLockH = entryDate < today ? handoverCovering(entryDate) : null;
+  const addLockH = handoverCovering(entryDate); // informational: a late expense goes into the next handover
 
   const deleteExpense = async (id: string) => {
     if (lockedExpenseIds.has(id)) {
@@ -782,7 +772,7 @@ export default function CashBook() {
                   <span style={{ fontSize: 12, fontWeight: 600, color: T.tx }}>{s.customer_name}</span>
                   {s.is_return && <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'oklch(0.63 0.22 25 / .12)', color: T.re, fontWeight: 600, textTransform: 'uppercase' }}>Return</span>}
                 </div>
-                <div style={{ fontSize: 9, color: T.tx3 }}>₹{Math.abs(Number(s.amount_paid)).toLocaleString('en-IN')}{s.payment_mode ? ` · ${s.payment_mode}` : ''}{s.payment_date ? ` · ${new Date(s.payment_date + 'T00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}` : ''}</div>
+                <div style={{ fontSize: 9, color: T.tx3 }}>{s.ho ? <span style={{ color: T.bl, fontWeight: 700 }}>{formatHandoverNo(s.ho)} · </span> : <span style={{ color: T.yl }}>Not handed over · </span>}₹{Math.abs(Number(s.amount_paid)).toLocaleString('en-IN')}{s.payment_mode ? ` · ${s.payment_mode}` : ''}{s.payment_date ? ` · ${new Date(s.payment_date + 'T00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}` : ''}</div>
               </div>
               {(() => { const v = (s.is_return ? -1 : 1) * Number(s.amount_paid); return <div style={{ fontSize: 13, fontWeight: 700, fontFamily: T.mono, color: v < 0 ? T.re : T.gr }}>{v < 0 ? '−' : '+'}₹{Math.abs(v).toLocaleString('en-IN')}</div>; })()}
             </div>
@@ -846,15 +836,10 @@ export default function CashBook() {
             <div style={{ fontSize: 10, color: T.tx3, marginBottom: 12 }}>Auto-calculated from sales, expenses, and previous handovers</div>
 
             {/* Period Range */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
-              <div>
-                <label style={{ ...S.fLabel, display: 'block', marginBottom: 4 }}>Period From</label>
-                <DateInput value={handPeriodFrom} onChange={e => { setHandPeriodFrom(e.target.value); setHandAmount(''); }} style={{ width: '100%' }} />
-              </div>
-              <div>
-                <label style={{ ...S.fLabel, display: 'block', marginBottom: 4 }}>Period To</label>
-                <DateInput value={handPeriodTo} onChange={e => { setHandPeriodTo(e.target.value); setHandAmount(''); }} style={{ width: '100%' }} />
-              </div>
+            <div style={{ marginBottom: 10 }}>
+              <label style={{ ...S.fLabel, display: 'block', marginBottom: 4 }}>Hand over everything up to</label>
+              <DateInput value={handPeriodTo} max={today} onChange={e => { setHandPeriodTo(e.target.value); setHandAmount(''); }} style={{ width: '100%' }} />
+              {handBreakdown && <div style={{ fontSize: 10, color: T.tx3, marginTop: 4 }}>Covers every payment and expense not yet handed over — new from {handBreakdown.periodFrom}{handBreakdown.earlierCount ? <span style={{ color: T.yl }}> · includes {handBreakdown.earlierCount} late entr{handBreakdown.earlierCount === 1 ? 'y' : 'ies'} dated earlier ({signed(handBreakdown.earlier || 0, '+')})</span> : null}</div>}
             </div>
 
             {/* Breakdown Card */}
@@ -863,7 +848,7 @@ export default function CashBook() {
                 <div style={{ fontSize: 9, color: T.ac2, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 700, marginBottom: 6 }}>Cash Flow Summary</div>
                 {!handBreakdown.openingIsSet && (
                   <div style={{ background: 'oklch(0.78 0.18 75 / .08)', border: '1px solid oklch(0.78 0.18 75 / .2)', borderRadius: 4, padding: '6px 8px', marginBottom: 6, fontSize: 9, color: T.yl }}>
-                    No opening balance set for {handPeriodFrom}. Using ₹0. Set it in Cash Book before initiating if that's wrong.
+                    No opening balance set for {handBreakdown.periodFrom}. Using ₹0. Set it in Cash Book before initiating if that's wrong.
                   </div>
                 )}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 4, fontFamily: T.mono }}>
@@ -1112,7 +1097,7 @@ export default function CashBook() {
                 <input type="number" min="0.01" step="0.01" value={amount} onKeyDown={e => numericKeyDown(e)} onChange={e => setAmount(e.target.value)} autoFocus placeholder="0.00" style={{ ...S.fInput, width: '100%', fontFamily: T.mono }} />
               </div>
             </div>
-            {addLockH && <div style={{ background: 'oklch(0.78 0.18 75 / .08)', border: '1px solid oklch(0.78 0.18 75 / .25)', borderRadius: 6, padding: '6px 10px', fontSize: 10, color: T.yl, marginBottom: 10 }}>This date is inside {formatHandoverNo(addLockH.handover_number)} ({addLockH.period_from} → {addLockH.period_to}) — the period is handed over and locked. Pick a later date, or record it as a correction on the handover.</div>}
+            {addLockH && <div style={{ background: 'oklch(0.78 0.18 75 / .08)', border: '1px solid oklch(0.78 0.18 75 / .25)', borderRadius: 6, padding: '6px 10px', fontSize: 10, color: T.yl, marginBottom: 10 }}>This date is already handed over in {formatHandoverNo(addLockH.handover_number)} — this expense will go into the next handover.</div>}
             <div style={{ marginBottom: 10 }}>
               <label style={{ ...S.fLabel, display: 'block', marginBottom: 4 }}>Category</label>
               <select value={category} onChange={e => setCategory(e.target.value)} style={{ ...S.fInput, width: '100%', cursor: 'pointer' }}>
@@ -1126,7 +1111,7 @@ export default function CashBook() {
             {formError && <div style={{ background: 'oklch(0.63 0.22 25 / .08)', border: '1px solid oklch(0.63 0.22 25 / .2)', borderRadius: 6, padding: '6px 10px', fontSize: 10, color: T.re, marginBottom: 8 }}>{formError}</div>}
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => { setShowAdd(false); setFormError(''); setExpSaving(false); setAmount(''); setDescription(''); setCategory(CATEGORIES[0]); setEntryDate(today); }} style={{ ...S.btnGhost, flex: 1, padding: '9px 0', fontSize: 11 }}>Cancel</button>
-              <button onClick={addExpense} disabled={expSaving || !!addLockH} style={{ ...S.btnPrimary, flex: 1, padding: '9px 0', fontSize: 11, opacity: (expSaving || addLockH) ? 0.5 : 1, pointerEvents: (expSaving || addLockH) ? 'none' : 'auto' }}>{expSaving ? 'Saving…' : addLockH ? 'Date Locked' : 'Add'}</button>
+              <button onClick={addExpense} disabled={expSaving} style={{ ...S.btnPrimary, flex: 1, padding: '9px 0', fontSize: 11, opacity: expSaving ? 0.5 : 1, pointerEvents: expSaving ? 'none' : 'auto' }}>{expSaving ? 'Saving…' : 'Add'}</button>
             </div>
           </div>
         </div>,
