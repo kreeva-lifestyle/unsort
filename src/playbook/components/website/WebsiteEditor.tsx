@@ -3,15 +3,20 @@
 // the changed keys are sent). The store domain + credentials, the Active switch
 // and routing rules save on their own (separate writes with their own buttons).
 // The draft is reported up to Websites so the device Back button keeps it.
+// Layout (V2): desktop = hero + section side list (3) beside the section (9);
+// phone = hero + section rows, each section full screen with its own back.
 import { useEffect, useState } from 'react';
-import { T, S, alpha } from '../../../lib/theme';
+import { useBackClose } from '../../../hooks/useBackClose';
 import { friendlyError } from '../../../lib/friendlyError';
-import ConfirmModal, { useConfirm } from '../../../components/ui/ConfirmModal';
+import { useConfirm } from '../../../components/ui/ConfirmModal';
+import PbConfirm from '../ui/PbConfirm';
 import type { AddToast } from '../PbToasts';
 import type { PbWebsite } from '../../types';
 import type { VendorLite } from '../../data/products';
 import { updateWebsite, type WebsitePatch } from '../../data/websites';
+import { useIsPhone } from '../../hooks/useIsPhone';
 import { Dot } from '../product/status';
+import { PbPageHeader, PbTag, focusPageTitle } from '../ui';
 import { connection } from './WebsiteCard';
 import ConnectionSection from './ConnectionSection';
 import PublishingSection from './PublishingSection';
@@ -19,6 +24,10 @@ import RoutingSection from './RoutingSection';
 import PricingSection from './PricingSection';
 import TagsSection from './TagsSection';
 import ContentSection from './ContentSection';
+import EditorHero from './shell/EditorHero';
+import SaveBar from './shell/SaveBar';
+import { SectionRows, SectionSideList } from './shell/SectionNav';
+import { SECTIONS, sectionMeta, type SectionId } from './shell/sections';
 
 export type Draft = Pick<PbWebsite, 'name' | 'publish_mode' | 'routing_default' | 'track_inventory' | 'pricing' | 'tag_rules' | 'content'>;
 export type SetDraft = (p: Partial<Draft>) => void;
@@ -31,11 +40,7 @@ const pick = (s: PbWebsite): Draft => ({
 const stable = (v: unknown) => JSON.stringify(v, (_k, x) => (x && typeof x === 'object' && !Array.isArray(x)
   ? Object.fromEntries(Object.entries(x as Record<string, unknown>).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) : x));
 
-const TABS = [
-  { id: 'connection', label: 'Connection' }, { id: 'publishing', label: 'Publishing' }, { id: 'routing', label: 'Routing rules' },
-  { id: 'pricing', label: 'Pricing' }, { id: 'tags', label: 'Tags' }, { id: 'content', label: 'Content & AI' },
-] as const;
-type Tab = typeof TABS[number]['id'];
+type Tab = SectionId;
 
 export default function WebsiteEditor({ site, initialDraft, onDraft, onClose, onSaved, addToast, vendors, categories }: {
   site: PbWebsite; initialDraft?: Draft; onDraft: (id: string, d: Draft | null) => void;
@@ -49,7 +54,18 @@ export default function WebsiteEditor({ site, initialDraft, onDraft, onClose, on
   const setDraft: SetDraft = p => setDraftState(d => ({ ...d, ...p }));
   const dirty = stable(draft) !== stable(pick(site));
   const c = connection(site);
+  const phone = useIsPhone();
+  // Phone: which section is open full screen (device Back returns to the overview).
+  const [phoneOpen, setPhoneOpen] = useState(false);
+  useBackClose(phone && phoneOpen, () => setPhoneOpen(false));
   useEffect(() => { onDraft(site.id, dirty ? draft : null); }, [site.id, draft, dirty, onDraft]);
+
+  const showSection = (id: Tab) => {
+    setTab(id);
+    if (phone) { setPhoneOpen(true); document.querySelector('.pb-scroll')?.scrollTo({ top: 0 }); }
+  };
+  // Opening the editor (or a phone section) moves focus to its title, not <body>.
+  useEffect(() => { focusPageTitle(); }, [phoneOpen]);
 
   const close = async () => {
     if (dirty && !(await ask({ title: 'Discard unsaved changes?', message: 'Your edits to this website have not been saved.', confirmLabel: 'Discard', danger: true }))) return;
@@ -58,8 +74,8 @@ export default function WebsiteEditor({ site, initialDraft, onDraft, onClose, on
 
   const save = async () => {
     const name = draft.name.trim().replace(/\s+/g, ' ');
-    if (!name) { setErr('Give the website a name'); setTab('connection'); return; }
-    if (draft.content.title_template.trim() === '') { setErr('The title pattern cannot be empty — use {ai_title} to let the AI write it.'); setTab('content'); return; }
+    if (!name) { setErr('Give the website a name'); showSection('connection'); return; }
+    if (draft.content.title_template.trim() === '') { setErr('The title pattern cannot be empty — use {ai_title} to let the AI write it.'); showSection('content'); return; }
     // Only the keys that really changed — so the activity log says what was edited.
     const next: Draft = { ...draft, name }, cur = pick(site);
     const patch = Object.fromEntries((Object.keys(next) as (keyof Draft)[])
@@ -75,56 +91,65 @@ export default function WebsiteEditor({ site, initialDraft, onDraft, onClose, on
     } finally { setSaving(false); }
   };
 
-  const tabBtn = (t: Tab, label: string) => (
-    <button key={t} type="button" onClick={() => setTab(t)} aria-current={tab === t ? 'page' : undefined}
-      style={{
-        flexShrink: 0, minHeight: 44, padding: '0 14px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: T.sans,
-        fontSize: 13, fontWeight: tab === t ? 600 : 500, color: tab === t ? T.tx : T.tx3,
-        borderBottom: `2px solid ${tab === t ? T.yl : 'transparent'}`,
-      }}>{label}</button>
-  );
+  const saved = pick(site);
+  const edited = (id: Tab) => SECTIONS.find(s => s.id === id)!.keys.some(k => stable(draft[k]) !== stable(saved[k]));
+  const discard = () => { setDraftState(pick(site)); setErr(''); };
+  const sectionLabel = SECTIONS.find(s => s.id === tab)!.label;
 
-  return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-        <button type="button" onClick={() => void close()} aria-label="Back to websites" style={{ ...S.btnGhost, minHeight: 44, minWidth: 44 }}>&#8592;</button>
-        <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ fontFamily: T.sora, fontSize: 18, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{site.name}</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 12px', marginTop: 4 }}>
-            <Dot color={c.color} label={c.label} />
-            <Dot color={site.active ? T.gr : T.tx3} label={site.active ? 'On' : 'Off — nothing is sent'} />
-          </div>
-        </div>
-      </div>
-      <nav aria-label="Website sections" style={{ display: 'flex', overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', borderBottom: `1px solid ${T.bd}`, marginBottom: 14 }}>
-        {TABS.map(t => tabBtn(t.id, t.label))}
-      </nav>
-
+  const body = (
+    <>
       {tab === 'connection' && <ConnectionSection site={site} draft={draft} set={setDraft} onSaved={onSaved} addToast={addToast} />}
       {tab === 'publishing' && <PublishingSection draft={draft} set={setDraft} />}
       {tab === 'routing' && <RoutingSection siteId={site.id} draft={draft} set={setDraft} addToast={addToast} vendors={vendors} categories={categories} />}
       {tab === 'pricing' && <PricingSection draft={draft} set={setDraft} />}
       {tab === 'tags' && <TagsSection draft={draft} set={setDraft} />}
       {tab === 'content' && <ContentSection draft={draft} set={setDraft} />}
+    </>
+  );
+  const bar = (dirty || err) && <SaveBar dirty={dirty} err={err} saving={saving} onDiscard={discard} onSave={() => void save()} />;
+  const hero = <EditorHero site={site} connLabel={c.label} onConnection={() => showSection('connection')} />;
 
-      {(dirty || err) && (
-        <div style={{
-          position: 'sticky', bottom: 0, zIndex: 5, marginTop: 6, padding: '10px 12px calc(10px + env(safe-area-inset-bottom))',
-          background: T.s2, border: `1px solid ${T.bd2}`, borderRadius: T.rLg, boxShadow: `0 -8px 24px ${alpha(T.bg, 0.35)}`,
-        }}>
-          {err && <div style={{ ...S.errorBox, marginBottom: 8 }}>{err}</div>}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 12, color: dirty ? T.yl : T.tx3, flex: 1, minWidth: 120 }}>{dirty ? 'Unsaved changes' : 'Nothing to save'}</span>
-            <button type="button" onClick={() => { setDraftState(pick(site)); setErr(''); }} disabled={!dirty}
-              style={{ ...S.btnGhost, minHeight: 44, opacity: dirty ? 1 : 0.4 }}>Discard</button>
-            <button type="button" onClick={() => void save()} disabled={!dirty}
-              style={{ ...S.btnPrimary, minHeight: 44, pointerEvents: saving || !dirty ? 'none' : 'auto', opacity: saving || !dirty ? 0.5 : 1 }}>
-              {saving ? 'Saving…' : 'Save changes'}
-            </button>
+  // Phone: overview (hero + one row per section) or one section full screen.
+  if (phone) return (
+    <div>
+      {phoneOpen ? (
+        <>
+          <PbPageHeader back={{ label: site.name, onBack: () => setPhoneOpen(false) }} title={sectionLabel} sub={site.name} phoneSub phoneAction={null} />
+          {body}
+        </>
+      ) : (
+        <>
+          <PbPageHeader back={{ label: 'Websites', onBack: () => void close() }} title={site.name} phoneAction={null} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {hero}
+            <SectionRows onPick={showSection} edited={edited} meta={id => sectionMeta(id, draft, c.label)} />
           </div>
-        </div>
+        </>
       )}
-      <ConfirmModal {...modalProps} />
+      {bar}
+      <PbConfirm {...modalProps} />
+    </div>
+  );
+
+  // Desktop: side column 3 (hero + section list, sticky under the top bar) + section body 9.
+  return (
+    <div>
+      <PbPageHeader back={{ label: 'Websites', onBack: () => void close() }} title={site.name}
+        sub={<span style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 16px' }}>
+          <Dot color={c.color} label={c.label} />
+          <PbTag>{site.active ? 'On' : 'Off · nothing is sent'}</PbTag>
+        </span>} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(220px, 3fr) minmax(0, 9fr)', gap: 16, alignItems: 'start' }}>
+        <div style={{ position: 'sticky', top: 88, display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
+          {hero}
+          <SectionSideList current={tab} onPick={showSection} edited={edited} />
+        </div>
+        <div style={{ minWidth: 0 }}>
+          {body}
+          {bar}
+        </div>
+      </div>
+      <PbConfirm {...modalProps} />
     </div>
   );
 }

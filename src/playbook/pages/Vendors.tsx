@@ -1,31 +1,36 @@
 // Vendors: who supplies the products — add, edit, deactivate, and how many
 // products each has in the directory. Spec: docs/playbook/product-directory-spec.md.
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { T, S } from '../../lib/theme';
+// V2 layout: desktop = (12 toolbar tile) / (12 tile of glass rows) / pager;
+// phone = search + "Show inactive" chip, then the rows straight on the backdrop.
+import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import { friendlyError } from '../../lib/friendlyError';
-import Empty from '../../components/ui/Empty';
 import type { AddToast } from '../components/PbToasts';
-import PbModal from '../components/product/PbModal';
-import { Field, input44 } from '../components/website/ui';
-import { Dot } from '../components/product/status';
-import { VENDOR_PAGE, listVendors, saveVendor, setVendorActive, type VendorRow } from '../data/vendors';
+import Pager from '../components/product/Pager';
+import { PB, pbInput } from '../pbTheme';
+import { useIsPhone } from '../hooks/useIsPhone';
+import { PbButton, PbChip, PbChipRow, PbIcon, PbPageHeader, PbTile } from '../components/ui';
+import VendorRow from '../components/vendors/VendorRow';
+import VendorForm, { type VendorFormState as Form } from '../components/vendors/VendorForm';
+import { VendorsEmpty, VendorsError, VendorsNoMatch, VendorsSkeleton } from '../components/vendors/VendorStates';
+import { VENDOR_PAGE, listVendors, saveVendor, setVendorActive, type VendorRow as Vendor } from '../data/vendors';
 
-type Form = { id: string | null; name: string; code: string; notes: string };
 const NEW: Form = { id: null, name: '', code: '', notes: '' };
 
-export default function Vendors({ addToast }: { addToast: AddToast }) {
-  const [rows, setRows] = useState<VendorRow[]>([]);
+export default function Vendors({ addToast, onBack }: { addToast: AddToast; onBack?: () => void }) {
+  const [rows, setRows] = useState<Vendor[]>([]);
   const [count, setCount] = useState(0);
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState('');
   const [q, setQ] = useState('');
   const [inactive, setInactive] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadErr, setLoadErr] = useState('');
   const [form, setForm] = useState<Form | null>(null);
   const [saving, setSaving] = useState(false);
   const [busy, setBusy] = useState('');
   const [err, setErr] = useState('');
   const seq = useRef(0);
+  const phone = useIsPhone();
 
   useEffect(() => { const t = setTimeout(() => { setQ(search); setPage(0); }, 300); return () => clearTimeout(t); }, [search]);
 
@@ -38,9 +43,9 @@ export default function Vendors({ addToast }: { addToast: AddToast }) {
       // Past the last page (last row deactivated, or the list shrank) → step back to the real last page.
       const last = Math.max(0, Math.ceil(r.count / VENDOR_PAGE) - 1);
       if (page > last) { setPage(last); return; }
-      setRows(r.rows); setCount(r.count);
+      setRows(r.rows); setCount(r.count); setLoadErr('');
     }
-    catch (e) { if (my === seq.current) addToast(friendlyError(e), 'error'); }
+    catch (e) { if (my === seq.current) { addToast(friendlyError(e), 'error'); setLoadErr(friendlyError(e)); } }
     finally { if (my === seq.current) setLoading(false); }
   }, [q, inactive, page, addToast]);
   useEffect(() => { void load(); }, [load]);
@@ -58,7 +63,7 @@ export default function Vendors({ addToast }: { addToast: AddToast }) {
     } catch (e) { const m = friendlyError(e); setErr(m); addToast(m, 'error'); setSaving(false); }
   };
 
-  const toggle = async (v: VendorRow) => {
+  const toggle = async (v: Vendor) => {
     setBusy(v.id);
     try {
       await setVendorActive(v.id, !v.active);
@@ -68,89 +73,63 @@ export default function Vendors({ addToast }: { addToast: AddToast }) {
     } catch (e) { addToast(friendlyError(e), 'error'); } finally { setBusy(''); }
   };
 
-  const pages = Math.max(1, Math.ceil(count / VENDOR_PAGE));
-  const pBtn = (off: boolean) => ({ ...S.btnGhost, minHeight: 44, minWidth: 64, opacity: off ? 0.3 : 1, pointerEvents: off ? 'none' as const : 'auto' as const });
+  const add = () => setForm(NEW);
+  const editing = form?.id ? rows.find(r => r.id === form.id) : undefined;
+  const firstLoad = loading && !rows.length && !loadErr;
+
+  const toolbar = (
+    <div style={{ display: 'flex', flexDirection: phone ? 'column' : 'row', alignItems: phone ? 'stretch' : 'center', gap: phone ? 8 : 12, minWidth: 0 }}>
+      <div style={{ position: 'relative', flex: phone ? 'none' : '1 1 320px', minWidth: 0 }}>
+        <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: PB.tx3, display: 'inline-flex', pointerEvents: 'none' }}>
+          <PbIcon name="search" size={16} />
+        </span>
+        <input type="search" className="pb-input" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search name or code"
+          aria-label="Search vendors" enterKeyHint="search" autoCorrect="off" spellCheck={false}
+          style={{ ...pbInput, paddingLeft: 40, paddingRight: search ? 48 : 14 }} />
+        {search && (
+          <button type="button" onClick={() => setSearch('')} aria-label="Clear search" className="pb-pill"
+            style={{ position: 'absolute', right: 2, top: '50%', transform: 'translateY(-50%)', width: 44, height: 44, border: 'none', background: 'transparent', color: PB.tx2, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: PB.r.input }}>
+            <PbIcon name="x" size={16} />
+          </button>
+        )}
+      </div>
+      <PbChipRow label="Filter vendors">
+        <PbChip pressed={inactive} onClick={() => { setInactive(!inactive); setPage(0); }}>Show inactive</PbChip>
+      </PbChipRow>
+    </div>
+  );
+
+  const list = (
+    <ul aria-label="Vendors" aria-busy={loading || undefined}
+      style={{ display: 'flex', flexDirection: 'column', gap: 8, margin: 0, padding: 0, opacity: loading ? 0.6 : 1, transition: 'opacity .3s ease' }}>
+      {rows.map(v => (
+        <VendorRow key={v.id} v={v} busy={busy} compact={phone} onToggle={() => void toggle(v)}
+          onEdit={() => setForm({ id: v.id, name: v.name, code: v.code ?? '', notes: v.notes ?? '' })} />
+      ))}
+    </ul>
+  );
+
+  const inTile = (n: ReactElement) => (phone ? n : <PbTile as="section" aria-label="Vendor list" style={{ padding: 12 }}>{n}</PbTile>);
+  const body = firstLoad ? inTile(<VendorsSkeleton />)
+    : loadErr && !rows.length ? <VendorsError message={loadErr} onRetry={() => void load()} busy={loading} />
+      : rows.length === 0 ? (q ? <VendorsNoMatch search={q} onClear={() => setSearch('')} /> : <VendorsEmpty onAdd={add} />)
+        : inTile(list);
 
   return (
     <>
-      <div style={{ ...S.flexBetween, gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
-        <div>
-          <div style={{ fontFamily: T.sora, fontSize: 20, fontWeight: 700, letterSpacing: -0.3 }}>Vendors</div>
-          <div style={{ fontSize: 12, color: T.tx3, marginTop: 4 }}>Who supplies the products — rules can send a vendor's products to chosen websites</div>
-        </div>
-        <button type="button" onClick={() => setForm(NEW)} style={{ ...S.btnPrimary, minHeight: 44 }}>+ Add vendor</button>
+      <PbPageHeader title="Vendors" sub="Who supplies the products — rules can send a vendor's products to chosen websites"
+        back={onBack ? { label: 'More', onBack } : undefined}
+        actions={<PbButton kind="primary" icon="plus" onClick={add}>Add vendor</PbButton>}
+        phoneAction={<PbButton kind="primary" iconOnly icon="plus" aria-label="Add vendor" onClick={add} />} />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: phone ? 12 : 16, minWidth: 0 }}>
+        {/* First run (no vendors at all): no search or filter over an empty page. */}
+        {(count > 0 || firstLoad || search || q || inactive) && (phone ? toolbar : <PbTile as="section" aria-label="Search vendors">{toolbar}</PbTile>)}
+        {loadErr && rows.length > 0 && <VendorsError inline message={loadErr} onRetry={() => void load()} busy={loading} />}
+        {body}
       </div>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-        <div style={{ position: 'relative', flex: '1 1 220px' }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={T.tx3} strokeWidth="1.8" strokeLinecap="round" aria-hidden
-            style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', opacity: 0.5 }}><circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" /></svg>
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search name or code" aria-label="Search vendors" style={{ ...S.fSearch, minHeight: 44 }} />
-        </div>
-        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, minHeight: 44, fontSize: 12, color: T.tx2, cursor: 'pointer' }}>
-          <input type="checkbox" checked={inactive} onChange={e => { setInactive(e.target.checked); setPage(0); }} style={{ width: 18, height: 18 }} />Show inactive
-        </label>
-      </div>
-
-      {loading && !rows.length ? <div style={S.emptyState}>Loading vendors…</div> : rows.length === 0 ? (
-        q ? <Empty icon="search" title="No vendor matches" message="Try another name or code." />
-          : <Empty icon="handshake" title="No vendors yet" message="Add the people you buy from. Products and routing rules link to them." cta="Add vendor" onCta={() => setForm(NEW)} />
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, opacity: loading ? 0.6 : 1 }}>
-          {rows.map(v => (
-            <div key={v.id} style={{ ...S.card, padding: 12, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-              <div style={{ flex: '1 1 200px', minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: v.active ? T.tx : T.tx3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {v.name}{v.code && <span style={{ fontFamily: T.mono, fontSize: 11, color: T.tx3, marginLeft: 8 }}>{v.code}</span>}
-                </div>
-                <div style={{ display: 'flex', gap: 12, marginTop: 4, flexWrap: 'wrap' }}>
-                  <Dot color={v.active ? T.gr : T.tx3} label={v.active ? 'Active' : 'Inactive'} />
-                  <span style={{ fontSize: 11, color: T.tx2 }}>{v.products} product{v.products === 1 ? '' : 's'}</span>
-                </div>
-                {v.notes && <div style={{ fontSize: 11, color: T.tx3, marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.notes}</div>}
-              </div>
-              <div style={{ display: 'flex', gap: 6 }}>
-                <button type="button" onClick={() => setForm({ id: v.id, name: v.name, code: v.code ?? '', notes: v.notes ?? '' })} style={{ ...S.btnGhost, minHeight: 44 }}>Edit</button>
-                <button type="button" onClick={() => void toggle(v)}
-                  style={{ ...(v.active ? S.btnDanger : S.btnSuccess), minHeight: 44, pointerEvents: busy ? 'none' : 'auto', opacity: busy === v.id ? 0.5 : 1 }}>
-                  {busy === v.id ? 'Saving…' : v.active ? 'Deactivate' : 'Activate'}
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-      {(count > VENDOR_PAGE || page > 0) && (
-        <div style={{ ...S.flexBetween, gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <button type="button" onClick={() => setPage(p => p - 1)} disabled={page === 0} style={pBtn(page === 0)}>Prev</button>
-            <span style={{ fontSize: 10, color: T.tx3 }}>{page + 1} / {pages}</span>
-            <button type="button" onClick={() => setPage(p => p + 1)} disabled={page >= pages - 1} style={pBtn(page >= pages - 1)}>Next</button>
-          </div>
-          <span style={{ fontSize: 11, color: T.tx3 }}>{count} vendors</span>
-        </div>
-      )}
-
-      <PbModal open={!!form} title={form?.id ? 'Edit vendor' : 'Add vendor'} onClose={close}>
-        {form && (
-          <form onSubmit={e => { e.preventDefault(); void save(); }}>
-            <Field label="Name" htmlFor="pbv-name">
-              <input id="pbv-name" autoFocus value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} maxLength={120} style={input44} />
-            </Field>
-            <Field label="Short code" htmlFor="pbv-code" hint="Optional — usable in tags as {vendor_code}, e.g. RG">
-              <input id="pbv-code" value={form.code} onChange={e => setForm({ ...form, code: e.target.value })} maxLength={20} style={{ ...input44, fontFamily: T.mono }} />
-            </Field>
-            <Field label="Notes" htmlFor="pbv-notes">
-              <textarea id="pbv-notes" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} maxLength={1000} rows={3}
-                style={{ ...S.fInput, height: 'auto', minHeight: 72, resize: 'vertical', lineHeight: 1.5 }} />
-            </Field>
-            {err && <div style={{ ...S.errorBox, marginBottom: 12 }}>{err}</div>}
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button type="button" onClick={close} style={{ ...S.btnGhost, minHeight: 44 }}>Cancel</button>
-              <button type="submit" style={{ ...S.btnPrimary, minHeight: 44, pointerEvents: saving ? 'none' : 'auto', opacity: saving ? 0.5 : 1 }}>{saving ? 'Saving…' : 'Save vendor'}</button>
-            </div>
-          </form>
-        )}
-      </PbModal>
+      {(count > VENDOR_PAGE || page > 0) && <Pager page={page} pageSize={VENDOR_PAGE} count={count} onPage={setPage} noun="vendor" />}
+      <VendorForm form={form} setForm={setForm} saving={saving} err={err} onSave={() => void save()} onClose={close}
+        toggle={phone && editing ? { active: editing.active, name: editing.name, busy: busy === editing.id, dim: !!busy && busy !== editing.id, onToggle: () => void toggle(editing) } : undefined} />
     </>
   );
 }

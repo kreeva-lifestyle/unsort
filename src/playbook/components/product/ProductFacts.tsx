@@ -1,13 +1,17 @@
 // The product's facts, editable. A field staff change joins `locked`, so the AI
 // reader never overwrites it. Filling the missing cost / category of a
 // "Needs info" product makes it Ready and sends it to the matching websites.
+// V2: a glass tile (the page places it with `className`); Save is the page's
+// gradient only when `primary` (no listing is waiting for approval).
 import { useState, type FormEvent } from 'react';
-import { T, S } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
 import type { AddToast } from '../PbToasts';
 import type { PbProduct } from '../../types';
 import { pbCall } from '../../data/pbFunctions';
 import { updateProduct, type ProductDetail, type VendorLite } from '../../data/products';
+import { pbErrorBox, pbInput, pbLabel, pbMeta, pbNum, pbTextarea, pbTile, pbTileTitle } from '../../pbTheme';
+import PbButton from '../ui/PbButton';
+import { KeptTag } from './detail/ListingField';
 import VendorSelect from './VendorSelect';
 import { numKey, splitList } from './status';
 
@@ -19,9 +23,9 @@ const toForm = (p: ProductDetail): Form => ({
   color: p.color ?? '', sizes: p.sizes.join(', '), cost_price: p.cost_price == null ? '' : String(p.cost_price), raw_text: p.raw_text ?? '',
 });
 
-export default function ProductFacts({ product, vendors, categories, onVendorCreated, onSaved, addToast }: {
+export default function ProductFacts({ product, vendors, categories, onVendorCreated, onSaved, addToast, className, primary = true }: {
   product: ProductDetail; vendors: VendorLite[]; categories: string[]; onVendorCreated: (v: VendorLite) => void;
-  onSaved: () => void; addToast: AddToast;
+  onSaved: () => void; addToast: AddToast; className?: string; primary?: boolean;
 }) {
   const [f, setF] = useState<Form>(() => toForm(product));
   const [err, setErr] = useState('');
@@ -73,51 +77,55 @@ export default function ProductFacts({ product, vendors, categories, onVendorCre
     } catch (e2) { setErr(friendlyError(e2)); } finally { setSaving(false); }
   };
 
-  const lock = (k: string) => product.locked.includes(k) &&
-    <span title="Kept as typed — the AI will not change it" style={{ ...S.badge, marginLeft: 6, background: T.glass2, color: T.tx3, letterSpacing: 0, textTransform: 'none' }}>kept</span>;
-  const input = (k: keyof Form, label: string, extra: Record<string, unknown> = {}) => (
-    <div>
-      <label htmlFor={`pb-f-${k}`} style={S.fLabel}>{label}{lock(k)}</label>
-      <input id={`pb-f-${k}`} value={f[k]} onChange={e => set(k)(e.target.value)} style={{ ...S.fInput, minHeight: 44 }} {...extra} />
+  const label = (k: string, text: string, htmlFor = `pb-f-${k}`) => (
+    <label htmlFor={htmlFor} style={{ ...pbLabel, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+      {text}{product.locked.includes(k) && <KeptTag hint="You changed this. The AI will not overwrite it." />}
+    </label>
+  );
+  const input = (k: keyof Form, text: string, extra: Record<string, unknown> = {}, mono = false) => (
+    <div style={{ minWidth: 0 }}>
+      {label(k, text)}
+      <input id={`pb-f-${k}`} value={f[k]} onChange={e => set(k)(e.target.value)} className="pb-input" style={{ ...pbInput, ...(mono ? pbNum : null) }} {...extra} />
     </div>
   );
   const cats = f.category && !categories.includes(f.category) ? [f.category, ...categories] : categories;
 
   return (
-    <form onSubmit={save} style={S.card}>
-      <div style={{ ...S.sectionTitle, marginBottom: 12 }}>Facts</div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: 10 }}>
-        {input('name', 'Name', { maxLength: 200 })}
-        {input('sku', 'SKU', { maxLength: 80 })}
-        <div>
-          <label htmlFor="pb-f-vendor" style={S.fLabel}>Vendor</label>
+    <form onSubmit={save} className={className} aria-labelledby="pb-facts-title"
+      style={{ ...pbTile, display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <h2 id="pb-facts-title" style={pbTileTitle}>Facts</h2>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: 16 }}>
+        {input('name', 'Name', { maxLength: 200, autoCapitalize: 'sentences' })}
+        {input('sku', 'SKU', { maxLength: 80, autoCapitalize: 'characters', autoCorrect: 'off', spellCheck: false }, true)}
+        <div style={{ minWidth: 0 }}>
+          {label('vendor_id', 'Vendor', 'pb-f-vendor')}
           <VendorSelect id="pb-f-vendor" value={f.vendor_id} vendors={vendors} onChange={set('vendor_id')} onCreated={onVendorCreated} />
         </div>
-        {input('cost_price', 'Cost price (₹)', { type: 'number', inputMode: 'decimal', min: 0, step: '0.01', onKeyDown: numKey })}
-        <div>
-          <label htmlFor="pb-f-category" style={S.fLabel}>Category{lock('category')}</label>
-          <select id="pb-f-category" value={f.category} onChange={e => set('category')(e.target.value)} style={{ ...S.fInput, minHeight: 44 }}>
+        {input('cost_price', 'Cost price (₹)', { type: 'number', inputMode: 'decimal', min: 0, step: '0.01', onKeyDown: numKey }, true)}
+        <div style={{ minWidth: 0 }}>
+          {label('category', 'Category')}
+          <select id="pb-f-category" value={f.category} onChange={e => set('category')(e.target.value)} className="pb-input" style={pbInput}>
             <option value="">— Not set —</option>
             {cats.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
         </div>
         {input('fabric', 'Fabric', { maxLength: 120 })}
         {input('color', 'Colour', { maxLength: 120 })}
-        {input('sizes', 'Sizes (comma list)', { placeholder: 'S, M, L' })}
+        {input('sizes', 'Sizes (comma list)', { placeholder: 'e.g. S, M, L' })}
       </div>
-      <div style={{ marginTop: 10 }}>
-        <label htmlFor="pb-f-raw" style={S.fLabel}>Details (vendor's post){lock('raw_text')}</label>
-        <textarea id="pb-f-raw" value={f.raw_text} onChange={e => set('raw_text')(e.target.value)} rows={4} maxLength={8000}
-          style={{ ...S.fInput, height: 'auto', minHeight: 90, resize: 'vertical', lineHeight: 1.5 }} />
+      <div style={{ minWidth: 0 }}>
+        {label('raw_text', 'Details (vendor’s post)', 'pb-f-raw')}
+        <textarea id="pb-f-raw" value={f.raw_text} onChange={e => set('raw_text')(e.target.value)} rows={4} maxLength={8000} className="pb-input"
+          style={{ ...pbTextarea, height: 'auto', minHeight: 112 }} />
       </div>
-      {err && <div style={{ ...S.errorBox, marginTop: 10 }}>{err}</div>}
-      {reading && <div style={{ fontSize: 11, color: T.tx3, marginTop: 10 }}>The AI is reading this product — wait a moment, then reload to edit.</div>}
-      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12 }}>
-        {changed.length > 0 && <button type="button" onClick={() => { setF(orig); setErr(''); }} style={{ ...S.btnGhost, minHeight: 44 }}>Undo changes</button>}
-        <button type="submit" disabled={off}
-          style={{ ...S.btnPrimary, minHeight: 44, opacity: off ? 0.5 : 1, pointerEvents: off ? 'none' : 'auto' }}>
-          {saving ? 'Saving…' : !changed.length && promote ? 'Mark ready' : 'Save facts'}
-        </button>
+      {err && <div role="alert" style={pbErrorBox}>{err}</div>}
+      {reading && <div style={pbMeta}>The AI is reading this product — wait a moment, then reload to edit.</div>}
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+        {changed.length > 0 && <PbButton dim={saving} onClick={() => { setF(orig); setErr(''); }}>Discard changes</PbButton>}
+        <PbButton type="submit" kind={primary ? 'primary' : 'secondary'} disabled={off && !saving} busy={saving} busyLabel="Saving…"
+          style={{ minWidth: 140, ...(off && !saving ? { pointerEvents: 'none' } : null) }}>
+          {!changed.length && promote ? 'Mark ready' : 'Save facts'}
+        </PbButton>
       </div>
     </form>
   );

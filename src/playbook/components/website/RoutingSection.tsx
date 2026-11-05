@@ -1,18 +1,21 @@
 // Routing: what happens when no rule matches (part of the draft), and the
 // ordered rules (saved one by one). The first enabled rule that matches decides.
+// Layout: (Rules 12) / (When no rule matches 6)(Send matching products now 6);
+// the pair stacks at 6 columns and on phone.
 import { useCallback, useEffect, useState } from 'react';
-import { T, S } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
-import Toggle from '../../../components/ui/Toggle';
-import ConfirmModal, { useConfirm } from '../../../components/ui/ConfirmModal';
-import Empty from '../../../components/ui/Empty';
+import { useConfirm } from '../../../components/ui/ConfirmModal';
+import PbConfirm from '../ui/PbConfirm';
 import type { AddToast } from '../PbToasts';
 import type { PbRoutingRule } from '../../types';
 import type { VendorLite } from '../../data/products';
 import { deleteRule, listRules, reorderRules, sendMatchingProducts, sentMessage, setRuleEnabled } from '../../data/websites';
 import { rupees } from '../product/status';
+import { PbButton } from '../ui';
 import RuleModal from './RuleModal';
 import { Section, Seg } from './ui';
+import { Cell, SectionGrid } from './sections/SectionGrid';
+import RuleRow, { RulesEmpty, RulesError, RulesSkeleton } from './sections/RuleRow';
 import type { Draft, SetDraft } from './WebsiteEditor';
 
 function summary(r: PbRoutingRule, vendors: VendorLite[]): string {
@@ -31,12 +34,15 @@ export default function RoutingSection({ siteId, draft, set, addToast, vendors, 
 }) {
   const [rules, setRules] = useState<PbRoutingRule[]>([]);
   const [loading, setLoading] = useState(true);
+  // A failed load is not "no rules": it shows the error with Try again.
+  const [loadErr, setLoadErr] = useState('');
+  const [retrying, setRetrying] = useState(false);
   const [busy, setBusy] = useState('');
   const [editing, setEditing] = useState<PbRoutingRule | 'new' | null>(null);
   const { ask, modalProps } = useConfirm();
 
   const load = useCallback(async () => {
-    try { setRules(await listRules(siteId)); } catch (e) { addToast(friendlyError(e), 'error'); } finally { setLoading(false); }
+    try { setRules(await listRules(siteId)); setLoadErr(''); } catch (e) { const m = friendlyError(e); setLoadErr(m); addToast(m, 'error'); } finally { setLoading(false); }
   }, [siteId, addToast]);
   useEffect(() => { void load(); }, [load]);
 
@@ -72,62 +78,51 @@ export default function RoutingSection({ siteId, draft, set, addToast, vendors, 
     catch (e) { addToast(friendlyError(e), 'error'); } finally { setBusy(''); }
   };
 
-  const small = (key: string) => ({ ...S.btnGhost, minHeight: 44, minWidth: 44, padding: '0 10px', pointerEvents: busy ? 'none' as const : 'auto' as const, opacity: busy === key ? 0.5 : 1 });
   const nextPosition = (rules.reduce((m, r) => Math.max(m, r.position), 0) || 0) + 10;
+  const retry = async () => { setRetrying(true); await load(); setRetrying(false); };
+  const ownPrice = (r: PbRoutingRule) => (r.price_override ? `+${r.price_override.markup_pct ?? 0}% + ${rupees(r.price_override.add_flat ?? 0)}` : null);
 
   return (
     <>
-      <Section title="When no rule matches" hint="Saved with “Save changes”.">
-        <Seg label="Default routing" value={draft.routing_default} onChange={v => set({ routing_default: v })} options={[
-          { id: 'none', label: 'Do not list it', hint: 'Safe: only products a rule sends' },
-          { id: 'all', label: 'List everything', hint: 'Every product unless a rule keeps it off' },
-        ]} />
-      </Section>
+      <SectionGrid>
+        <Cell>
+          <Section title="Rules" hint="Checked top to bottom; the first enabled rule that matches decides. Each change saves at once and applies to products that arrive or are re-routed after it."
+            right={<PbButton icon="plus" onClick={() => setEditing('new')}>Add rule</PbButton>}>
+            {loading ? <RulesSkeleton /> : loadErr && rules.length === 0 ? <RulesError message={loadErr} onRetry={() => void retry()} busy={retrying} />
+              : rules.length === 0 ? <RulesEmpty sendsAll={draft.routing_default === 'all'} /> : (
+                <ol aria-label="Routing rules, first match wins" style={{ display: 'flex', flexDirection: 'column', gap: 8, margin: 0, padding: 0 }}>
+                  {rules.map((r, i) => (
+                    <RuleRow key={r.id} rule={r} index={i} count={rules.length} summary={summary(r, vendors)} price={ownPrice(r)} busy={busy}
+                      onMove={dir => move(i, dir)} onToggle={() => toggle(r)} onEdit={() => setEditing(r)} onDelete={() => void remove(r)} />
+                  ))}
+                </ol>
+              )}
+          </Section>
+        </Cell>
 
-      <Section title="Rules" hint="Checked top to bottom; the first enabled rule that matches decides. Each change saves at once and applies to products that arrive or are re-routed after it."
-        right={<button type="button" onClick={() => setEditing('new')} style={{ ...S.btnPrimary, minHeight: 44 }}>+ Add rule</button>}>
-        {loading ? <div style={S.emptyState}>Loading rules…</div> : rules.length === 0 ? (
-          <Empty icon="clipboard" title="No rules yet" message={draft.routing_default === 'all' ? 'Every product goes to this store.' : 'Nothing goes to this store until you add a rule (or choose “List everything”).'} />
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {rules.map((r, i) => (
-              <div key={r.id} style={{ border: `1px solid ${T.bd}`, borderRadius: T.r, padding: 12, background: T.glass1, opacity: r.enabled ? 1 : 0.6 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontFamily: T.mono, fontSize: 11, color: T.tx3, width: 18 }}>{i + 1}</span>
-                  <span style={{ ...S.badge, background: r.action === 'include' ? T.gr22 : T.re44, color: r.action === 'include' ? T.gr : T.re }}>{r.action === 'include' ? 'SEND' : 'KEEP OFF'}</span>
-                  <span style={{ fontSize: 13, fontWeight: 600, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name || 'Unnamed rule'}</span>
-                  <span style={{ display: 'inline-flex', pointerEvents: busy ? 'none' : 'auto', opacity: busy === `en-${r.id}` ? 0.5 : 1 }}>
-                    <Toggle size="sm" on={r.enabled} onToggle={() => toggle(r)} label={`Rule ${r.name || i + 1} enabled`} />
-                  </span>
-                </div>
-                <div style={{ fontSize: 12, color: T.tx2, margin: '6px 0 8px 26px', lineHeight: 1.5 }}>
-                  {summary(r, vendors)}
-                  {r.price_override && <span style={{ color: T.yl }}> · own price: +{r.price_override.markup_pct ?? 0}% + {rupees(r.price_override.add_flat ?? 0)}</span>}
-                </div>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginLeft: 26 }}>
-                  <button type="button" aria-label="Move up" disabled={i === 0} onClick={() => move(i, -1)} style={{ ...small(`move-${r.id}`), opacity: i === 0 ? 0.3 : 1 }}>&#8593;</button>
-                  <button type="button" aria-label="Move down" disabled={i === rules.length - 1} onClick={() => move(i, 1)} style={{ ...small(`move-${r.id}`), opacity: i === rules.length - 1 ? 0.3 : 1 }}>&#8595;</button>
-                  <button type="button" onClick={() => setEditing(r)} style={small(`edit-${r.id}`)}>Edit</button>
-                  <button type="button" onClick={() => void remove(r)} style={{ ...small(`del-${r.id}`), ...S.btnDanger, minHeight: 44 }}>{busy === `del-${r.id}` ? 'Deleting…' : 'Delete'}</button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </Section>
-
-      <Section title="Products already in the directory" hint="Rules apply to products that arrive or are checked again after a change. This sends every Ready product that matches the saved rules (and the saved “When no rule matches” choice) to this website now. The website must be switched on.">
-        <button type="button" onClick={() => void send()} style={{ ...S.btnGhost, minHeight: 44, pointerEvents: busy ? 'none' : 'auto', opacity: busy ? 0.5 : 1 }}>
-          {busy === 'send' ? 'Sending…' : 'Send matching products now'}
-        </button>
-      </Section>
+        <Cell span={6}>
+          <Section title="When no rule matches" hint="Saved with “Save changes”.">
+            <Seg label="Default routing" value={draft.routing_default} onChange={v => set({ routing_default: v })} options={[
+              { id: 'none', label: 'Do not list it', hint: 'Safe: only products a rule sends' },
+              { id: 'all', label: 'List everything', hint: 'Every product unless a rule keeps it off' },
+            ]} />
+          </Section>
+        </Cell>
+        <Cell span={6}>
+          <Section title="Products already in the directory" hint="Rules apply to products that arrive or are checked again after a change. This sends every Ready product that matches the saved rules (and the saved “When no rule matches” choice) to this website now. The website must be switched on.">
+            <PbButton icon="arrowUpRight" onClick={() => void send()} busy={busy === 'send'} busyLabel="Sending…" style={busy && busy !== 'send' ? { pointerEvents: 'none', opacity: 0.5 } : undefined}>
+              Send matching products now
+            </PbButton>
+          </Section>
+        </Cell>
+      </SectionGrid>
 
       {editing && (
         <RuleModal siteId={siteId} rule={editing === 'new' ? null : editing} nextPosition={nextPosition} vendors={vendors} categories={categories}
           addToast={addToast} onClose={() => setEditing(null)}
           onSaved={r => { setRules(list => (list.some(x => x.id === r.id) ? list.map(x => (x.id === r.id ? r : x)) : [...list, r])); setEditing(null); }} />
       )}
-      <ConfirmModal {...modalProps} />
+      <PbConfirm {...modalProps} />
     </>
   );
 }

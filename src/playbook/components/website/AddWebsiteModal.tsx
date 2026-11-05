@@ -1,12 +1,15 @@
 // New website: only the name and the myshopify.com domain. Everything else
 // starts from the column defaults (switched off, routing "none") and is set in
-// the editor that opens right after.
+// the editor that opens right after. V2: phone sheet with one full-width
+// primary (Cancel is the ×); desktop modal with Cancel + the primary.
 import { useState } from 'react';
-import { S } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
 import type { AddToast } from '../PbToasts';
 import type { PbWebsite } from '../../types';
+import { pbErrorBox, pbNum } from '../../pbTheme';
+import { useIsPhone } from '../../hooks/useIsPhone';
 import PbModal from '../product/PbModal';
+import { PbButton } from '../ui';
 import { cleanDomain, createWebsite, domainProblem } from '../../data/websites';
 import { Field, input44 } from './ui';
 
@@ -17,6 +20,7 @@ export default function AddWebsiteModal({ open, onClose, onCreated, addToast }: 
   const [domain, setDomain] = useState('');
   const [err, setErr] = useState('');
   const [saving, setSaving] = useState(false);
+  const phone = useIsPhone();
 
   const close = () => { setName(''); setDomain(''); setErr(''); setSaving(false); onClose(); };
 
@@ -39,22 +43,24 @@ export default function AddWebsiteModal({ open, onClose, onCreated, addToast }: 
   };
 
   return (
-    <PbModal open={open} title="Add website" onClose={close}>
-      <form onSubmit={e => { e.preventDefault(); void save(); }}>
-        <Field label="Name" htmlFor="pbw-name" hint="How you call it, e.g. Indya Ethnic">
-          <input id="pbw-name" autoFocus value={name} onChange={e => setName(e.target.value)} maxLength={80} style={input44} />
+    <PbModal open={open} title="Add website" onClose={close} guard={!!(name.trim() || domain.trim())}
+      footer={
+        <div style={{ display: 'flex', gap: 16, justifyContent: 'flex-end' }}>
+          {!phone && <PbButton onClick={close} dim={saving}>Cancel</PbButton>}
+          <PbButton type="submit" form="pb-website-form" kind="primary" block={phone} busy={saving} busyLabel="Adding…">Add website</PbButton>
+        </div>
+      }>
+      <form id="pb-website-form" onSubmit={e => { e.preventDefault(); void save(); }} noValidate>
+        <Field label="Name" htmlFor="pbw-name" hint="What you call it, e.g. Indya Ethnic">
+          <input id="pbw-name" autoFocus value={name} onChange={e => setName(e.target.value)} maxLength={80} className="pb-input"
+            aria-describedby="pbw-name-hint" autoCapitalize="words" enterKeyHint="next" style={input44} />
         </Field>
         <Field label="Store domain" htmlFor="pbw-domain" hint="The myshopify.com address (Shopify admin → Settings → Domains), not your custom domain.">
-          <input id="pbw-domain" value={domain} onChange={e => setDomain(e.target.value)} placeholder="my-store.myshopify.com"
-            autoCapitalize="none" autoCorrect="off" spellCheck={false} maxLength={120} style={input44} />
+          <input id="pbw-domain" value={domain} onChange={e => setDomain(e.target.value)} placeholder="my-store.myshopify.com" className="pb-input"
+            aria-describedby="pbw-domain-hint" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} maxLength={120} enterKeyHint="done"
+            style={{ ...input44, ...pbNum }} />
         </Field>
-        {err && <div style={{ ...S.errorBox, marginBottom: 12 }}>{err}</div>}
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-          <button type="button" onClick={close} style={{ ...S.btnGhost, minHeight: 44 }}>Cancel</button>
-          <button type="submit" style={{ ...S.btnPrimary, minHeight: 44, pointerEvents: saving ? 'none' : 'auto', opacity: saving ? 0.5 : 1 }}>
-            {saving ? 'Saving…' : 'Add website'}
-          </button>
-        </div>
+        {err && <div role="alert" style={pbErrorBox}>{err}</div>}
       </form>
     </PbModal>
   );

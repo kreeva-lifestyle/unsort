@@ -47,7 +47,7 @@ If an answer is unknown, ask the owner one short question. Do not fill the gap w
 |---|---|
 | Short task, 6 fields or fewer, one decision, page behind gives context | Bottom sheet on phone, `PbModal` on desktop |
 | Long form, several steps, product detail, has its own back history | Full page, opened in place (see §5) |
-| Confirm an irreversible or external action | `useConfirm()` + `ConfirmModal` (shared) |
+| Confirm an irreversible or external action | `useConfirm()` (shared) + `PbConfirm` (Playbook) |
 | Change one value in a row (price, on/off) | Inline edit in the row, saved on blur or Enter |
 | Rare action on one item | Header action on desktop, `ActionSheet` (shared) on phone |
 
