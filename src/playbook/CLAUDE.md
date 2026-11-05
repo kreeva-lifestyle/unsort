@@ -61,6 +61,10 @@ mobile". Playbook instead:
   which is grandfathered and must not grow).
 - Reading DailyWork data (e.g. sales for a dashboard) goes through a view or
   RPC built for Playbook, never by writing to DailyWork tables.
+- `npm run build` does not type-check edge functions. Before merging a change
+  under `supabase/functions/pb-products/`, run `deno check
+  supabase/functions/pb-products/index.ts` (or `tsc --noEmit` over the folder
+  with a small `Deno` stub) — a missing import there is a runtime 500.
 
 ## Brand
 - Logo: `PlaybookMark` / `DivisionLogo division="playbook"` from
