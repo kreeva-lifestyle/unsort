@@ -6,6 +6,7 @@
 // Minis hub for every tool, so a tool costs its own chunk only when tapped.
 import { lazy, type ComponentType } from 'react';
 import { T, S } from './theme';
+import { logError } from './errorLogger';
 
 export const ChunkErrorScreen = () => (
   <div style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
@@ -19,7 +20,7 @@ export const ChunkErrorScreen = () => (
 
 // `Fallback` replaces the generic screen (Playbook's offers a way back to DailyWork).
 export const retryImport = (fn: () => Promise<any>, Fallback: ComponentType = ChunkErrorScreen) => lazy(() =>
-  fn().catch(() => {
+  fn().catch((err: unknown) => {
     // Offline, a reload cannot fetch anything either — it would only wipe
     // the in-memory state of every mounted tab (a half-filled form, an
     // imported sheet). Show the screen instead; its Reload button is there
@@ -27,7 +28,13 @@ export const retryImport = (fn: () => Promise<any>, Fallback: ComponentType = Ch
     if (!navigator.onLine) return { default: Fallback };
     let last = 0;
     try { last = Number(sessionStorage.getItem('chunkReloadedAt')) || 0; } catch {}
-    if (Date.now() - last > 30_000) {
+    const reload = Date.now() - last > 30_000;
+    // The browser's message names the chunk (Chrome) or just says the import
+    // failed (Safari); either way Settings → Error Logs then shows WHICH page
+    // failed on WHICH build instead of a silent "couldn't open" on a phone.
+    const m = err instanceof Error ? err.message : String(err);
+    void logError(new Error(`chunk load failed (${reload ? 'reloading once' : 'already reloaded, showing fallback'}): ${m}`), 'manual');
+    if (reload) {
       try { sessionStorage.setItem('chunkReloadedAt', String(Date.now())); } catch {}
       window.location.reload();
       return new Promise<never>(() => {});

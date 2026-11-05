@@ -44,6 +44,12 @@ jobs:
       - name: Build
         run: npm run build
 
+      # Every build renames every chunk. Carry the previous builds' chunks
+      # into this deploy so a tab opened before it can still load its pages
+      # (scripts/keep-previous-assets.cjs; it never fails the deploy).
+      - name: Keep previous builds' chunks
+        run: node scripts/keep-previous-assets.cjs
+
       - name: Setup Pages
         uses: actions/configure-pages@v4
 
