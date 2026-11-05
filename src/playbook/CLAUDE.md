@@ -13,8 +13,12 @@ should do before building it — do not borrow DailyWork features by guess.**
 The root `CLAUDE.md` is DailyWork's rulebook. From it, these apply here
 unchanged: the auto-deploy flow (commit → PR → squash merge → wait for the
 Pages run → smoke steps), the mandatory pre-merge self-review, engineering
-ethics, database sustainability, theme tokens, inputs/buttons/modals/tables,
-and the patterns to preserve (friendlyError on every toast, RPCs for
+ethics, database sustainability, token discipline (no hex, no hex alpha
+suffix, OKLCH tokens only), the modal mechanics (createPortal, `modal-inner`,
+scroll lock, reset on close), the two-signal async buttons, 44 px targets,
+16 px phone inputs and the table rules. Colour, size and radius values for new
+or redesigned screens come from `src/playbook/DESIGN.md` (PB tokens), not from
+`T`/`S`. Also the patterns to preserve (friendlyError on every toast, RPCs for
 multi-table writes, escHtml/csvCell, no `select('*')` on growing tables).
 
 Layout rules that do NOT carry over (they assume DailyWork's sidebar and
@@ -23,14 +27,13 @@ mobile". Playbook instead:
 - scrolls inside its own container (`PlaybookApp` root: `height: 100%;
   overflow-y: auto`) — `#root` is a fixed, non-scrolling frame;
 - pads with the safe-area insets (`max(16px, env(safe-area-inset-*))`);
-- keeps actions visible in its header or on the page (no FAB until Playbook
-  has its own navigation).
+- keeps actions visible in its header or on the page (never a FAB).
 
 ## Where Playbook code lives
 - Everything Playbook goes under `src/playbook/`:
-  - `PlaybookApp.tsx` — the shell (header, division switch, logout) and,
-    later, Playbook's own navigation. Keep it thin.
-  - `PlaybookDashboard.tsx` — the home page (a placeholder today).
+  - `PlaybookApp.tsx` — the shell (header, division switch, logout, `PbNav`,
+    toasts). Keep it thin.
+  - `PlaybookDashboard.tsx` — the home page.
   - New pages: `src/playbook/pages/`; components: `src/playbook/components/`;
     data access: `src/playbook/data/` (one file per area); hooks:
     `src/playbook/hooks/`.
@@ -66,7 +69,10 @@ mobile". Playbook instead:
   supabase/functions/pb-products/index.ts` (or `tsc --noEmit` over the folder
   with a small `Deno` stub) — a missing import there is a runtime 500.
 
-## Design — read `src/playbook/DESIGN.md` before any Playbook UI work
+## Design — load the `playbook-design` skill before any Playbook UI work
+- The skill (`.claude/skills/playbook-design/SKILL.md`) has you read
+  `src/playbook/DESIGN.md` and the guides in `src/playbook/design/` before
+  writing UI, and ends with the review checklist and screenshots.
 - The owner approved the **"V2 · Bento glass"** look (2026-11-05): dark
   backdrop with soft glows, frosted-glass tiles on a 12-column bento grid,
   frosted-glass selected states, a 4-tab glass bar on phone, and slow hover
@@ -74,8 +80,9 @@ mobile". Playbook instead:
   checklist, plus a link to the mock-ups. Every new or redesigned Playbook
   screen follows it. Put its values in a Playbook token file rather than
   inline literals.
-- Until the redesign is built, the screens below still use the old look and
-  logo. Move them over only when the owner asks.
+- Until the redesign is built, the existing screens (`PlaybookDashboard.tsx`,
+  `pages/*`, `components/*`) still use the old look and logo. Move them over
+  only when the owner asks.
 
 ## Brand
 - Logo: `PlaybookMark` / `DivisionLogo division="playbook"` from
