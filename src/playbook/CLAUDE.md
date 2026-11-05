@@ -66,6 +66,17 @@ mobile". Playbook instead:
   supabase/functions/pb-products/index.ts` (or `tsc --noEmit` over the folder
   with a small `Deno` stub) — a missing import there is a runtime 500.
 
+## Design — read `src/playbook/DESIGN.md` before any Playbook UI work
+- The owner approved the **"V2 · Bento glass"** look (2026-11-05): dark
+  backdrop with soft glows, frosted-glass tiles on a 12-column bento grid,
+  frosted-glass selected states, a 4-tab glass bar on phone, and slow hover
+  motion. `DESIGN.md` holds the tokens, recipes, layouts, logo and a
+  checklist, plus a link to the mock-ups. Every new or redesigned Playbook
+  screen follows it. Put its values in a Playbook token file rather than
+  inline literals.
+- Until the redesign is built, the screens below still use the old look and
+  logo. Move them over only when the owner asks.
+
 ## Brand
 - Logo: `PlaybookMark` / `DivisionLogo division="playbook"` from
   `src/components/brand/DivisionLogos.tsx` — an open book whose spine is a
