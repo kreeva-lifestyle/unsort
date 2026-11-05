@@ -44,6 +44,8 @@ Build these once in `src/playbook/pbTheme.ts`, exporting `PB` the way `T` works.
 | `onActive` | `oklch(0.99 0.01 80)` | text in the active recipe |
 | `reviewBg` / `reviewBd` | `oklch(0.80 0.15 75 / .12)` / `oklch(0.85 0.12 75 / .35)` | review tint, border |
 | `failedBg` / `failedBd` | `oklch(0.62 0.2 25 / .16)` / `oklch(0.75 0.15 25 / .4)` | failed tint, border |
+| `liveBg` / `liveBd` | `oklch(0.80 0.17 150 / .10)` / `oklch(0.80 0.17 150 / .30)` | tip / success box tint, border |
+| `onBrandBd` | `oklch(0.16 0.03 40 / .45)` | outline of a secondary button on the hero gradient |
 | `activeBd` / `activeBar` / `activeGlow` | `oklch(1 0 0 / .30)` / `oklch(0.72 0.19 40)` / `oklch(0.64 0.21 28 / .22)` | active border, side-list bar, glow |
 | `ctl` / `ctlBd` / `inputBd` | `oklch(1 0 0 / .06)` / `oklch(1 0 0 / .14)` / `oklch(1 0 0 / .36)` | control fill, secondary border, input border |
 | `dangerBd` / `dangerTx` | `oklch(0.75 0.15 25 / .4)` / `oklch(0.88 0.08 25)` | destructive button |

@@ -1,14 +1,20 @@
 // Add / edit one routing rule: include or exclude, the conditions (all given
 // ones must match; an empty one is ignored) and an optional price override.
+// V2: a sheet on phone (one full-width primary in the PbModal footer, outside
+// the scrolling body; Cancel is the ×), a centred modal on desktop (Cancel,
+// then Save rule). An edited rule is guarded against scrim tap / swipe-down.
 import { useState } from 'react';
-import { T, S } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
-import Toggle from '../../../components/ui/Toggle';
+import PbSwitch from '../ui/PbSwitch';
 import type { AddToast } from '../PbToasts';
 import type { PbRoutingRule, PbRuleConditions } from '../../types';
 import type { VendorLite } from '../../data/products';
 import { saveRule, type RuleDraft } from '../../data/websites';
 import PbModal from '../product/PbModal';
+import { PB, pbErrorBox, pbLabel, pbMeta } from '../../pbTheme';
+import { useIsPhone } from '../../hooks/useIsPhone';
+import { Dot } from '../product/status';
+import { PbButton, PbTag } from '../ui';
 import { ChipsInput, Field, Grid2, NumInput, PickChips, Seg, input44 } from './ui';
 
 const EMPTY: RuleDraft = { name: '', enabled: true, action: 'include', conditions: {}, price_override: null };
@@ -30,8 +36,10 @@ export default function RuleModal({ siteId, rule, nextPosition, vendors, categor
   onClose: () => void; onSaved: (r: PbRoutingRule) => void; addToast: AddToast;
 }) {
   const [d, setD] = useState<RuleDraft>(() => (rule ? { name: rule.name, enabled: rule.enabled, action: rule.action, conditions: { ...rule.conditions }, price_override: rule.price_override } : EMPTY));
+  const [initial] = useState(() => JSON.stringify(d));
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
+  const phone = useIsPhone();
   const c = d.conditions;
   const putC = (x: Partial<PbRuleConditions>) => setD(v => ({ ...v, conditions: { ...v.conditions, ...x } }));
   const vendorOpts = vendors.filter(v => v.active || c.vendor_ids?.includes(v.id)).map(v => ({ id: v.id, label: v.active ? v.name : `${v.name} (inactive)` }));
@@ -52,20 +60,33 @@ export default function RuleModal({ siteId, rule, nextPosition, vendors, categor
   };
 
   const none = Object.keys(cleanConditions(c)).length === 0;
+  const po = d.price_override;
+  const setPo = (x: { markup_pct?: number; add_flat?: number }) => setD(v => ({ ...v, price_override: { ...v.price_override, ...x } }));
   return (
-    <PbModal open title={rule ? 'Edit rule' : 'Add rule'} onClose={onClose} width={560}>
-      <form onSubmit={e => { e.preventDefault(); void save(); }}>
+    <PbModal open title={rule ? 'Edit rule' : 'Add rule'} onClose={onClose} width={560} guard={JSON.stringify(d) !== initial}
+      footer={
+        <div style={{ display: 'flex', gap: 16, justifyContent: 'flex-end' }}>
+          {!phone && <PbButton onClick={onClose} dim={saving}>Cancel</PbButton>}
+          <PbButton kind="primary" type="submit" form="pb-rule-form" block={phone} busy={saving} busyLabel="Saving…">Save rule</PbButton>
+        </div>
+      }>
+      <form id="pb-rule-form" onSubmit={e => { e.preventDefault(); void save(); }} style={{ display: 'flex', flexDirection: 'column' }}>
         <Field label="Rule name" htmlFor="pbr-name" hint="For you, e.g. “Rangoli sarees” or “Nothing under ₹500”">
-          <input id="pbr-name" value={d.name} onChange={e => setD(v => ({ ...v, name: e.target.value }))} maxLength={80} style={input44} />
+          <input id="pbr-name" value={d.name} onChange={e => setD(v => ({ ...v, name: e.target.value }))} maxLength={80} aria-describedby="pbr-name-hint" className="pb-input" style={input44} />
         </Field>
         <Field label="When a product matches">
           <Seg label="Rule action" value={d.action} onChange={v => setD(x => ({ ...x, action: v }))} options={[
-            { id: 'include', label: 'Send it to this store' }, { id: 'exclude', label: 'Keep it off this store' },
+            { id: 'include', label: 'Send it to this store', hint: 'Matching products are listed here' },
+            { id: 'exclude', label: 'Keep it off this store', hint: 'Matching products are not listed here' },
           ]} />
         </Field>
-        <div style={{ ...S.fLabel, marginTop: 4, color: T.tx2 }}>Conditions — all that you fill must match</div>
-        <Field label="Vendors"><PickChips options={vendorOpts} selected={c.vendor_ids ?? []} onChange={v => putC({ vendor_ids: v })} empty="No vendors yet — add them on the Vendors page." /></Field>
-        <Field label="Categories"><PickChips options={catOpts} selected={c.categories ?? []} onChange={v => putC({ categories: v })} empty="No categories — add them in Settings." /></Field>
+
+        <div style={{ borderTop: `1px solid ${PB.tileBd}`, paddingTop: 16, marginBottom: 16 }}>
+          <h3 style={{ ...pbLabel, margin: 0 }}>Conditions</h3>
+          <div style={pbMeta}>All that you fill must match; an empty one is ignored.</div>
+        </div>
+        <Field label="Vendors"><PickChips label="Vendors" options={vendorOpts} selected={c.vendor_ids ?? []} onChange={v => putC({ vendor_ids: v })} empty="No vendors yet — add them on the Vendors page." /></Field>
+        <Field label="Categories"><PickChips label="Categories" options={catOpts} selected={c.categories ?? []} onChange={v => putC({ categories: v })} empty="No categories — add them in Settings." /></Field>
         <Field label="Fabrics" htmlFor="pbr-fab" hint="Any of these (not case-sensitive)">
           <ChipsInput id="pbr-fab" values={c.fabrics ?? []} onChange={v => putC({ fabrics: v })} placeholder="e.g. Silk" />
         </Field>
@@ -76,28 +97,36 @@ export default function RuleModal({ siteId, rule, nextPosition, vendors, categor
         <Field label="Keywords" htmlFor="pbr-kw" hint="Any of these words in the name, SKU, details or AI-read attributes">
           <ChipsInput id="pbr-kw" values={c.keywords ?? []} onChange={v => putC({ keywords: v })} placeholder="e.g. bridal" />
         </Field>
-        {none && <div style={{ ...S.warningBox, marginBottom: 14 }}>No conditions: this rule matches every product.</div>}
+        {none && (
+          <div role="status" style={{ marginBottom: 16, padding: '12px 16px', borderRadius: PB.r.input, background: PB.reviewBg, border: `1px solid ${PB.reviewBd}` }}>
+            <Dot color={PB.review} label="No conditions: this rule matches every product." style={{ whiteSpace: 'normal', fontSize: 13, color: PB.tx }} />
+          </div>
+        )}
 
         {d.action === 'include' && (
-          <div style={{ ...S.card, padding: 12, marginBottom: 14 }}>
-            <div style={{ ...S.flexBetween, gap: 10 }}>
-              <span style={{ fontSize: 12, color: T.tx2 }}>Own price for these products (replaces the store's markup and add ₹)</span>
-              <Toggle on={!!d.price_override} label="Price override"
-                onToggle={() => setD(v => ({ ...v, price_override: v.price_override ? null : { markup_pct: 100, add_flat: 0 } }))} />
+          <div style={{ borderTop: `1px solid ${PB.tileBd}`, paddingTop: 16, marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <span style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+                <span style={{ ...pbLabel, margin: 0 }}>Own price</span>
+                <span style={pbMeta}>For these products — replaces the store's markup and add ₹.</span>
+              </span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+                <PbTag>{po ? 'On' : 'Off'}</PbTag>
+                <PbSwitch on={!!po} label="Price override"
+                  onToggle={() => setD(v => ({ ...v, price_override: v.price_override ? null : { markup_pct: 100, add_flat: 0 } }))} />
+              </span>
             </div>
-            {d.price_override && (
-              <Grid2>
-                <Field label="Markup %" htmlFor="pbr-mk"><NumInput id="pbr-mk" value={d.price_override.markup_pct ?? 0} max={1000} onChange={v => setD(x => ({ ...x, price_override: { ...x.price_override, markup_pct: v ?? 0 } }))} /></Field>
-                <Field label="Add ₹" htmlFor="pbr-add"><NumInput id="pbr-add" value={d.price_override.add_flat ?? 0} max={1000000} onChange={v => setD(x => ({ ...x, price_override: { ...x.price_override, add_flat: v ?? 0 } }))} /></Field>
-              </Grid2>
+            {po && (
+              <div style={{ marginTop: 16 }}>
+                <Grid2>
+                  <Field label="Markup %" htmlFor="pbr-mk"><NumInput id="pbr-mk" value={po.markup_pct ?? 0} max={1000} onChange={v => setPo({ markup_pct: v ?? 0 })} /></Field>
+                  <Field label="Add ₹" htmlFor="pbr-add"><NumInput id="pbr-add" value={po.add_flat ?? 0} max={1000000} onChange={v => setPo({ add_flat: v ?? 0 })} /></Field>
+                </Grid2>
+              </div>
             )}
           </div>
         )}
-        {err && <div style={{ ...S.errorBox, marginBottom: 12 }}>{err}</div>}
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-          <button type="button" onClick={onClose} style={{ ...S.btnGhost, minHeight: 44 }}>Cancel</button>
-          <button type="submit" style={{ ...S.btnPrimary, minHeight: 44, pointerEvents: saving ? 'none' : 'auto', opacity: saving ? 0.5 : 1 }}>{saving ? 'Saving…' : 'Save rule'}</button>
-        </div>
+        {err && <div role="alert" style={{ ...pbErrorBox, marginBottom: 16, overflowWrap: 'anywhere' }}>{err}</div>}
       </form>
     </PbModal>
   );

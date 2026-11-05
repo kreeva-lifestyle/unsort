@@ -1,23 +1,39 @@
 // Buttons under the listing editor. Unsaved edits are saved first, so an
 // action never runs on stale text. Each button shows "…ing" while it works.
-import type { CSSProperties } from 'react';
-import ConfirmModal, { useConfirm } from '../../../components/ui/ConfirmModal';
-import { S } from '../../../lib/theme';
+// V2: one gradient per view (Save when edited, else the status's main step).
+// The editor renders this twice: part="primary" in the sheet footer (always in
+// view, full width on phone) and part="rest" in the body — the other steps,
+// then "Remove from site" on its own row, away from the primary.
+import { useConfirm } from '../../../components/ui/ConfirmModal';
+import PbConfirm from '../ui/PbConfirm';
 import { friendlyError } from '../../../lib/friendlyError';
 import type { AddToast } from '../PbToasts';
 import { pbCall } from '../../data/pbFunctions';
-import { approveListing, getListing, type ListingFull } from '../../data/listings';
+import { getListing, type ListingFull } from '../../data/listings';
+import { PB } from '../../pbTheme';
+import PbButton from '../ui/PbButton';
+import { useIsPhone } from '../../hooks/useIsPhone';
+import { approveCall, approveDone, canPublish, isRemoved, onShopify as onShopifyOf, publishBusy, publishCall, publishDone, publishLabel } from './detail/listingCalls';
 
 type Props = {
+  part: 'primary' | 'rest';
   listing: ListingFull; dirty: boolean; busy: string | null; setBusy: (b: string | null) => void;
   save: () => Promise<boolean>; onSave: () => void; onUpdated: (l: ListingFull) => void; addToast: AddToast;
 };
 
-export default function ListingActions({ listing: l, dirty, busy, setBusy, save, onSave, onUpdated, addToast }: Props) {
+/** Which button is the gradient: Save when edited; else Approve (review), Publish, or "Put back on site" (regen when removed). */
+export function listingPrimary(l: ListingFull, dirty: boolean): 'save' | 'approve' | 'publish' | 'regen' | null {
+  const removed = isRemoved(l);
+  const regen = l.status !== 'generating' && (!removed || !l.generated_at);
+  return dirty ? 'save' : l.status === 'review' ? 'approve' : canPublish(l) ? 'publish' : regen && removed ? 'regen' : null;
+}
+
+export default function ListingActions({ part, listing: l, dirty, busy, setBusy, save, onSave, onUpdated, addToast }: Props) {
   const { ask, modalProps } = useConfirm();
-  const onShopify = !!l.shopify_product_id;
+  const phone = useIsPhone();
+  const onShopify = onShopifyOf(l);
   const working = l.status === 'generating';
-  const removed = l.status === 'skipped';
+  const removed = isRemoved(l);
   // Removed after it was written → "Put back on site" publishes it again. Removed (or skipped by
   // routing / archive) before it was ever written → writing it is how it comes back (generate_listing).
   const written = !!l.generated_at;
@@ -45,36 +61,48 @@ export default function ListingActions({ listing: l, dirty, busy, setBusy, save,
     if (ok) await run('remove', () => pbCall('unpublish_listing', { listing_id: l.id }), 'Removed from the website');
   };
 
-  const btn = (style: CSSProperties): CSSProperties => ({
-    ...style, minHeight: 44, flex: '1 1 140px', opacity: busy ? 0.5 : 1, pointerEvents: busy ? 'none' : 'auto',
+  const review = l.status === 'review';
+  const publish = canPublish(l);
+  const regen = !working && (!removed || !written);
+  const primary = listingPrimary(l, dirty);
+  // Each button shows in exactly one part: the primary in the footer, the rest in the body.
+  const here = (key: string) => (part === 'primary') === (primary === key);
+  const props = (key: string) => ({
+    kind: primary === key ? 'primary' as const : 'secondary' as const,
+    busy: busy === key, dim: !!busy && busy !== key,
+    style: { flex: part === 'rest' || phone ? '1 1 160px' : '0 1 auto' },
   });
 
+  if (part === 'primary') return primary ? <div style={{ display: 'flex', justifyContent: 'flex-end' }}>{buttons()}</div> : null;
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 6 }}>
-      {dirty && <button type="button" onClick={onSave} style={btn(S.btnPrimary)}>{busy === 'save' ? 'Saving…' : 'Save changes'}</button>}
-      {l.status === 'review' && (
-        <button type="button" onClick={() => run('approve', () => approveListing(l), r => ((r as { paused?: boolean })?.paused
-          ? 'Approved — automation is paused, so it is sent when it is resumed (or tap Publish now)'
-          : 'Approved — it will publish within a minute'))} style={btn(S.btnSuccessSolid)}>
-          {busy === 'approve' ? 'Approving…' : 'Approve'}
-        </button>
-      )}
-      {(['review', 'failed', 'published', 'publishing'].includes(l.status) || (removed && written)) && (
-        <button type="button" onClick={() => run('publish', () => pbCall('publish_listing', { listing_id: l.id }), removed ? 'Back on the website' : onShopify ? 'Updated on Shopify' : 'Published to Shopify')}
-          style={btn(l.status === 'review' ? S.btnGhost : S.btnPrimary)}>
-          {busy === 'publish' ? (onShopify ? 'Updating…' : 'Publishing…') : removed ? 'Put back on site' : onShopify ? 'Update on Shopify' : 'Publish now'}
-        </button>
-      )}
-      {!working && (!removed || !written) && (
-        <button type="button" onClick={() => run('regen', () => pbCall('generate_listing', { listing_id: l.id }), removed ? 'Written — it goes back on the website' : 'Written again — your edited fields were kept')}
-          style={btn(removed ? S.btnPrimary : S.btnGhost)}>
-          {busy === 'regen' ? 'Writing…' : removed ? 'Put back on site' : 'Regenerate'}
-        </button>
-      )}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 8 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>{buttons()}</div>
       {!removed && (
-        <button type="button" onClick={remove} style={btn(S.btnDanger)}>{busy === 'remove' ? 'Removing…' : 'Remove from site'}</button>
+        <div style={{ borderTop: `1px solid ${PB.tileBd}`, paddingTop: 16, display: 'flex' }}>
+          <PbButton kind="danger" icon="trash" busy={busy === 'remove'} dim={!!busy && busy !== 'remove'} busyLabel="Removing…" onClick={remove}>Remove from site</PbButton>
+        </div>
       )}
-      <ConfirmModal {...modalProps} />
+      <PbConfirm {...modalProps} />
     </div>
   );
+
+  function buttons() {
+    return (
+      <>
+        {dirty && here('save') && <PbButton {...props('save')} onClick={onSave} busyLabel="Saving…">Save changes</PbButton>}
+        {review && here('approve') && (
+          <PbButton {...props('approve')} busyLabel="Approving…" onClick={() => run('approve', approveCall(l), approveDone)}>Approve</PbButton>
+        )}
+        {publish && here('publish') && (
+          <PbButton {...props('publish')} busyLabel={publishBusy(l)} onClick={() => run('publish', publishCall(l), publishDone(l))}>{publishLabel(l)}</PbButton>
+        )}
+        {regen && here('regen') && (
+          <PbButton {...props('regen')} busyLabel="Writing…"
+            onClick={() => run('regen', () => pbCall('generate_listing', { listing_id: l.id }), removed ? 'Written — it goes back on the website' : 'Written again — your edited fields were kept')}>
+            {removed ? 'Put back on site' : 'Regenerate'}
+          </PbButton>
+        )}
+      </>
+    );
+  }
 }

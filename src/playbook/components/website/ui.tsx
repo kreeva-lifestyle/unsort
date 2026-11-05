@@ -1,29 +1,35 @@
 // Small form pieces shared by the Websites editor, Vendors and Settings:
 // a labelled field, a section card, a segmented picker, a number input that
 // keeps what is typed ("12." stays), a list editor (type → chips) and a
-// multi-select of chips. Every control is a 44px tap target.
-import { useState, type ReactNode } from 'react';
-import { T, S } from '../../../lib/theme';
+// multi-select of chips. V2 look (pbInput / pbLabel / pbActive); every control
+// is 48px on touch (40 on a fine pointer, 44px chip hit boxes).
+import { useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { PB, pbActive, pbBtnSecondary, pbInput, pbLabel, pbMeta, pbNum, pbTileFlat, pbTileTitle } from '../../pbTheme';
+import PbIcon from '../ui/PbIcon';
 import { numKey } from '../product/status';
 
-export function Field({ label, hint, htmlFor, children }: { label: string; hint?: ReactNode; htmlFor?: string; children: ReactNode }) {
+/** Label above, hint below (id `${htmlFor}-hint` for aria-describedby), optional error in PB.failed. */
+export function Field({ label, hint, htmlFor, children, error }: { label: string; hint?: ReactNode; htmlFor?: string; children: ReactNode; error?: ReactNode }) {
   return (
-    <div style={{ marginBottom: 14, minWidth: 0 }}>
-      <label htmlFor={htmlFor} style={S.fLabel}>{label}</label>
+    <div style={{ marginBottom: 16, minWidth: 0 }}>
+      <label htmlFor={htmlFor} style={pbLabel}>{label}</label>
       {children}
-      {hint && <div style={{ fontSize: 11, color: T.tx3, marginTop: 5, lineHeight: 1.5 }}>{hint}</div>}
+      {hint && <div id={htmlFor ? `${htmlFor}-hint` : undefined} style={{ ...pbMeta, marginTop: 8 }}>{hint}</div>}
+      {error && <div id={htmlFor ? `${htmlFor}-error` : undefined} style={{ fontSize: 12, lineHeight: 1.5, color: PB.failed, marginTop: 8 }}>{error}</div>}
     </div>
   );
 }
 
+/** A titled glass tile (settings / editor sections). Flat (no blur): editor
+ *  pages stack several, and blur stays within the 6-surface budget. Never nest tiles inside. */
 export function Section({ title, hint, children, right }: { title: string; hint?: string; children: ReactNode; right?: ReactNode }) {
   return (
-    <section style={{ ...S.card, marginBottom: 14 }}>
-      <div style={{ ...S.flexBetween, gap: 10, marginBottom: hint ? 4 : 14, flexWrap: 'wrap' }}>
-        <h3 style={{ ...S.sectionTitle, margin: 0 }}>{title}</h3>
+    <section style={{ ...pbTileFlat, marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: hint ? 4 : 16, flexWrap: 'wrap' }}>
+        <h2 style={pbTileTitle}>{title}</h2>
         {right}
       </div>
-      {hint && <div style={{ fontSize: 12, color: T.tx3, marginBottom: 14, lineHeight: 1.5 }}>{hint}</div>}
+      {hint && <div style={{ ...pbMeta, marginBottom: 16 }}>{hint}</div>}
       {children}
     </section>
   );
@@ -31,27 +37,44 @@ export function Section({ title, hint, children, right }: { title: string; hint?
 
 /** Two-column grid that drops to one column on narrow screens. */
 export const Grid2 = ({ children }: { children: ReactNode }) => (
-  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', columnGap: 14 }}>{children}</div>
+  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', columnGap: 16 }}>{children}</div>
 );
 
-export const input44 = { ...S.fInput, minHeight: 44 };
+/** Kept for existing importers: the V2 input recipe (add className="pb-input"). */
+export const input44 = pbInput;
 
+/** Segmented picker: role=radiogroup, roving tabindex, arrows / Home / End move and select. */
 export function Seg<V extends string>({ value, options, onChange, label }: {
   value: V; options: { id: V; label: string; hint?: string }[]; onChange: (v: V) => void; label: string;
 }) {
+  const refs = useRef<(HTMLButtonElement | null)[]>([]);
+  const cur = Math.max(0, options.findIndex(o => o.id === value));
+  const onKey = (e: KeyboardEvent<HTMLDivElement>) => {
+    const n = options.length;
+    const i = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? (cur + 1) % n
+      : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? (cur - 1 + n) % n
+        : e.key === 'Home' ? 0 : e.key === 'End' ? n - 1 : -1;
+    if (i < 0) return;
+    e.preventDefault();
+    onChange(options[i].id);
+    refs.current[i]?.focus();
+  };
   return (
-    <div role="radiogroup" aria-label={label} style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-      {options.map(o => {
+    <div role="radiogroup" aria-label={label} onKeyDown={onKey}
+      style={{ display: 'flex', flexWrap: 'wrap', gap: 4, padding: 4, borderRadius: PB.r.btn, background: 'var(--pb-tile-fill)', border: `1px solid ${PB.tileBd}`, boxShadow: PB.tileHi }}>
+      {options.map((o, i) => {
         const on = o.id === value;
         return (
-          <button key={o.id} type="button" role="radio" aria-checked={on} onClick={() => onChange(o.id)} title={o.hint}
+          <button key={o.id} ref={el => { refs.current[i] = el; }} type="button" role="radio" aria-checked={on} tabIndex={i === cur ? 0 : -1}
+            onClick={() => onChange(o.id)} title={o.hint} className="pb-pill"
             style={{
-              flex: '1 1 auto', minHeight: 44, padding: '6px 12px', borderRadius: T.r, cursor: 'pointer', fontFamily: T.sans,
-              fontSize: 12, fontWeight: on ? 600 : 500, textAlign: 'left',
-              border: `1px solid ${on ? T.ac55 : T.bd2}`, background: on ? T.ac3 : T.glass1, color: on ? T.tx : T.tx2,
+              flex: '1 1 auto', minHeight: 'var(--pb-chip-h)', padding: '6px 12px', borderRadius: PB.r.input, cursor: 'pointer',
+              fontFamily: PB.sans, fontSize: 'var(--pb-seg-fs)', fontWeight: 500, textAlign: 'left', lineHeight: 1.3,
+              border: '1px solid transparent', background: 'transparent', color: PB.tx2,
+              ...(on ? pbActive : null),
             }}>
             {o.label}
-            {o.hint && <span style={{ display: 'block', fontSize: 10, color: T.tx3, fontWeight: 400, marginTop: 2 }}>{o.hint}</span>}
+            {o.hint && <span style={{ display: 'block', fontSize: 12, color: on ? PB.onActive : PB.tx2, fontWeight: 400, marginTop: 2 }}>{o.hint}</span>}
           </button>
         );
       })}
@@ -79,19 +102,20 @@ export function NumInput({ value, onChange, id, placeholder, min = 0, max }: {
         if (n != null) n = Math.max(n, min);
         onChange(n);
       }}
-      style={input44} />
+      className="pb-input" style={{ ...pbInput, ...pbNum }} />
   );
 }
 
 const chip = (on: boolean) => ({
-  minHeight: 44, padding: '0 12px', borderRadius: T.r, cursor: 'pointer', fontFamily: T.sans, fontSize: 12,
-  display: 'inline-flex', alignItems: 'center', gap: 6, maxWidth: '100%',
-  border: `1px solid ${on ? T.ac55 : T.bd2}`, background: on ? T.ac3 : T.glass1, color: on ? T.tx : T.tx2,
+  ...pbBtnSecondary, minHeight: 'var(--pb-chip-h)', padding: '0 14px', borderRadius: PB.r.pill, fontWeight: 500, gap: 6,
+  ...(on ? pbActive : null),
 });
 
 /** Free list: type a value + Enter / Add; tap a chip to remove it. Case-insensitive dedupe. */
-export function ChipsInput({ values, onChange, placeholder, id, maxLen = 120, mono }: {
+export function ChipsInput({ values, onChange, placeholder, id, maxLen = 120, mono, label }: {
   values: string[]; onChange: (v: string[]) => void; placeholder?: string; id?: string; maxLen?: number; mono?: boolean;
+  /** Accessible name when no <label htmlFor={id}> names the input. */
+  label?: string;
 }) {
   const [text, setText] = useState('');
   const add = () => {
@@ -103,19 +127,19 @@ export function ChipsInput({ values, onChange, placeholder, id, maxLen = 120, mo
   };
   return (
     <div>
-      <div style={{ display: 'flex', gap: 6 }}>
-        <input id={id} value={text} onChange={e => setText(e.target.value)} placeholder={placeholder} maxLength={maxLen * 4}
+      <div style={{ display: 'flex', gap: 8 }}>
+        <input id={id} aria-label={label} value={text} onChange={e => setText(e.target.value)} placeholder={placeholder} maxLength={maxLen * 4}
           onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
-          style={{ ...input44, fontFamily: mono ? T.mono : T.sans }} />
-        <button type="button" onClick={add} style={{ ...S.btnGhost, minHeight: 44, flexShrink: 0 }}>Add</button>
+          className="pb-input" style={{ ...pbInput, fontFamily: mono ? PB.mono : PB.sans }} />
+        <button type="button" onClick={add} className="pb-pill" style={{ ...pbBtnSecondary, flexShrink: 0 }}>Add</button>
       </div>
       {values.length > 0 && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
           {values.map(v => (
             <button key={v} type="button" aria-label={`Remove ${v}`} onClick={() => onChange(values.filter(x => x !== v))}
-              style={{ ...chip(true), fontFamily: mono ? T.mono : T.sans }}>
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v}</span>
-              <span aria-hidden style={{ color: T.tx3, fontSize: 15 }}>&#215;</span>
+              className="pb-pill" style={{ ...chip(false), fontFamily: mono ? PB.mono : PB.sans }}>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{v}</span>
+              <span style={{ color: PB.tx3, display: 'inline-flex' }}><PbIcon name="x" size={16} /></span>
             </button>
           ))}
         </div>
@@ -124,20 +148,22 @@ export function ChipsInput({ values, onChange, placeholder, id, maxLen = 120, mo
   );
 }
 
-/** Pick any number of options (tap to toggle). */
-export function PickChips({ options, selected, onChange, empty }: {
+/** Pick any number of options (tap to toggle). Picked = frosted active + check. */
+export function PickChips({ options, selected, onChange, empty, label }: {
   options: { id: string; label: string }[]; selected: string[]; onChange: (v: string[]) => void; empty?: string;
+  /** Names the group for screen readers (the Field label is tied to no control). */
+  label?: string;
 }) {
-  if (!options.length) return <div style={{ fontSize: 12, color: T.tx3 }}>{empty || 'Nothing to pick yet.'}</div>;
+  if (!options.length) return <div style={pbMeta}>{empty || 'Nothing to pick yet.'}</div>;
   const has = (id: string) => selected.some(s => s.toLowerCase() === id.toLowerCase());
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+    <div role="group" aria-label={label} style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
       {options.map(o => {
         const on = has(o.id);
         return (
-          <button key={o.id} type="button" aria-pressed={on} style={chip(on)}
+          <button key={o.id} type="button" aria-pressed={on} style={chip(on)} className="pb-pill"
             onClick={() => onChange(on ? selected.filter(s => s.toLowerCase() !== o.id.toLowerCase()) : [...selected, o.id])}>
-            {on && <span aria-hidden style={{ color: T.gr }}>&#10003;</span>}{o.label}
+            {on && <PbIcon name="check" size={16} />}{o.label}
           </button>
         );
       })}

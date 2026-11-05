@@ -1,16 +1,26 @@
 // One product: photos, editable facts, what the AI read, and its listing on
 // each website. Actions: Read again with AI, Check websites again, Archive / Restore.
 // Device Back closes it (Products owns the useBackClose layer).
+// V2 bento (desktop): header 12 · photos 8×2 + hero 4 + websites stat 4 ·
+// facts 8 + AI read 4 · websites 6+6 (odd last 12). Phone: photo hero, name
+// card, website tiles, facts, AI read, then the product actions.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
-import ConfirmModal, { useConfirm } from '../../components/ui/ConfirmModal';
+import { useConfirm } from '../../components/ui/ConfirmModal';
+import PbConfirm from '../components/ui/PbConfirm';
 import type { AddToast } from '../components/PbToasts';
-import { pbCall, pbImageUrl } from '../data/pbFunctions';
+import { pbCall } from '../data/pbFunctions';
 import { addPhotos, checkPhoto, getProduct, setProductStatus, type ProductDetail, type VendorLite, type WebsiteLite } from '../data/products';
 import ProductFacts from '../components/product/ProductFacts';
 import ProductListings from '../components/product/ProductListings';
-import { Dot, PRODUCT_STATUS, shortDate } from '../components/product/status';
+import { Dot, PRODUCT_STATUS } from '../components/product/status';
+import ProductActions, { PhoneActionsTile } from '../components/product/detail/ProductActions';
+import { PhonePhotoHero, PhotosTile } from '../components/product/detail/ProductPhotos';
+import { AiReadTile, PhoneNameCard, ProductHero, WebsitesStat } from '../components/product/detail/ProductSummary';
+import ProductStates from '../components/product/detail/ProductStates';
+import { PbPageHeader, focusPageTitle } from '../components/ui';
+import { pbMeta } from '../pbTheme';
+import { useIsPhone } from '../hooks/useIsPhone';
 
 type Props = {
   id: string; onClose: () => void; onChanged: () => void; addToast: AddToast;
@@ -23,6 +33,7 @@ export default function ProductPage({ id, onClose, onChanged, addToast, vendors,
   const [loadErr, setLoadErr] = useState('');
   const fileInput = useRef<HTMLInputElement>(null);
   const top = useRef<HTMLDivElement>(null);
+  const phone = useIsPhone();
   // Opened from far down the list: start at the top (Playbook scrolls inside its own container).
   useEffect(() => { top.current?.scrollIntoView({ block: 'start' }); }, [id]);
   const { ask, modalProps } = useConfirm();
@@ -33,7 +44,11 @@ export default function ProductPage({ id, onClose, onChanged, addToast, vendors,
   }, [id, addToast]);
   useEffect(() => { void load(); }, [load]);
   const refresh = () => { void load(); onChanged(); };
+  // Once the product shows, focus moves to its name (not <body>) for keyboard and screen-reader users.
+  const loaded = !!p;
+  useEffect(() => { if (loaded) focusPageTitle(); }, [loaded]);
 
+  /** One busy key per screen. */
   const act = async (key: string, fn: () => Promise<unknown>, done: string) => {
     if (busy) return;
     setBusy(key);
@@ -64,84 +79,60 @@ export default function ProductPage({ id, onClose, onChanged, addToast, vendors,
     }
   };
 
-  const bstyle = (base = S.btnGhost) => ({ ...base, minHeight: 44, opacity: busy ? 0.5 : 1, pointerEvents: busy ? 'none' as const : 'auto' as const });
   if (!p) return (
-    <div ref={top} style={{ display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'flex-start', scrollMarginTop: 140 }}>
-      <button type="button" onClick={onClose} style={{ ...S.btnGhost, minHeight: 44 }}>&#8249; Products</button>
-      {loadErr ? (
-        <>
-          <div style={{ ...S.errorBox, alignSelf: 'stretch' }}>Could not open this product: {loadErr}</div>
-          <button type="button" onClick={() => { setLoadErr(''); void load(); }} style={{ ...S.btnPrimary, minHeight: 44 }}>Try again</button>
-        </>
-      ) : <div style={{ ...S.emptyState, alignSelf: 'stretch' }}>Loading…</div>}
+    <div ref={top} style={{ scrollMarginTop: 140 }}>
+      <ProductStates loadErr={loadErr} onBack={onClose} onRetry={() => { setLoadErr(''); void load(); }} />
     </div>
   );
   const st = PRODUCT_STATUS[p.status];
-  const attrs = Object.entries(p.attributes ?? {}).filter(([, v]) => v != null && String(v).trim() !== '');
+  const name = p.name || p.sku || 'Untitled product';
+  const actionProps = {
+    p, busy,
+    onRead: () => act('read', () => pbCall('read_product', { product_id: p.id }), 'Read again by the AI'),
+    onRoute: () => act('route', () => pbCall('route_product', { product_id: p.id }), 'Checked against every website’s rules'),
+    onRestore: () => act('restore', () => setProductStatus(p.id, 'new'), 'Restored — the AI will read it again'),
+    onArchive: archive,
+  };
+  const addPhoto = () => fileInput.current?.click();
+  // The page's one gradient: Edit on the first listing waiting for approval, else Save facts.
+  const waiting = p.pb_listings.some(l => l.status === 'review');
+  const facts = (
+    <ProductFacts key={p.updated_at} product={p} vendors={vendors} categories={categories} onVendorCreated={onVendorCreated}
+      onSaved={refresh} addToast={addToast} primary={!waiting} />
+  );
+  const listings = <ProductListings listings={p.pb_listings} sites={sites} onChanged={refresh} addToast={addToast} busy={busy} primary={waiting} phone={phone} />;
 
   return (
-    <div ref={top} style={{ display: 'flex', flexDirection: 'column', gap: 14, scrollMarginTop: 140 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-        <button type="button" onClick={onClose} style={{ ...S.btnGhost, minHeight: 44 }}>&#8249; Products</button>
-        <div style={{ flex: 1, minWidth: 180 }}>
-          <div style={{ fontFamily: T.sora, fontSize: 18, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name || p.sku || 'Untitled product'}</div>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 4, flexWrap: 'wrap' }}>
-            <Dot color={st.color} label={st.label} />
-            <span style={{ fontSize: 11, color: T.tx3 }}>{st.hint}</span>
-          </div>
-        </div>
-      </div>
-
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <button type="button" onClick={() => act('read', () => pbCall('read_product', { product_id: p.id }), 'Read again by the AI')} style={bstyle(S.btnPrimary)}>
-          {busy === 'read' ? 'Reading…' : 'Read again with AI'}
-        </button>
-        {p.status === 'ready' && (
-          <button type="button" onClick={() => act('route', () => pbCall('route_product', { product_id: p.id }), 'Checked against every website’s rules')} style={bstyle()}>
-            {busy === 'route' ? 'Checking…' : 'Check websites again'}
-          </button>
-        )}
-        {p.status === 'archived'
-          ? <button type="button" onClick={() => act('restore', () => setProductStatus(p.id, 'new'), 'Restored — the AI will read it again')} style={bstyle()}>{busy === 'restore' ? 'Restoring…' : 'Restore'}</button>
-          : <button type="button" onClick={archive} style={bstyle(S.btnDanger)}>{busy === 'archive' ? 'Archiving…' : 'Archive'}</button>}
-      </div>
-
-      {p.ai_error && <div style={S.errorBox}>AI reader: {p.ai_error}</div>}
-
-      <div style={S.card}>
-        <div style={{ ...S.flexBetween, marginBottom: 10 }}>
-          <div style={S.sectionTitle}>Photos</div>
-          <button type="button" onClick={() => fileInput.current?.click()} style={{ ...bstyle(), ...S.btnSm, minHeight: 44 }}>{busy === 'photos' ? 'Uploading…' : '+ Add photos'}</button>
-          <input ref={fileInput} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={e => pickPhotos(e.target.files)} />
-        </div>
-        {p.pb_product_images.length === 0 ? <div style={{ fontSize: 12, color: T.tx3 }}>No photos yet.</div> : (
-          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 4 }}>
-            {p.pb_product_images.map((img, i) => (
-              <a key={img.id} href={pbImageUrl(img.path)} target="_blank" rel="noreferrer" style={{ flexShrink: 0 }}>
-                <img src={pbImageUrl(img.path)} alt={`Photo ${i + 1}`} loading="lazy" style={{ width: 120, height: 150, objectFit: 'cover', borderRadius: T.r, border: `1px solid ${T.bd}` }} />
-              </a>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <ProductFacts key={p.updated_at} product={p} vendors={vendors} categories={categories} onVendorCreated={onVendorCreated} onSaved={refresh} addToast={addToast} />
-
-      {attrs.length > 0 && (
-        <div style={S.card}>
-          <div style={{ ...S.sectionTitle, marginBottom: 8 }}>What the AI read{p.ai_read_at ? <span style={{ fontSize: 11, color: T.tx3, fontWeight: 400, fontFamily: T.sans }}> · {shortDate(p.ai_read_at)}</span> : null}</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 220px), 1fr))', gap: '6px 14px' }}>
-            {attrs.map(([k, v]) => (
-              <div key={k} style={{ fontSize: 12, color: T.tx2, lineHeight: 1.5 }}>
-                <span style={{ ...S.fLabel, display: 'inline', marginRight: 6 }}>{k.replace(/_/g, ' ')}</span>{String(v)}
-              </div>
-            ))}
+    <div ref={top} style={{ scrollMarginTop: 140, display: 'flex', flexDirection: 'column', gap: phone ? 12 : 24, minWidth: 0 }}>
+      {phone ? (
+        <>
+          <PhonePhotoHero images={p.pb_product_images} onAdd={addPhoto} busy={busy} onBack={onClose} />
+          <PhoneNameCard p={p} vendors={vendors} />
+          {listings}
+          {facts}
+          <AiReadTile p={p} />
+          <PhoneActionsTile {...actionProps} />
+        </>
+      ) : (
+        <div>
+          <PbPageHeader title={name} back={{ label: 'Products', onBack: onClose }}
+            sub={<span style={{ display: 'inline-flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}><Dot color={st.color} label={st.label} /><span style={pbMeta}>{st.hint}</span></span>}
+            actions={<ProductActions {...actionProps} />} />
+          <div className="pb-bento">
+            <PhotosTile images={p.pb_product_images} onAdd={addPhoto} busy={busy} />
+            <ProductHero p={p} vendors={vendors} />
+            <WebsitesStat p={p} />
+            {/* Facts 8 + AI 4 on their own 12-column grid: its lines match the outer grid at 12 and 6 columns, so the row stays full. */}
+            <div className="pb-span-12" style={{ display: 'grid', gridTemplateColumns: 'repeat(12, minmax(0, 1fr))', gap: 16 }}>
+              <div style={{ gridColumn: 'span 8', display: 'grid', minWidth: 0 }}>{facts}</div>
+              <div style={{ gridColumn: 'span 4', display: 'grid', minWidth: 0 }}><AiReadTile p={p} /></div>
+            </div>
           </div>
         </div>
       )}
-
-      <ProductListings listings={p.pb_listings} sites={sites} onChanged={refresh} addToast={addToast} />
-      <ConfirmModal {...modalProps} />
+      {!phone && listings}
+      <input ref={fileInput} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={e => pickPhotos(e.target.files)} />
+      <PbConfirm {...modalProps} />
     </div>
   );
 }

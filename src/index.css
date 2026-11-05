@@ -743,3 +743,143 @@ html.launching .brand-slot { opacity: 0; }
   .flow-palette-group { flex-direction: row !important; align-items: center; flex-shrink: 0; }
   .flow-inspector { max-height: none !important; }
 }
+
+/* ═══ Playbook V2 · Bento glass (src/playbook/DESIGN.md) ═══════════════════
+   Everything below is Playbook-only: --pb-* variables (unused by DailyWork)
+   and pb- classes. The variables sit on :root, not .pb-scroll, so portalled
+   sheets, modals and toasts read them too. Recipes in src/playbook/pbTheme.ts
+   reference them. Literals here mirror PB tokens (DESIGN.md §2/§8). */
+:root {
+  --pb-tile-fill: oklch(1 0 0 / .06); --pb-blur: blur(24px) saturate(140%); --pb-active-blur: blur(18px) saturate(170%);
+  --pb-sheet-fill: oklch(0.16 0.03 270 / .82); --pb-sheet-blur: blur(30px); --pb-scrim-blur: blur(6px);
+  --pb-bar-fill: oklch(1 0 0 / .08); --pb-bar-blur: blur(24px);
+  --pb-r-tile: 24px; --pb-r-hero: 28px; --pb-r-row: 18px; --pb-pad-tile: 20px; --pb-title: 32px;
+  /* Control sizes follow the pointer (DESIGN.md §5): coarse / unknown = touch sizes. */
+  --pb-ctl-h: 48px; --pb-chip-h: 44px; --pb-icon-btn: 44px; --pb-btn-fs: 15px; --pb-input-fs: 16px; --pb-seg-fs: 14px;
+  --pb-bar: 0px;   /* tab bar + its margin; 0 on desktop (no tab bar) */
+}
+@media (pointer: fine) and (min-width: 769px) {
+  :root { --pb-ctl-h: 40px; --pb-chip-h: 36px; --pb-icon-btn: 36px; --pb-btn-fs: 13px; --pb-input-fs: 14px; --pb-seg-fs: 13px; }
+}
+@media (max-width: 768px) {
+  :root { --pb-tile-fill: oklch(1 0 0 / .07); --pb-blur: none; --pb-active-blur: none; --pb-r-tile: 22px; --pb-r-hero: 24px; --pb-r-row: 20px; --pb-pad-tile: 16px; --pb-title: 20px; --pb-bar: 84px; }
+}
+@media (max-width: 768px) and (max-height: 500px) { :root { --pb-bar: 66px; } }
+
+/* Root scroller + backdrop (DESIGN.md §4, mobile.md §2/§12). */
+.pb-scroll { overscroll-behavior-y: contain; isolation: isolate; position: relative; }
+.pb-glow { position: fixed; inset: 0; z-index: -1; pointer-events: none; contain: strict;
+  background: radial-gradient(60% 40% at 0% 0%, var(--glowA), transparent 70%),
+    radial-gradient(50% 40% at 100% 45%, var(--glowC), transparent 70%),
+    radial-gradient(70% 40% at 50% 100%, var(--glowI), transparent 70%); }
+body.modal-open .pb-scroll { overflow: hidden !important; }
+.pb-shell { max-width: 1344px; margin: 0 auto; box-sizing: border-box;
+  padding: max(24px, env(safe-area-inset-top)) max(32px, env(safe-area-inset-right)) 48px max(32px, env(safe-area-inset-left)); }
+.pb-topbar { position: sticky; top: 12px; z-index: 50; margin-bottom: 24px; }
+.pb-statusbar { position: fixed; top: 0; left: 0; right: 0; height: env(safe-area-inset-top); z-index: 40; pointer-events: none; }
+@media (min-width: 769px) { .pb-phone-only { display: none !important; } }
+.pb-topbar-row { gap: 16px; }
+.pb-navpill { padding: 0 16px; font-size: 14px; }
+@media (max-width: 1099px) {
+  .pb-wordmark { display: none !important; }
+  .pb-topbar-row { gap: 8px; }
+  .pb-navpill { padding: 0 12px; font-size: 13px; }
+  .pb-topbar-row > .pb-pill { padding: 0 12px !important; }
+}
+@media (max-width: 768px) {
+  .pb-shell { padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) calc(var(--pb-bar) + env(safe-area-inset-bottom) + 16px) max(16px, env(safe-area-inset-left)); }
+  .pb-desk-only { display: none !important; }
+}
+
+/* Phone tab bar (DESIGN.md §7, mobile.md §4). */
+.pb-tabbar { position: fixed; z-index: 60; left: max(12px, env(safe-area-inset-left)); right: max(12px, env(safe-area-inset-right));
+  bottom: calc(18px + env(safe-area-inset-bottom)); max-width: 560px; margin: 0 auto; box-sizing: border-box;
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; padding: 6px; border-radius: 26px;
+  background: var(--pb-bar-fill); border: 1px solid oklch(1 0 0 / .14);
+  -webkit-backdrop-filter: var(--pb-bar-blur); backdrop-filter: var(--pb-bar-blur);
+  transition: transform .3s cubic-bezier(.22,1,.36,1), opacity .3s ease; }
+.pb-tab { min-height: 52px; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  border-radius: 20px; border: 1px solid transparent; background: transparent; cursor: pointer; font: 500 11px/1.2 Inter, system-ui, sans-serif; padding: 4px 2px; }
+@media (max-width: 768px) and (max-height: 500px) { .pb-tabbar { bottom: calc(8px + env(safe-area-inset-bottom)); } .pb-tab { min-height: 44px; } }
+html.pb-kb .pb-tabbar { transform: translateY(120%); opacity: 0; pointer-events: none; }
+body.modal-open .pb-tabbar { visibility: hidden; }
+
+/* Bento grid: 12 columns, 6 at ≤1099px, 2 on phone (DESIGN.md §6, layout §4). */
+.pb-bento { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 16px; grid-auto-rows: minmax(120px, auto); }
+.pb-bento--dash { grid-auto-rows: minmax(152px, auto); }
+.pb-bento--auto { grid-auto-rows: auto; }
+.pb-span-12 { grid-column: span 12; } .pb-span-9 { grid-column: span 9; } .pb-span-8 { grid-column: span 8; }
+.pb-span-6 { grid-column: span 6; } .pb-span-4 { grid-column: span 4; } .pb-span-3 { grid-column: span 3; }
+.pb-rows-2 { grid-row: span 2; }
+@media (max-width: 1099px) {
+  .pb-bento { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .pb-span-12, .pb-span-9, .pb-span-8, .pb-span-6 { grid-column: span 6; }
+  .pb-span-4, .pb-span-3 { grid-column: span 3; }
+  .pb-rows-2 { grid-row: auto; }
+}
+@media (max-width: 768px) {
+  .pb-bento { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: auto; gap: 12px; }
+  .pb-bento > * { grid-column: span 2 !important; grid-row: auto !important; }
+  .pb-bento > .pb-phone-half { grid-column: span 1 !important; }
+}
+
+/* Motion (DESIGN.md §8, verbatim). */
+.pb-pill,.pb-tile{-webkit-tap-highlight-color:transparent;transition:transform .6s cubic-bezier(.22,1,.36,1),box-shadow .6s cubic-bezier(.22,1,.36,1),border-color .5s ease,filter .5s ease}
+.pb-pill{position:relative;overflow:hidden}
+.pb-pill::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;background:linear-gradient(110deg,transparent 35%,oklch(1 0 0 / .22) 50%,transparent 65%);transform:translateX(-130%);transition:transform 1.1s cubic-bezier(.22,1,.36,1)}
+@media (hover:hover){.pb-pill:hover{transform:translateY(-1px);filter:brightness(1.08)}.pb-pill:hover::after{transform:translateX(130%)}.pb-tile:hover{transform:translateY(-3px);box-shadow:inset 0 1px 0 oklch(1 0 0 / .18),var(--pb-lift);border-color:oklch(1 0 0 / .22)}}
+.pb-pill:active,.pb-tile:active{transform:scale(.98);transition-duration:.08s}
+.pb-focus:focus-visible,.pb-pill:focus-visible,.pb-tile:focus-visible{outline:2px solid var(--pb-focus, oklch(0.90 0.10 85));outline-offset:2px}
+@keyframes pbPulse{50%{opacity:.5}} .pb-pulse{animation:pbPulse 1.6s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){.pb-pill,.pb-tile,.pb-pill::after{transition:none}.pb-pill:hover,.pb-tile:hover,.pb-pill:active,.pb-tile:active{transform:none}.pb-pulse{animation:none}}
+.pb-tab:focus-visible, .pb-chip:focus-visible { outline: 2px solid var(--pb-focus, oklch(0.90 0.10 85)); outline-offset: 2px; }
+.pb-chip:focus-visible > span { outline: none; }
+@media (hover:hover) { .pb-rowhover:hover { background: oklch(1 0 0 / .04); } }
+
+/* Inputs: focus border + ring, placeholder in tx3 (copy-and-a11y §B2). */
+.pb-input::placeholder, .pb-scroll input::placeholder, .pb-sheet input::placeholder, .pb-sheet textarea::placeholder, .pb-scroll textarea::placeholder { color: oklch(0.78 0.02 255); opacity: 1; }
+.pb-input:focus, .pb-scroll :is(input, select, textarea):focus, .pb-sheet :is(input, select, textarea):focus {
+  border-color: var(--pb-focus, oklch(0.90 0.10 85)) !important; outline: 2px solid var(--pb-focus, oklch(0.90 0.10 85)); outline-offset: 0; box-shadow: none !important; }
+.pb-input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; display: none; }
+.pb-scroll [role=switch]:focus-visible, .pb-sheet [role=switch]:focus-visible { outline: 2px solid var(--pb-focus, oklch(0.90 0.10 85)); outline-offset: 2px; }
+
+/* Helpers. */
+.pb-sr { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.pb-clamp2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.pb-chiprow { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; }
+.pb-chiprow::-webkit-scrollbar { display: none; }
+@media (max-width: 768px) { .pb-chiprow { margin: 0 -16px; padding: 0 16px; scroll-padding: 0 16px; } }
+.pb-skel { background: linear-gradient(90deg, oklch(1 0 0 / .08) 0%, oklch(1 0 0 / .14) 50%, oklch(1 0 0 / .08) 100%); background-size: 200% 100%; animation: shimmer 1.5s linear infinite; border-radius: 8px; }
+.pb-row-cv { content-visibility: auto; contain-intrinsic-size: auto 96px; }
+
+/* Sheets and modals (DESIGN.md §6/§7, mobile.md §6). */
+.pb-sheet { display: flex; flex-direction: column; overflow: hidden; }
+@keyframes pbSheetIn { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes pbFade { from { opacity: 0; } to { opacity: 1; } }
+@media (max-width: 768px) {
+  .modal-inner.pb-sheet { border-radius: 30px 30px 0 0 !important; max-height: min(90dvh, calc(100dvh - var(--pb-kb, 0px) - 24px)) !important;
+    bottom: var(--pb-kb, 0px) !important; padding: 0 !important; overflow: hidden !important; display: flex !important; flex-direction: column;
+    border-bottom: none !important; animation: pbSheetIn .45s cubic-bezier(.22,1,.36,1) backwards !important; }
+  .modal-inner.pb-sheet form { padding: 0 !important; }
+}
+@media (prefers-reduced-motion: reduce) { .modal-inner.pb-sheet { animation: pbFade .15s ease both !important; } .pb-skel { animation: none; } .pb-toast { animation: none; } }
+.pb-toast { animation: pbFade .15s ease both; }
+
+/* No glass support, reduced transparency, forced colours: opaque fills, no glows. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root { --pb-tile-fill: oklch(0.18 0.03 270 / .92); --pb-sheet-fill: oklch(0.16 0.03 270 / .97); --pb-bar-fill: oklch(0.16 0.03 270 / .95); }
+  .pb-glow { display: none; }
+}
+@media (prefers-reduced-transparency: reduce), (forced-colors: active) {
+  :root { --pb-tile-fill: oklch(0.18 0.03 270 / .92); --pb-sheet-fill: oklch(0.16 0.03 270 / .97); --pb-bar-fill: oklch(0.16 0.03 270 / .95);
+    --pb-blur: none; --pb-active-blur: none; --pb-sheet-blur: none; --pb-bar-blur: none; --pb-scrim-blur: none; }
+  .pb-glow { display: none; }
+}
+
+/* DailyWork's `main { overflow-y: auto }` (top of this file) makes <main> a
+   scroll container, which stops position: sticky inside Playbook pages (save
+   bar, editor side column, Guide contents). Playbook scrolls .pb-scroll. */
+.pb-shell > main { overflow: visible !important; }
+.pb-shell > main:focus, .pb-scroll :is(h1, h2, section)[tabindex="-1"]:focus { outline: none; }
+/* Skip link: hidden until focused (copy-and-a11y §B). */
+.pb-skip:focus { position: fixed !important; left: 16px; top: 16px; width: auto; height: auto; margin: 0; padding: 0 16px !important; border: 1px solid oklch(1 0 0 / .12) !important; clip: auto; white-space: nowrap; z-index: 400; }

@@ -72,7 +72,7 @@ This file is the gate. The rules behind each line are in `ux-process.md`, `layou
 - [ ] Colours and recipes come from `src/playbook/pbTheme.ts` (`PB.*`). If that file does not exist yet, create it first (`layout-and-components.md` §0). Redesigned screens have no new `T.*` accents.
 - [ ] No hex, no `rgba()` literals, no hex alpha suffix. Use tokens or `alpha()`.
 - [ ] Each new file is under 200 lines. Grandfathered files do not grow (root `CLAUDE.md` "Reading conventions").
-- [ ] Reuse before building: `src/components/ui/` (`Empty`, `ConfirmModal`/`useConfirm`, `Toggle`, `ActionSheet`, `Skeleton`, `PrintPreview`), Playbook's `PbModal`, `usePbToasts`, `status.tsx`, `website/ui.tsx`, `Pager`.
+- [ ] Reuse before building: `src/components/ui/` (`Empty`, `useConfirm` with Playbook's `PbConfirm`, `Toggle`, `ActionSheet`, `Skeleton`, `PrintPreview`), Playbook's `PbModal`, `usePbToasts`, `status.tsx`, `website/ui.tsx`, `Pager`.
 - [ ] Imports respect the division boundary. No DailyWork feature folders. The shared layer is touched only if needed, and the PR says so.
 - [ ] Number inputs block letters (`numKey` in `status.tsx`). No `window.alert`, `confirm` or `open`. HTML templates use `escHtml`.
 

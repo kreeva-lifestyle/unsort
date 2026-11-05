@@ -80,14 +80,19 @@ mobile". Playbook instead:
   checklist, plus a link to the mock-ups. Every new or redesigned Playbook
   screen follows it. Put its values in a Playbook token file rather than
   inline literals.
-- Until the redesign is built, the existing screens (`PlaybookDashboard.tsx`,
-  `pages/*`, `components/*`) still use the old look and logo. Move them over
-  only when the owner asks.
+- Every existing screen is on V2 (owner, 2026-11-05: "Build playbook V2
+  design"). Tokens and recipes: `src/playbook/pbTheme.ts`; primitives:
+  `src/playbook/components/ui/` (`PbTile`, `PbButton`, `PbRow`, `PbConfirm`,
+  `PbPageHeader`…) and `components/product/PbModal.tsx` (with `footer` and
+  `guard`); CSS: the
+  "Playbook V2" block at the end of `src/index.css` (pb- classes only).
 
 ## Brand
 - Logo: `PlaybookMark` / `DivisionLogo division="playbook"` from
-  `src/components/brand/DivisionLogos.tsx` — an open book whose spine is a
-  play button, on a yellow→red gradient (`T.yl` → `T.re`).
+  `src/components/brand/DivisionLogos.tsx` — the "bento P" (DESIGN.md §9):
+  white blocks forming a P with a play button in its bowl, on the amber→coral
+  brand gradient (`PB.brandA` → `PB.brandB`, mirrored as literals there
+  because shared code must not import from `src/playbook/`).
 - Playbook's accent is that warm gradient; DailyWork keeps indigo→sky. Use
-  theme tokens only, never hex.
+  tokens only, never hex.
 - Page titles: `<Page> · Playbook · DailyOffice`.

@@ -1,17 +1,20 @@
 // One product on one website: edit title / description / SEO / handle / tags /
 // price (each edit joins listing.locked so Regenerate keeps it), plus the
-// actions in ListingActions (Regenerate, Approve, Publish / Update, Remove).
+// actions in ListingActions (Regenerate, Approve, Publish / Update, Remove):
+// the gradient one in the sheet footer, the others and Remove in the body.
 import { useState } from 'react';
-import { T, S } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
 import type { AddToast } from '../PbToasts';
 import { shopifyAdminUrl } from '../../data/pbFunctions';
 import type { WebsiteLite } from '../../data/products';
 import { listingBusy, updateListing, type ListingFull } from '../../data/listings';
 import { compareAtPrice } from '../../data/websites';
+import { PB, pbBtnSecondary, pbErrorBox, pbNum, pbTileReview } from '../../pbTheme';
 import PbModal from './PbModal';
-import ListingActions from './ListingActions';
-import { Dot, LISTING_STATUS, numKey, rupees, shortDate, splitList } from './status';
+import ListingActions, { listingPrimary } from './ListingActions';
+import ListingField from './detail/ListingField';
+import PbIcon from '../ui/PbIcon';
+import { Dot, LISTING_STATUS, rupees, shortDate, splitList } from './status';
 import { cleanDescriptionHtml } from './cleanHtml';
 
 type Form = { title: string; description_html: string; seo_title: string; seo_description: string; handle: string; tags: string; price: string };
@@ -66,42 +69,41 @@ export default function ListingEditor({ listing, site, onClose, onChanged, addTo
 
   const st = LISTING_STATUS[l.status];
   const admin = site ? shopifyAdminUrl(site.shop_domain, l.shopify_product_id) : null;
-  const lockTag = (k: string) => l.locked.includes(k) &&
-    <span title="Edited by hand — Regenerate keeps it" style={{ ...S.badge, marginLeft: 6, background: T.glass2, color: T.tx3, textTransform: 'none', letterSpacing: 0 }}>kept</span>;
-  const field = (k: keyof Form, label: string, opts: { area?: number; max?: number; num?: boolean } = {}) => (
-    <div style={{ marginBottom: 10 }}>
-      <label htmlFor={`pb-l-${k}`} style={{ ...S.fLabel, display: 'flex', alignItems: 'center' }}>
-        {label}{lockTag(k)}
-        {opts.max ? <span style={{ marginLeft: 'auto', color: f[k].length > opts.max ? T.yl : T.tx3, textTransform: 'none', letterSpacing: 0 }}>{f[k].length}/{opts.max}</span> : null}
-      </label>
-      {opts.area
-        ? <textarea id={`pb-l-${k}`} value={f[k]} rows={opts.area} disabled={locked} onChange={e => set(k)(e.target.value)} style={{ ...S.fInput, height: 'auto', resize: 'vertical', lineHeight: 1.5, fontFamily: k === 'description_html' ? T.mono : T.sans }} />
-        : <input id={`pb-l-${k}`} value={f[k]} disabled={locked} onChange={e => set(k)(e.target.value)} style={{ ...S.fInput, minHeight: 44 }}
-            {...(opts.num ? { type: 'number', inputMode: 'decimal' as const, min: 0, step: '0.01', onKeyDown: numKey } : {})} />}
-    </div>
+  const field = (k: keyof Form, label: string, opts: { area?: number; max?: number; num?: boolean; mono?: boolean } = {}) => (
+    <ListingField id={`pb-l-${k}`} label={label} value={f[k]} onChange={set(k)} disabled={locked} kept={l.locked.includes(k)} {...opts} />
   );
 
+  const dirty = changed.length > 0 && !locked;
+  const actions = { listing: l, dirty, busy, setBusy, save, onSave, onUpdated: (next: ListingFull) => { reset(next); onChanged(); }, addToast };
   return (
-    <PbModal open title={site?.name ?? 'Listing'} onClose={onClose} width={620}>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', marginBottom: 12, fontSize: 11, color: T.tx3 }}>
+    <PbModal open title={site?.name ?? 'Listing'} onClose={onClose} width={620} guard={changed.length > 0}
+      footer={listingPrimary(l, dirty) ? <ListingActions part="primary" {...actions} /> : undefined}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 16px', alignItems: 'center', marginBottom: 16, fontSize: 12, color: PB.tx2 }}>
         <Dot color={st.color} label={st.label} />
-        {l.compare_at_price != null && <span>Compare-at {rupees(l.compare_at_price)}</span>}
-        {l.generated_at && <span>Written {shortDate(l.generated_at)}{l.ai_model ? ` · ${l.ai_model.replace('claude-', '')}` : ''}</span>}
-        {l.published_at && <span>Published {shortDate(l.published_at)}</span>}
-        {admin && <a href={admin} target="_blank" rel="noreferrer" style={{ color: T.ac2, minHeight: 44, display: 'inline-flex', alignItems: 'center' }}>Open in Shopify</a>}
+        {l.compare_at_price != null && <span>Was <s style={pbNum}>{rupees(l.compare_at_price)}</s></span>}
+        {l.generated_at && <span>Written <span style={{ color: PB.tx3 }}>{shortDate(l.generated_at)}</span></span>}
+        {l.published_at && <span>Published <span style={{ color: PB.tx3 }}>{shortDate(l.published_at)}</span></span>}
+        {admin && (
+          <a href={admin} target="_blank" rel="noreferrer" className="pb-pill" style={{ ...pbBtnSecondary, marginLeft: 'auto' }}>
+            Open on Shopify <PbIcon name="arrowUpRight" size={16} />
+          </a>
+        )}
       </div>
-      {l.error && <div style={{ ...S.errorBox, marginBottom: 12 }}>{l.error}</div>}
-      {locked && <div style={{ ...S.warningBox, marginBottom: 12, fontSize: 12 }}>Being {l.status === 'generating' ? 'written' : 'published'} right now — editing is off. Close and reopen in a minute.</div>}
+      {l.error && <div role="alert" style={{ ...pbErrorBox, marginBottom: 16, overflowWrap: 'anywhere' }}>{l.error}</div>}
+      {locked && (
+        <div style={{ ...pbTileReview, backdropFilter: undefined, WebkitBackdropFilter: undefined, borderRadius: PB.r.input, padding: '8px 12px', marginBottom: 16, fontSize: 13, lineHeight: 1.5 }}>
+          Being {l.status === 'generating' ? 'written' : 'published'} right now — editing is off. Close and reopen in a minute.
+        </div>
+      )}
       {field('price', 'Price (₹)', { num: true })}
       {field('title', 'Title', { max: site?.content?.title_max })}
-      {field('description_html', 'Description (HTML: p, ul, li, strong, em, br)', { area: 8 })}
+      {field('description_html', 'Description (HTML: p, ul, li, strong, em, br)', { area: 8, mono: true })}
       {field('seo_title', 'SEO title', { max: site?.content?.meta_title_max })}
       {field('seo_description', 'SEO description', { area: 3, max: site?.content?.meta_desc_max })}
       {field('handle', 'Handle (URL)')}
       {field('tags', 'Tags (comma list)', { area: 2 })}
-      {err && <div style={{ ...S.errorBox, marginBottom: 10 }}>{err}</div>}
-      <ListingActions listing={l} dirty={changed.length > 0 && !locked} busy={busy} setBusy={setBusy} save={save} onSave={onSave}
-        onUpdated={next => { reset(next); onChanged(); }} addToast={addToast} />
+      {err && <div role="alert" style={{ ...pbErrorBox, marginBottom: 12 }}>{err}</div>}
+      <ListingActions part="rest" {...actions} />
     </PbModal>
   );
 }
