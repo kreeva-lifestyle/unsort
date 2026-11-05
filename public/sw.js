@@ -74,10 +74,14 @@ self.addEventListener('fetch', e => {
   }
   if (url.hostname.includes('supabase')) return;
 
-  // HTML: network-first, cache the response for offline
+  // HTML: network-first, cache the response for offline. `no-cache` makes the
+  // browser revalidate index.html with the server (ETag, a 304 when unchanged)
+  // instead of trusting its 10-minute HTTP cache: a reload right after a
+  // deploy must bring the NEW chunk names, or the page reloads into the same
+  // old names that just 404'd and lands on "couldn't open".
   if (e.request.mode === 'navigate' || e.request.headers.get('accept')?.includes('text/html')) {
     e.respondWith(
-      fetch(e.request).then(r => {
+      fetch(e.request, { cache: 'no-cache' }).then(r => {
         if (r.ok) { const c = r.clone(); caches.open(CACHE).then(cache => cache.put(e.request, c)); }
         return r;
       }).catch(() => caches.match(e.request).then(c => c || caches.match('/index.html')))
