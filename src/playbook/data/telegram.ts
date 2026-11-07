@@ -14,14 +14,15 @@ export const WINDOW_DEFAULT = { start: 1380, end: 420 };
 /** waiting: not used yet; retrying: failed once or twice, tried again by itself; failed: gave up after 3 tries. */
 export type TgStatus = { config: PbTgConfig | null; waiting: number; retrying: number; failed: number; schedule: TgScheduleRow[] };
 /** One vendor channel in the daily-check list (Settings → Telegram → Crawler). */
-export type TgScheduleRow = Pick<PbVendor, 'id' | 'name' | 'active' | 'tg_username' | 'tg_title' | 'tg_channel_id' | 'tg_slot_minute' | 'tg_checked_at' | 'tg_cursor_ready'>;
-const SCHEDULE_COLS = 'id,name,active,tg_username,tg_title,tg_channel_id,tg_slot_minute,tg_checked_at,tg_cursor_ready';
+export type TgScheduleRow = Pick<PbVendor, 'id' | 'name' | 'active' | 'tg_username' | 'tg_title' | 'tg_channel_id' | 'tg_slot_minute' | 'tg_slot_set_at' | 'tg_checked_at' | 'tg_cursor_ready'>;
+const SCHEDULE_COLS = 'id,name,active,tg_username,tg_title,tg_channel_id,tg_slot_minute,tg_slot_set_at,tg_checked_at,tg_cursor_ready';
 /** The backend writes "… (attempt N of 3)" on a failed message; 1 and 2 are still being retried (for 7 days). */
 const RETRYING = 'note.like."*(attempt 1 of 3)",note.like."*(attempt 2 of 3)"';
 const RETRY_DAYS = 7;
 
 const asChannels = (v: unknown): PbTgChannel[] => (Array.isArray(v) ? v : []).filter(c => c && typeof c === 'object').map(c => ({
   username: c.username ?? null, channel_id: c.channel_id ?? null, title: c.title ?? null, last_id: c.last_id ?? null, error: c.error ?? null,
+  sent: Number.isSafeInteger(c.sent) && c.sent >= 0 ? c.sent : null,
 }));
 
 /** One round trip per table: the config row + two head-only counts (never the messages themselves). */

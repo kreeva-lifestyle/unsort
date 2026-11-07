@@ -5,10 +5,11 @@
 import { useState } from 'react';
 import type { TgScheduleRow } from '../../../data/telegram';
 import { minuteLabel, nextCheck, upcomingLabel, windowOffset } from '../../../data/tgSchedule';
-import { istDate, istRelative } from '../../../format';
+import { count, istDate, istRelative } from '../../../format';
 import { PB, pbLabel, pbMeta, pbNum } from '../../../pbTheme';
 import type { PbTgChannel } from '../../../types';
 import { Dot } from '../../product/status';
+import { TgHandle } from '../../vendors/VendorTg';
 import PbButton from '../../ui/PbButton';
 import TgWindowForm from './TgWindowForm';
 
@@ -23,13 +24,14 @@ const reportOf = (r: TgScheduleRow, channels: PbTgChannel[]) =>
 
 function Row({ r, report, now }: { r: TgScheduleRow; report?: PbTgChannel; now: number }) {
   const slot = r.tg_slot_minute;
-  const next = slot === null ? null : nextCheck(slot, r.tg_checked_at, now);
+  const next = slot === null ? null : nextCheck({ slot, checkedAt: r.tg_checked_at, slotSetAt: r.tg_slot_set_at, cursorReady: r.tg_cursor_ready }, now);
   const result = report?.error
     ? <Dot color={PB.failed} label={report.error} style={{ whiteSpace: 'normal', color: PB.tx, overflowWrap: 'anywhere' }} />
     : !r.tg_cursor_ready
       ? <Dot color={PB.busy} label="Getting ready — the crawler notes its newest post first, so old posts are not copied" style={{ whiteSpace: 'normal', color: PB.tx }} />
       : r.tg_checked_at
-        ? <span style={pbMeta} title={istDate(r.tg_checked_at)}>Last checked <span style={{ color: PB.tx }}>{istRelative(r.tg_checked_at, now)}</span></span>
+        ? <span style={pbMeta} title={istDate(r.tg_checked_at)}>Last checked <span style={{ color: PB.tx }}>{istRelative(r.tg_checked_at, now)}</span>
+          {report?.sent != null && <> · <span style={{ whiteSpace: 'nowrap' }}><span style={pbNum}>{count(report.sent)}</span> {report.sent === 1 ? 'message' : 'messages'} copied</span></>}</span>
         : <span style={pbMeta}>Not checked yet</span>;
   return (
     <li style={{ listStyle: 'none', display: 'flex', gap: 12, padding: '12px 0', borderTop: `1px solid ${PB.tileBd}`, minWidth: 0 }}>
@@ -39,12 +41,12 @@ function Row({ r, report, now }: { r: TgScheduleRow; report?: PbTgChannel; now: 
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', columnGap: 8, flexWrap: 'wrap', minWidth: 0 }}>
           <span style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.4, color: PB.tx, overflowWrap: 'anywhere', minWidth: 0 }}>{r.name}</span>
-          {r.tg_username && <span style={{ ...pbNum, fontSize: 12, color: PB.tx2, overflowWrap: 'anywhere', minWidth: 0 }}>@{r.tg_username}</span>}
+          {r.tg_username && <span style={{ ...pbNum, fontSize: 12, color: PB.tx2, overflowWrap: 'normal', wordBreak: 'normal', minWidth: 0 }}><TgHandle u={r.tg_username} /></span>}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', columnGap: 16, rowGap: 4, flexWrap: 'wrap', minWidth: 0 }}>
           {next && r.tg_cursor_ready && (next.due
-            ? <Dot color={PB.review} label="Due now — the crawler checks it next" style={{ color: PB.tx }} />
-            : <span style={pbMeta}>Next check <span style={{ color: PB.tx }}>{upcomingLabel(next.at, slot!, now)}</span></span>)}
+            ? <Dot color={PB.review} label="Due now — checked next" style={{ whiteSpace: 'normal', color: PB.tx }} />
+            : <span style={pbMeta}>Next check <span style={{ color: PB.tx, whiteSpace: 'nowrap' }}>{upcomingLabel(next.at, slot!, now)}</span></span>)}
           {result}
         </div>
       </div>

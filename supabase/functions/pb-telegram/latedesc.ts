@@ -1,12 +1,16 @@
 // A description that came FIRST in the waiting messages with no photos of its
 // own (group.ts lateDesc): usually the text of the product made just before it
 // from photos alone ("No description arrived" after 60 minutes). If that
-// product still has no text, is under a day old and is on no website, the text
+// product still has no text, is under 2 days old and is on no website, the text
 // goes onto it and it is read again (locked fields stay as typed). Otherwise
 // the caller falls back to the usual rule (a priced text is its own product).
 import { ago, enc, logActivity, one, patch, sel } from '../pb-products/db.ts';
 import type { MsgRow } from './create.ts';
 import type { GProduct } from './group.ts';
+
+// 2 days, not 1: channels are checked once a day, so a text posted after
+// that night's check arrives about 24 hours after its photos.
+const LATE_DESC_MS = 2 * 86_400_000;
 
 export const NO_DESC_NOTE = 'No description arrived from Telegram';
 const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2));
@@ -16,7 +20,7 @@ export async function applyLateDesc(g: GProduct, rows: Map<number, MsgRow>): Pro
   const prev = await one<{ state: string; product_id: string | null }>(
     `pb_tg_messages?origin_chat_id=eq.${g.chat}&origin_message_id=lt.${g.first}&state=neq.ignored&select=state,product_id&order=origin_message_id.desc`);
   if (!prev || prev.state !== 'used' || !prev.product_id) return prev && prev.state === 'pending' ? 'wait' : 'none';
-  const p = await one<P>(`pb_products?id=eq.${enc(prev.product_id)}&source=eq.telegram&created_at=gt.${enc(ago(86_400_000))}&select=id,status,raw_text,intake_notes,less_amount`);
+  const p = await one<P>(`pb_products?id=eq.${enc(prev.product_id)}&source=eq.telegram&created_at=gt.${enc(ago(LATE_DESC_MS))}&select=id,status,raw_text,intake_notes,less_amount`);
   if (!p || (p.raw_text || '').trim() || !(p.intake_notes || []).includes(NO_DESC_NOTE) || p.status === 'archived') return 'none';
   if (p.status === 'reading') return 'wait';
   const listings = await sel<{ status: string; shopify_product_id: string | null }>(`pb_listings?product_id=eq.${enc(p.id)}&select=status,shopify_product_id&limit=50`);

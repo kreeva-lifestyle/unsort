@@ -9,6 +9,12 @@ import type { PbVendor } from '../../types';
 
 type Tg = Pick<PbVendor, 'active' | 'tg_username' | 'tg_title' | 'tg_slot_minute' | 'tg_checked_at'>;
 
+/** "@jaipur_prints_official" that breaks only after an underscore (never "offi / cial") on a narrow phone. */
+export function TgHandle({ u }: { u: string }) {
+  const parts = u.split('_');
+  return <>@{parts.map((p, i) => <span key={i}>{p}{i < parts.length - 1 && <>_<wbr /></>}</span>)}</>;
+}
+
 /** "checked daily at 1:12 AM" · "not checked while inactive" · "daily time not set yet". */
 export function dailyWords(v: Tg): string {
   if (!v.active) return 'not checked while inactive';
@@ -21,8 +27,10 @@ export default function VendorTg({ v }: { v: Tg }) {
     <span style={{ ...pbMeta, display: 'flex', flexWrap: 'wrap', columnGap: 8, rowGap: 0, minWidth: 0 }}>
       <span style={{ minWidth: 0, overflowWrap: 'anywhere' }} title={v.tg_title ?? undefined}>
         <span className="pb-sr">Telegram channel </span>
-        {v.tg_username ? <span style={{ ...pbNum, color: PB.tx }}>@{v.tg_username}</span> : <>Telegram · {v.tg_title}</>}
-        {' · '}{dailyWords(v)}
+        {v.tg_username
+          ? <span style={{ ...pbNum, color: PB.tx, overflowWrap: 'normal', wordBreak: 'normal' }}><TgHandle u={v.tg_username} /></span>
+          : <>Telegram · {v.tg_title}</>}
+        {' · '}<span style={{ whiteSpace: 'nowrap' }}>{dailyWords(v)}</span>
       </span>
       <span title={v.tg_checked_at ? istDate(v.tg_checked_at) : undefined}>
         {v.tg_checked_at ? <>Last checked <span style={{ color: PB.tx }}>{istRelative(v.tg_checked_at)}</span></> : 'Not checked yet'}

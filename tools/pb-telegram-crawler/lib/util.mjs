@@ -34,6 +34,7 @@ export function readEnv(env = process.env) {
     pollSeconds: num(env.POLL_SECONDS, 60, 15, 3600, 'POLL_SECONDS', problems),
     backfill: num(env.BACKFILL_POSTS, 0, 0, 500, 'BACKFILL_POSTS', problems),
     startDelay: num(env.START_DELAY_SECONDS, 20, 0, 600, 'START_DELAY_SECONDS', problems),
+    forwardGap: gap(env.FORWARD_GAP_SECONDS, problems),
   };
   if (cfg.pbUrl && !/^https:\/\//.test(cfg.pbUrl)) problems.push('PB_URL must start with https://');
   if (problems.length) throw new Error(`Setup problem: ${problems.join('; ')}`);
@@ -46,6 +47,17 @@ function num(raw, dflt, min, max, name, problems) {
   if (!Number.isInteger(n) || n < min || n > max) {
     problems.push(`${name} must be a whole number from ${min} to ${max}`);
     return dflt;
+  }
+  return n;
+}
+
+// Seconds between two forwards (all channels): default 1.5, at least 1 (Telegram's limits), at most 60.
+function gap(raw, problems) {
+  if (raw == null || String(raw).trim() === '') return 1.5;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 1 || n > 60) {
+    problems.push('FORWARD_GAP_SECONDS must be a number from 1 to 60');
+    return 1.5;
   }
   return n;
 }

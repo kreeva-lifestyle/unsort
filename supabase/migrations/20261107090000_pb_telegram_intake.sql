@@ -330,6 +330,9 @@ $$;
 -- times (as offsets from the window start; times outside the window are
 -- ignored), the window's start and end counting as edges; ties → earliest gap.
 -- Pure; its TypeScript twin is pickSlot() in pb-telegram/schedule.ts.
+-- Limit: once the largest gap is 1 minute (more channels than minutes in the
+-- window) it returns a taken minute; respread likewise repeats minutes. Harmless:
+-- the crawler still checks one due channel at a time, oldest overdue first.
 create or replace function public.pb_tg_pick_slot(p_start integer, p_end integer, p_taken integer[])
 returns smallint language plpgsql immutable set search_path = pg_catalog, public as $$
 declare

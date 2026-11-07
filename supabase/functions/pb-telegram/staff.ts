@@ -4,9 +4,15 @@
 //   link_code      (admin|manager) → { ok, code, expires_at }   6 digits, 30 minutes, 5 wrong tries
 //   crawler_key    (admin|manager) → { ok, key }          shown once; replaces the old key
 //   test_bot       (staff)  → { ok, url_ok, pending_update_count, last_error_message }
+//   respread       (admin|manager) → { ok, channels }  every channel's daily time spaced evenly
+//                  over the window, in their current order (pb_tg_respread_slots)
+//   save_window    (admin|manager) { start, end } → { ok, start, end, channels }  the overnight
+//                  window (IST minutes of day 0–1439, may cross midnight, >= 60 min), then a
+//                  respread in the old order — one database step (pb_tg_set_window)
 import { SB_URL } from '../pb-products/db.ts';
 import { HttpError, plain } from '../pb-products/http.ts';
-import { botToken, randomHex, saveConfig, saveSecrets, scrub, sha256, tg } from './tg.ts';
+import { windowProblem } from './schedule.ts';
+import { botToken, randomHex, rpc, saveConfig, saveSecrets, scrub, sha256, tg } from './tg.ts';
 import { resetCache } from './webhook.ts';
 import { resetKeyCache } from './crawler.ts';
 
@@ -63,4 +69,16 @@ export async function testBot() {
   const webhook_error = !url_ok ? 'The bot is not pointed at Playbook — save the bot token again.' : recent ? last_error_message : null;
   await saveConfig({ webhook_ok: url_ok && !webhook_error, webhook_error });
   return { ok: true, url_ok, pending_update_count: Number(info.pending_update_count || 0), last_error_message };
+}
+
+export async function respread() {
+  return { ok: true, channels: Number(await rpc<number>('pb_tg_respread_slots', {})) || 0 };
+}
+
+export async function saveWindow(b: Body) {
+  const start = Number(b.start), end = Number(b.end);
+  const no = windowProblem(start, end);
+  if (no) throw new HttpError(400, no);
+  const channels = Number(await rpc<number>('pb_tg_set_window', { p_start: start, p_end: end })) || 0;
+  return { ok: true, start, end, channels };
 }

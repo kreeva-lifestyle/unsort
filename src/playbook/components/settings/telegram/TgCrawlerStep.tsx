@@ -55,7 +55,7 @@ export default function TgCrawlerStep({ config, canManage, busy, newKey, onKey, 
       )}
       {config?.crawler_error && (running
         ? <div style={{ ...pbErrorBox, background: PB.reviewBg, border: `1px solid ${PB.reviewBd}`, color: PB.tx, overflowWrap: 'anywhere' }}>{config.crawler_error}</div>
-        : <div role="alert" style={{ ...pbErrorBox, overflowWrap: 'anywhere' }}>{config.crawler_error}</div>)}
+        : <span style={{ ...pbMeta, overflowWrap: 'anywhere' }}>Its last message: {config.crawler_error}</span>)}
       {!canManage && !seen && <p style={{ ...pbMeta, margin: 0 }}>An admin or manager creates the crawler key here.</p>}
       {canManage && !newKey && (
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>

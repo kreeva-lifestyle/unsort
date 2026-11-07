@@ -29,8 +29,10 @@ test('error kinds', () => {
 test('environment: every missing variable named at once, numbers checked', () => {
   assert.throws(() => readEnv({}), /TG_API_ID is not set; TG_API_HASH is not set; TG_SESSION is not set; PB_URL is not set; PB_CRAWLER_KEY is not set/);
   const base = { TG_API_ID: '123', TG_API_HASH: 'h', TG_SESSION: 's', PB_URL: 'https://x.test/f', PB_CRAWLER_KEY: 'k' };
-  assert.deepEqual(readEnv(base), { apiId: 123, apiHash: 'h', session: 's', pbUrl: 'https://x.test/f', crawlerKey: 'k', pollSeconds: 60, backfill: 0, startDelay: 20 });
+  assert.deepEqual(readEnv(base), { apiId: 123, apiHash: 'h', session: 's', pbUrl: 'https://x.test/f', crawlerKey: 'k', pollSeconds: 60, backfill: 0, startDelay: 20, forwardGap: 1.5 });
   assert.throws(() => readEnv({ ...base, PB_URL: 'http://x.test/f' }), /PB_URL must start with https/);
   assert.equal(readEnv({ ...base, POLL_SECONDS: '30', BACKFILL_POSTS: '20' }).backfill, 20);
   assert.throws(() => readEnv({ ...base, POLL_SECONDS: 'x' }), /POLL_SECONDS must be a whole number/);
+  assert.equal(readEnv({ ...base, FORWARD_GAP_SECONDS: '2.5' }).forwardGap, 2.5);
+  assert.throws(() => readEnv({ ...base, FORWARD_GAP_SECONDS: '0.5' }), /FORWARD_GAP_SECONDS must be a number from 1 to 60/);
 });

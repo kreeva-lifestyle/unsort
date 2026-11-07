@@ -15,9 +15,10 @@ export interface PbVendor {
   id: string; name: string; code: string | null; notes: string | null; active: boolean;
   /** Telegram channel (20261107090000_pb_telegram_intake.sql): Bot API id (-100…), username (lowercase, no @), title. */
   tg_channel_id: number | null; tg_username: string | null; tg_title: string | null;
-  /** Daily check (set by a trigger, never by the app): IST minute of day 0–1439, when the last check finished,
-   *  and whether the crawler has noted the channel's newest post yet (old posts are never copied). */
-  tg_slot_minute: number | null; tg_checked_at: string | null; tg_cursor_ready: boolean;
+  /** Daily check (set by the database, never by the app): IST minute of day 0–1439, when it was given
+   *  (first check = its next occurrence after that), when the last check finished, and whether the
+   *  crawler has noted the channel's newest post yet (old posts are never copied). */
+  tg_slot_minute: number | null; tg_slot_set_at: string | null; tg_checked_at: string | null; tg_cursor_ready: boolean;
   created_by: string | null; created_at: string; updated_at: string;
 }
 
@@ -156,7 +157,11 @@ export interface PbTgMessage {
 }
 
 /** What the crawler last reported for one vendor channel. */
-export interface PbTgChannel { username: string | null; channel_id: number | null; title: string | null; last_id: number | null; error: string | null }
+export interface PbTgChannel {
+  username: string | null; channel_id: number | null; title: string | null; last_id: number | null; error: string | null;
+  /** How many messages its last finished daily check copied (null: none reported yet). */
+  sent?: number | null;
+}
 
 /** Single row (id = 1): bot, admin group and crawler status. Staff read; only pb-telegram writes. */
 export interface PbTgConfig {

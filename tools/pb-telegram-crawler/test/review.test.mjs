@@ -8,13 +8,14 @@ import bigInt from 'big-integer';
 import { makeCrawler } from '../lib/cycle.mjs';
 import { MSG } from '../lib/errors.mjs';
 import { makeTelegram, normalize, within } from '../lib/telegram.mjs';
-import { m, makeClock, makeFakePb, makeFakeTelegram, rpcError } from './fake.mjs';
+import { m, makeClock, makeFakePb, makeFakePlaybook, makeFakeTelegram, rpcError } from './fake.mjs';
 
 const cfg = channels => ({ group_chat_id: -1001111111111, group_title: 'Admin', channels });
-const kumari = { vendor_id: 'v1', vendor_name: 'Kumari Art', username: 'kumari_art', channel_id: null, last_id: 0 };
+// Ready and due: these cases are about one daily check.
+const kumari = { vendor_id: 'v1', vendor_name: 'Kumari Art', username: 'kumari_art', channel_id: null, last_id: 0, cursor_ready: true, due: true };
 function setup(config) {
   const tg = makeFakeTelegram(), pb = makeFakePb(config), clock = makeClock();
-  const crawler = makeCrawler({ tg, pb, version: '1.0.0', sleep: clock.sleep, now: clock.now, log: () => {} });
+  const crawler = makeCrawler({ tg, pb, version: '1.1.0', sleep: clock.sleep, now: clock.now, log: () => {} });
   return { tg, pb, clock, crawler };
 }
 
@@ -32,7 +33,11 @@ test('staff account removed from the group mid-forward: the post is kept, not sk
 });
 
 test('a long flood wait while forwarding pauses every channel without skipping', async () => {
-  const { tg, pb, crawler, clock } = setup(cfg([kumari, { ...kumari, vendor_id: 'v2', username: 'sita_art' }]));
+  const tg = makeFakeTelegram(), clock = makeClock();
+  const pb = makeFakePlaybook({ channels: [{ username: 'kumari_art', last_id: 0, cursor_ready: true }, { username: 'sita_art', last_id: 0, cursor_ready: true }] });
+  const crawler = makeCrawler({ tg, pb, version: '1.1.0', sleep: clock.sleep, now: clock.now, log: () => {} });
+  pb.dueNow('kumari_art', clock.now() - 60_000);
+  pb.dueNow('sita_art', clock.now());
   tg.addChannel('kumari_art', { id: -1002222222222, messages: [m(1)] });
   tg.addChannel('sita_art', { id: -1003333333333, messages: [m(5)] });
   tg.failNext.push(rpcError('FLOOD', { seconds: 3600 }));
@@ -42,6 +47,7 @@ test('a long flood wait while forwarding pauses every channel without skipping',
   assert.equal(tg.forwards.length, 0, 'the other channel waits too');
   assert.match(pb.reports.at(-1).error, /slow down for 60 min/);
   clock.advance(3601_000);
+  await crawler.cycle();                         // one channel per cycle
   await crawler.cycle();
   assert.deepEqual(tg.forwards.map(f => f.ids), [[1], [5]]);
 });

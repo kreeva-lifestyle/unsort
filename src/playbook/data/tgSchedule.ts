@@ -53,24 +53,35 @@ export function lastOccurrence(slot: number, now = Date.now()): number {
   return minuteStart - mod(nowIst - slot, DAY) * MIN_MS;
 }
 
-/** Same rule as the server: the latest occurrence is after the last check, and under 20 hours old. */
-export function isDue(slot: number, checkedAt: string | null, now = Date.now()): boolean {
-  const occ = lastOccurrence(slot, now);
-  if (now - occ >= DUE_FOR_HOURS * 3600_000) return false;
-  return checkedAt === null || occ > new Date(checkedAt).getTime();
+/** The schedule state of one channel (pb_vendors columns). */
+export type SlotState = { slot: number | null; checkedAt: string | null; slotSetAt: string | null; cursorReady: boolean };
+
+/** Same rule as the server (pb-telegram schedule.ts dueInfo): the cursor is ready, the latest occurrence is
+ *  after the last check AND after the time was given (a vendor added in the daytime waits for its night),
+ *  and it is under 20 hours old. */
+export function isDue(s: SlotState, now = Date.now()): boolean {
+  if (s.slot === null) return false;
+  const occ = lastOccurrence(s.slot, now);
+  const after = Math.max(...[s.checkedAt, s.slotSetAt].map(x => (x ? Date.parse(x) : NaN)).filter(Number.isFinite), -Infinity);
+  return s.cursorReady && occ > after && now - occ < DUE_FOR_HOURS * 3600_000;
 }
 
 /** When the channel is checked next: its latest occurrence while that is still due, else the next one. */
-export function nextCheck(slot: number, checkedAt: string | null, now = Date.now()): { at: number; due: boolean } {
-  const occ = lastOccurrence(slot, now);
-  return isDue(slot, checkedAt, now) ? { at: occ, due: true } : { at: occ + DAY * MIN_MS, due: false };
+export function nextCheck(s: SlotState & { slot: number }, now = Date.now()): { at: number; due: boolean } {
+  const occ = lastOccurrence(s.slot, now);
+  return isDue(s, now) ? { at: occ, due: true } : { at: occ + DAY * MIN_MS, due: false };
 }
 
-/** "Tonight, 1:12 AM" style words for a time ahead: "Today, …", "Tomorrow, …" (IST days). */
+/** Words for a time ahead (IST days): "Tonight, 1:12 AM" for this coming night — asked in the afternoon,
+ *  a 1:12 AM check is tonight, not "Tomorrow" — else "Today, 3:00 AM" / "Tomorrow, 11:40 PM". */
 const dayKey = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' });
 export function upcomingLabel(at: number, slot: number, now = Date.now()): string {
   const t = minuteLabel(slot);
-  if (dayKey.format(at) === dayKey.format(now)) return `Today, ${t}`;
-  if (dayKey.format(at) === dayKey.format(now + DAY * MIN_MS)) return `Tomorrow, ${t}`;
+  const today = dayKey.format(at) === dayKey.format(now), tomorrow = dayKey.format(at) === dayKey.format(now + DAY * MIN_MS);
+  const atHour = mod(slot, DAY) / 60, nowHour = mod(Math.floor(now / MIN_MS) + IST_MIN, DAY) / 60;
+  const tonight = at - now < 18 * 3600_000 && ((today && atHour >= 18) || (tomorrow && atHour < 12 && nowHour >= 12));
+  if (tonight) return `Tonight, ${t}`;
+  if (today) return `Today, ${t}`;
+  if (tomorrow) return `Tomorrow, ${t}`;
   return t;
 }

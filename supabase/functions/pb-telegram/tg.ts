@@ -14,9 +14,11 @@ export interface TgConfig {
   link_code: string | null; link_code_expires_at: string | null; link_attempts: number; webhook_ok: boolean | null; webhook_error: string | null;
   crawler_seen_at: string | null; crawler_version: string | null; crawler_error: string | null;
   crawler_channels: CrawlerChannel[]; last_message_at: string | null;
+  crawl_window_start: number; crawl_window_end: number;
 }
-export interface CrawlerChannel { username: string | null; channel_id: number | null; title: string | null; last_id: number | null; error: string | null }
-export const CONFIG_COLS = 'bot_username,group_chat_id,group_title,link_code,link_code_expires_at,link_attempts,webhook_ok,webhook_error,crawler_seen_at,crawler_version,crawler_error,crawler_channels,last_message_at';
+/** sent: how many messages the channel's last finished daily check forwarded. */
+export interface CrawlerChannel { username: string | null; channel_id: number | null; title: string | null; last_id: number | null; error: string | null; sent?: number | null }
+export const CONFIG_COLS = 'bot_username,group_chat_id,group_title,link_code,link_code_expires_at,link_attempts,webhook_ok,webhook_error,crawler_seen_at,crawler_version,crawler_error,crawler_channels,last_message_at,crawl_window_start,crawl_window_end';
 
 const hex = (b: Uint8Array) => [...b].map(x => x.toString(16).padStart(2, '0')).join('');
 export const randomHex = (n: number) => hex(crypto.getRandomValues(new Uint8Array(n)));

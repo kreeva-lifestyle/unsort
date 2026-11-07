@@ -22,7 +22,8 @@
 // first in the waiting messages is a LATE less for the product made before it.
 // The last product of a channel is final once its newest message is 3 minutes
 // old; one closed by the next product's messages waits until those are 60 s
-// old (a delayed album still finds its product). Photos with no description
+// old (a delayed album still finds its product); a description that is still
+// waiting for its photos (the last thing seen) waits 20 minutes. Photos with no description
 // become a product after 60 minutes. A description with no photos that comes
 // FIRST in the waiting messages is a LATE description (lateDesc) for the
 // product made before it; otherwise text with no photos becomes a product only
@@ -43,6 +44,7 @@ export interface GPlan {
 }
 
 export const QUIET_MS = 3 * 60_000;
+export const DESC_WAIT_MS = 20 * 60_000;
 export const NO_DESC_MS = 60 * 60_000;
 export const SETTLE_MS = 60_000;
 const DESC_MIN = 40;
@@ -143,7 +145,10 @@ function channelPlan(msgs: GMsg[], now: number, out: GPlan, truncated: boolean) 
   }
   if (!cur || truncated) return; // the batch ended inside this channel: its last group may be cut
   const age = now - cur.lastAt;
-  if (cur.texts.length ? age >= QUIET_MS : cur.media.length > 0 && age >= NO_DESC_MS) emit(cur);
+  // A description still waiting for its photos waits longer: a daily check cut short (a flood wait, a
+  // failed read retried minutes later) can pause between a "description first" text and its photos.
+  const quiet = cur.descFirst && !cur.media.length ? DESC_WAIT_MS : QUIET_MS;
+  if (cur.texts.length ? age >= quiet : cur.media.length > 0 && age >= NO_DESC_MS) emit(cur);
 }
 
 /**

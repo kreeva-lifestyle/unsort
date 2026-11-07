@@ -3,7 +3,7 @@
 // Less wording, a post forwarded twice, a batch cut short, emoji rows.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { inlineLess, isDescription, lessOf, plan, stripLess, QUIET_MS, NO_DESC_MS, SETTLE_MS } from '../group.ts';
+import { inlineLess, isDescription, lessOf, plan, stripLess, DESC_WAIT_MS, QUIET_MS, NO_DESC_MS, SETTLE_MS } from '../group.ts';
 
 const T0 = Date.parse('2026-11-07T06:00:00Z');
 const DESC = 'LEHENGA CHOLI COLLECTIONS\nCODE :- KA-5070\nLEHENGA :- Georgette\nSIZE :- 42\nCOLOUR :- 2\nWEIGHT :- 1.2 kg\nRATE :- 1600/-INR';
@@ -71,7 +71,8 @@ test('a batch cut short leaves that channel’s last group for the next run', ()
 
 test('a description 61 minutes after its photos comes back as a late description', () => {
   const d = feed(-5, 7, [['text', DESC], ['text', '200 Less']]);
-  const r = plan(d, late(d));
+  assert.equal(plan(d, late(d)).lateDesc.length, 0, 'still waiting: its photos may come after a pause');
+  const r = plan(d, d[d.length - 1].at + DESC_WAIT_MS);
   assert.equal(r.products.length, 0);
   assert.equal(r.lateDesc.length, 1);
   assert.equal(r.lateDesc[0].less, 200);
@@ -83,4 +84,15 @@ test('products come oldest first across channels', () => {
   const old = feed(-500, 1, [...photos(1, 'o'), ['text', DESC]], T0);
   const r = plan([...s, ...k, ...old], T0 + 10 * QUIET_MS);
   assert.deepEqual(r.products.map(p => p.chat), [-500, -9001, -1]);
+});
+
+test('description first, its photos 10 minutes later (a daily check paused in between): one product', () => {
+  const d = feed(-6, 1, [['text', 'Code KA-90 rate 1250/- pure cotton, 3 colours']]);
+  const p = feed(-6, 2, photos(3, 'z'), d[0].at + 10 * 60_000);
+  const mid = plan(d, d[0].at + 9 * 60_000);
+  assert.equal(mid.products.length + mid.lateDesc.length + mid.ignore.length, 0, 'nothing decided while it waits');
+  const r = plan([...d, ...p], p[p.length - 1].at + QUIET_MS);
+  assert.equal(r.products.length, 1);
+  assert.equal(r.products[0].media.length, 3);
+  assert.equal(r.products[0].noDescription, false);
 });

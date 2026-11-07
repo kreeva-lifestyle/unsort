@@ -67,7 +67,7 @@ export default function TelegramTile({ addToast, onGuide }: { addToast: AddToast
     const n = status?.schedule.length ?? 0;
     if (!(await ask({
       title: `Spread all ${n} channels evenly?`, confirmLabel: 'Spread evenly',
-      message: `Each channel gets a new daily time, evenly spaced between ${minuteLabel(winStart)} and ${minuteLabel(winEnd)}, in the same order as now. Nothing is copied twice.`,
+      message: `Each channel gets a new daily time, evenly spaced between ${minuteLabel(winStart)} and ${minuteLabel(winEnd)}, in the same order as now. Nothing is copied twice. If you do this during the night, channels whose new time has already passed are checked the next night.`,
     }))) return;
     await run('spread', async () => { await respreadSlots(); return `${n} channels spread evenly`; });
   };

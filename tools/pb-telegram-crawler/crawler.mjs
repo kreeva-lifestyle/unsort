@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 // Playbook Telegram crawler — runs 24/7 on a small cloud server.
 //   node crawler.mjs      (settings come from environment variables; see README)
-// Signed in as a staff Telegram account, it reads the vendor channels listed
-// in Playbook and forwards each new post into the admin group, where the
-// Playbook bot turns them into products. It never posts anything else.
+// Signed in as a staff Telegram account. Every POLL_SECONDS it asks Playbook
+// which vendor channel is due (each is checked ONCE A DAY at its own time in
+// the overnight window) and forwards that channel's new posts into the admin
+// group, where the Playbook bot turns them into products — one channel at a
+// time, never all vendors at once. It never posts anything else.
 import { makeCrawler } from './lib/cycle.mjs';
 import { classify, MSG } from './lib/errors.mjs';
 import { makePb } from './lib/pb.mjs';
@@ -28,7 +30,7 @@ try {
 const pb = makePb({ url: env.pbUrl, key: env.crawlerKey });
 let lastCycle = Date.now();       // last sign of life: a finished cycle, a report or a connect try
 const alive = () => { lastCycle = Date.now(); };
-const crawler = makeCrawler({ tg, pb, version: VERSION, backfill: env.backfill, sleep, log, onReport: alive });
+const crawler = makeCrawler({ tg, pb, version: VERSION, backfill: env.backfill, forwardGapMs: env.forwardGap * 1000, sleep, log, onReport: alive });
 
 const AUTH_WAIT_MS = 10 * 60_000;
 const backoff = n => Math.min(300, 5 * 2 ** Math.min(n, 6)) * 1000;   // 5 s … 5 min
@@ -83,7 +85,7 @@ async function connect() {
   }
 }
 
-log(`Playbook Telegram crawler ${VERSION} starting (every ${env.pollSeconds} s${env.backfill ? `, backfill ${env.backfill}` : ''})`);
+log(`Playbook Telegram crawler ${VERSION} starting (asks Playbook every ${env.pollSeconds} s, forwards ${env.forwardGap} s apart${env.backfill ? `, backfill ${env.backfill}` : ''})`);
 // Two copies on one session at once can make Telegram end the session for good
 // (AUTH_KEY_DUPLICATED). On a redeploy the old copy may still be stopping: wait.
 if (env.startDelay) { log(`Waiting ${env.startDelay} s for any older copy to stop`); await sleep(env.startDelay * 1000); }

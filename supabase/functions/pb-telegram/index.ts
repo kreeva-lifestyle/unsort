@@ -12,15 +12,18 @@
 //   link_code        admin|manager            → { ok, code, expires_at }
 //   crawler_key      admin|manager            → { ok, key }   (shown once; replaces the old key)
 //   test_bot         staff                    → { ok, url_ok, pending_update_count, last_error_message }
+//   respread         admin|manager            → { ok, channels }   daily times spaced evenly
+//   save_window      admin|manager { start, end } → { ok, start, end, channels }
 //   assemble         secret|staff             → { ok, products, less, ignored, failed, waiting }
-//   crawler_config   crawler                  → { ok, group_chat_id, group_title, channels[] }
-//   crawler_progress crawler { version, error?, channels[] } → { ok }
+//   crawler_config   crawler                  → { ok, now, group_chat_id, group_title, window, channels[] }
+//   crawler_progress crawler { version, error?, channels[], forwarded? } → { ok, mapped }
+// Details of the crawler pair: crawler.ts; of the daily schedule: schedule.ts.
 import { whoIs } from '../pb-products/auth.ts';
 import { HttpError, corsHeaders, fail, json, plain } from '../pb-products/http.ts';
 import type { Caller } from '../pb-products/types.ts';
 import { assemble } from './assemble.ts';
 import { crawlerConfig, crawlerOk, crawlerProgress } from './crawler.ts';
-import { type Body, crawlerKey, linkCode, saveBotToken, testBot } from './staff.ts';
+import { type Body, crawlerKey, linkCode, respread, saveBotToken, saveWindow, testBot } from './staff.ts';
 import { scrub } from './tg.ts';
 import { webhook } from './webhook.ts';
 
@@ -30,6 +33,8 @@ const ACTIONS: Record<string, { who: Who; run: (b: Body, c: Caller) => Promise<u
   link_code: { who: 'admin', run: () => linkCode() },
   crawler_key: { who: 'admin', run: () => crawlerKey() },
   test_bot: { who: 'staff', run: () => testBot() },
+  respread: { who: 'admin', run: () => respread() },
+  save_window: { who: 'admin', run: (b) => saveWindow(b) },
   assemble: { who: 'any', run: () => assemble() },
 };
 const CRAWLER: Record<string, (b: Body) => Promise<unknown>> = {
@@ -40,7 +45,7 @@ const CRAWLER: Record<string, (b: Body) => Promise<unknown>> = {
 function denied(who: Who, c: Caller): string | null {
   if (who === 'any') return null;
   if (c.kind !== 'staff') return 'Sign in as a staff member for this.';
-  if (who === 'admin' && !['admin', 'manager'].includes(c.role)) return 'Only an admin or manager can change the Telegram connection.';
+  if (who === 'admin' && !['admin', 'manager'].includes(c.role)) return 'Only an admin or manager can change the Telegram settings.';
   return null;
 }
 

@@ -6,6 +6,10 @@
 // pb_tg_messages.note: "… (attempt N of 3)"); then it stays 'failed', the
 // product (if made) is released with a note, and the failure is written to
 // pb_activity. Running out of time is not a failed try.
+// Channels are checked once a day, so a whole day's posts of one channel
+// arrive in a burst (~1.5 s apart): grouping goes by origin_message_id, and
+// its waits (group.ts) count from when the closing message ARRIVED, so a burst
+// groups the same as posts spread over the day.
 import { ago, enc, logActivity, one, patch, sel } from '../pb-products/db.ts';
 import { plain } from '../pb-products/http.ts';
 import { adopt } from './adopt.ts';

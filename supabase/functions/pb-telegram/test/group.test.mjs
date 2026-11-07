@@ -3,7 +3,7 @@
 // long text, sometimes "200 Less", then a pointing-hand separator.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { isDescription, lessOf, plan, QUIET_MS, NO_DESC_MS, SETTLE_MS } from '../group.ts';
+import { isDescription, lessOf, plan, DESC_WAIT_MS, QUIET_MS, NO_DESC_MS, SETTLE_MS } from '../group.ts';
 
 const T0 = Date.parse('2026-11-07T06:00:00Z');
 const DESC = 'LEHENGA CHOLI COLLECTIONS\nCODE :- KA-5070\nLEHENGA :- Georgette\nSIZE :- 42\nCOLOUR :- 2\nWEIGHT :- 1.2 kg\nRATE :- 1600/-INR';
@@ -106,11 +106,12 @@ test('two channels interleaved are grouped apart', () => {
 
 test('text with no photos: first in the batch → late description; later → product only when priced', () => {
   const chat = feed(-1004, 1, [['text', 'Good morning to all our dear customers, new stock tomorrow']]);
-  const r1 = plan(chat, chat[0].at + QUIET_MS);
+  assert.equal(plan(chat, chat[0].at + QUIET_MS).lateDesc.length, 0, 'a lone description waits for photos first');
+  const r1 = plan(chat, chat[0].at + DESC_WAIT_MS);
   assert.equal(r1.products.length, 0);
   assert.equal(r1.lateDesc.length, 1, 'assemble decides: a late description, or dropped (no rate)');
   const later = feed(-1004, 20, [...photos(2, 'm'), ['text', DESC], ['other'], ['text', 'Good morning to all our dear customers, new stock tomorrow'], ['other'], ['text', 'Code KA-77 rate 1100/-']]);
-  const r2 = plan(later, later[later.length - 1].at + QUIET_MS + SETTLE_MS);
+  const r2 = plan(later, later[later.length - 1].at + DESC_WAIT_MS);
   assert.equal(r2.products.length, 2, 'the photo product, then the priced text');
   assert.deepEqual(r2.products[1].desc, [later[6].id]);
   assert.ok(r2.ignore.includes(later[4].id), 'unpriced chatter between products is dropped');

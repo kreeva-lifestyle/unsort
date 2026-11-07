@@ -44,9 +44,9 @@ export default function TgWindowForm({ start, end, busy, onSave, onCancel }: Pro
       </div>
       <p style={{ ...pbMeta, margin: '0 0 12px' }} aria-live="polite">
         {s !== null && e !== null && len > 0
-          ? <>From <span style={{ color: PB.tx }}>{minuteLabel(s)}</span> to <span style={{ color: PB.tx }}>{minuteLabel(e)}</span>{e < s ? ' the next morning' : ''} · <span style={pbNum}>{Math.floor(len / 60)} h{len % 60 ? ` ${len % 60} min` : ''}</span>. </>
+          ? <>From <span style={{ color: PB.tx }}>{minuteLabel(s)}</span> to <span style={{ color: PB.tx }}>{minuteLabel(e)}</span>{e < s ? ' the next morning' : ''} · <span style={pbNum}>{len >= 60 ? `${Math.floor(len / 60)} h${len % 60 ? ` ${len % 60} min` : ''}` : `${len} min`}</span>. </>
           : null}
-        At least 1 hour; it may run past midnight. Saving spreads every channel evenly over the new window.
+        At least 1 hour; it may run past midnight. Saving spreads every channel evenly over the new window; saved during the night, a channel whose new time has already passed is checked the next night.
       </p>
       {err && <div role="alert" style={{ ...pbErrorBox, marginBottom: 12 }}>{err}</div>}
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
