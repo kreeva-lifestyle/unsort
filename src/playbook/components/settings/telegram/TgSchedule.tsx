@@ -6,7 +6,7 @@ import { useState } from 'react';
 import type { TgScheduleRow } from '../../../data/telegram';
 import { minuteLabel, nextCheck, upcomingLabel, windowOffset } from '../../../data/tgSchedule';
 import { count, istDate, istRelative } from '../../../format';
-import { PB, pbLabel, pbMeta, pbNum } from '../../../pbTheme';
+import { PB, pbBody, pbLabel, pbMeta, pbNum } from '../../../pbTheme';
 import type { PbTgChannel } from '../../../types';
 import { Dot } from '../../product/status';
 import { TgHandle } from '../../vendors/VendorTg';
@@ -30,13 +30,13 @@ function Row({ r, report, now }: { r: TgScheduleRow; report?: PbTgChannel; now: 
     : !r.tg_cursor_ready
       ? <Dot color={PB.busy} label="Getting ready — the crawler notes its newest post first, so old posts are not copied" style={{ whiteSpace: 'normal', color: PB.tx }} />
       : r.tg_checked_at
-        ? <span style={pbMeta} title={istDate(r.tg_checked_at)}>Last checked <span style={{ color: PB.tx }}>{istRelative(r.tg_checked_at, now)}</span>
+        ? <span style={pbMeta}>Last checked <span style={{ color: PB.tx }}>{istRelative(r.tg_checked_at, now)}</span> · {istDate(r.tg_checked_at)}
           {report?.sent != null && <> · <span style={{ whiteSpace: 'nowrap' }}><span style={pbNum}>{count(report.sent)}</span> {report.sent === 1 ? 'message' : 'messages'} copied</span></>}</span>
         : <span style={pbMeta}>Not checked yet</span>;
   return (
     <li style={{ listStyle: 'none', display: 'flex', gap: 12, padding: '12px 0', borderTop: `1px solid ${PB.tileBd}`, minWidth: 0 }}>
       {slot === null
-        ? <span style={{ ...pbMeta, width: 76, flexShrink: 0 }}>Time not set yet</span>
+        ? <span style={{ ...pbMeta, width: 76, flexShrink: 0 }}>Not set<span className="pb-sr"> — time not set yet</span></span>
         : <span style={{ ...pbNum, width: 76, flexShrink: 0, fontSize: 14, fontWeight: 600, lineHeight: 1.4, color: PB.tx }}>{minuteLabel(slot)}</span>}
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', columnGap: 8, flexWrap: 'wrap', minWidth: 0 }}>
@@ -63,7 +63,7 @@ export default function TgSchedule({ rows, channels, start, end, canManage, busy
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
       <span style={{ ...pbLabel, marginBottom: -4 }}>Daily checks · <span style={pbNum}>{rows.length}</span></span>
-      <p style={{ ...pbMeta, margin: 0, color: PB.tx }}>
+      <p style={{ ...pbBody, margin: 0 }}>
         Channels are checked once a day between {minuteLabel(start)} and {minuteLabel(end)}, each at its own time.
         <span style={{ color: PB.tx2 }}> A new channel gets the free time furthest from the others, so checks never pile up.</span>
       </p>
@@ -76,7 +76,7 @@ export default function TgSchedule({ rows, channels, start, end, canManage, busy
           </div>
         ))}
       {sorted.length === 0
-        ? <p style={{ ...pbMeta, margin: 0 }}>No channels yet — add each vendor’s Telegram channel under <span style={{ color: PB.tx }}>Vendors → Edit</span>. Each one gets its own daily time.</p>
+        ? <p style={{ ...pbBody, margin: 0, color: PB.tx2 }}>No channels yet — add each vendor’s Telegram channel under <span style={{ color: PB.tx }}>Vendors → Edit</span>. Each one gets its own daily time.</p>
         : <ul aria-label="Daily checks, in time order" style={{ margin: 0, padding: 0 }}>
           {sorted.map(r => <Row key={r.id} r={r} report={reportOf(r, channels)} now={now} />)}
         </ul>}

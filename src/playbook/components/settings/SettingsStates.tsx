@@ -9,10 +9,10 @@ import { PbButton, PbSkelBar, PbTile } from '../ui';
 /** Desktop 8 + 4 beside each other; phone stacks (form first, status after). */
 export function SettingsColumns({ form, side }: { form: ReactNode; side: ReactNode }) {
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'flex-start', minWidth: 0 }}>
-      <div style={{ flex: '2 1 480px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>{form}</div>
-      {/* Sticky beside the longer form on desktop (no hole under it); on phone it wraps below and never moves. */}
-      <div style={{ flex: '1 1 240px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 16, position: 'sticky', top: 104, alignSelf: 'flex-start' }}>{side}</div>
+    <div className="pb-settings-cols" style={{ display: 'flex', gap: 16, alignItems: 'flex-start', minWidth: 0 }}>
+      <div style={{ flex: '2 1 0', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>{form}</div>
+      {/* Sticky beside the longer form on desktop (no hole under it); on phone (.pb-settings-cols) it stacks below the form and never moves. */}
+      <div style={{ flex: '1 1 0', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 16, position: 'sticky', top: 'var(--pb-sticky-top)', alignSelf: 'flex-start' }}>{side}</div>
     </div>
   );
 }

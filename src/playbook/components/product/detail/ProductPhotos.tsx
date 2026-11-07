@@ -1,7 +1,8 @@
 // Product photos. Desktop: an 8×2 bento tile, the cover tall (4:5, garments
 // are portrait) with the rest and the "Add photos" cell in a grid beside it. Phone: the photo hero at the top of
 // the page, a sideways snap strip with the back button laid over it.
-// Each photo opens full size (as before); uploads go through the page.
+// Tapping a photo opens it in the in-app viewer (PhotoViewer, never a new
+// tab — mobile.md §10); uploads go through the page.
 // Telegram videos follow the photos (a "Videos" row on desktop, slides after
 // the photos on phone); the cover is always a photo.
 import type { CSSProperties, ReactNode } from 'react';
@@ -12,15 +13,16 @@ import PbIcon from '../../ui/PbIcon';
 import PbTile from '../../ui/PbTile';
 import { PbBackButton } from '../../ui/PbPageHeader';
 import { VideoCell, mediaCount, splitMedia } from './ProductVideos';
+import { usePhotoViewer } from './PhotoViewer';
 
 type Img = ProductDetail['pb_product_images'][number];
 type AddProps = { onAdd: () => void; busy: string | null };
 
-const photoLink = (img: Img, i: number, box: CSSProperties) => (
-  <a key={img.id} href={pbImageUrl(img.path)} target="_blank" rel="noreferrer" className="pb-tile" aria-label={`Open photo ${i + 1} full size`}
-    style={{ display: 'block', flexShrink: 0, borderRadius: PB.r.photo, overflow: 'hidden', background: PB.tile, border: `1px solid ${PB.tileBd}`, ...box }}>
+const photoLink = (img: Img, i: number, box: CSSProperties, open: (i: number) => void) => (
+  <button key={img.id} type="button" onClick={() => open(i)} className="pb-tile" aria-label={`Open photo ${i + 1} full size`}
+    style={{ display: 'block', flexShrink: 0, padding: 0, cursor: 'pointer', borderRadius: PB.r.photo, overflow: 'hidden', background: PB.tile, border: `1px solid ${PB.tileBd}`, ...box }}>
     <img src={pbImageUrl(img.path)} alt={`Photo ${i + 1}`} loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-  </a>
+  </button>
 );
 
 /** Dashed "Add photos" cell: two signals while uploading. */
@@ -50,6 +52,7 @@ function NoPhotos({ children }: { children?: ReactNode }) {
 export function PhotosTile({ images, onAdd, busy }: AddProps & { images: Img[] }) {
   const { photos, videos } = splitMedia(images);
   const [cover, ...rest] = photos;
+  const viewer = usePhotoViewer(photos);
   return (
     <PbTile as="section" span={8} rows={2} aria-labelledby="pb-photos-title" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
@@ -62,10 +65,10 @@ export function PhotosTile({ images, onAdd, busy }: AddProps & { images: Img[] }
         </div>
       ) : (
         <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', minWidth: 0 }}>
-          {photoLink(cover, 0, { height: 'clamp(280px, 30vw, 400px)', aspectRatio: '4 / 5', flex: 'none' })}
+          {photoLink(cover, 0, { height: 'clamp(280px, 30vw, 400px)', aspectRatio: '4 / 5', flex: 'none' }, viewer.open)}
           <div style={{ flex: 1, minWidth: 0, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(72px, 1fr))', gap: 8, alignContent: 'start' }}>
-            {rest.map((img, i) => photoLink(img, i + 1, { width: '100%', aspectRatio: '4 / 5' }))}
-            <AddCell onAdd={onAdd} busy={busy} style={{ width: '100%', aspectRatio: '4 / 5', minHeight: 90, padding: 4, textAlign: 'center', fontSize: 12 }} />
+            {rest.map((img, i) => photoLink(img, i + 1, { width: '100%', aspectRatio: '4 / 5' }, viewer.open))}
+            <AddCell onAdd={onAdd} busy={busy} style={{ width: '100%', aspectRatio: '4 / 5', minHeight: 90, padding: 4, textAlign: 'center' }} />
           </div>
         </div>
       )}
@@ -74,13 +77,16 @@ export function PhotosTile({ images, onAdd, busy }: AddProps & { images: Img[] }
           {videos.map((v, i) => <VideoCell key={v.id} v={v} n={i + 1} style={{ aspectRatio: '4 / 5' }} />)}
         </div>
       )}
+      {viewer.node}
     </PbTile>
   );
 }
 
 export function PhonePhotoHero({ images: all, onAdd, busy, onBack }: AddProps & { images: Img[]; onBack: () => void }) {
   const { photos: images, videos } = splitMedia(all);
-  const slide = all.length === 1 ? '0 0 calc(100% - 104px)' : '0 0 82%';
+  const viewer = usePhotoViewer(images);
+  // Slides are 4:5 of the strip width, capped so a tablet or landscape phone still shows the name below the fold.
+  const slide = all.length === 1 ? '0 0 min(calc(100% - 104px), 360px)' : '0 0 min(82%, 320px)';
   return (
     <div style={{ position: 'relative', minWidth: 0 }}>
       <div style={{ ...pbTileFlat, padding: 0, overflow: 'hidden', borderRadius: 'var(--pb-r-hero)' }}>
@@ -92,7 +98,7 @@ export function PhonePhotoHero({ images: all, onAdd, busy, onBack }: AddProps & 
           <div className="pb-chiprow" style={{ margin: 0, padding: 8, gap: 8, scrollPaddingLeft: 8 }}>
             {images.map((img, i) => (
               <div key={img.id} style={{ flex: slide, aspectRatio: '4 / 5', scrollSnapAlign: 'start', display: 'flex' }}>
-                {photoLink(img, i, { flex: 1 })}
+                {photoLink(img, i, { flex: 1 }, viewer.open)}
               </div>
             ))}
             {videos.map((v, i) => <VideoCell key={v.id} v={v} n={i + 1} style={{ flex: slide, aspectRatio: '4 / 5', scrollSnapAlign: 'start' }} />)}
@@ -108,6 +114,7 @@ export function PhonePhotoHero({ images: all, onAdd, busy, onBack }: AddProps & 
           {mediaCount(images.length, videos.length)}
         </span>
       )}
+      {viewer.node}
     </div>
   );
 }

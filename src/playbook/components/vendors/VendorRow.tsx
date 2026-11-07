@@ -33,10 +33,12 @@ export default function VendorRow({ v, busy, onEdit, onToggle, compact }: {
       <span style={{ flex: compact ? '1 1 0' : '1 1 180px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
         <span style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap', minWidth: 0 }}>
           <span className="pb-clamp2" style={{ ...pbName, color: v.active ? PB.tx : PB.tx2, minWidth: 0 }}>{v.name}</span>
-          {v.code && <span style={{ ...pbNum, fontSize: 12, color: PB.tx2, overflowWrap: 'anywhere' }}>{v.code}</span>}
+          {v.code && !compact && <span style={{ ...pbNum, fontSize: 12, color: PB.tx2, overflowWrap: 'anywhere' }}>{v.code}</span>}
         </span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', minWidth: 0 }}>
           <span style={pbMeta}><span style={pbNum}>{v.products.toLocaleString('en-IN')}</span> product{v.products === 1 ? '' : 's'}</span>
+          {/* Phone: the code sits here, so a long name is not broken by it beside the Edit button. */}
+          {v.code && compact && <span style={{ ...pbMeta, ...pbNum, overflowWrap: 'anywhere' }}>{v.code}</span>}
           <Dot color={v.active ? PB.live : NEUTRAL} label={v.active ? 'Active' : 'Inactive'} />
         </span>
         <VendorTg v={v} />

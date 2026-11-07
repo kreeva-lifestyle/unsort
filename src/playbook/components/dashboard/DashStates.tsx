@@ -5,7 +5,7 @@ import { PB, pbBody, pbTileTitle } from '../../pbTheme';
 import { Dot } from '../product/status';
 import { PbButton, PbSkeleton, PbTile } from '../ui';
 
-/** First load: hero 6×2 as a plain tile, four stat tiles, products tile, two website tiles. */
+/** First load: hero 6×2 as a plain tile, four stat tiles, products tile, three website tiles (4+4+4, as a 3-site page). */
 export function DashSkeleton() {
   return (
     <div aria-busy="true" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -15,7 +15,7 @@ export function DashSkeleton() {
         <PbSkeleton shape="tile" span={12} />
       </div>
       <div className="pb-bento pb-bento--auto">
-        <PbSkeleton shape="tile" span={6} count={2} height={260} />
+        <PbSkeleton shape="tile" span={4} count={3} height={280} />
       </div>
     </div>
   );

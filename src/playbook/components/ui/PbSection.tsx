@@ -3,7 +3,7 @@
 // above by a hairline. For a standalone titled card use Section from
 // components/website/ui.tsx (a glass tile).
 import type { ReactNode } from 'react';
-import { PB, pbLabel, pbMeta, pbTileTitle } from '../../pbTheme';
+import { PB, pbBody, pbLabel, pbTileTitle } from '../../pbTheme';
 
 export default function PbSection({ title, label, hint, right, divider, children, id }: {
   title?: ReactNode; label?: string; hint?: ReactNode; right?: ReactNode; divider?: boolean; children?: ReactNode; id?: string;
@@ -16,7 +16,7 @@ export default function PbSection({ title, label, hint, right, divider, children
           {right}
         </div>
       )}
-      {hint != null && <div style={{ ...pbMeta, marginTop: -4 }}>{hint}</div>}
+      {hint != null && <div style={{ ...pbBody, color: PB.tx2, marginTop: -4, maxWidth: 640 }}>{hint}</div>}
       {children}
     </section>
   );

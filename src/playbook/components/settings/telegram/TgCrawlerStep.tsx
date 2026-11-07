@@ -6,7 +6,7 @@
 import type { ReactNode } from 'react';
 import { CRAWLER_STALE_MIN, crawlerRunning } from '../../../data/telegram';
 import { istDate, istRelative } from '../../../format';
-import { PB, pbErrorBox, pbMeta, pbNum } from '../../../pbTheme';
+import { PB, pbBody, pbErrorBox, pbMeta, pbNum } from '../../../pbTheme';
 import type { PbTgConfig } from '../../../types';
 import { NEUTRAL } from '../../product/status';
 import PbButton from '../../ui/PbButton';
@@ -28,14 +28,14 @@ export default function TgCrawlerStep({ config, canManage, busy, newKey, onKey, 
   const running = crawlerRunning(config);
   return (
     <TgStep n={3} id="pbs-tg-crawler" title="Crawler" state={crawlerState(config)}>
-      <p style={{ ...pbMeta, margin: 0 }}>
+      <p style={{ ...pbBody, color: PB.tx2, margin: 0 }}>
         A staff Telegram account on a small cloud server checks each vendor channel once a day and forwards the new posts to the admin group, one channel at a time.
       </p>
       <div><PbButton icon="book" onClick={onGuide}>How to set it up</PbButton></div>
       {newKey && (
         <div aria-live="polite" style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
           <TgValueBox label="New crawler key">{newKey}</TgValueBox>
-          <p style={{ ...pbMeta, margin: 0, color: PB.tx }}>
+          <p style={{ ...pbBody, margin: 0 }}>
             Shown only once. Paste it on the server now (Railway → Variables → <span style={pbNum}>PB_CRAWLER_KEY</span>). Any older key has stopped working.
           </p>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
@@ -46,7 +46,7 @@ export default function TgCrawlerStep({ config, canManage, busy, newKey, onKey, 
       )}
       {seen && (
         <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', minWidth: 0 }}>
-          <span style={pbMeta} title={istDate(seen)}>Last seen <span style={{ color: PB.tx }}>{istRelative(seen)}</span></span>
+          <span style={pbMeta}>Last seen <span style={{ color: PB.tx }}>{istRelative(seen)}</span> · {istDate(seen)}</span>
           {config?.crawler_version && <span style={pbMeta}>Version <span style={{ ...pbNum, color: PB.tx }}>{config.crawler_version}</span></span>}
         </div>
       )}

@@ -16,7 +16,7 @@ import DashProducts from './components/dashboard/DashProducts';
 import DashWebsites from './components/dashboard/DashWebsites';
 import { DashError, DashSkeleton, PausedBanner } from './components/dashboard/DashStates';
 
-export default function PlaybookDashboard({ name, addToast, go }: { name: string; addToast: AddToast; go: (p: PbPage, s?: ProductsStart) => void }) {
+export default function PlaybookDashboard({ name, go }: { name: string; addToast: AddToast; go: (p: PbPage, s?: ProductsStart) => void }) {
   const [d, setD] = useState<DashData | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadErr, setLoadErr] = useState<string | null>(null);
@@ -28,14 +28,13 @@ export default function PlaybookDashboard({ name, addToast, go }: { name: string
       const perSite = await listingCounts(sites.map(s => s.id));
       setD({ products, sites, perSite, failed, review, paused: settings.paused });
       setLoadErr(null);
-    } catch (e) { setLoadErr(friendlyError(e)); addToast(friendlyError(e), 'error'); }
+    } catch (e) { setLoadErr(friendlyError(e)); } // shown in the failed tile with Try again; no toast on top
     finally { setLoading(false); }
-  }, [addToast]);
+  }, []);
   useEffect(() => { void load(); }, [load]);
 
-  const busyLabel = d ? 'Refreshing…' : 'Loading…';
   const refresh = (block?: boolean) => (
-    <PbButton icon="refresh" onClick={load} busy={loading} busyLabel={busyLabel} block={block}>Refresh</PbButton>
+    <PbButton icon="refresh" onClick={load} busy={loading} busyLabel="Refreshing…" block={block}>Refresh</PbButton>
   );
   const add = () => go('products', { add: true });
 
@@ -60,8 +59,8 @@ export default function PlaybookDashboard({ name, addToast, go }: { name: string
       )}
 
       {/* Phone: the header holds only "+", so Refresh sits at the end of the page, in thumb reach.
-          Not under the error tile, whose "Try again" is the one retry. */}
-      {!(loadErr && !d) && <div className="pb-phone-only" style={{ marginTop: 16 }}>{refresh(true)}</div>}
+          Only once something loaded: the skeletons are the first load's signal, and the error tile has Try again. */}
+      {d && <div className="pb-phone-only" style={{ marginTop: 16 }}>{refresh(true)}</div>}
     </>
   );
 }

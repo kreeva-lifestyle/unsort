@@ -45,9 +45,10 @@ export default function Vendors({ addToast, onBack }: { addToast: AddToast; onBa
       if (page > last) { setPage(last); return; }
       setRows(r.rows); setCount(r.count); setLoadErr('');
     }
-    catch (e) { if (my === seq.current) { addToast(friendlyError(e), 'error'); setLoadErr(friendlyError(e)); } }
+    // The error shows in the list tile with Try again (no toast on top of the header).
+    catch (e) { if (my === seq.current) setLoadErr(friendlyError(e)); }
     finally { if (my === seq.current) setLoading(false); }
-  }, [q, inactive, page, addToast]);
+  }, [q, inactive, page]);
   useEffect(() => { void load(); }, [load]);
 
   const close = () => { setForm(null); setErr(''); setSaving(false); };
@@ -111,7 +112,8 @@ export default function Vendors({ addToast, onBack }: { addToast: AddToast; onBa
     </ul>
   );
 
-  const inTile = (n: ReactElement) => (phone ? n : <PbTile as="section" aria-label="Vendor list" style={{ padding: 12 }}>{n}</PbTile>);
+  // Tile padding stays 20 (as the toolbar tile above), so the rows' left edge lines up with the search field.
+  const inTile = (n: ReactElement) => (phone ? n : <PbTile as="section" aria-label="Vendor list">{n}</PbTile>);
   const body = firstLoad ? inTile(<VendorsSkeleton />)
     : loadErr && !rows.length ? <VendorsError message={loadErr} onRetry={() => void load()} busy={loading} />
       : rows.length === 0 ? (q ? <VendorsNoMatch search={q} onClear={() => setSearch('')} /> : <VendorsEmpty onAdd={add} />)

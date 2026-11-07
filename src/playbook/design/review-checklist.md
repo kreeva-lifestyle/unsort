@@ -33,7 +33,7 @@ This file is the gate. The rules behind each line are in `ux-process.md`, `layou
 
 **C. States (`states-and-feedback.md` §14 lists them per component)**
 - [ ] Loading shows skeletons shaped like the real layout, never a bare "Loading…".
-- [ ] Load failure shows an error in the tile, with Retry. Not just a toast. (Today only `pages/ProductPage.tsx` does this.)
+- [ ] Load failure shows an error in the tile, with Retry, and no toast on top of it (every page does this since 2026-11-07).
 - [ ] There are two empty states, first run and filtered, both with the shared `<Empty>`. The filtered one has "Clear filters".
 - [ ] Partial failure lists which items failed and why.
 - [ ] Every async button gives two signals: a "Saving…" label plus disabled (`pointerEvents: 'none'`, opacity 0.5), then a toast through `friendlyError` (root `CLAUDE.md` "Buttons").

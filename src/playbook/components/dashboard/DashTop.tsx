@@ -6,7 +6,7 @@ import { PB, pbNum } from '../../pbTheme';
 import { PbStatTile, PbTile } from '../ui';
 import { count, groupTotal, type DashData, type DashGo } from './dashShared';
 
-const heroLabel = { fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', lineHeight: 1.5 } as const;
+const heroLabel = { fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', lineHeight: 1.5 } as const; // section label (DESIGN.md §3)
 
 function Hero({ d }: { d: DashData }) {
   const attention = d.products.needs_info + d.failed + d.review;

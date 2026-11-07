@@ -140,7 +140,7 @@ export default function WebsiteEditor({ site, initialDraft, onDraft, onClose, on
           <PbTag>{site.active ? 'On' : 'Off · nothing is sent'}</PbTag>
         </span>} />
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(220px, 3fr) minmax(0, 9fr)', gap: 16, alignItems: 'start' }}>
-        <div style={{ position: 'sticky', top: 88, display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
+        <div style={{ position: 'sticky', top: 'var(--pb-sticky-top)', display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
           {hero}
           <SectionSideList current={tab} onPick={showSection} edited={edited} />
         </div>

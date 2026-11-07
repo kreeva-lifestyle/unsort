@@ -112,7 +112,7 @@ export const pbHero: CSSProperties = {
 
 const btn: CSSProperties = {
   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxSizing: 'border-box',
-  minHeight: v.ctlH, padding: '0 16px', fontFamily: PB.sans, fontSize: v.btnFs, fontWeight: 600, lineHeight: 1.2,
+  minHeight: v.ctlH, padding: '0 16px', fontFamily: PB.sans, fontSize: v.btnFs, fontWeight: 600, lineHeight: 1.5,
   cursor: 'pointer', whiteSpace: 'nowrap', textDecoration: 'none', maxWidth: '100%',
 };
 /** The one gradient button per view. */
@@ -150,7 +150,8 @@ export const pbRow: CSSProperties = {
 // Type scale (layout-and-components.md §2).
 export const pbPageTitle: CSSProperties = { fontFamily: PB.sora, fontWeight: 700, fontSize: 'var(--pb-title)', letterSpacing: -0.3, lineHeight: 1.2, color: PB.tx, margin: 0, minWidth: 0, overflowWrap: 'anywhere' };
 export const pbTileTitle: CSSProperties = { fontFamily: PB.sora, fontWeight: 700, fontSize: 17, letterSpacing: -0.3, lineHeight: 1.3, color: PB.tx, margin: 0 };
-export const pbName: CSSProperties = { fontSize: 15, fontWeight: 600, lineHeight: 1.35, color: PB.tx };
+// Line-height 1.5 everywhere text may hold Hindi (DESIGN.md §3): names, buttons, chips, status labels.
+export const pbName: CSSProperties = { fontSize: 15, fontWeight: 600, lineHeight: 1.5, color: PB.tx };
 export const pbBody: CSSProperties = { fontSize: 13, lineHeight: 1.5, color: PB.tx };
 export const pbMeta: CSSProperties = { fontSize: 12, lineHeight: 1.5, color: PB.tx2 };
 export const pbNum: CSSProperties = { fontFamily: PB.mono, fontVariantNumeric: 'tabular-nums' };

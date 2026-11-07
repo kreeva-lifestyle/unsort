@@ -32,8 +32,9 @@ export default function VendorTg({ v }: { v: Tg }) {
           : <>Telegram · {v.tg_title}</>}
         {' · '}<span style={{ whiteSpace: 'nowrap' }}>{dailyWords(v)}</span>
       </span>
-      <span title={v.tg_checked_at ? istDate(v.tg_checked_at) : undefined}>
-        {v.tg_checked_at ? <>Last checked <span style={{ color: PB.tx }}>{istRelative(v.tg_checked_at)}</span></> : 'Not checked yet'}
+      {/* The exact IST time sits inline (a title= tooltip never shows on a phone). */}
+      <span>
+        {v.tg_checked_at ? <>Last checked <span style={{ color: PB.tx }}>{istRelative(v.tg_checked_at)}</span> · {istDate(v.tg_checked_at)}</> : 'Not checked yet'}
       </span>
     </span>
   );

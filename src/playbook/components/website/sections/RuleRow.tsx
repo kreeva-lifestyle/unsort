@@ -36,7 +36,7 @@ export default function RuleRow({ rule: r, index: i, count, summary, price, busy
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
         <span className="pb-clamp2" style={{ ...pbName, color: r.enabled ? PB.tx : PB.tx2 }}>{name}</span>
-        <span style={{ ...pbMeta, overflowWrap: 'anywhere' }}>{summary}</span>
+        <span style={{ ...pbBody, color: PB.tx2, overflowWrap: 'anywhere' }}>{summary}</span>
         {price && <span style={{ ...pbMeta }}>Own price <span style={{ ...pbNum, color: PB.tx, whiteSpace: 'nowrap' }}>{price}</span></span>}
       </div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -47,7 +47,8 @@ export default function RuleRow({ rule: r, index: i, count, summary, price, busy
           <PbIcon name="chevronDown" size={18} />
         </PbButton>
         <PbButton icon="edit" onClick={onEdit} aria-label={`Edit rule ${name}`} style={hold(`edit-${r.id}`)}>Edit</PbButton>
-        <PbButton kind="danger" icon="trash" onClick={onDelete} aria-label={`Delete rule ${name}`} busy={busy === `del-${r.id}`} busyLabel="Deleting…" style={{ marginLeft: 'auto', ...hold(`del-${r.id}`) }}>Delete</PbButton>
+        {/* Phone (.pb-phone-full): Delete takes its own full-width line instead of wrapping alone, right-aligned. */}
+        <PbButton kind="danger" icon="trash" onClick={onDelete} aria-label={`Delete rule ${name}`} busy={busy === `del-${r.id}`} busyLabel="Deleting…" className="pb-phone-full" style={{ marginLeft: 'auto', ...hold(`del-${r.id}`) }}>Delete</PbButton>
       </div>
     </li>
   );

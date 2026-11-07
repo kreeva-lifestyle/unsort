@@ -59,9 +59,10 @@ export default function Products({ addToast, start = {} }: { addToast: AddToast;
       if (my !== seq.current) return;
       setRows(r.rows); setCount(r.count); setLoadErr('');
     } catch (e) {
-      if (my === seq.current) { addToast(friendlyError(e), 'error'); setLoadErr(friendlyError(e)); }
+      // The error shows in the results tile with Try again; a toast on top would only cover the header.
+      if (my === seq.current) setLoadErr(friendlyError(e));
     } finally { if (my === seq.current) setLoading(false); }
-  }, [filter, page, addToast]);
+  }, [filter, page]);
   useEffect(() => { void load(); }, [load]);
 
   useEffect(() => {

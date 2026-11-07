@@ -22,6 +22,7 @@ Visual values live in `src/playbook/DESIGN.md` (tokens §2, type and icons §3, 
   - rows and tiles: 12–16 (the bento gap is 16)
   - sections: 24–32
 - Tile padding is 20 on desktop and 16 on phone. Sheet padding is 16 on the sides, with the footer padding at 16 plus `env(safe-area-inset-bottom)`.
+- Sticky side columns (editor section list, Settings status tile, Guide contents) sit at `top: var(--pb-sticky-top)` (84 = top bar 12 + 56, plus 16), never a per-page number.
 - Space siblings with flex or grid `gap`, never with a margin on each child. Put `min-width: 0` on every flex or grid child that holds text.
 
 ## 2. Type scale (DESIGN.md §3)
@@ -30,7 +31,7 @@ Visual values live in `src/playbook/DESIGN.md` (tokens §2, type and icons §3, 
 |---|---|---|---|
 | Page title | Sora | 32 desktop, 20 phone / 700, −0.3px | `PB.tx` |
 | Tile or sheet title | Sora | 17 / 700, −0.3px | `PB.tx` |
-| List name | Inter | 15 / 600, line-height 1.35, 2-line clamp | `PB.tx` |
+| List name | Inter | 15 / 600, line-height 1.5 (Hindi marks need it, DESIGN.md §3), 2-line clamp | `PB.tx` |
 | Body | Inter | 13 / 400, line-height 1.5 | `PB.tx` or `PB.tx2` |
 | Meta | Inter | 12 | `PB.tx2` |
 | Section label | Inter | 11 / 600, uppercase, 0.08em | `PB.tx2` |
@@ -38,6 +39,7 @@ Visual values live in `src/playbook/DESIGN.md` (tokens §2, type and icons §3, 
 
 - Nothing goes under 11px. The current 10px spots (Pager, ProductCard, Vendors, WebsiteCard, `ui.tsx`, Dashboard, PbSettings) go up to 11 or 12 when you touch them.
 - `PB.tx3` is only for chevrons, icons, timestamps and placeholders.
+- Help copy longer than one short phrase (section and field hints, what a setting does) is body text: 13 px, line-height 1.5, `PB.tx2`, at most 640 px wide. `pbMeta` (12 px) is for one-line meta only (SKU · vendor · time).
 
 ## 3. Page shells
 **Root.** `PlaybookApp.tsx` stays the single scroll container (`height: 100%; overflow-y: auto`, per `src/playbook/CLAUDE.md`). It owns:
@@ -106,7 +108,8 @@ Every row of a fixed layout adds up to 12. Write the spans down before coding, a
 | Action menu | `src/components/ui/ActionSheet.tsx` | add a variant prop for `pbSheet` | Use it for row menus ("…"). It must also have a visible button; never rely on swipe alone. |
 | Confirm | `useConfirm()` (`src/components/ui/ConfirmModal.tsx`) + `PbConfirm` (`components/ui/PbConfirm.tsx`, same props as `ConfirmModal`, built on `PbModal`) | confirm = `pbBtnDanger` when `danger`; focus starts on the safe button | Only for irreversible or Shopify-side actions. Name the item and its effect. Reversible actions use Undo (`states-and-feedback.md`). |
 | Undo bar | `src/components/ui/UndoBar.tsx` | it uses `--nav-h`; add a bottom-offset prop and pass `calc(var(--pb-bar) + env(safe-area-inset-bottom) + 8px)` | The only place Undo appears (never in a toast). Shows for 6–8s. |
-| Toasts | `components/PbToasts.tsx` (`usePbToasts`) | `pbSheet` glass; replace the shadow literal there with a token | Every error goes through `friendlyError`. Behaviour is in `states-and-feedback.md`. |
+| Toasts | `components/PbToasts.tsx` (`usePbToasts`) | `pbSheet` glass; position is the `.pb-toasts` CSS rule (top right on desktop, above the tab bar on phone) | Every error goes through `friendlyError`. Behaviour is in `states-and-feedback.md`. |
+| Photo viewer | `components/product/detail/PhotoViewer.tsx` (`usePhotoViewer`) | `PbModal` (sheet on phone, 720 modal on desktop) holding one `<img>` at `object-fit: contain`, Previous / Next in the footer | A photo opens here, never in a new tab (`mobile.md` §10). Title "Photo 2 of 5". |
 | Empty state | `src/components/ui/Empty.tsx` | before a redesigned screen uses it, add an optional `ink` prop `{ accent, title, body }` defaulting to today's `T` values; Playbook passes `PB.brandA`, `PB.tx`, `PB.tx2` (its message is `T.tx3` today). Shared change: say so in the PR | First-run and filtered-empty are different states (`states-and-feedback.md`). |
 | Loading | `Skeleton` / `SkeletonRows` (`src/components/ui/Skeleton.tsx`) | skeleton tiles sized like the real `PbTile`/`PbRow`, with fill `PB.tile` | Replace the plain "Loading…" text. |
 | Pagination | `components/product/Pager.tsx` | `pbBtnSecondary` buttons; mono "1 / N" in `PB.tx2` at 12px | Add a `noun` prop (it always says "products" today). Vendors deletes its own copy and uses this one. 25 a page. Reset to page 0 on search or filter change. After a delete, stay on the page, or step back one page if it is now empty (as `Vendors.tsx`). |

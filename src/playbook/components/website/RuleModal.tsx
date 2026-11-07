@@ -63,7 +63,7 @@ export default function RuleModal({ siteId, rule, nextPosition, vendors, categor
   const po = d.price_override;
   const setPo = (x: { markup_pct?: number; add_flat?: number }) => setD(v => ({ ...v, price_override: { ...v.price_override, ...x } }));
   return (
-    <PbModal open title={rule ? 'Edit rule' : 'Add rule'} onClose={onClose} width={560} guard={JSON.stringify(d) !== initial}
+    <PbModal open title={rule ? 'Edit rule' : 'Add rule'} onClose={onClose} guard={JSON.stringify(d) !== initial}
       footer={
         <div style={{ display: 'flex', gap: 16, justifyContent: 'flex-end' }}>
           {!phone && <PbButton onClick={onClose} dim={saving}>Cancel</PbButton>}

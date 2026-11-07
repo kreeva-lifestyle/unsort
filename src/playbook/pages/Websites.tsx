@@ -39,12 +39,12 @@ export default function Websites({ addToast }: { addToast: AddToast }) {
     setOpenId(null);
   });
 
-  // A failed load is never an empty state: it keeps its own error (and still toasts, as before).
+  // A failed load is never an empty state: it keeps its own error tile with Try again (no toast on top).
   const load = useCallback(async () => {
     try { setSites(await listWebsites()); setLoadErr(''); }
-    catch (e) { const m = friendlyError(e); setLoadErr(m); addToast(m, 'error'); }
+    catch (e) { setLoadErr(friendlyError(e)); }
     finally { setLoading(false); }
-  }, [addToast]);
+  }, []);
   useEffect(() => { void load(); }, [load]);
   const retry = async () => { setRetrying(true); try { await load(); } finally { setRetrying(false); } };
 

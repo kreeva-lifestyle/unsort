@@ -8,7 +8,7 @@ import type { GuideSection } from './types';
 type Meta = { title: string; brand: string; subtitle: string; updated: string; pdf: string };
 
 const heroBtn = {
-  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 48, padding: '0 16px', borderRadius: PB.r.btn,
+  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 'var(--pb-ctl-h)', padding: '0 16px', borderRadius: PB.r.btn,
   fontFamily: PB.sans, fontSize: 'var(--pb-btn-fs)', fontWeight: 600, textDecoration: 'none', whiteSpace: 'nowrap', boxSizing: 'border-box',
 } as const;
 
@@ -41,7 +41,7 @@ const sub = (s: GuideSection) => s.title.replace(/^Step \d+\s*[—-]\s*/, '');
 /** Phone: one glass row per section (min 60, number, name, meta, chevron). */
 export function GuideRows({ sections, onJump }: { sections: GuideSection[]; onJump: (id: string) => void }) {
   return (
-    <nav aria-label="Guide contents">
+    <nav id="pbg-contents" aria-label="Guide contents" style={{ scrollMarginTop: 12 }}>
       <ol style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
         {sections.map((s, i) => (
           <li key={s.id}>
@@ -63,7 +63,7 @@ export function GuideRows({ sections, onJump }: { sections: GuideSection[]; onJu
 /** Desktop: a sticky side list in one glass tile; the row you jumped to is not tracked (no scroll spy). */
 export function GuideSideNav({ sections, onJump }: { sections: GuideSection[]; onJump: (id: string) => void }) {
   return (
-    <nav aria-label="Guide contents" style={{ ...pbTile, padding: 12, position: 'sticky', top: 96, maxHeight: 'calc(100dvh - 120px)', overflowY: 'auto', overscrollBehavior: 'contain' }}>
+    <nav aria-label="Guide contents" style={{ ...pbTile, padding: 12, position: 'sticky', top: 'var(--pb-sticky-top)', maxHeight: 'calc(100dvh - 120px)', overflowY: 'auto', overscrollBehavior: 'contain' }}>
       <h2 style={{ ...pbLabel, margin: '4px 8px 8px' }}>Contents</h2>
       <ol style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
         {sections.map((s, i) => (

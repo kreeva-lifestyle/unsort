@@ -44,7 +44,7 @@ function Block({ b }: { b: GuideBlock }) {
 
 export function GuideSectionView({ s, n }: { s: GuideSection; n: number }) {
   return (
-    <section id={`pbg-${s.id}`} aria-labelledby={`pbg-${s.id}-h`} style={{ ...pbTileFlat, scrollMarginTop: 120, paddingBottom: 8 }}>
+    <section id={`pbg-${s.id}`} aria-labelledby={`pbg-${s.id}-h`} className="pb-guide-sec" style={{ ...pbTileFlat, scrollMarginTop: 120 }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: s.lead ? 8 : 16, minWidth: 0 }}>
         <span aria-hidden="true" style={{ ...pbNum, fontSize: 13, fontWeight: 500, color: PB.brandA, flexShrink: 0 }}>{String(n).padStart(2, '0')}</span>
         <h2 id={`pbg-${s.id}-h`} style={{ ...pbTileTitle, minWidth: 0, overflowWrap: 'anywhere' }}>{s.title}</h2>

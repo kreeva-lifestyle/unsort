@@ -18,7 +18,7 @@ export default function PbConfirm({ open, title, message, confirmLabel = 'Confir
   const confirm = <PbButton kind={danger ? 'danger' : 'primary'} block={phone} autoFocus={!danger} onClick={onConfirm}>{confirmLabel}</PbButton>;
   const cancel = <PbButton block={phone} autoFocus={danger} onClick={onCancel}>{cancelLabel}</PbButton>;
   return (
-    <PbModal open={open} title={title} onClose={onCancel} width={440}
+    <PbModal open={open} title={title} onClose={onCancel}
       footer={phone
         ? <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>{confirm}{cancel}</div>
         : <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 16, flexWrap: 'wrap' }}>{cancel}{confirm}</div>}>

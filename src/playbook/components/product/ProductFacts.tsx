@@ -125,7 +125,8 @@ export default function ProductFacts({ product, vendors, categories, onVendorCre
       </div>
       {err && <div role="alert" style={pbErrorBox}>{err}</div>}
       {reading && <div style={pbMeta}>The AI is reading this product — wait a moment, then reload to edit.</div>}
-      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'wrap' }}>
+        {!changed.length && !promote && !reading && !saving && <span style={pbMeta}>No changes to save</span>}
         {changed.length > 0 && <PbButton dim={saving} onClick={() => { setF(orig); setErr(''); }}>Discard changes</PbButton>}
         <PbButton type="submit" kind={primary ? 'primary' : 'secondary'} disabled={off && !saving} busy={saving} busyLabel="Saving…"
           style={{ minWidth: 140, ...(off && !saving ? { pointerEvents: 'none' } : null) }}>

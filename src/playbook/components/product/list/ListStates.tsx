@@ -25,7 +25,7 @@ export function ListSkeleton({ phone }: { phone: boolean }) {
       <span className="pb-sr" role="status">Loading products</span>
       {Array.from({ length: 6 }, (_, i) => (
         <div key={i} aria-hidden="true" className="pb-span-4" style={{ ...pbTileFlat, padding: 8, display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <PbSkelBar w="100%" h={200} style={{ borderRadius: PB.r.photo }} />
+          <PbSkelBar w="100%" style={{ height: 'auto', aspectRatio: '5 / 4', borderRadius: PB.r.photo }} />
           <span style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '4px 8px 8px' }}>
             <PbSkelBar w="70%" h={14} /><PbSkelBar w="45%" h={10} /><PbSkelBar w="30%" h={14} />
           </span>

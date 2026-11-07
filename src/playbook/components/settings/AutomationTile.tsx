@@ -3,7 +3,7 @@
 // now" (the page's one gradient) and the last run's counts. Paused is a
 // lasting page-wide state, so the tile takes the review tint.
 import PbSwitch from '../ui/PbSwitch';
-import { PB, pbLabel, pbMeta, pbName, pbNum, pbTileTitle } from '../../pbTheme';
+import { PB, pbBody, pbLabel, pbMeta, pbName, pbNum, pbTileTitle } from '../../pbTheme';
 import type { WorkResult } from '../../data/settings';
 import { Dot } from '../product/status';
 import { PbButton, PbTile } from '../ui';
@@ -22,7 +22,7 @@ export default function AutomationTile({ paused, saving, running, dim, run, onTo
         </span>
         <PbSwitch on={!paused} label="Automation running" onToggle={onToggle} />
       </div>
-      <p style={{ ...pbMeta, margin: 0 }}>
+      <p style={{ ...pbBody, color: PB.tx2, margin: 0 }}>
         {paused ? 'Paused — nothing is read or published on its own. Buttons like “Publish now” still work.'
           : 'The worker checks every minute: reads new products, sends them to matching websites, writes listings and publishes them.'}
       </p>

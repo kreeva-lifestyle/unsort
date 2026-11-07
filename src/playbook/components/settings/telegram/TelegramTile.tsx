@@ -82,8 +82,9 @@ export default function TelegramTile({ addToast, onGuide }: { addToast: AddToast
         <span style={pbMeta}>Messages waiting <span style={{ ...pbNum, color: PB.tx, fontWeight: 600 }}>{count(status.waiting + status.retrying)}</span></span>
         {status.retrying > 0 && <Dot color={PB.review} label={`${count(status.retrying)} being tried again`} style={{ color: PB.tx }} />}
         {status.failed > 0 && <Dot color={PB.failed} label={`${count(status.failed)} could not be used`} style={{ color: PB.tx }} />}
-        <span style={pbMeta} title={config?.last_message_at ? istDate(config.last_message_at) : undefined}>
+        <span style={pbMeta}>
           Last message <span style={{ color: PB.tx }}>{config?.last_message_at ? istRelative(config.last_message_at) : 'none yet'}</span>
+          {config?.last_message_at && <> · {istDate(config.last_message_at)}</>}
         </span>
       </span>
       {status.failed > 0 && <TgFailedPosts failed={status.failed} />}

@@ -57,8 +57,9 @@ export function PbTabBar({ page, onGo }: { page: PbPage; onGo: (p: PbPage) => vo
         const on = exact || (t.id === 'more' && MORE_PAGES.includes(page));
         return (
           <button key={t.id} type="button" onClick={() => onGo(t.id)} aria-current={on ? 'page' : undefined} className="pb-tab pb-pill"
-            style={{ color: PB.tx2, ...(on ? { ...pbActive, borderRadius: PB.r.row } : null) }}>
-            <PbIcon name={t.icon} size={20} />
+            style={{ color: PB.tx, ...(on ? { ...pbActive, borderRadius: PB.r.row } : null) }}>
+            {/* Label in tx: coloured tiles scroll under the .08 bar, where tx2 drops below 4.5:1. Icon stays tx2. */}
+            <span style={{ display: 'inline-flex', color: on ? 'inherit' : PB.tx2 }}><PbIcon name={t.icon} size={20} /></span>
             <span>{t.label}</span>
           </button>
         );

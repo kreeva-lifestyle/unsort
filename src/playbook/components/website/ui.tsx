@@ -4,7 +4,12 @@
 // multi-select of chips. V2 look (pbInput / pbLabel / pbActive); every control
 // is 48px on touch (40 on a fine pointer, 44px chip hit boxes).
 import { useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
-import { PB, pbActive, pbBtnSecondary, pbInput, pbLabel, pbMeta, pbNum, pbTileFlat, pbTileTitle } from '../../pbTheme';
+import { PB, pbActive, pbBody, pbBtnSecondary, pbInput, pbLabel, pbMeta, pbNum, pbTileFlat, pbTileTitle } from '../../pbTheme';
+
+/** Help copy is body text (13px, tx2), not 12px meta (DESIGN.md §3). */
+const hintText = { ...pbBody, color: PB.tx2 } as const;
+/** "1,234 becomes 1,230": the figures a reader compares go in mono. */
+const figures = (s: string) => s.split(/(\d[\d,.]*)/).map((part, i) => (i % 2 ? <span key={i} style={pbNum}>{part}</span> : part));
 import PbIcon from '../ui/PbIcon';
 import { numKey } from '../product/status';
 
@@ -14,22 +19,23 @@ export function Field({ label, hint, htmlFor, children, error }: { label: string
     <div style={{ marginBottom: 16, minWidth: 0 }}>
       <label htmlFor={htmlFor} style={pbLabel}>{label}</label>
       {children}
-      {hint && <div id={htmlFor ? `${htmlFor}-hint` : undefined} style={{ ...pbMeta, marginTop: 8 }}>{hint}</div>}
+      {hint && <div id={htmlFor ? `${htmlFor}-hint` : undefined} style={{ ...hintText, marginTop: 8 }}>{hint}</div>}
       {error && <div id={htmlFor ? `${htmlFor}-error` : undefined} style={{ fontSize: 12, lineHeight: 1.5, color: PB.failed, marginTop: 8 }}>{error}</div>}
     </div>
   );
 }
 
 /** A titled glass tile (settings / editor sections). Flat (no blur): editor
- *  pages stack several, and blur stays within the 6-surface budget. Never nest tiles inside. */
+ *  pages stack several, and blur stays within the 6-surface budget. Never nest tiles inside.
+ *  Siblings are spaced by their grid (SectionGrid), not by a margin here. */
 export function Section({ title, hint, children, right }: { title: string; hint?: string; children: ReactNode; right?: ReactNode }) {
   return (
-    <section style={{ ...pbTileFlat, marginBottom: 16 }}>
+    <section style={pbTileFlat}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: hint ? 4 : 16, flexWrap: 'wrap' }}>
         <h2 style={pbTileTitle}>{title}</h2>
         {right}
       </div>
-      {hint && <div style={{ ...pbMeta, marginBottom: 16 }}>{hint}</div>}
+      {hint && <div style={{ ...hintText, marginBottom: 16, maxWidth: 640 }}>{hint}</div>}
       {children}
     </section>
   );
@@ -74,7 +80,7 @@ export function Seg<V extends string>({ value, options, onChange, label }: {
               ...(on ? pbActive : null),
             }}>
             {o.label}
-            {o.hint && <span style={{ display: 'block', fontSize: 12, color: on ? PB.onActive : PB.tx2, fontWeight: 400, marginTop: 2 }}>{o.hint}</span>}
+            {o.hint && <span style={{ display: 'block', fontSize: 12, color: on ? PB.onActive : PB.tx2, fontWeight: 400, marginTop: 2 }}>{figures(o.hint)}</span>}
           </button>
         );
       })}
@@ -131,7 +137,8 @@ export function ChipsInput({ values, onChange, placeholder, id, maxLen = 120, mo
         <input id={id} aria-label={label} value={text} onChange={e => setText(e.target.value)} placeholder={placeholder} maxLength={maxLen * 4}
           onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
           className="pb-input" style={{ ...pbInput, fontFamily: mono ? PB.mono : PB.sans }} />
-        <button type="button" onClick={add} className="pb-pill" style={{ ...pbBtnSecondary, flexShrink: 0 }}>Add</button>
+        {/* Nothing typed = nothing to add; the empty box beside it is the reason. */}
+        <button type="button" onClick={add} disabled={!text.trim()} className="pb-pill" style={{ ...pbBtnSecondary, flexShrink: 0, ...(text.trim() ? null : { opacity: 0.5, cursor: 'not-allowed' }) }}>Add</button>
       </div>
       {values.length > 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>

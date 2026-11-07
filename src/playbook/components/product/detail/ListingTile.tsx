@@ -45,7 +45,8 @@ export default function ListingTile({ l, site, span, busy, primary, onEdit, stre
         </div>
       </div>
       <div style={{ ...pbMeta, ...clamp(2), color: l.title ? PB.tx : PB.tx2 }}>{l.title || 'Not written yet'}</div>
-      {l.error && <div title={l.error} style={{ fontSize: 13, lineHeight: 1.5, color: PB.failed, ...clamp(3) }}>{l.error}</div>}
+      {/* The error is the thing to act on, so it is never clamped (a title= tooltip never shows on a phone). */}
+      {l.error && <div style={{ fontSize: 13, lineHeight: 1.5, color: PB.failed, overflowWrap: 'anywhere' }}>{l.error}</div>}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 'auto', paddingTop: 4 }}>
         <PbButton kind={primary ? 'primary' : 'secondary'} icon="edit" {...btn(`edit:${l.id}`)} onClick={onEdit} aria-label={`Edit the listing on ${name}`}>Edit</PbButton>
         {admin && (

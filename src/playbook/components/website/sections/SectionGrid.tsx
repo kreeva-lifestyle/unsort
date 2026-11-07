@@ -1,12 +1,12 @@
-// Bento placement for the editor's section tiles (the 9-wide body column).
-// Section tiles (ui.tsx) carry their own 16px bottom margin, so the grid has
-// no row gap. span 6 pairs sit side by side at 12 columns and stack at 6
-// columns (≤1099px) and on phone, so every row stays full.
+// Bento placement for the editor's section tiles (the 9-wide body column):
+// the grid's 16px gap spaces them (layout §1: gap, never a margin per child).
+// span 6 pairs sit side by side at 12 columns and stack at 6 columns
+// (≤1099px) and on phone, so every row stays full.
 import type { ReactNode } from 'react';
 import { bentoClass, type PbSpan } from '../../ui';
 
 export function SectionGrid({ children }: { children: ReactNode }) {
-  return <div className="pb-bento pb-bento--auto" style={{ rowGap: 0 }}>{children}</div>;
+  return <div className="pb-bento pb-bento--auto">{children}</div>;
 }
 
 /** One grid cell; the Section inside stretches to the row height. */

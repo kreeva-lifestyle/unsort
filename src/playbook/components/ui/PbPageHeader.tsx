@@ -48,7 +48,8 @@ export default function PbPageHeader({ title, back, actions, phoneAction, sub, p
         : logo && <span className="pb-phone-only" style={{ display: 'inline-flex' }}><PlaybookMark size={32} decorative /></span>}
       <div style={{ flex: '1 1 200px', minWidth: 0 }}>
         {/* tabIndex -1: a detail view moves focus here when it opens (copy-and-a11y §B). */}
-        <h1 id={id} tabIndex={-1} style={{ ...pbPageTitle, outline: 'none' }}>{title}</h1>
+        {/* A long website / product name clamps to 2 lines (the full name stays in title=); the body shows it in full. */}
+        <h1 id={id} tabIndex={-1} className="pb-clamp2" title={typeof title === 'string' ? title : undefined} style={{ ...pbPageTitle, outline: 'none' }}>{title}</h1>
         {sub != null && <div className={phoneSub ? undefined : 'pb-desk-only'} style={{ ...pbMeta, marginTop: 4, display: 'block' }}>{sub}</div>}
       </div>
       {actions != null && <div className="pb-desk-only" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginLeft: 'auto' }}>{actions}</div>}

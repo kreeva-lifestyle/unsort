@@ -11,7 +11,7 @@ import { GuideSectionView } from '../components/guide/GuideBlocks';
 import { GuideHero, GuideRows, GuideSideNav } from '../components/guide/GuideNav';
 import { PbButton, PbPageHeader } from '../components/ui';
 import { useIsPhone } from '../hooks/useIsPhone';
-import { PB, pbMeta } from '../pbTheme';
+import { PB, pbMeta, pbSheet } from '../pbTheme';
 
 export default function Guide({ onBack, at }: { addToast: AddToast; onBack?: () => void; at?: string | null }) {
   const phone = useIsPhone();
@@ -49,6 +49,10 @@ export default function Guide({ onBack, at }: { addToast: AddToast; onBack?: () 
           <>
             <GuideRows sections={GUIDE_SECTIONS} onJump={jump} />
             {sections}
+            {/* 14 sections inline make a very long page: a sticky way back to the contents, above the tab bar (mobile.md §5 offset). */}
+            <div style={{ position: 'sticky', bottom: 'calc(var(--pb-bar) + env(safe-area-inset-bottom) + 8px)', display: 'flex', justifyContent: 'flex-end', pointerEvents: 'none', marginTop: -8 }}>
+              <PbButton icon="book" onClick={() => jump('contents')} style={{ ...pbSheet, pointerEvents: 'auto', borderRadius: PB.r.pill }}>Contents</PbButton>
+            </div>
           </>
         ) : (
           <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', minWidth: 0 }}>

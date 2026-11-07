@@ -30,7 +30,7 @@ export default function PbSettings({ addToast, onBack, onGuide }: { addToast: Ad
 
   const load = useCallback(() => getSettings()
     .then(s => { setSaved(s); setReader(s.reader); setCats(s.categories); setLoadErr(''); })
-    .catch(e => { addToast(friendlyError(e), 'error'); setLoadErr(friendlyError(e)); }), [addToast]);
+    .catch(e => setLoadErr(friendlyError(e))), []); // the error tile (with Try again) is the one signal
   useEffect(() => { void load(); }, [load]);
   const retry = () => { setRetrying(true); void load().finally(() => setRetrying(false)); };
 
