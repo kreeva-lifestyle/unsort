@@ -7,11 +7,12 @@ import type { PbVendor } from '../types';
 
 export const VENDOR_PAGE = 25;
 
-export type VendorRow = Pick<PbVendor, 'id' | 'name' | 'code' | 'notes' | 'active' | 'created_at' | 'tg_username' | 'tg_title' | 'tg_channel_id'> & { products: number };
+export type VendorRow = Pick<PbVendor, 'id' | 'name' | 'code' | 'notes' | 'active' | 'created_at' | 'tg_username' | 'tg_title' | 'tg_channel_id'
+  | 'tg_slot_minute' | 'tg_checked_at' | 'tg_cursor_ready'> & { products: number };
 type Raw = Omit<VendorRow, 'products'> & { pb_products: { count: number }[] | null };
 
 export async function listVendors(search: string, showInactive: boolean, page: number): Promise<{ rows: VendorRow[]; count: number }> {
-  let q = supabase.from('pb_vendors').select('id,name,code,notes,active,created_at,tg_username,tg_title,tg_channel_id,pb_products(count)', { count: 'exact' });
+  let q = supabase.from('pb_vendors').select('id,name,code,notes,active,created_at,tg_username,tg_title,tg_channel_id,tg_slot_minute,tg_checked_at,tg_cursor_ready,pb_products(count)', { count: 'exact' });
   // Filter on the embedded rows only (not !inner), so a vendor with 0 products still shows.
   q = q.neq('pb_products.status', 'archived');
   if (!showInactive) q = q.eq('active', true);

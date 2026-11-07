@@ -14,7 +14,7 @@ import VendorForm, { type VendorFormState as Form } from '../components/vendors/
 import { VendorsEmpty, VendorsError, VendorsNoMatch, VendorsSkeleton } from '../components/vendors/VendorStates';
 import { VENDOR_PAGE, listVendors, normalizeTgChannel, saveVendor, setVendorActive, type VendorRow as Vendor } from '../data/vendors';
 
-const NEW: Form = { id: null, name: '', code: '', notes: '', tg: '', tgTitle: null };
+const NEW: Form = { id: null, name: '', code: '', notes: '', tg: '' };
 
 export default function Vendors({ addToast, onBack }: { addToast: AddToast; onBack?: () => void }) {
   const [rows, setRows] = useState<Vendor[]>([]);
@@ -106,7 +106,7 @@ export default function Vendors({ addToast, onBack }: { addToast: AddToast; onBa
       style={{ display: 'flex', flexDirection: 'column', gap: 8, margin: 0, padding: 0, opacity: loading ? 0.6 : 1, transition: 'opacity .3s ease' }}>
       {rows.map(v => (
         <VendorRow key={v.id} v={v} busy={busy} compact={phone} onToggle={() => void toggle(v)}
-          onEdit={() => setForm({ id: v.id, name: v.name, code: v.code ?? '', notes: v.notes ?? '', tg: v.tg_username ? `@${v.tg_username}` : '', tgTitle: v.tg_title })} />
+          onEdit={() => setForm({ id: v.id, name: v.name, code: v.code ?? '', notes: v.notes ?? '', tg: v.tg_username ? `@${v.tg_username}` : '' })} />
       ))}
     </ul>
   );
@@ -130,7 +130,7 @@ export default function Vendors({ addToast, onBack }: { addToast: AddToast; onBa
         {body}
       </div>
       {(count > VENDOR_PAGE || page > 0) && <Pager page={page} pageSize={VENDOR_PAGE} count={count} onPage={setPage} noun="vendor" />}
-      <VendorForm form={form} setForm={setForm} saving={saving} err={err} onSave={() => void save()} onClose={close}
+      <VendorForm form={form} setForm={setForm} saving={saving} err={err} onSave={() => void save()} onClose={close} saved={editing}
         toggle={phone && editing ? { active: editing.active, name: editing.name, busy: busy === editing.id, dim: !!busy && busy !== editing.id, onToggle: () => void toggle(editing) } : undefined} />
     </>
   );

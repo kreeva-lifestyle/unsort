@@ -7,16 +7,17 @@ import { useIsPhone } from '../../hooks/useIsPhone';
 import PbModal from '../product/PbModal';
 import { Field } from '../website/ui';
 import PbButton from '../ui/PbButton';
+import TgHint, { type SavedTg } from './VendorTgHint';
 
-/** tg = the Telegram channel as typed (@name, name or a t.me link); tgTitle = the channel's title once the crawler found it. */
-export type VendorFormState = { id: string | null; name: string; code: string; notes: string; tg: string; tgTitle: string | null };
+/** tg = the Telegram channel as typed (@name, name or a t.me link). */
+export type VendorFormState = { id: string | null; name: string; code: string; notes: string; tg: string };
 
 /** Phone only: the row's Deactivate / Activate, shown in the sheet body. */
 export type VendorToggle = { active: boolean; name: string; busy: boolean; dim: boolean; onToggle: () => void };
 
-export default function VendorForm({ form, setForm, saving, err, onSave, onClose, toggle }: {
+export default function VendorForm({ form, setForm, saving, err, onSave, onClose, toggle, saved }: {
   form: VendorFormState | null; setForm: (f: VendorFormState) => void; saving: boolean; err: string; onSave: () => void; onClose: () => void;
-  toggle?: VendorToggle;
+  toggle?: VendorToggle; saved?: SavedTg;
 }) {
   const phone = useIsPhone();
   return (
@@ -40,9 +41,7 @@ export default function VendorForm({ form, setForm, saving, err, onSave, onClose
               className="pb-input" style={{ ...pbInput, ...pbNum }} />
           </Field>
           <Field label="Telegram channel" htmlFor="pbv-tg"
-            hint={<>Optional — e.g. <span style={pbNum}>@kumari_art</span> or a t.me link. New posts there come in as this vendor’s products.
-              {form.tgTitle && <> Channel found: <span style={{ color: PB.tx }}>{form.tgTitle}</span>.</>}
-              {form.tg.trim() && !form.tgTitle && <> Not checked yet — the crawler looks it up within a minute. If the channel is private, join it from the staff account.</>}</>}>
+            hint={<TgHint form={form} saved={saved} />}>
             <input id="pbv-tg" value={form.tg} onChange={e => setForm({ ...form, tg: e.target.value })} maxLength={80} placeholder="@channel_name"
               autoCapitalize="none" autoCorrect="off" spellCheck={false} inputMode="url" enterKeyHint="next" aria-describedby="pbv-tg-hint"
               className="pb-input" style={{ ...pbInput, ...pbNum }} />

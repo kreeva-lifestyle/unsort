@@ -1,11 +1,13 @@
 // One vendor as a glass row (DESIGN.md §7, no blur): initial avatar, name +
-// mono code, product count, status dot + label, notes; then Edit and
+// mono code, product count, status dot + label, the Telegram channel with
+// its daily check time (VendorTg), notes; then Edit and
 // Deactivate / Activate as their own 44px buttons (never nested in a
 // clickable row). Phone (`compact`): only Edit on the row, as in the mock-up;
 // Deactivate / Activate sits in the Edit sheet, away from its Save.
 import { PB, pbMeta, pbName, pbNum, pbRow } from '../../pbTheme';
 import { Dot, NEUTRAL } from '../product/status';
 import PbButton from '../ui/PbButton';
+import VendorTg from './VendorTg';
 import type { VendorRow as Vendor } from '../../data/vendors';
 
 /** First character (whole grapheme for Hindi when the browser can split one), upper-cased. */
@@ -36,13 +38,8 @@ export default function VendorRow({ v, busy, onEdit, onToggle, compact }: {
         <span style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', minWidth: 0 }}>
           <span style={pbMeta}><span style={pbNum}>{v.products.toLocaleString('en-IN')}</span> product{v.products === 1 ? '' : 's'}</span>
           <Dot color={v.active ? PB.live : NEUTRAL} label={v.active ? 'Active' : 'Inactive'} />
-          {(v.tg_username || v.tg_title) && (
-            <span style={{ ...pbMeta, minWidth: 0, overflowWrap: 'anywhere' }} title={v.tg_title ?? undefined}>
-              <span className="pb-sr">Telegram channel </span>
-              {v.tg_username ? <span style={{ ...pbNum, color: PB.tx }}>@{v.tg_username}</span> : <>Telegram · {v.tg_title}</>}
-            </span>
-          )}
         </span>
+        <VendorTg v={v} />
         {v.notes && <span className="pb-clamp2" style={pbMeta}>{v.notes}</span>}
       </span>
       <span style={{ display: 'flex', gap: 8, marginLeft: 'auto', flexShrink: 0 }}>

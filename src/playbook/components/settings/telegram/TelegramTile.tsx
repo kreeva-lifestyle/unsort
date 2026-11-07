@@ -1,5 +1,5 @@
 // Settings → Telegram: vendor channel posts → Products, set up in three
-// numbered steps (bot, admin group, crawler) with live status, plus how many
+// numbered steps (bot, admin group, crawler + its daily checks) with live status, plus how many
 // forwarded messages are waiting to become products. Owns the one busy key
 // for its buttons; every action ends in a success or friendlyError toast.
 import { useState } from 'react';
@@ -7,7 +7,8 @@ import { friendlyError } from '../../../../lib/friendlyError';
 import { useAuth } from '../../../../hooks/useAuth';
 import { useConfirm } from '../../../../components/ui/ConfirmModal';
 import type { AddToast } from '../../PbToasts';
-import { createCrawlerKey, getLinkCode, saveBotToken, testBot } from '../../../data/telegram';
+import { WINDOW_DEFAULT, createCrawlerKey, getLinkCode, respreadSlots, saveBotToken, saveCrawlWindow, testBot } from '../../../data/telegram';
+import { minuteLabel } from '../../../data/tgSchedule';
 import { count, istDate, istRelative } from '../../../format';
 import { useTgStatus } from '../../../hooks/useTgStatus';
 import { PB, pbBody, pbLabel, pbMeta, pbNum } from '../../../pbTheme';
@@ -18,8 +19,9 @@ import TgGroupStep from './TgGroupStep';
 import TgCrawlerStep from './TgCrawlerStep';
 import { copyText } from './TgStep';
 import TgFailedPosts from './TgFailedPosts';
+import TgSchedule from './TgSchedule';
 
-type Busy = '' | 'token' | 'test' | 'code' | 'key';
+type Busy = '' | 'token' | 'test' | 'code' | 'key' | 'window' | 'spread';
 
 export default function TelegramTile({ addToast, onGuide }: { addToast: AddToast; onGuide: () => void }) {
   const { status, error, loading, reload } = useTgStatus();
@@ -55,6 +57,19 @@ export default function TelegramTile({ addToast, onGuide }: { addToast: AddToast
       message: 'The crawler stops forwarding posts until you paste the new key on the server.',
     }))) return;
     await run('key', async () => { const r = await createCrawlerKey(); setNewKey(r.key); return 'New crawler key created — copy it now, it is shown only once'; });
+  };
+  const winStart = config?.crawl_window_start ?? WINDOW_DEFAULT.start, winEnd = config?.crawl_window_end ?? WINDOW_DEFAULT.end;
+  const onWindow = (start: number, end: number) => run('window', async () => {
+    await saveCrawlWindow(start, end);
+    return `Window saved — channels are checked between ${minuteLabel(start)} and ${minuteLabel(end)}, spread evenly`;
+  });
+  const onSpread = async () => {
+    const n = status?.schedule.length ?? 0;
+    if (!(await ask({
+      title: `Spread all ${n} channels evenly?`, confirmLabel: 'Spread evenly',
+      message: `Each channel gets a new daily time, evenly spaced between ${minuteLabel(winStart)} and ${minuteLabel(winEnd)}, in the same order as now. Nothing is copied twice.`,
+    }))) return;
+    await run('spread', async () => { await respreadSlots(); return `${n} channels spread evenly`; });
   };
   const onCopy = async (text: string, what: string) => {
     if (await copyText(text)) addToast(`${what} copied`, 'success');
@@ -112,7 +127,9 @@ export default function TelegramTile({ addToast, onGuide }: { addToast: AddToast
         <TgBotStep config={config} canManage={canManage} busy={busy} onSave={onSave} onTest={onTest} />
         <TgGroupStep config={config} canManage={canManage} busy={busy} onCode={onCode} onCopy={(t, w) => void onCopy(t, w)} />
         <TgCrawlerStep config={config} canManage={canManage} busy={busy} newKey={newKey} onKey={() => void onKey()}
-          onHideKey={() => setNewKey(null)} onCopy={(t, w) => void onCopy(t, w)} onGuide={onGuide} />
+          onHideKey={() => setNewKey(null)} onCopy={(t, w) => void onCopy(t, w)} onGuide={onGuide}
+          schedule={<TgSchedule rows={status.schedule} channels={config?.crawler_channels ?? []} start={winStart} end={winEnd}
+            canManage={canManage} busy={busy} onSaveWindow={onWindow} onSpread={() => void onSpread()} />} />
       </ol>
       <PbConfirm {...modalProps} />
     </PbTile>

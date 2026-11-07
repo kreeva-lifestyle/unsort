@@ -15,6 +15,9 @@ export interface PbVendor {
   id: string; name: string; code: string | null; notes: string | null; active: boolean;
   /** Telegram channel (20261107090000_pb_telegram_intake.sql): Bot API id (-100…), username (lowercase, no @), title. */
   tg_channel_id: number | null; tg_username: string | null; tg_title: string | null;
+  /** Daily check (set by a trigger, never by the app): IST minute of day 0–1439, when the last check finished,
+   *  and whether the crawler has noted the channel's newest post yet (old posts are never copied). */
+  tg_slot_minute: number | null; tg_checked_at: string | null; tg_cursor_ready: boolean;
   created_by: string | null; created_at: string; updated_at: string;
 }
 
@@ -163,5 +166,7 @@ export interface PbTgConfig {
   webhook_ok: boolean | null; webhook_error: string | null;
   crawler_seen_at: string | null; crawler_version: string | null; crawler_error: string | null;
   crawler_channels: PbTgChannel[];
+  /** The overnight window the channels are checked in, IST minutes of day (may cross midnight; default 23:00–07:00). */
+  crawl_window_start: number; crawl_window_end: number;
   last_message_at: string | null; updated_at: string;
 }
