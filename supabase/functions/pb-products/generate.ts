@@ -47,7 +47,7 @@ export async function generateOne(l: ListingRow, o: { manual: boolean; prevStatu
     if (p.cost_price === null || p.cost_price === undefined) throw new HttpError(400, 'The product has no cost price yet — add it on the product page.');
     const [vendor, imgs, rule] = await Promise.all([
       p.vendor_id ? one<{ name: string; code: string | null }>(`pb_vendors?id=eq.${enc(p.vendor_id)}&select=name,code`) : Promise.resolve(null),
-      sel<{ path: string }>(`pb_product_images?product_id=eq.${enc(p.id)}&select=path&order=position.asc&limit=20`),
+      sel<{ path: string }>(`pb_product_images?product_id=eq.${enc(p.id)}&kind=eq.image&select=path&order=position.asc&limit=20`),
       l.rule_id ? one<{ price_override: { markup_pct?: number; add_flat?: number } | null }>(`pb_routing_rules?id=eq.${enc(l.rule_id)}&select=price_override`) : Promise.resolve(null),
     ]);
     const locked = new Set(l.locked || []);

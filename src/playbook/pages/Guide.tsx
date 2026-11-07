@@ -4,6 +4,7 @@
 // prints the HTML + PDF from it, so re-run that script after editing.
 // V2 layout: desktop = hero (12) / sticky contents side list (3) + sections
 // (9); phone = hero, numbered section rows, then the sections.
+import { useEffect } from 'react';
 import type { AddToast } from '../components/PbToasts';
 import { GUIDE_META, GUIDE_SECTIONS } from '../components/guide/content';
 import { GuideSectionView } from '../components/guide/GuideBlocks';
@@ -12,7 +13,7 @@ import { PbButton, PbPageHeader } from '../components/ui';
 import { useIsPhone } from '../hooks/useIsPhone';
 import { PB, pbMeta } from '../pbTheme';
 
-export default function Guide({ onBack }: { addToast: AddToast; onBack?: () => void }) {
+export default function Guide({ onBack, at }: { addToast: AddToast; onBack?: () => void; at?: string | null }) {
   const phone = useIsPhone();
   // Jump to a section and move focus there (smooth only without reduced motion).
   const jump = (id: string) => {
@@ -22,6 +23,12 @@ export default function Guide({ onBack }: { addToast: AddToast; onBack?: () => v
     if (!el.hasAttribute('tabindex')) el.setAttribute('tabindex', '-1');
     el.focus({ preventScroll: true });
   };
+  // Opened at a section (e.g. from Settings → Telegram → How to set it up).
+  useEffect(() => {
+    if (!at) return;
+    const r = requestAnimationFrame(() => jump(at));
+    return () => cancelAnimationFrame(r);
+  }, [at]); // jump only reads the DOM
 
   const sections = (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>

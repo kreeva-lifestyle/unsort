@@ -2,7 +2,8 @@
 // import). Deduped on (source, source_ref). Photos are downloaded into the
 // playbook-products bucket (max 10, 15 MB each, jpeg / png / webp only). The
 // product is created 'new' with claimed_at = now, so the worker does not read
-// it before its photos are in; the claim is cleared at the end.
+// it before its photos are in; the claim is cleared at the end. Optional
+// less_amount / source_url / intake_notes are stored as given (validated).
 import { SB_URL, enc, insert, logActivity, nowIso, one, patch, sel, svcHeaders } from './db.ts';
 import { HttpError, fetchT, plain } from './http.ts';
 import { BUCKET } from './types.ts';
@@ -10,7 +11,27 @@ import { BUCKET } from './types.ts';
 const MAX_IMAGES = 10;
 const MAX_BYTES = 15 * 1024 * 1024;
 
-export interface IngestBody { source?: unknown; source_ref?: unknown; raw_text?: unknown; vendor_name?: unknown; image_urls?: unknown }
+export interface IngestBody {
+  source?: unknown; source_ref?: unknown; raw_text?: unknown; vendor_name?: unknown; image_urls?: unknown;
+  // Optional (Telegram intake, 2026-11-07): the vendor's "Less" (cost = rate − less, see reader.ts), a link to the post, notes.
+  less_amount?: unknown; source_url?: unknown; intake_notes?: unknown;
+}
+
+function extras(b: IngestBody): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (b.less_amount !== undefined && b.less_amount !== null && b.less_amount !== '') {
+    const n = Number(b.less_amount);
+    if (!Number.isFinite(n) || n < 0 || n >= 10_000_000) throw new HttpError(400, 'less_amount must be a number of rupees, 0 or more.');
+    out.less_amount = Math.round(n * 100) / 100;
+  }
+  const url = String(b.source_url ?? '').trim();
+  if (url) {
+    if (!/^https:\/\/\S+$/i.test(url) || url.length > 500) throw new HttpError(400, 'source_url must be an https link.');
+    out.source_url = url;
+  }
+  if (Array.isArray(b.intake_notes)) out.intake_notes = b.intake_notes.map(n => String(n ?? '').trim().slice(0, 300)).filter(Boolean).slice(0, 20);
+  return out;
+}
 
 async function vendorId(name: string): Promise<string | null> {
   if (!name) return null;
@@ -64,6 +85,7 @@ export async function ingest(b: IngestBody): Promise<Record<string, unknown>> {
   if (!ref || ref.length > 200) throw new HttpError(400, 'source_ref (the message id) is required, up to 200 characters.');
   const rawText = String(b.raw_text ?? '').slice(0, 20_000);
   const urls = Array.isArray(b.image_urls) ? b.image_urls.map(String).filter(Boolean).slice(0, MAX_IMAGES) : [];
+  const more = extras(b);
   const findDup = () => one<{ id: string }>(`pb_products?source=eq.${enc(source)}&source_ref=eq.${enc(ref)}&select=id`);
 
   const dup = await findDup();
@@ -71,7 +93,7 @@ export async function ingest(b: IngestBody): Promise<Record<string, unknown>> {
   const vendor_id = await vendorId(String(b.vendor_name ?? '').replace(/\s+/g, ' ').trim().slice(0, 120));
   let id: string;
   try {
-    id = (await insert<{ id: string }>('pb_products', [{ source, source_ref: ref, raw_text: rawText || null, vendor_id, status: 'new', claimed_at: nowIso() }]))[0].id;
+    id = (await insert<{ id: string }>('pb_products', [{ source, source_ref: ref, raw_text: rawText || null, vendor_id, status: 'new', claimed_at: nowIso(), ...more }]))[0].id;
   } catch (e) {
     const again = e instanceof HttpError && e.status === 409 ? await findDup() : null;
     if (again) return { ok: true, product_id: again.id, duplicate: true };

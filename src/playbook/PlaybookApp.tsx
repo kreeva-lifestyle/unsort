@@ -37,6 +37,8 @@ export default function PlaybookApp() {
   // A dashboard tile opens Products with a filter; the key remounts Products so it takes the new start.
   const [start, setStart] = useState<{ key: number; value: ProductsStart }>({ key: 0, value: {} });
   const { addToast, toasts, dismiss } = usePbToasts();
+  // A "How to set it up" button opens the Guide at one section (null: the top).
+  const [guideAt, setGuideAt] = useState<string | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const isPhone = useIsPhone();
   useKeyboardInset();
@@ -61,6 +63,7 @@ export default function PlaybookApp() {
     // A plain nav tap opens Products clean: an old tile filter or "+ Add product" must not come back.
     if (s || p !== pageRef.current) setStart(prev => ({ key: prev.key + 1, value: s ?? {} }));
     pageRef.current = p;
+    setGuideAt(null);
     setPage(p);
     try { localStorage.setItem(PAGE_KEY, p); } catch { /* storage blocked: page just isn't remembered */ }
     scroller.current?.scrollTo({ top: 0 });
@@ -120,8 +123,8 @@ export default function PlaybookApp() {
           {shown === 'products' && <Products key={start.key} addToast={addToast} start={start.value} />}
           {shown === 'websites' && <Websites addToast={addToast} />}
           {shown === 'vendors' && <Vendors addToast={addToast} onBack={backToMore} />}
-          {shown === 'settings' && <PbSettings addToast={addToast} onBack={backToMore} />}
-          {shown === 'guide' && <Guide addToast={addToast} onBack={backToMore} />}
+          {shown === 'settings' && <PbSettings addToast={addToast} onBack={backToMore} onGuide={id => { go('guide'); setGuideAt(id); }} />}
+          {shown === 'guide' && <Guide addToast={addToast} onBack={backToMore} at={guideAt} />}
           {shown === 'more' && <More go={p => go(p)} onSwitch={toDailyWork} onSignOut={out} signingOut={signingOut} />}
         </main>
       </div>

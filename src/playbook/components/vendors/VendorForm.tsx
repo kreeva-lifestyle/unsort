@@ -1,4 +1,4 @@
-// Add / edit a vendor: a short sheet (3 fields) through PbModal. Desktop
+// Add / edit a vendor: a short sheet (4 fields) through PbModal. Desktop
 // footer: Cancel then Save; phone: one full-width Save (Cancel is the ×,
 // swipe down or Back), in the PbModal footer. A filled form is guarded
 // against scrim tap / swipe-down. Enter submits. The page owns the save and the state.
@@ -8,7 +8,8 @@ import PbModal from '../product/PbModal';
 import { Field } from '../website/ui';
 import PbButton from '../ui/PbButton';
 
-export type VendorFormState = { id: string | null; name: string; code: string; notes: string };
+/** tg = the Telegram channel as typed (@name, name or a t.me link); tgTitle = the channel's title once the crawler found it. */
+export type VendorFormState = { id: string | null; name: string; code: string; notes: string; tg: string; tgTitle: string | null };
 
 /** Phone only: the row's Deactivate / Activate, shown in the sheet body. */
 export type VendorToggle = { active: boolean; name: string; busy: boolean; dim: boolean; onToggle: () => void };
@@ -20,7 +21,7 @@ export default function VendorForm({ form, setForm, saving, err, onSave, onClose
   const phone = useIsPhone();
   return (
     <PbModal open={!!form} title={form?.id ? 'Edit vendor' : 'Add vendor'} onClose={onClose}
-      guard={!!form && !!(form.name.trim() || form.code.trim() || form.notes.trim())}
+      guard={!!form && !!(form.name.trim() || form.code.trim() || form.notes.trim() || form.tg.trim())}
       footer={
         <div style={{ display: 'flex', gap: 16, justifyContent: 'flex-end' }}>
           {!phone && <PbButton onClick={onClose} dim={saving}>Cancel</PbButton>}
@@ -36,6 +37,14 @@ export default function VendorForm({ form, setForm, saving, err, onSave, onClose
           <Field label="Short code" htmlFor="pbv-code" hint="Optional — usable in tags as {vendor_code}, e.g. RG">
             <input id="pbv-code" value={form.code} onChange={e => setForm({ ...form, code: e.target.value })} maxLength={20}
               autoCapitalize="characters" autoCorrect="off" spellCheck={false} enterKeyHint="next" aria-describedby="pbv-code-hint"
+              className="pb-input" style={{ ...pbInput, ...pbNum }} />
+          </Field>
+          <Field label="Telegram channel" htmlFor="pbv-tg"
+            hint={<>Optional — e.g. <span style={pbNum}>@kumari_art</span> or a t.me link. New posts there come in as this vendor’s products.
+              {form.tgTitle && <> Channel found: <span style={{ color: PB.tx }}>{form.tgTitle}</span>.</>}
+              {form.tg.trim() && !form.tgTitle && <> Not checked yet — the crawler looks it up within a minute. If the channel is private, join it from the staff account.</>}</>}>
+            <input id="pbv-tg" value={form.tg} onChange={e => setForm({ ...form, tg: e.target.value })} maxLength={80} placeholder="@channel_name"
+              autoCapitalize="none" autoCorrect="off" spellCheck={false} inputMode="url" enterKeyHint="next" aria-describedby="pbv-tg-hint"
               className="pb-input" style={{ ...pbInput, ...pbNum }} />
           </Field>
           <Field label="Notes" htmlFor="pbv-notes">

@@ -1,15 +1,16 @@
-// Calls to the pb-products edge function (actions: docs/playbook/product-directory-spec.md).
-// Shared by every Playbook page. Errors come back as thrown Error(<plain sentence>) — show
-// them with friendlyError().
+// Calls to Playbook's edge functions: pb-products (actions: docs/playbook/product-directory-spec.md)
+// and pb-telegram (Settings → Telegram). Shared by every Playbook page. Errors come back as
+// thrown Error(<plain sentence>) — show them with friendlyError().
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '../../lib/supabase';
 import { PB_BUCKET } from '../types';
 
-const FN = `${SUPABASE_URL}/functions/v1/pb-products`;
+export type PbFunction = 'pb-products' | 'pb-telegram';
 
-export async function pbCall<T = Record<string, unknown>>(action: string, body: Record<string, unknown> = {}): Promise<T> {
+/** POST {action, ...body} to a Playbook edge function as the signed-in user. */
+export async function pbFnCall<T = Record<string, unknown>>(fn: PbFunction, action: string, body: Record<string, unknown> = {}): Promise<T> {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.access_token) throw new Error('Sign in again to continue');
-  const r = await fetch(FN, {
+  const r = await fetch(`${SUPABASE_URL}/functions/v1/${fn}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: `Bearer ${session.access_token}`, apikey: SUPABASE_ANON_KEY },
     body: JSON.stringify({ action, ...body }),
@@ -18,6 +19,8 @@ export async function pbCall<T = Record<string, unknown>>(action: string, body: 
   if (!r.ok || out?.error) throw new Error(out?.error || `The Playbook server answered ${r.status}`);
   return out as T;
 }
+
+export const pbCall = <T = Record<string, unknown>>(action: string, body: Record<string, unknown> = {}) => pbFnCall<T>('pb-products', action, body);
 
 /** Public URL of a product photo (the bucket is public so Shopify can fetch it). */
 export const pbImageUrl = (path: string) => supabase.storage.from(PB_BUCKET).getPublicUrl(path).data.publicUrl;

@@ -12,6 +12,7 @@ import { updateProduct, type ProductDetail, type VendorLite } from '../../data/p
 import { pbErrorBox, pbInput, pbLabel, pbMeta, pbNum, pbTextarea, pbTile, pbTileTitle } from '../../pbTheme';
 import PbButton from '../ui/PbButton';
 import { KeptTag } from './detail/ListingField';
+import { LessLine } from './detail/TelegramBits';
 import VendorSelect from './VendorSelect';
 import { numKey, splitList } from './status';
 
@@ -90,6 +91,8 @@ export default function ProductFacts({ product, vendors, categories, onVendorCre
   );
   const cats = f.category && !categories.includes(f.category) ? [f.category, ...categories] : categories;
 
+  const lessFirst = Number(product.less_amount) > 0;
+  const costInput = input('cost_price', 'Cost price (₹)', { type: 'number', inputMode: 'decimal', min: 0, step: '0.01', onKeyDown: numKey }, true);
   return (
     <form onSubmit={save} className={className} aria-labelledby="pb-facts-title"
       style={{ ...pbTile, display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -101,7 +104,7 @@ export default function ProductFacts({ product, vendors, categories, onVendorCre
           {label('vendor_id', 'Vendor', 'pb-f-vendor')}
           <VendorSelect id="pb-f-vendor" value={f.vendor_id} vendors={vendors} onChange={set('vendor_id')} onCreated={onVendorCreated} />
         </div>
-        {input('cost_price', 'Cost price (₹)', { type: 'number', inputMode: 'decimal', min: 0, step: '0.01', onKeyDown: numKey }, true)}
+        {!lessFirst && costInput}
         <div style={{ minWidth: 0 }}>
           {label('category', 'Category')}
           <select id="pb-f-category" value={f.category} onChange={e => set('category')(e.target.value)} className="pb-input" style={pbInput}>
@@ -112,6 +115,8 @@ export default function ProductFacts({ product, vendors, categories, onVendorCre
         {input('fabric', 'Fabric', { maxLength: 120 })}
         {input('color', 'Colour', { maxLength: 120 })}
         {input('sizes', 'Sizes (comma list)', { placeholder: 'e.g. S, M, L' })}
+        {/* With a Telegram "Less", the cost sits last so its Rate − Less = Cost line is right under it. */}
+        {lessFirst && <>{costInput}<div style={{ gridColumn: '1 / -1', minWidth: 0 }}><LessLine p={product} /></div></>}
       </div>
       <div style={{ minWidth: 0 }}>
         {label('raw_text', 'Details (vendor’s post)', 'pb-f-raw')}

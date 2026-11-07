@@ -1,5 +1,5 @@
-// Guide help: troubleshooting table, FAQ, and what is coming (Telegram intake).
-import { type GuideSection, h, list, p, table } from '../types';
+// Guide help: troubleshooting table and FAQ (Telegram problems: telegram.ts).
+import { type GuideSection, h, p, table } from '../types';
 
 export const HELP: GuideSection[] = [
   {
@@ -50,19 +50,6 @@ export const HELP: GuideSection[] = [
       p('Nothing runs on its own until you switch it back on; buttons on a product still work. When it is switched on again it carries on from where it stopped.'),
       h('Two of us edited the same listing. Whose change stays?'),
       p('The last one saved. Close and reopen a listing before editing if someone else may have just changed it.'),
-    ],
-  },
-  {
-    id: 'next',
-    short: 'Coming next',
-    title: 'What is coming next',
-    blocks: [
-      h('Telegram intake'),
-      p('Soon every product posted in the vendors\' Telegram channel will land in **Products** by itself — photos and text together — and go through exactly the same steps: read, sorted, priced, written, published. The same post arriving twice is ignored.'),
-      list(
-        'Until then, add products with **+ Add product**.',
-        'Nothing to set up for it today: the categories, vendors and website rules you make now are the ones Telegram products will use.',
-      ),
     ],
   },
 ];

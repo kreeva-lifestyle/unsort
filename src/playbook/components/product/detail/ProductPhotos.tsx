@@ -2,6 +2,8 @@
 // are portrait) with the rest and the "Add photos" cell in a grid beside it. Phone: the photo hero at the top of
 // the page, a sideways snap strip with the back button laid over it.
 // Each photo opens full size (as before); uploads go through the page.
+// Telegram videos follow the photos (a "Videos" row on desktop, slides after
+// the photos on phone); the cover is always a photo.
 import type { CSSProperties, ReactNode } from 'react';
 import { pbImageUrl } from '../../../data/pbFunctions';
 import type { ProductDetail } from '../../../data/products';
@@ -9,6 +11,7 @@ import { PB, pbMeta, pbTileFlat, pbTileTitle } from '../../../pbTheme';
 import PbIcon from '../../ui/PbIcon';
 import PbTile from '../../ui/PbTile';
 import { PbBackButton } from '../../ui/PbPageHeader';
+import { VideoCell, mediaCount, splitMedia } from './ProductVideos';
 
 type Img = ProductDetail['pb_product_images'][number];
 type AddProps = { onAdd: () => void; busy: string | null };
@@ -45,12 +48,13 @@ function NoPhotos({ children }: { children?: ReactNode }) {
 }
 
 export function PhotosTile({ images, onAdd, busy }: AddProps & { images: Img[] }) {
-  const [cover, ...rest] = images;
+  const { photos, videos } = splitMedia(images);
+  const [cover, ...rest] = photos;
   return (
     <PbTile as="section" span={8} rows={2} aria-labelledby="pb-photos-title" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
         <h2 id="pb-photos-title" style={pbTileTitle}>Photos</h2>
-        <span style={pbMeta}>{images.length === 1 ? '1 photo' : `${images.length} photos`}</span>
+        <span style={pbMeta}>{mediaCount(photos.length, videos.length)}</span>
       </div>
       {!cover ? (
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 240, borderRadius: PB.r.photo, background: PB.ctl }}>
@@ -65,25 +69,33 @@ export function PhotosTile({ images, onAdd, busy }: AddProps & { images: Img[] }
           </div>
         </div>
       )}
+      {videos.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 200px))', gap: 12, borderTop: `1px solid ${PB.tileBd}`, paddingTop: 12 }}>
+          {videos.map((v, i) => <VideoCell key={v.id} v={v} n={i + 1} style={{ aspectRatio: '4 / 5' }} />)}
+        </div>
+      )}
     </PbTile>
   );
 }
 
-export function PhonePhotoHero({ images, onAdd, busy, onBack }: AddProps & { images: Img[]; onBack: () => void }) {
+export function PhonePhotoHero({ images: all, onAdd, busy, onBack }: AddProps & { images: Img[]; onBack: () => void }) {
+  const { photos: images, videos } = splitMedia(all);
+  const slide = all.length === 1 ? '0 0 calc(100% - 104px)' : '0 0 82%';
   return (
     <div style={{ position: 'relative', minWidth: 0 }}>
       <div style={{ ...pbTileFlat, padding: 0, overflow: 'hidden', borderRadius: 'var(--pb-r-hero)' }}>
-        {images.length === 0 ? (
+        {all.length === 0 ? (
           <div style={{ minHeight: 220, display: 'flex', alignItems: 'center', justifyContent: 'center', paddingTop: 44 }}>
             <NoPhotos><AddCell onAdd={onAdd} busy={busy} style={{ padding: '8px 16px', flexDirection: 'row' }} /></NoPhotos>
           </div>
         ) : (
           <div className="pb-chiprow" style={{ margin: 0, padding: 8, gap: 8, scrollPaddingLeft: 8 }}>
             {images.map((img, i) => (
-              <div key={img.id} style={{ flex: images.length === 1 ? '0 0 calc(100% - 104px)' : '0 0 82%', aspectRatio: '4 / 5', scrollSnapAlign: 'start', display: 'flex' }}>
+              <div key={img.id} style={{ flex: slide, aspectRatio: '4 / 5', scrollSnapAlign: 'start', display: 'flex' }}>
                 {photoLink(img, i, { flex: 1 })}
               </div>
             ))}
+            {videos.map((v, i) => <VideoCell key={v.id} v={v} n={i + 1} style={{ flex: slide, aspectRatio: '4 / 5', scrollSnapAlign: 'start' }} />)}
             <AddCell onAdd={onAdd} busy={busy} style={{ flex: '0 0 96px', alignSelf: 'stretch', scrollSnapAlign: 'end', padding: 8, textAlign: 'center' }} />
           </div>
         )}
@@ -91,9 +103,9 @@ export function PhonePhotoHero({ images, onAdd, busy, onBack }: AddProps & { ima
       <div style={{ position: 'absolute', top: 16, left: 16, borderRadius: PB.r.input, background: PB.sheet }}>
         <PbBackButton label="Products" onBack={onBack} />
       </div>
-      {images.length > 0 && (
-        <span style={{ position: 'absolute', bottom: 16, left: 16, padding: '4px 12px', borderRadius: PB.r.pill, background: PB.sheet, border: `1px solid ${PB.tileBd}`, fontSize: 12, color: PB.tx, fontWeight: 600 }}>
-          {images.length === 1 ? '1 photo' : `${images.length} photos`}
+      {all.length > 0 && (
+        <span style={{ position: 'absolute', top: 26, right: 16, padding: '4px 12px', borderRadius: PB.r.pill, background: PB.sheet, border: `1px solid ${PB.tileBd}`, fontSize: 12, color: PB.tx, fontWeight: 600, pointerEvents: 'none' }}>
+          {mediaCount(images.length, videos.length)}
         </span>
       )}
     </div>

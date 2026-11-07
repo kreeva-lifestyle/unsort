@@ -115,6 +115,8 @@ Every row of a fixed layout adds up to 12. Write the spans down before coding, a
 | Status | `Dot`, `PRODUCT_STATUS`, `LISTING_STATUS` in `components/product/status.tsx` | swap the colours to the mapping in §6 | Always dot + text label, with the dot `aria-hidden`. Statuses that need action get the tinted tile. |
 | Charts | `src/components/ui/Charts.tsx` | add an optional `ink` prop | Rules are in `data-and-charts.md`. |
 | Section within a tile | `Section` in `components/website/ui.tsx` | title 17 Sora or an 11px label; separated by a `tileBd` hairline | Do not nest tiles inside it. |
+| Numbered setup step | `TgStep` + `TgValueBox` in `components/settings/telegram/TgStep.tsx` | hairline-separated block inside one tile; 32px mono number circle (`PB.ctl`), `pbName` title, dot + label status | For one-time setups done in order (Settings → Telegram). Steps are an `<ol>`; a value shown once (code, key) goes in `TgValueBox` with a Copy button. |
+| Video in the photo area | `VideoCell` in `components/product/detail/ProductVideos.tsx` | photo cell recipe (radius 16, `PB.ctl`), `pbSheet`-style "Video · 12 MB" badge above the controls | `<video controls preload="metadata" playsInline>`; never the cover; never sent to Shopify or the AI (`kind = 'video'`). |
 
 ## 6. Status mapping (real Product Directory values to PB tokens)
 Change the `color` fields in `components/product/status.tsx` and nowhere else. The labels stay. "Neutral" means a `PB.tx3` dot with a `PB.tx2` label.

@@ -6,6 +6,7 @@ import { PB, pbLabel, pbMeta, pbNum, pbPageTitle, pbTileTitle } from '../../../p
 import PbStatTile from '../../ui/PbStatTile';
 import PbTile from '../../ui/PbTile';
 import { Dot, LISTING_STATUS, PRODUCT_STATUS, rupees, shortDate } from '../status';
+import { SourceLine } from './TelegramBits';
 
 type P = { p: ProductDetail; vendors: VendorLite[] };
 const vendorName = ({ p, vendors }: P) => vendors.find(v => v.id === p.vendor_id)?.name ?? null;
@@ -59,6 +60,7 @@ export function PhoneNameCard({ p, vendors }: P) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <Dot color={st.color} label={st.label} /><span style={pbMeta}>{st.hint}</span>
       </div>
+      <SourceLine p={p} />
     </PbTile>
   );
 }

@@ -6,13 +6,13 @@
 //
 // Auth (auth.ts):
 //   - x-sync-secret header = app_secrets.pb_worker_secret → the cron worker
-//     (trigger_pb_worker) or the future Telegram bridge;
+//     (trigger_pb_worker) or a bridge (Telegram intake lives in pb-telegram);
 //   - or Bearer JWT of a signed-in ACTIVE admin / manager / operator.
 // All database writes use the service role; credentials never leave the server.
 //
 // POST JSON { action, ... } → JSON; errors → HTTP 4xx/5xx { ok:false, error:'<plain sentence>' }.
 //   work               secret|staff   –                                   → { ok, read, routed, generated, published, failed }
-//   ingest             secret         { source:'telegram'|'import', source_ref, raw_text, vendor_name?, image_urls?[] }
+//   ingest             secret         { source:'telegram'|'import', source_ref, raw_text, vendor_name?, image_urls?[], less_amount?, source_url?, intake_notes?[] }
 //                                                                          → { ok, product_id, duplicate?, images?, warnings? }
 //   read_product       staff          { product_id }                      → { ok, product, routed, warning? }
 //   route_product      staff          { product_id }                      → { ok, routed, repriced, listings, warning? }
@@ -29,6 +29,8 @@
 // generate (generate.ts: pricing.ts, content.ts, tags.ts) → publish
 // (publish.ts / productInput.ts / shopifyProduct.ts / shopify.ts). Every step writes pb_activity.
 // Shopify requests go only to a …myshopify.com host on a supported Admin API version (shopify.ts).
+// Only pb_product_images rows with kind = 'image' go to the AI and Shopify (videos are for staff).
+// A product's less_amount (Telegram "200 Less") is taken off the rate the reader reads (reader.ts).
 import * as A from './actions.ts';
 import { userOf, whoIs } from './auth.ts';
 import { HttpError, corsHeaders, fail, json, plain } from './http.ts';

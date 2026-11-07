@@ -1,5 +1,6 @@
 // Product Directory settings: the AI that reads incoming products, the
-// category list, the automation pause switch and "Run now".
+// category list, Telegram intake (bot, admin group, crawler), the automation
+// pause switch and "Run now".
 // V2 layout (layout-and-components.md §4): form tiles 8 wide + the
 // automation status tile 4 wide on desktop; on phone the status tile follows
 // the form. "Run now" is the page's one gradient; the saves are secondary.
@@ -12,12 +13,13 @@ import { ChipsInput, Field, Grid2 } from '../components/website/ui';
 import { pbInput, pbMeta } from '../pbTheme';
 import { PbButton, PbPageHeader, PbSection, PbTile } from '../components/ui';
 import AutomationTile from '../components/settings/AutomationTile';
+import TelegramTile from '../components/settings/telegram/TelegramTile';
 import { SettingsColumns, SettingsError, SettingsSkeleton } from '../components/settings/SettingsStates';
 
 type Busy = '' | 'reader' | 'categories' | 'automation' | 'run';
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
-export default function PbSettings({ addToast, onBack }: { addToast: AddToast; onBack?: () => void }) {
+export default function PbSettings({ addToast, onBack, onGuide }: { addToast: AddToast; onBack?: () => void; onGuide?: (section: string) => void }) {
   const [saved, setSaved] = useState<Settings | null>(null);
   const [reader, setReader] = useState<Settings['reader']>(DEFAULT_SETTINGS.reader);
   const [cats, setCats] = useState<string[]>([]);
@@ -52,7 +54,7 @@ export default function PbSettings({ addToast, onBack }: { addToast: AddToast; o
     } catch (e) { addToast(friendlyError(e), 'error'); } finally { setBusy(''); }
   };
 
-  const header = <PbPageHeader title="Settings" sub="How the Product Directory reads products and when the automation runs"
+  const header = <PbPageHeader title="Settings" sub="How the Product Directory reads products, how Telegram posts come in, and when the automation runs"
     back={onBack ? { label: 'More', onBack } : undefined} />;
   if (!saved) return <>{header}{loadErr ? <SettingsError message={loadErr} onRetry={retry} busy={retrying} /> : <SettingsSkeleton />}</>;
   const paused = saved.automation.paused;
@@ -100,6 +102,7 @@ export default function PbSettings({ addToast, onBack }: { addToast: AddToast; o
           </div>
         </PbSection>
       </PbTile>
+      <TelegramTile addToast={addToast} onGuide={() => onGuide?.('telegram')} />
     </>
   );
 

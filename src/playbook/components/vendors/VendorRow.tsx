@@ -36,6 +36,12 @@ export default function VendorRow({ v, busy, onEdit, onToggle, compact }: {
         <span style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', minWidth: 0 }}>
           <span style={pbMeta}><span style={pbNum}>{v.products.toLocaleString('en-IN')}</span> product{v.products === 1 ? '' : 's'}</span>
           <Dot color={v.active ? PB.live : NEUTRAL} label={v.active ? 'Active' : 'Inactive'} />
+          {(v.tg_username || v.tg_title) && (
+            <span style={{ ...pbMeta, minWidth: 0, overflowWrap: 'anywhere' }} title={v.tg_title ?? undefined}>
+              <span className="pb-sr">Telegram channel </span>
+              {v.tg_username ? <span style={{ ...pbNum, color: PB.tx }}>@{v.tg_username}</span> : <>Telegram · {v.tg_title}</>}
+            </span>
+          )}
         </span>
         {v.notes && <span className="pb-clamp2" style={pbMeta}>{v.notes}</span>}
       </span>

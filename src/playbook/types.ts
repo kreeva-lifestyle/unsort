@@ -13,6 +13,8 @@ export type PbEffort = '' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 
 export interface PbVendor {
   id: string; name: string; code: string | null; notes: string | null; active: boolean;
+  /** Telegram channel (20261107090000_pb_telegram_intake.sql): Bot API id (-100…), username (lowercase, no @), title. */
+  tg_channel_id: number | null; tg_username: string | null; tg_title: string | null;
   created_by: string | null; created_at: string; updated_at: string;
 }
 
@@ -26,10 +28,18 @@ export interface PbProduct {
   /** Fields staff edited by hand — the AI reader never overwrites these. */
   locked: string[];
   ai_read_at: string | null; ai_error: string | null; claimed_at: string | null;
+  /** The vendor's separate "200 Less" message: cost = RATE − less (₹). */
+  less_amount: number | null;
+  /** https://t.me/<channel>/<message id> when the channel is public. */
+  source_url: string | null;
+  /** Notes from the Telegram intake ("No description arrived…", big videos). */
+  intake_notes: string[];
   created_by: string | null; created_at: string; updated_at: string;
 }
 
-export interface PbProductImage { id: string; product_id: string; path: string; position: number; created_at: string }
+export type PbMediaKind = 'image' | 'video';
+/** Photos and (Telegram) videos. Shopify and the AI only ever use kind 'image'. */
+export interface PbProductImage { id: string; product_id: string; path: string; position: number; kind: PbMediaKind; bytes: number | null; created_at: string }
 
 export interface PbPricing {
   /** % added to the vendor cost (100 = double). */
@@ -128,3 +138,30 @@ export const PB_EFFORTS: { id: PbEffort; label: string }[] = [
   { id: 'high', label: 'High' }, { id: 'xhigh', label: 'Extra high' }, { id: 'max', label: 'Max' },
 ];
 export const PB_BUCKET = 'playbook-products';
+
+// ── Telegram intake (20261107090000_pb_telegram_intake.sql) ──
+export type PbTgMessageKind = 'photo' | 'video' | 'text' | 'other';
+export type PbTgMessageState = 'pending' | 'used' | 'ignored' | 'failed';
+
+/** One forwarded message in the admin group, until it becomes (part of) a product. Staff read only. */
+export interface PbTgMessage {
+  id: number; update_id: number | null; chat_id: number; message_id: number;
+  origin_chat_id: number | null; origin_title: string | null; origin_username: string | null; origin_message_id: number | null;
+  media_group_id: string | null; kind: PbTgMessageKind | null; text: string | null;
+  file_id: string | null; file_unique_id: string | null; file_size: number | null; mime: string | null;
+  state: PbTgMessageState; product_id: string | null; note: string | null; received_at: string;
+}
+
+/** What the crawler last reported for one vendor channel. */
+export interface PbTgChannel { username: string | null; channel_id: number | null; title: string | null; last_id: number | null; error: string | null }
+
+/** Single row (id = 1): bot, admin group and crawler status. Staff read; only pb-telegram writes. */
+export interface PbTgConfig {
+  bot_username: string | null;
+  group_chat_id: number | null; group_title: string | null;
+  link_code: string | null; link_code_expires_at: string | null; link_attempts: number;
+  webhook_ok: boolean | null; webhook_error: string | null;
+  crawler_seen_at: string | null; crawler_version: string | null; crawler_error: string | null;
+  crawler_channels: PbTgChannel[];
+  last_message_at: string | null; updated_at: string;
+}
