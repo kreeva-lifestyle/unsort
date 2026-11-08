@@ -2,6 +2,7 @@
 // products each has in the directory. Spec: docs/playbook/product-directory-spec.md.
 // V2 layout: desktop = (12 toolbar tile) / (12 tile of glass rows) / pager;
 // phone = search + "Show inactive" chip, then the rows straight on the backdrop.
+// Deactivate / Activate sits at the end of the Edit sheet (VendorForm), not on the rows.
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import { friendlyError } from '../../lib/friendlyError';
 import type { AddToast } from '../components/PbToasts';
@@ -12,9 +13,9 @@ import { PbButton, PbChip, PbChipRow, PbIcon, PbPageHeader, PbTile } from '../co
 import VendorRow from '../components/vendors/VendorRow';
 import VendorForm, { type VendorFormState as Form } from '../components/vendors/VendorForm';
 import { VendorsEmpty, VendorsError, VendorsNoMatch, VendorsSkeleton } from '../components/vendors/VendorStates';
-import { VENDOR_PAGE, listVendors, saveVendor, setVendorActive, type VendorRow as Vendor } from '../data/vendors';
+import { VENDOR_PAGE, listVendors, normalizeTgChannel, saveVendor, setVendorActive, type VendorRow as Vendor } from '../data/vendors';
 
-const NEW: Form = { id: null, name: '', code: '', notes: '' };
+const NEW: Form = { id: null, name: '', code: '', notes: '', tg: '' };
 
 export default function Vendors({ addToast, onBack }: { addToast: AddToast; onBack?: () => void }) {
   const [rows, setRows] = useState<Vendor[]>([]);
@@ -45,9 +46,10 @@ export default function Vendors({ addToast, onBack }: { addToast: AddToast; onBa
       if (page > last) { setPage(last); return; }
       setRows(r.rows); setCount(r.count); setLoadErr('');
     }
-    catch (e) { if (my === seq.current) { addToast(friendlyError(e), 'error'); setLoadErr(friendlyError(e)); } }
+    // The error shows in the list tile with Try again (no toast on top of the header).
+    catch (e) { if (my === seq.current) setLoadErr(friendlyError(e)); }
     finally { if (my === seq.current) setLoading(false); }
-  }, [q, inactive, page, addToast]);
+  }, [q, inactive, page]);
   useEffect(() => { void load(); }, [load]);
 
   const close = () => { setForm(null); setErr(''); setSaving(false); };
@@ -55,9 +57,11 @@ export default function Vendors({ addToast, onBack }: { addToast: AddToast; onBa
     if (!form) return;
     const name = form.name.trim().replace(/\s+/g, ' ');
     if (!name) { setErr('Type the vendor name'); return; }
+    const tg = normalizeTgChannel(form.tg);
+    if ('error' in tg) { setErr(tg.error); return; }
     setSaving(true); setErr('');
     try {
-      await saveVendor(form.id, { name, code: form.code.trim() || null, notes: form.notes.trim() || null });
+      await saveVendor(form.id, { name, code: form.code.trim() || null, notes: form.notes.trim() || null, tg_username: tg.value });
       addToast(form.id ? 'Vendor saved' : `${name} added`, 'success');
       close(); void load();
     } catch (e) { const m = friendlyError(e); setErr(m); addToast(m, 'error'); setSaving(false); }
@@ -83,7 +87,7 @@ export default function Vendors({ addToast, onBack }: { addToast: AddToast; onBa
         <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: PB.tx3, display: 'inline-flex', pointerEvents: 'none' }}>
           <PbIcon name="search" size={16} />
         </span>
-        <input type="search" className="pb-input" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search name or code"
+        <input type="search" className="pb-input" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search name, code or channel"
           aria-label="Search vendors" enterKeyHint="search" autoCorrect="off" spellCheck={false}
           style={{ ...pbInput, paddingLeft: 40, paddingRight: search ? 48 : 14 }} />
         {search && (
@@ -103,13 +107,14 @@ export default function Vendors({ addToast, onBack }: { addToast: AddToast; onBa
     <ul aria-label="Vendors" aria-busy={loading || undefined}
       style={{ display: 'flex', flexDirection: 'column', gap: 8, margin: 0, padding: 0, opacity: loading ? 0.6 : 1, transition: 'opacity .3s ease' }}>
       {rows.map(v => (
-        <VendorRow key={v.id} v={v} busy={busy} compact={phone} onToggle={() => void toggle(v)}
-          onEdit={() => setForm({ id: v.id, name: v.name, code: v.code ?? '', notes: v.notes ?? '' })} />
+        <VendorRow key={v.id} v={v} busy={busy} compact={phone}
+          onEdit={() => setForm({ id: v.id, name: v.name, code: v.code ?? '', notes: v.notes ?? '', tg: v.tg_username ? `@${v.tg_username}` : '' })} />
       ))}
     </ul>
   );
 
-  const inTile = (n: ReactElement) => (phone ? n : <PbTile as="section" aria-label="Vendor list" style={{ padding: 12 }}>{n}</PbTile>);
+  // Tile padding stays 20 (as the toolbar tile above), so the rows' left edge lines up with the search field.
+  const inTile = (n: ReactElement) => (phone ? n : <PbTile as="section" aria-label="Vendor list">{n}</PbTile>);
   const body = firstLoad ? inTile(<VendorsSkeleton />)
     : loadErr && !rows.length ? <VendorsError message={loadErr} onRetry={() => void load()} busy={loading} />
       : rows.length === 0 ? (q ? <VendorsNoMatch search={q} onClear={() => setSearch('')} /> : <VendorsEmpty onAdd={add} />)
@@ -128,8 +133,8 @@ export default function Vendors({ addToast, onBack }: { addToast: AddToast; onBa
         {body}
       </div>
       {(count > VENDOR_PAGE || page > 0) && <Pager page={page} pageSize={VENDOR_PAGE} count={count} onPage={setPage} noun="vendor" />}
-      <VendorForm form={form} setForm={setForm} saving={saving} err={err} onSave={() => void save()} onClose={close}
-        toggle={phone && editing ? { active: editing.active, name: editing.name, busy: busy === editing.id, dim: !!busy && busy !== editing.id, onToggle: () => void toggle(editing) } : undefined} />
+      <VendorForm form={form} setForm={setForm} saving={saving} err={err} onSave={() => void save()} onClose={close} saved={editing}
+        toggle={editing ? { active: editing.active, name: editing.name, busy: busy === editing.id, dim: !!busy && busy !== editing.id, onToggle: () => void toggle(editing) } : undefined} />
     </>
   );
 }

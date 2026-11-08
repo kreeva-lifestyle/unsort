@@ -8,7 +8,7 @@ import { previewPrice } from '../../data/websites';
 import { PB, pbMeta, pbNum } from '../../pbTheme';
 import { rupees } from '../product/status';
 import { Field, NumInput, Section, Seg } from './ui';
-import { Quad } from './sections/SectionGrid';
+import { Cell, Quad, SectionGrid } from './sections/SectionGrid';
 import type { Draft, SetDraft } from './WebsiteEditor';
 
 export const ROUNDINGS: { id: PbRounding; label: string; hint: string }[] = [
@@ -25,8 +25,8 @@ export default function PricingSection({ draft, set }: { draft: Draft; set: SetD
   const out = sample != null ? previewPrice(sample, p) : null;
 
   return (
-    <>
-      <Section title="Price formula" hint="The vendor's price in a post is our COST. Selling price = cost × (1 + markup %) + add ₹, then rounded, never below the minimum.">
+    <SectionGrid>
+      <Cell><Section title="Price formula" hint="The vendor's price in a post is our COST. Selling price = cost × (1 + markup %) + add ₹, then rounded, never below the minimum.">
         <Quad>
           <Field label="Markup %" htmlFor="pbp-mk" hint="100 = double the cost">
             <NumInput id="pbp-mk" value={p.markup_pct} max={1000} onChange={v => put({ markup_pct: v ?? 0 })} />
@@ -45,9 +45,9 @@ export default function PricingSection({ draft, set }: { draft: Draft; set: SetD
           <Seg label="Rounding" value={p.rounding} onChange={v => put({ rounding: v })} options={ROUNDINGS} />
         </Field>
         <div style={pbMeta}>A routing rule can replace the markup and add ₹ for the products it sends here (Routing rules, price override).</div>
-      </Section>
+      </Section></Cell>
 
-      <Section title="Preview" hint="Try a cost to see what this store will charge (with the unsaved values above).">
+      <Cell><Section title="Preview" hint="Try a cost to see what this store will charge (with the unsaved values above).">
         <div style={{ display: 'flex', gap: 16, alignItems: 'stretch', flexWrap: 'wrap' }}>
           <div style={{ flex: '1 1 180px', maxWidth: 320, minWidth: 0 }}>
             <Field label="Sample cost ₹" htmlFor="pbp-sample">
@@ -72,7 +72,7 @@ export default function PricingSection({ draft, set }: { draft: Draft; set: SetD
             ) : <span style={{ ...pbMeta }}>Enter a cost to see the price.</span>}
           </div>
         </div>
-      </Section>
-    </>
+      </Section></Cell>
+    </SectionGrid>
   );
 }

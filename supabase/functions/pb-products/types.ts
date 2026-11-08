@@ -6,7 +6,7 @@
 export interface ProductRow {
   id: string; vendor_id: string | null; source: string; source_ref: string | null;
   raw_text: string | null; sku: string | null; name: string | null; category: string | null;
-  fabric: string | null; color: string | null; sizes: string[]; cost_price: number | null;
+  fabric: string | null; color: string | null; sizes: string[]; cost_price: number | null; less_amount: number | null;
   attributes: Record<string, string>; status: string; locked: string[];
   ai_read_at: string | null; ai_error: string | null; claimed_at: string | null;
   created_at: string; updated_at: string;
@@ -71,7 +71,7 @@ export type Caller = { kind: 'secret' } | { kind: 'staff'; id: string; role: str
 /** Per-call time limits: stop starting new items after `soft`; every outside call ends by `hard`. */
 export interface Budget { soft: number; hard: number }
 
-export const PRODUCT_COLS = 'id,vendor_id,source,source_ref,raw_text,sku,name,category,fabric,color,sizes,cost_price,attributes,status,locked,ai_read_at,ai_error,claimed_at,created_at,updated_at';
+export const PRODUCT_COLS = 'id,vendor_id,source,source_ref,raw_text,sku,name,category,fabric,color,sizes,cost_price,less_amount,attributes,status,locked,ai_read_at,ai_error,claimed_at,created_at,updated_at';
 export const LISTING_COLS = 'id,product_id,website_id,status,rule_id,price,compare_at_price,title,description_html,seo_title,seo_description,handle,tags,product_type,image_alts,locked,ai_model,ai_effort,ai_cost_usd,generated_at,shopify_product_id,shopify_status,published_at,attempts,claimed_at,error,created_at,updated_at';
 export const WEBSITE_COLS = 'id,name,shop_domain,auth_mode,api_version,active,publish_mode,routing_default,track_inventory,pricing,tag_rules,content,connected_at,shop_name,last_error';
 export const RULE_COLS = 'id,website_id,position,name,enabled,action,conditions,price_override';

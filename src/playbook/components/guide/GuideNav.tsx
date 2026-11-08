@@ -1,14 +1,16 @@
 // The guide's hero (title + the PDF, the page's one gradient tile) and its
 // contents: numbered glass rows on phone, a sticky side list on desktop.
 // Rows jump to the section; they hold no other action.
+import { useState } from 'react';
 import { PB, pbHero, pbLabel, pbMeta, pbName, pbNum, pbRow, pbTile } from '../../pbTheme';
+import PbButton from '../ui/PbButton';
 import PbIcon from '../ui/PbIcon';
 import type { GuideSection } from './types';
 
 type Meta = { title: string; brand: string; subtitle: string; updated: string; pdf: string };
 
 const heroBtn = {
-  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 48, padding: '0 16px', borderRadius: PB.r.btn,
+  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 'var(--pb-ctl-h)', padding: '0 16px', borderRadius: PB.r.btn,
   fontFamily: PB.sans, fontSize: 'var(--pb-btn-fs)', fontWeight: 600, textDecoration: 'none', whiteSpace: 'nowrap', boxSizing: 'border-box',
 } as const;
 
@@ -38,12 +40,15 @@ const num = (i: number) => String(i + 1).padStart(2, '0');
 /** "Step 1 — Add and connect…" → "Add and connect…" (the number is already on the row). */
 const sub = (s: GuideSection) => s.title.replace(/^Step \d+\s*[—-]\s*/, '');
 
-/** Phone: one glass row per section (min 60, number, name, meta, chevron). */
+const SHOWN = 6;
+/** Phone: one glass row per section (min 60, number, name, meta, chevron); the first 6, then "Show all N". */
 export function GuideRows({ sections, onJump }: { sections: GuideSection[]; onJump: (id: string) => void }) {
+  const [all, setAll] = useState(false);
+  const rows = all || sections.length <= SHOWN + 1 ? sections : sections.slice(0, SHOWN);
   return (
-    <nav aria-label="Guide contents">
+    <nav id="pbg-contents" aria-label="Guide contents" style={{ scrollMarginTop: 12 }}>
       <ol style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {sections.map((s, i) => (
+        {rows.map((s, i) => (
           <li key={s.id}>
             <button type="button" onClick={() => onJump(s.id)} className="pb-tile" style={{ ...pbRow, cursor: 'pointer', font: 'inherit' }}>
               <span aria-hidden="true" style={{ ...pbNum, width: 24, flexShrink: 0, fontSize: 13, fontWeight: 500, color: PB.brandA }}>{num(i)}</span>
@@ -56,6 +61,9 @@ export function GuideRows({ sections, onJump }: { sections: GuideSection[]; onJu
           </li>
         ))}
       </ol>
+      {rows.length < sections.length && (
+        <PbButton block icon="chevronDown" onClick={() => setAll(true)} style={{ marginTop: 8 }}>Show all {sections.length} sections</PbButton>
+      )}
     </nav>
   );
 }
@@ -63,7 +71,7 @@ export function GuideRows({ sections, onJump }: { sections: GuideSection[]; onJu
 /** Desktop: a sticky side list in one glass tile; the row you jumped to is not tracked (no scroll spy). */
 export function GuideSideNav({ sections, onJump }: { sections: GuideSection[]; onJump: (id: string) => void }) {
   return (
-    <nav aria-label="Guide contents" style={{ ...pbTile, padding: 12, position: 'sticky', top: 96, maxHeight: 'calc(100dvh - 120px)', overflowY: 'auto', overscrollBehavior: 'contain' }}>
+    <nav aria-label="Guide contents" style={{ ...pbTile, padding: 12, position: 'sticky', top: 'var(--pb-sticky-top)', maxHeight: 'calc(100dvh - 120px)', overflowY: 'auto', overscrollBehavior: 'contain' }}>
       <h2 style={{ ...pbLabel, margin: '4px 8px 8px' }}>Contents</h2>
       <ol style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
         {sections.map((s, i) => (

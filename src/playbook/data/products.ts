@@ -4,7 +4,7 @@
 // show them with friendlyError().
 import { supabase } from '../../lib/supabase';
 import { logSwallowed } from '../../lib/errorLogger';
-import { PB_BUCKET, type PbListingStatus, type PbProduct, type PbProductStatus, type PbWebsite } from '../types';
+import { PB_BUCKET, type PbListingStatus, type PbProduct, type PbProductImage, type PbProductStatus, type PbWebsite } from '../types';
 import { LISTING_COLS, logPbActivity as logActivity, type ListingFull } from './listings';
 export type { ListingFull } from './listings';
 
@@ -35,6 +35,7 @@ export async function listProducts(f: ProductFilter, page: number): Promise<{ ro
   if (s) q = q.or(`name.ilike.%${s}%,sku.ilike.%${s}%,raw_text.ilike.%${s}%`);
   const { data, error, count } = await q
     .order('created_at', { ascending: false })
+    .eq('pb_product_images.kind', 'image') // the list thumbnail is always a photo, never a Telegram video
     .order('position', { referencedTable: 'pb_product_images' })
     .limit(1, { referencedTable: 'pb_product_images' })
     .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
@@ -43,15 +44,15 @@ export async function listProducts(f: ProductFilter, page: number): Promise<{ ro
 }
 
 export type ProductDetail = Omit<PbProduct, 'claimed_at' | 'created_by'> & {
-  pb_vendors: { name: string } | null;
-  pb_product_images: { id: string; path: string; position: number }[];
+  pb_vendors: { name: string; tg_username: string | null; tg_title: string | null } | null;
+  pb_product_images: Pick<PbProductImage, 'id' | 'path' | 'position' | 'kind' | 'bytes'>[];
   pb_listings: ListingFull[];
 };
-const PRODUCT_COLS = 'id,vendor_id,source,source_ref,raw_text,sku,name,category,fabric,color,sizes,cost_price,attributes,status,locked,ai_read_at,ai_error,created_at,updated_at';
+const PRODUCT_COLS = 'id,vendor_id,source,source_ref,raw_text,sku,name,category,fabric,color,sizes,cost_price,attributes,status,locked,ai_read_at,ai_error,less_amount,source_url,intake_notes,created_at,updated_at';
 
 export async function getProduct(id: string): Promise<ProductDetail> {
   const { data, error } = await supabase.from('pb_products')
-    .select(`${PRODUCT_COLS},pb_vendors(name),pb_product_images(id,path,position),pb_listings(${LISTING_COLS})`)
+    .select(`${PRODUCT_COLS},pb_vendors(name,tg_username,tg_title),pb_product_images(id,path,position,kind,bytes),pb_listings(${LISTING_COLS})`)
     .eq('id', id).order('position', { referencedTable: 'pb_product_images' }).single();
   if (error) throw error;
   return data as unknown as ProductDetail;
@@ -68,6 +69,13 @@ export async function updateProduct(p: Pick<PbProduct, 'id' | 'locked' | 'status
   if (error) throw error;
   if (!data?.length) throw new Error('The AI is reading this product right now, or it changed meanwhile — wait a minute, reload it and save again.');
   if (changed.length) logActivity({ product_id: p.id, action: 'edited', details: { fields: changed } });
+}
+
+/** "Mark as checked" on the Notes from Telegram tile: the notes are cleared. */
+export async function clearIntakeNotes(id: string) {
+  const { error } = await supabase.from('pb_products').update({ intake_notes: [] }).eq('id', id);
+  if (error) throw error;
+  logActivity({ product_id: id, action: 'edited', details: { fields: ['intake_notes'] } });
 }
 
 export const setProductStatus = async (id: string, status: PbProductStatus) => {

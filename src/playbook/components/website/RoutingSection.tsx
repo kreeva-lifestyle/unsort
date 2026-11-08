@@ -12,7 +12,7 @@ import type { VendorLite } from '../../data/products';
 import { deleteRule, listRules, reorderRules, sendMatchingProducts, sentMessage, setRuleEnabled } from '../../data/websites';
 import { rupees } from '../product/status';
 import { PbButton } from '../ui';
-import RuleModal from './RuleModal';
+import RuleModal, { deleteRuleAsk } from './RuleModal';
 import { Section, Seg } from './ui';
 import { Cell, SectionGrid } from './sections/SectionGrid';
 import RuleRow, { RulesEmpty, RulesError, RulesSkeleton } from './sections/RuleRow';
@@ -66,8 +66,7 @@ export default function RoutingSection({ siteId, draft, set, addToast, vendors, 
   }, r.enabled ? 'Rule switched off' : 'Rule switched on');
 
   const remove = async (r: PbRoutingRule) => {
-    const price = r.price_override ? ' Their own price from this rule is dropped: the next time they are updated or regenerated they get the store\'s normal markup.' : '';
-    if (!(await ask({ title: 'Delete this rule?', message: `“${r.name || 'Unnamed rule'}” will stop sorting products. Products already listed stay listed.${price}`, confirmLabel: 'Delete', danger: true }))) return;
+    if (!(await ask(deleteRuleAsk(r)))) return;
     void act(`del-${r.id}`, async () => { await deleteRule(r); setRules(list => list.filter(x => x.id !== r.id)); }, 'Rule deleted');
   };
 
@@ -120,7 +119,8 @@ export default function RoutingSection({ siteId, draft, set, addToast, vendors, 
       {editing && (
         <RuleModal siteId={siteId} rule={editing === 'new' ? null : editing} nextPosition={nextPosition} vendors={vendors} categories={categories}
           addToast={addToast} onClose={() => setEditing(null)}
-          onSaved={r => { setRules(list => (list.some(x => x.id === r.id) ? list.map(x => (x.id === r.id ? r : x)) : [...list, r])); setEditing(null); }} />
+          onSaved={r => { setRules(list => (list.some(x => x.id === r.id) ? list.map(x => (x.id === r.id ? r : x)) : [...list, r])); setEditing(null); }}
+          onDeleted={r => { setRules(list => list.filter(x => x.id !== r.id)); setEditing(null); }} />
       )}
       <PbConfirm {...modalProps} />
     </>

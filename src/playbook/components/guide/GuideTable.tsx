@@ -2,8 +2,8 @@
 // 11px uppercase tx2, cells 13px, tileBd row lines); on phone there is no
 // table (layout §7) — each row becomes a small stacked block of
 // "Heading — value" pairs, so nothing scrolls sideways.
-import { PB, pbLabel } from '../../pbTheme';
-import { Rich, guideText } from './GuideRich';
+import { PB, pbLabel, pbNum } from '../../pbTheme';
+import { Rich, guideText, isFigure } from './GuideRich';
 
 const frame = { border: `1px solid ${PB.tileBd}`, borderRadius: PB.r.input, marginBottom: 16, overflow: 'hidden' } as const;
 
@@ -19,7 +19,7 @@ export default function GuideTable({ head, rows }: { head: string[]; rows: strin
             {rows.map((r, i) => (
               <tr key={i} className="pb-rowhover">
                 {r.map((c, j) => (
-                  <td key={j} style={{ padding: '12px 16px', fontSize: 13, lineHeight: 1.55, color: j === 0 ? PB.tx : PB.tx2, verticalAlign: 'top', borderTop: i ? `1px solid ${PB.tileBd}` : 'none', overflowWrap: 'break-word' }}>
+                  <td key={j} style={{ padding: '12px 16px', fontSize: 13, lineHeight: 1.55, color: j === 0 ? PB.tx : PB.tx2, verticalAlign: 'top', borderTop: i ? `1px solid ${PB.tileBd}` : 'none', overflowWrap: 'break-word', ...(isFigure(c) ? pbNum : null) }}>
                     <Rich text={c} />
                   </td>
                 ))}
@@ -32,7 +32,7 @@ export default function GuideTable({ head, rows }: { head: string[]; rows: strin
         {rows.map((r, i) => (
           <div key={i} role="listitem" style={{ padding: '12px 16px', borderTop: i ? `1px solid ${PB.tileBd}` : 'none', display: 'flex', flexDirection: 'column', gap: 4 }}>
             {r.map((c, j) => (
-              <div key={j} style={{ ...guideText, margin: 0, color: j === 0 ? PB.tx : PB.tx2, fontWeight: j === 0 ? 600 : 400 }}>
+              <div key={j} style={{ ...guideText, margin: 0, color: j === 0 ? PB.tx : PB.tx2, fontWeight: j === 0 ? 600 : 400, ...(isFigure(c) ? pbNum : null) }}>
                 {j > 0 && <span style={{ ...pbLabel, display: 'block', margin: '4px 0 0' }}>{head[j]}</span>}
                 <Rich text={c} />
               </div>

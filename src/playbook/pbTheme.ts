@@ -86,7 +86,8 @@ const v = {
   sheetFill: 'var(--pb-sheet-fill)', sheetBlur: 'var(--pb-sheet-blur)', scrimBlur: 'var(--pb-scrim-blur)',
 } as const;
 
-const activeShadow = `inset 0 1px 0 oklch(1 0 0 / .50), inset 0 -1px 0 oklch(1 0 0 / .06), 0 8px 24px ${PB.activeGlow}`;
+const activeInset = 'inset 0 1px 0 oklch(1 0 0 / .50), inset 0 -1px 0 oklch(1 0 0 / .06)';
+const activeShadow = `${activeInset}, 0 8px 24px ${PB.activeGlow}`;
 
 /** Glass tile without blur: phone tiles, rows, cards in a results grid. */
 export const pbTileFlat: CSSProperties = {
@@ -102,6 +103,8 @@ export const pbActive: CSSProperties = {
   background: PB.activeFill, border: `1px solid ${PB.activeBd}`, color: PB.onActive, fontWeight: 600,
   boxShadow: activeShadow, backdropFilter: v.activeBlur, WebkitBackdropFilter: v.activeBlur,
 };
+/** Selected segment inside a track: the glow would smear past the track border, so inset parts only. */
+export const pbActiveSeg: CSSProperties = { ...pbActive, boxShadow: activeInset };
 /** Selected item in a side list: pbActive plus the amber inset bar. */
 export const pbActiveSide: CSSProperties = { ...pbActive, boxShadow: `inset 3px 0 0 ${PB.activeBar}, ${activeShadow}` };
 /** One per page. Opaque stops (it nearly always holds text under 18px). No blur. */
@@ -112,7 +115,7 @@ export const pbHero: CSSProperties = {
 
 const btn: CSSProperties = {
   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxSizing: 'border-box',
-  minHeight: v.ctlH, padding: '0 16px', fontFamily: PB.sans, fontSize: v.btnFs, fontWeight: 600, lineHeight: 1.2,
+  minHeight: v.ctlH, padding: '0 16px', fontFamily: PB.sans, fontSize: v.btnFs, fontWeight: 600, lineHeight: 1.5,
   cursor: 'pointer', whiteSpace: 'nowrap', textDecoration: 'none', maxWidth: '100%',
 };
 /** The one gradient button per view. */
@@ -150,7 +153,8 @@ export const pbRow: CSSProperties = {
 // Type scale (layout-and-components.md §2).
 export const pbPageTitle: CSSProperties = { fontFamily: PB.sora, fontWeight: 700, fontSize: 'var(--pb-title)', letterSpacing: -0.3, lineHeight: 1.2, color: PB.tx, margin: 0, minWidth: 0, overflowWrap: 'anywhere' };
 export const pbTileTitle: CSSProperties = { fontFamily: PB.sora, fontWeight: 700, fontSize: 17, letterSpacing: -0.3, lineHeight: 1.3, color: PB.tx, margin: 0 };
-export const pbName: CSSProperties = { fontSize: 15, fontWeight: 600, lineHeight: 1.35, color: PB.tx };
+// Line-height 1.5 everywhere text may hold Hindi (DESIGN.md §3): names, buttons, chips, status labels.
+export const pbName: CSSProperties = { fontSize: 15, fontWeight: 600, lineHeight: 1.5, color: PB.tx };
 export const pbBody: CSSProperties = { fontSize: 13, lineHeight: 1.5, color: PB.tx };
 export const pbMeta: CSSProperties = { fontSize: 12, lineHeight: 1.5, color: PB.tx2 };
 export const pbNum: CSSProperties = { fontFamily: PB.mono, fontVariantNumeric: 'tabular-nums' };

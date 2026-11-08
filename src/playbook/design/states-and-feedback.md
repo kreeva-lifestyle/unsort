@@ -109,10 +109,11 @@ This rule comes from root CLAUDE.md, Buttons. Playbook keeps **one `busy` key pe
 
 | Channel | Use for | Do not use for | V2 look |
 |---|---|---|---|
-| Toast (`usePbToasts`) | The result of an action just taken: "Published to 3 websites" | Undo, load errors, form validation, lasting states, every small tap | The `pbSheet` recipe (`PB.sheet`, `blur(30px)`, DESIGN.md §7), radius 16, a status dot plus text, top of screen inside the safe area, at most 4 at once. Success 4 s, error 7 s. Tap to dismiss |
+| Toast (`usePbToasts`) | The result of an action just taken: "Published to 3 websites" | Undo, load errors, form validation, lasting states, every small tap | The `pbSheet` recipe (`PB.sheet`, `blur(30px)`, DESIGN.md §7), radius 16, a status dot plus text, at most 4 at once. Desktop: top right inside the safe area. Phone: above the tab bar (`bottom: calc(var(--pb-bar) + env(safe-area-inset-bottom) + 8px + var(--pb-kb))`, the `.pb-toasts` rule), so it never covers the header's back button or its one action and sits in thumb reach to dismiss (changed 2026-11-07 after the phone audit). The same message is never shown twice at once. Success 4 s, error 7 s. Tap to dismiss |
 | Inline | One field, row or tile: validation, a load failure, a lock reason | Anything page-wide | Tinted tile or field border plus a sentence. Stays until fixed |
 | Banner | A page-wide state that lasts: automation paused, offline, website disconnected | One-off results | A full-width review or failed tinted tile at the top of the content, with a dot, one sentence and one action ("Turn on"). It cannot be dismissed while the state lasts |
 
+- A load failure that already shows in its tile with Retry sends no toast as well (Dashboard, Products, Websites, Vendors, Settings): the toast would only cover the header.
 - **Undo** always uses `UndoBar` at `bottom: calc(var(--pb-bar) + env(safe-area-inset-bottom) + 8px)` (in the thumb zone), shown 6–8 s. Toasts never carry Undo.
 - When `PbToasts.tsx` is redesigned: replace its `T.*` colours and `rgba` shadow literal, and render error toasts with `role="alert"` (today one `role="status"` container holds all). Never move focus to a toast.
 

@@ -1,6 +1,8 @@
 // One routing rule as a glass row (no blur): position, a Send / Keep off tag,
 // the name, what it matches, its own price, an On/Off switch, and Move up /
-// Move down / Edit / Delete as real 44px buttons (never swipe-only). Plus the
+// Move down / Edit as real 44px buttons (never swipe-only). Delete sits here
+// on desktop only; on phone it is at the end of the Edit sheet (RuleModal), so
+// the list is not a column of red buttons beside Edit (mobile.md §3). Plus the
 // rules list's loading, first-run and load-error states.
 import type { CSSProperties } from 'react';
 import PbSwitch from '../../ui/PbSwitch';
@@ -36,7 +38,7 @@ export default function RuleRow({ rule: r, index: i, count, summary, price, busy
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
         <span className="pb-clamp2" style={{ ...pbName, color: r.enabled ? PB.tx : PB.tx2 }}>{name}</span>
-        <span style={{ ...pbMeta, overflowWrap: 'anywhere' }}>{summary}</span>
+        <span style={{ ...pbBody, color: PB.tx2, overflowWrap: 'anywhere' }}>{summary}</span>
         {price && <span style={{ ...pbMeta }}>Own price <span style={{ ...pbNum, color: PB.tx, whiteSpace: 'nowrap' }}>{price}</span></span>}
       </div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -47,7 +49,7 @@ export default function RuleRow({ rule: r, index: i, count, summary, price, busy
           <PbIcon name="chevronDown" size={18} />
         </PbButton>
         <PbButton icon="edit" onClick={onEdit} aria-label={`Edit rule ${name}`} style={hold(`edit-${r.id}`)}>Edit</PbButton>
-        <PbButton kind="danger" icon="trash" onClick={onDelete} aria-label={`Delete rule ${name}`} busy={busy === `del-${r.id}`} busyLabel="Deleting…" style={{ marginLeft: 'auto', ...hold(`del-${r.id}`) }}>Delete</PbButton>
+        <PbButton kind="danger" icon="trash" onClick={onDelete} aria-label={`Delete rule ${name}`} busy={busy === `del-${r.id}`} busyLabel="Deleting…" className="pb-desk-only" style={{ marginLeft: 'auto', ...hold(`del-${r.id}`) }}>Delete</PbButton>
       </div>
     </li>
   );

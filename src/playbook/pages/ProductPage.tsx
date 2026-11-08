@@ -18,6 +18,7 @@ import ProductActions, { PhoneActionsTile } from '../components/product/detail/P
 import { PhonePhotoHero, PhotosTile } from '../components/product/detail/ProductPhotos';
 import { AiReadTile, PhoneNameCard, ProductHero, WebsitesStat } from '../components/product/detail/ProductSummary';
 import ProductStates from '../components/product/detail/ProductStates';
+import { IntakeNotesTile, SourceLine } from '../components/product/detail/TelegramBits';
 import { PbPageHeader, focusPageTitle } from '../components/ui';
 import { pbMeta } from '../pbTheme';
 import { useIsPhone } from '../hooks/useIsPhone';
@@ -108,6 +109,7 @@ export default function ProductPage({ id, onClose, onChanged, addToast, vendors,
         <>
           <PhonePhotoHero images={p.pb_product_images} onAdd={addPhoto} busy={busy} onBack={onClose} />
           <PhoneNameCard p={p} vendors={vendors} />
+          <IntakeNotesTile p={p} addToast={addToast} onChanged={refresh} />
           {listings}
           {facts}
           <AiReadTile p={p} />
@@ -116,12 +118,16 @@ export default function ProductPage({ id, onClose, onChanged, addToast, vendors,
       ) : (
         <div>
           <PbPageHeader title={name} back={{ label: 'Products', onBack: onClose }}
-            sub={<span style={{ display: 'inline-flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}><Dot color={st.color} label={st.label} /><span style={pbMeta}>{st.hint}</span></span>}
+            sub={<span style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <span style={{ display: 'inline-flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}><Dot color={st.color} label={st.label} /><span style={pbMeta}>{st.hint}</span></span>
+              <SourceLine p={p} />
+            </span>}
             actions={<ProductActions {...actionProps} />} />
           <div className="pb-bento">
             <PhotosTile images={p.pb_product_images} onAdd={addPhoto} busy={busy} />
             <ProductHero p={p} vendors={vendors} />
             <WebsitesStat p={p} />
+            <IntakeNotesTile p={p} span={12} addToast={addToast} onChanged={refresh} />
             {/* Facts 8 + AI 4 on their own 12-column grid: its lines match the outer grid at 12 and 6 columns, so the row stays full. */}
             <div className="pb-span-12" style={{ display: 'grid', gridTemplateColumns: 'repeat(12, minmax(0, 1fr))', gap: 16 }}>
               <div style={{ gridColumn: 'span 8', display: 'grid', minWidth: 0 }}>{facts}</div>

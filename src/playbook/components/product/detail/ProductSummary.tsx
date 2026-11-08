@@ -6,6 +6,7 @@ import { PB, pbLabel, pbMeta, pbNum, pbPageTitle, pbTileTitle } from '../../../p
 import PbStatTile from '../../ui/PbStatTile';
 import PbTile from '../../ui/PbTile';
 import { Dot, LISTING_STATUS, PRODUCT_STATUS, rupees, shortDate } from '../status';
+import { SourceLine } from './TelegramBits';
 
 type P = { p: ProductDetail; vendors: VendorLite[] };
 const vendorName = ({ p, vendors }: P) => vendors.find(v => v.id === p.vendor_id)?.name ?? null;
@@ -28,9 +29,10 @@ export function ProductHero({ p, vendors }: P) {
       <span style={{ fontSize: 13, lineHeight: 1.5 }}>{st.hint}</span>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         <span style={{ fontSize: 12, fontWeight: 600 }}>Cost price</span>
-        <span style={{ ...pbNum, fontSize: cost(p) ? 'clamp(28px, 3vw, 40px)' : 17, fontWeight: 500, lineHeight: 1.1, overflowWrap: 'anywhere' }}>
-          {cost(p) ?? 'Not set — add it in Facts'}
-        </span>
+        {/* Mono is for figures: the "not set" sentence is body text. */}
+        {cost(p)
+          ? <span style={{ ...pbNum, fontSize: 'clamp(28px, 3vw, 40px)', fontWeight: 500, lineHeight: 1.1, overflowWrap: 'anywhere' }}>{cost(p)}</span>
+          : <span style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.5 }}>Not set — add it in Facts</span>}
       </div>
     </PbTile>
   );
@@ -59,6 +61,7 @@ export function PhoneNameCard({ p, vendors }: P) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <Dot color={st.color} label={st.label} /><span style={pbMeta}>{st.hint}</span>
       </div>
+      <SourceLine p={p} />
     </PbTile>
   );
 }

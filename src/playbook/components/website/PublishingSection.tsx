@@ -5,6 +5,7 @@ import PbSwitch from '../ui/PbSwitch';
 import { PB } from '../../pbTheme';
 import { PbTag } from '../ui';
 import { Section, Seg } from './ui';
+import { Cell, SectionGrid } from './sections/SectionGrid';
 import type { Draft, SetDraft } from './WebsiteEditor';
 
 const MODES = [
@@ -16,11 +17,11 @@ const MODES = [
 export default function PublishingSection({ draft, set }: { draft: Draft; set: SetDraft }) {
   const on = draft.track_inventory;
   return (
-    <>
-      <Section title="Publishing mode" hint="What happens after the AI has written a listing for this store.">
+    <SectionGrid>
+      <Cell><Section title="Publishing mode" hint="What happens after the AI has written a listing for this store.">
         <Seg label="Publishing mode" value={draft.publish_mode} onChange={v => set({ publish_mode: v })} options={MODES} />
-      </Section>
-      <Section title="Track stock" hint="On: Shopify counts stock and stops selling at 0 — new products start at 0, so set the quantities in Shopify (the app needs write_inventory). Off: always available to order."
+      </Section></Cell>
+      <Cell><Section title="Track stock" hint="On: Shopify counts stock and stops selling at 0 — new products start at 0, so set the quantities in Shopify (the app needs write_inventory). Off: always available to order."
         right={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 12 }}>
           <PbTag>{on ? 'On' : 'Off'}</PbTag>
           <PbSwitch on={on} onToggle={() => set({ track_inventory: !on })} label="Track stock in Shopify" />
@@ -28,7 +29,7 @@ export default function PublishingSection({ draft, set }: { draft: Draft; set: S
         <div style={{ fontSize: 13, lineHeight: 1.5, color: on ? PB.tx : PB.tx2 }}>
           {on ? 'Stock is tracked — new products cannot be bought until you set their quantities in Shopify.' : 'Not tracked — products stay orderable (made to order).'}
         </div>
-      </Section>
-    </>
+      </Section></Cell>
+    </SectionGrid>
   );
 }

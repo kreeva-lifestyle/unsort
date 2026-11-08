@@ -34,7 +34,7 @@ export default function WebsiteCard({ site, onOpen, span }: { site: PbWebsite; o
         <PbTag>{MODE_LABEL[site.publish_mode]}</PbTag>
       </span>
       {site.last_error && (
-        <span style={{ fontSize: 12, lineHeight: 1.5, color: PB.tx, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflowWrap: 'anywhere' }}>
+        <span style={{ fontSize: 13, lineHeight: 1.5, color: PB.tx, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflowWrap: 'anywhere' }}>
           {site.last_error}
         </span>
       )}

@@ -30,7 +30,7 @@ export const LISTING_STATUS: Record<PbListingStatus, { label: string; color: str
 /** Status = dot + label, never colour alone. The dot is aria-hidden; the label carries the meaning. */
 export function Dot({ color, label, style }: { color: string; label?: string; style?: CSSProperties }) {
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, lineHeight: 1.4, color: PB.tx2, whiteSpace: 'nowrap', ...style }}>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, lineHeight: 1.5, color: PB.tx2, whiteSpace: 'nowrap', ...style }}>
       <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: 4, background: color, flexShrink: 0 }} />
       {label}
     </span>

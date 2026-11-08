@@ -1,7 +1,9 @@
 // Playbook's own toasts (DailyWork's NotificationProvider lives in the hidden
-// DailyWork tree). V2: pbSheet glass, radius 16, status dot + text, top of the
-// screen inside the safe area, at most 4, tap to dismiss; success/info 4 s,
-// error 7 s. Errors sit in a role="alert" region, the rest in role="status".
+// DailyWork tree). V2: pbSheet glass, radius 16, status dot + text, at most 4,
+// tap to dismiss; success/info 4 s, error 7 s. Position is CSS (.pb-toasts):
+// top right on desktop, above the tab bar on phone so the header's back button
+// and action stay tappable. A message already on screen is not shown twice.
+// Errors sit in a role="alert" region, the rest in role="status".
 // Every error message must already be friendlyError()'d by the caller.
 import { useCallback, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -17,8 +19,10 @@ export function usePbToasts(): { addToast: AddToast; toasts: Toast[]; dismiss: (
   const dismiss = useCallback((id: number) => setToasts(t => t.filter(x => x.id !== id)), []);
   const addToast = useCallback<AddToast>((msg, type = 'info') => {
     const id = ++n.current;
-    setToasts(t => [...t.slice(-3), { id, msg, type }]);
-    setTimeout(() => dismiss(id), type === 'error' ? 7000 : 4000);
+    let shown = false;
+    setToasts(t => { if (t.some(x => x.msg === msg && x.type === type)) return t; shown = true; return [...t.slice(-3), { id, msg, type }]; });
+    // The updater runs before this timer does; a duplicate leaves nothing to dismiss.
+    setTimeout(() => { if (shown) dismiss(id); }, type === 'error' ? 7000 : 4000);
   }, [dismiss]);
   return { addToast, toasts, dismiss };
 }
@@ -42,7 +46,7 @@ function Item({ t, dismiss }: { t: Toast; dismiss: (id: number) => void }) {
 export function PbToasts({ toasts, dismiss }: { toasts: Toast[]; dismiss: (id: number) => void }) {
   const col = { display: 'flex', flexDirection: 'column' as const, alignItems: 'flex-end', gap: 8, width: '100%' };
   return createPortal(
-    <div style={{ position: 'fixed', top: 'max(12px, env(safe-area-inset-top))', right: 'max(12px, env(safe-area-inset-right))', left: 'max(12px, env(safe-area-inset-left))', zIndex: 300, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, pointerEvents: 'none' }}>
+    <div className="pb-toasts">
       <div role="alert" style={col}>{toasts.filter(t => t.type === 'error').map(t => <Item key={t.id} t={t} dismiss={dismiss} />)}</div>
       <div role="status" aria-live="polite" style={col}>{toasts.filter(t => t.type !== 'error').map(t => <Item key={t.id} t={t} dismiss={dismiss} />)}</div>
     </div>, document.body);

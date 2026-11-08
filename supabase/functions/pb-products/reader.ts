@@ -17,6 +17,7 @@ import { HttpError, plain } from './http.ts';
 import { aiPhotos } from './photos.ts';
 import { readerPrompt, readerSchema, type ReadOut } from './readerPrompt.ts';
 import { routeProduct } from './route.ts';
+import { stripLess } from '../pb-telegram/group.ts';
 import { MAX_ATTEMPTS, PRODUCT_COLS, STALE_MS, type Budget, type ProductRow } from './types.ts';
 
 /** Products the worker may read: new (not in a retry wait) or a stuck 'reading'. */
@@ -54,7 +55,9 @@ function merge(p: ProductRow, out: ReadOut, categories: string[], manual: boolea
   if (cat && can('category')) set.category = cat;
   const sizes = [...new Set((Array.isArray(out.sizes) ? out.sizes : []).map(s => String(s ?? '').trim().slice(0, 40)).filter(Boolean))].slice(0, 30);
   if (sizes.length && can('sizes')) set.sizes = sizes;
-  const cost = Number(out.cost_price);
+  // A Telegram "Less" comes off the RATE the AI read — in code, never by the AI: cost = rate − less.
+  // Less >= rate leaves the cost empty (needs_info) instead of ₹0.
+  const cost = Number(out.cost_price) - (Number(p.less_amount) > 0 ? Number(p.less_amount) : 0);
   if (out.cost_price !== null && Number.isFinite(cost) && cost > 0 && cost < 10_000_000 && can('cost_price')) set.cost_price = Math.round(cost * 100) / 100;
   if (!locked.has('attributes')) {
     const attrs: Record<string, string> = { ...(p.attributes || {}) };
@@ -77,7 +80,7 @@ export async function readOne(p: ProductRow, o: { manual: boolean; prevStatus?: 
     const s = await getSettings();
     const [vendor, imgs] = await Promise.all([
       p.vendor_id ? one<{ name: string }>(`pb_vendors?id=eq.${enc(p.vendor_id)}&select=name`) : Promise.resolve(null),
-      sel<{ path: string }>(`pb_product_images?product_id=eq.${enc(p.id)}&select=path&order=position.asc&limit=2`),
+      sel<{ path: string }>(`pb_product_images?product_id=eq.${enc(p.id)}&kind=eq.image&select=path&order=position.asc&limit=2`),
     ]);
     const photos = await aiPhotos(imgs.map(i => i.path));
     const ai = await askClaude<ReadOut>({
@@ -142,10 +145,14 @@ async function routeAfterRead(product: ProductRow, o: { manual: boolean; userId:
 }
 
 function factsText(p: ProductRow, vendor: string): string {
+  const less = Number(p.less_amount) > 0; // the reader must return the RATE: the stored cost is already rate − less
   const known = [
     p.name && `Name: ${p.name}`, p.sku && `SKU: ${p.sku}`, vendor && `Vendor: ${vendor}`,
     p.category && `Category: ${p.category}`, p.fabric && `Fabric: ${p.fabric}`, p.color && `Color: ${p.color}`,
-    p.sizes?.length && `Sizes: ${p.sizes.join(', ')}`, p.cost_price !== null && p.cost_price !== undefined && `Cost price: ${p.cost_price}`,
+    p.sizes?.length && `Sizes: ${p.sizes.join(', ')}`, !less && p.cost_price !== null && p.cost_price !== undefined && `Cost price: ${p.cost_price}`,
   ].filter(Boolean).join('\n');
-  return `${known ? `Already known:\n${known}\n\n` : ''}Vendor's post:\n${String(p.raw_text || '(no text — use the photos)').slice(0, 6000)}`;
+  // Every less phrase ("Less: 200", "200 Less", "RATE 1600 LESS 200" → "RATE 1600") is hidden, so it is never taken off twice.
+  const post = less ? stripLess(String(p.raw_text || '')) : p.raw_text;
+  const note = less ? '\n\nThe vendor also gives a separate discount ("less"); Playbook subtracts it itself, so cost_price must be the RATE written in the post, before any less.' : '';
+  return `${known ? `Already known:\n${known}\n\n` : ''}Vendor's post:\n${String(post || '(no text — use the photos)').slice(0, 6000)}${note}`;
 }

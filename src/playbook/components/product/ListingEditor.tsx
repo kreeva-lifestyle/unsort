@@ -76,7 +76,7 @@ export default function ListingEditor({ listing, site, onClose, onChanged, addTo
   const dirty = changed.length > 0 && !locked;
   const actions = { listing: l, dirty, busy, setBusy, save, onSave, onUpdated: (next: ListingFull) => { reset(next); onChanged(); }, addToast };
   return (
-    <PbModal open title={site?.name ?? 'Listing'} onClose={onClose} width={620} guard={changed.length > 0}
+    <PbModal open title={site?.name ?? 'Listing'} onClose={onClose} dirty={changed.length > 0} discardTitle="Discard changes to this listing?"
       footer={listingPrimary(l, dirty) ? <ListingActions part="primary" {...actions} /> : undefined}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 16px', alignItems: 'center', marginBottom: 16, fontSize: 12, color: PB.tx2 }}>
         <Dot color={st.color} label={st.label} />
@@ -84,7 +84,7 @@ export default function ListingEditor({ listing, site, onClose, onChanged, addTo
         {l.generated_at && <span>Written <span style={{ color: PB.tx3 }}>{shortDate(l.generated_at)}</span></span>}
         {l.published_at && <span>Published <span style={{ color: PB.tx3 }}>{shortDate(l.published_at)}</span></span>}
         {admin && (
-          <a href={admin} target="_blank" rel="noreferrer" className="pb-pill" style={{ ...pbBtnSecondary, marginLeft: 'auto' }}>
+          <a href={admin} target="_blank" rel="noreferrer" className="pb-pill pb-phone-full" style={{ ...pbBtnSecondary, marginLeft: 'auto' }}>
             Open on Shopify <PbIcon name="arrowUpRight" size={16} />
           </a>
         )}

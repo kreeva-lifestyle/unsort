@@ -2,7 +2,10 @@
 // reader never overwrites it. Filling the missing cost / category of a
 // "Needs info" product makes it Ready and sends it to the matching websites.
 // V2: a glass tile (the page places it with `className`); Save is the page's
-// gradient only when `primary` (no listing is waiting for approval).
+// gradient only when `primary` (no listing is waiting for approval) AND there
+// is something to save. On phone the edited tile's Discard / Save ride in a
+// sticky bar above the tab bar and the keyboard (mobile.md §5). Edited facts
+// register as dirty (useDirty), so Back and the nav ask before leaving.
 import { useState, type FormEvent } from 'react';
 import { friendlyError } from '../../../lib/friendlyError';
 import type { AddToast } from '../PbToasts';
@@ -10,8 +13,13 @@ import type { PbProduct } from '../../types';
 import { pbCall } from '../../data/pbFunctions';
 import { updateProduct, type ProductDetail, type VendorLite } from '../../data/products';
 import { pbErrorBox, pbInput, pbLabel, pbMeta, pbNum, pbTextarea, pbTile, pbTileTitle } from '../../pbTheme';
+import { useDirty } from '../../hooks/useDirty';
+import { useIsPhone } from '../../hooks/useIsPhone';
+import SaveBar from '../website/shell/SaveBar';
+import GrowArea from './detail/GrowArea';
 import PbButton from '../ui/PbButton';
 import { KeptTag } from './detail/ListingField';
+import { LessLine } from './detail/TelegramBits';
 import VendorSelect from './VendorSelect';
 import { numKey, splitList } from './status';
 
@@ -30,6 +38,7 @@ export default function ProductFacts({ product, vendors, categories, onVendorCre
   const [f, setF] = useState<Form>(() => toForm(product));
   const [err, setErr] = useState('');
   const [saving, setSaving] = useState(false);
+  const phone = useIsPhone();
   const orig = toForm(product);
   const changed = (Object.keys(f) as (keyof Form)[]).filter(k => f[k].trim() !== orig[k].trim());
   const set = (k: keyof Form) => (v: string) => setF(x => ({ ...x, [k]: v }));
@@ -37,6 +46,7 @@ export default function ProductFacts({ product, vendors, categories, onVendorCre
   // Needs info although cost and category are filled (e.g. the AI reader gave up): saving makes it Ready.
   const promote = product.status === 'needs_info' && product.cost_price != null && !!product.category;
   const off = saving || (!changed.length && !promote) || reading;
+  useDirty(changed.length > 0 && !saving, 'Discard changes to this product?');
 
   const save = async (e?: FormEvent) => {
     e?.preventDefault();
@@ -90,18 +100,24 @@ export default function ProductFacts({ product, vendors, categories, onVendorCre
   );
   const cats = f.category && !categories.includes(f.category) ? [f.category, ...categories] : categories;
 
+  const lessFirst = Number(product.less_amount) > 0;
+  const costInput = input('cost_price', 'Cost price (₹)', { type: 'number', inputMode: 'decimal', min: 0, step: '0.01', onKeyDown: numKey }, true);
   return (
     <form onSubmit={save} className={className} aria-labelledby="pb-facts-title"
       style={{ ...pbTile, display: 'flex', flexDirection: 'column', gap: 16 }}>
       <h2 id="pb-facts-title" style={pbTileTitle}>Facts</h2>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: 16 }}>
-        {input('name', 'Name', { maxLength: 200, autoCapitalize: 'sentences' })}
+        <div style={{ minWidth: 0 }}>
+          {label('name', 'Name')}
+          {/* Grows to a second line for a long name (mobile.md §8); Enter still saves. */}
+          <GrowArea id="pb-f-name" single value={f.name} onChange={set('name')} maxLength={200} autoCapitalize="sentences" className="pb-input" style={pbTextarea} />
+        </div>
         {input('sku', 'SKU', { maxLength: 80, autoCapitalize: 'characters', autoCorrect: 'off', spellCheck: false }, true)}
         <div style={{ minWidth: 0 }}>
           {label('vendor_id', 'Vendor', 'pb-f-vendor')}
           <VendorSelect id="pb-f-vendor" value={f.vendor_id} vendors={vendors} onChange={set('vendor_id')} onCreated={onVendorCreated} />
         </div>
-        {input('cost_price', 'Cost price (₹)', { type: 'number', inputMode: 'decimal', min: 0, step: '0.01', onKeyDown: numKey }, true)}
+        {!lessFirst && costInput}
         <div style={{ minWidth: 0 }}>
           {label('category', 'Category')}
           <select id="pb-f-category" value={f.category} onChange={e => set('category')(e.target.value)} className="pb-input" style={pbInput}>
@@ -112,21 +128,29 @@ export default function ProductFacts({ product, vendors, categories, onVendorCre
         {input('fabric', 'Fabric', { maxLength: 120 })}
         {input('color', 'Colour', { maxLength: 120 })}
         {input('sizes', 'Sizes (comma list)', { placeholder: 'e.g. S, M, L' })}
+        {/* With a Telegram "Less", the cost sits last so its Rate − Less = Cost line is right under it. */}
+        {lessFirst && <>{costInput}<div style={{ gridColumn: '1 / -1', minWidth: 0 }}><LessLine p={product} /></div></>}
       </div>
       <div style={{ minWidth: 0 }}>
         {label('raw_text', 'Details (vendor’s post)', 'pb-f-raw')}
-        <textarea id="pb-f-raw" value={f.raw_text} onChange={e => set('raw_text')(e.target.value)} rows={4} maxLength={8000} className="pb-input"
-          style={{ ...pbTextarea, height: 'auto', minHeight: 112 }} />
+        <GrowArea id="pb-f-raw" value={f.raw_text} onChange={set('raw_text')} rows={4} maxLength={8000} autoCapitalize="sentences" className="pb-input" style={pbTextarea} />
       </div>
       {err && <div role="alert" style={pbErrorBox}>{err}</div>}
       {reading && <div style={pbMeta}>The AI is reading this product — wait a moment, then reload to edit.</div>}
-      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-        {changed.length > 0 && <PbButton dim={saving} onClick={() => { setF(orig); setErr(''); }}>Discard changes</PbButton>}
-        <PbButton type="submit" kind={primary ? 'primary' : 'secondary'} disabled={off && !saving} busy={saving} busyLabel="Saving…"
-          style={{ minWidth: 140, ...(off && !saving ? { pointerEvents: 'none' } : null) }}>
-          {!changed.length && promote ? 'Mark ready' : 'Save facts'}
-        </PbButton>
-      </div>
+      {phone && changed.length > 0 ? (
+        <SaveBar dirty={!saving} saving={saving} err="" primary={primary} saveLabel="Save facts" style={{ marginTop: 0 }}
+          onDiscard={() => { setF(orig); setErr(''); }} onSave={() => void save()} />
+      ) : (
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'wrap' }}>
+          {!changed.length && !promote && !reading && !saving && <span style={pbMeta}>No changes to save</span>}
+          {changed.length > 0 && <PbButton dim={saving} onClick={() => { setF(orig); setErr(''); }}>Discard changes</PbButton>}
+          {/* Gradient only when there is something to save: a greyed-out gradient reads as broken. */}
+          <PbButton type="submit" kind={primary && (changed.length > 0 || promote) ? 'primary' : 'secondary'} disabled={off && !saving} busy={saving} busyLabel="Saving…"
+            style={{ minWidth: 140, ...(off && !saving ? { pointerEvents: 'none' } : null) }}>
+            {!changed.length && promote ? 'Mark ready' : 'Save facts'}
+          </PbButton>
+        </div>
+      )}
     </form>
   );
 }

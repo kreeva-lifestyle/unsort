@@ -3,7 +3,8 @@
 // V2 (mobile.md §6): PbModal sheet on phone / centred modal on desktop; the
 // footer (PbModal `footer`, outside the scrolling body) holds the one gradient
 // button (full width on phone; Cancel beside it on desktop, the × on phone).
-// A filled form is guarded: a scrim tap or swipe-down does not wipe it.
+// A filled form is dirty: a scrim tap or swipe-down does not wipe it, and ×,
+// Back or Escape ask "Discard this product?" first (PbModal).
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { friendlyError } from '../../../lib/friendlyError';
 import type { AddToast } from '../PbToasts';
@@ -64,7 +65,7 @@ export default function AddProductModal({ open, onClose, onSaved, vendors, onVen
 
   const col = { display: 'flex', flexDirection: 'column' as const, minWidth: 0 };
   return (
-    <PbModal open={open} title="Add product" onClose={close} guard={files.length > 0 || Object.values(f).some(Boolean)}
+    <PbModal open={open} title="Add product" onClose={close} dirty={files.length > 0 || Object.values(f).some(Boolean)} discardTitle="Discard this product?"
       footer={
         <div style={{ display: 'flex', gap: 16, justifyContent: 'flex-end' }}>
           {!phone && <PbButton onClick={close} dim={saving}>Cancel</PbButton>}

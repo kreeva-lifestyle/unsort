@@ -135,7 +135,7 @@ vv.addEventListener('resize', sync); vv.addEventListener('scroll', sync); // rem
   - 3 columns of 4:5 cells at 390px, with an 8px gap.
   - The first photo is the cover and has a badge.
   - Each photo has a 44px remove button and 44px move-left/right buttons. Drag to reorder is only an extra.
-  - Tapping a photo opens it in-app, never in a new tab.
+  - Tapping a photo opens it in-app, never in a new tab (`PhotoViewer`, built on `PbModal`: Previous / Next buttons, 44px close, device Back).
   - Revoke object URLs on remove and on close (this is already done).
 - **Showing photos:** lists ask for sized images (Shopify CDN `&width=128`, `srcset` `&width=256 2x`), never originals. Every image gets `width`/`height`, `loading="lazy"`, `decoding="async"`, `object-fit: cover` and a `PB.tile` background while loading.
 

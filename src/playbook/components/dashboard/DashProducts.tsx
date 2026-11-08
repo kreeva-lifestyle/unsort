@@ -26,7 +26,7 @@ export default function DashProducts({ d, go }: { d: DashData; go: DashGo }) {
         {PRODUCT_STATUSES.map(s => (
           <button key={s} type="button" className="pb-pill" onClick={() => go('products', { status: s })}
             aria-label={`${PRODUCT_STATUS[s].label}: ${count(d.products[s])}. Open the list`}
-            style={{ ...pbBtnSecondary, minHeight: 44, gap: 12, flex: '1 1 140px', justifyContent: 'space-between' }}>
+            style={{ ...pbBtnSecondary, minHeight: 44, gap: 12, flex: '1 1 120px', justifyContent: 'space-between' }}>
             <Dot color={PRODUCT_STATUS[s].color} label={PRODUCT_STATUS[s].label} style={{ fontSize: 13, color: PB.tx }} />
             <span style={{ ...pbNum, fontSize: 15, fontWeight: 500, color: PB.tx }}>{count(d.products[s])}</span>
           </button>

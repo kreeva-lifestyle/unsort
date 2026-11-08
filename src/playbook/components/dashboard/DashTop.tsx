@@ -6,7 +6,7 @@ import { PB, pbNum } from '../../pbTheme';
 import { PbStatTile, PbTile } from '../ui';
 import { count, groupTotal, type DashData, type DashGo } from './dashShared';
 
-const heroLabel = { fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', lineHeight: 1.5 } as const;
+const heroLabel = { fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', lineHeight: 1.5 } as const; // section label (DESIGN.md §3)
 
 function Hero({ d }: { d: DashData }) {
   const attention = d.products.needs_info + d.failed + d.review;
@@ -20,7 +20,8 @@ function Hero({ d }: { d: DashData }) {
   ].filter(Boolean).join(' · ');
   return (
     <PbTile variant="hero" as="section" span={6} rows={2} aria-labelledby="pb-dash-hero"
-      style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 16, minHeight: 200 }}>
+      // Quiet / first-run copy sits together at the top (no void above the footer line on phone).
+      style={{ display: 'flex', flexDirection: 'column', justifyContent: attention > 0 ? 'space-between' : 'flex-start', gap: 16, ...(attention > 0 ? { minHeight: 200 } : null) }}>
       {attention > 0 ? (
         // Label at the top, the big number anchored bottom-left above its breakdown (mock-up V2Dashboard).
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0, flex: 1 }}>

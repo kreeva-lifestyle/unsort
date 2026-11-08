@@ -10,7 +10,7 @@ import { PbButton, PbIcon, PbSkeleton, PbTile } from '../../ui';
 export function WebsitesSkeleton() {
   return (
     <div className="pb-bento pb-bento--auto" aria-busy="true">
-      <PbSkeleton shape="tile" count={3} span={4} height={152} srLabel="Loading websites" />
+      <PbSkeleton shape="tile" count={3} span={4} height={200} srLabel="Loading websites" />
     </div>
   );
 }

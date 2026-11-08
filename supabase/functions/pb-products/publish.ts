@@ -53,7 +53,7 @@ export async function publishOne(l: ListingRow, o: { manual: boolean; putBack?: 
     const [p, site, imgs, last, tried] = await Promise.all([
       one<ProductRow>(`pb_products?id=eq.${enc(l.product_id)}&select=${PRODUCT_COLS}`),
       one<WebsiteRow>(`pb_websites?id=eq.${enc(l.website_id)}&select=${WEBSITE_COLS}`),
-      sel<{ path: string }>(`pb_product_images?product_id=eq.${enc(l.product_id)}&select=path&order=position.asc&limit=20`),
+      sel<{ path: string }>(`pb_product_images?product_id=eq.${enc(l.product_id)}&kind=eq.image&select=path&order=position.asc&limit=20`),
       one<{ details: { photos?: string[] } }>(`pb_activity?product_id=eq.${enc(l.product_id)}&listing_id=eq.${enc(l.id)}&action=eq.published&select=details&order=created_at.desc`),
       sel<{ details: { handles?: string[] } }>(`pb_activity?product_id=eq.${enc(l.product_id)}&listing_id=eq.${enc(l.id)}&action=eq.failed&select=details&order=created_at.desc&limit=5`),
     ]);
