@@ -43,7 +43,7 @@ export default function AddWebsiteModal({ open, onClose, onCreated, addToast }: 
   };
 
   return (
-    <PbModal open={open} title="Add website" onClose={close} guard={!!(name.trim() || domain.trim())}
+    <PbModal open={open} title="Add website" onClose={close} dirty={!!(name.trim() || domain.trim())} discardTitle="Discard this website?"
       footer={
         <div style={{ display: 'flex', gap: 16, justifyContent: 'flex-end' }}>
           {!phone && <PbButton onClick={close} dim={saving}>Cancel</PbButton>}

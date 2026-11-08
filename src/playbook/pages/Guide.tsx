@@ -4,7 +4,7 @@
 // prints the HTML + PDF from it, so re-run that script after editing.
 // V2 layout: desktop = hero (12) / sticky contents side list (3) + sections
 // (9); phone = hero, numbered section rows, then the sections.
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import type { AddToast } from '../components/PbToasts';
 import { GUIDE_META, GUIDE_SECTIONS } from '../components/guide/content';
 import { GuideSectionView } from '../components/guide/GuideBlocks';
@@ -13,8 +13,22 @@ import { PbButton, PbPageHeader } from '../components/ui';
 import { useIsPhone } from '../hooks/useIsPhone';
 import { PB, pbMeta, pbSheet } from '../pbTheme';
 
+/** True once the phone contents list has scrolled out of view (then the sticky "Contents" bar shows). */
+function useContentsGone(on: boolean) {
+  const [gone, setGone] = useState(false);
+  useEffect(() => {
+    const el = on ? document.getElementById('pbg-contents') : null;
+    if (!el) { setGone(false); return; }
+    const io = new IntersectionObserver(([e]) => setGone(!e.isIntersecting && e.boundingClientRect.bottom < 0), { threshold: 0 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [on]);
+  return gone;
+}
+
 export default function Guide({ onBack, at }: { addToast: AddToast; onBack?: () => void; at?: string | null }) {
   const phone = useIsPhone();
+  const contentsGone = useContentsGone(phone);
   // Jump to a section and move focus there (smooth only without reduced motion).
   const jump = (id: string) => {
     const el = document.getElementById(`pbg-${id}`);
@@ -49,17 +63,20 @@ export default function Guide({ onBack, at }: { addToast: AddToast; onBack?: () 
           <>
             <GuideRows sections={GUIDE_SECTIONS} onJump={jump} />
             {sections}
-            {/* 14 sections inline make a very long page: a sticky way back to the contents, above the tab bar (mobile.md §5 offset). */}
-            <div style={{ position: 'sticky', bottom: 'calc(var(--pb-bar) + env(safe-area-inset-bottom) + 8px)', display: 'flex', justifyContent: 'flex-end', pointerEvents: 'none', marginTop: -8 }}>
-              <PbButton icon="book" onClick={() => jump('contents')} style={{ ...pbSheet, pointerEvents: 'auto', borderRadius: PB.r.pill }}>Contents</PbButton>
-            </div>
+            {/* 14 sections inline make a very long page: once the contents list is off screen, a sticky bar (mobile.md §5, never a floating pill) leads back to it. */}
+            {contentsGone && (
+              <div style={{ ...pbSheet, background: PB.sheetSolid, position: 'sticky', zIndex: 5, bottom: 'calc(var(--pb-bar) + env(safe-area-inset-bottom) + 8px)', padding: 8, borderRadius: PB.r.tilePhone, marginTop: -4 }}>
+                <PbButton icon="book" block onClick={() => jump('contents')}>Contents</PbButton>
+              </div>
+            )}
           </>
         ) : (
           <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', minWidth: 0 }}>
             <div style={{ flex: '0 0 280px', alignSelf: 'stretch' }}>
               <GuideSideNav sections={GUIDE_SECTIONS} onJump={jump} />
             </div>
-            <div style={{ flex: '1 1 0', minWidth: 0 }}>{sections}</div>
+            {/* Capped so a 13px line stays near 90 characters (copy-and-a11y.md). */}
+            <div style={{ flex: '1 1 0', minWidth: 0, maxWidth: 600 }}>{sections}</div>
           </div>
         )}
       </div>

@@ -95,7 +95,7 @@ export default function PbSettings({ addToast, onBack, onGuide }: { addToast: Ad
             <ChipsInput id="pbs-cats" values={cats} onChange={setCats} placeholder="e.g. Saree — or paste several, comma separated" maxLen={60} />
           </Field>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            <PbButton icon="refresh" onClick={() => setCats(saved.categories)} disabled={!catsDirty} dim={!!busy}>Discard changes</PbButton>
+            {catsDirty && <PbButton icon="refresh" onClick={() => setCats(saved.categories)} dim={!!busy}>Discard changes</PbButton>}
             <PbButton onClick={() => void save('categories', cats, 'Categories saved')} disabled={!catsDirty}
               busy={busy === 'categories'} busyLabel="Saving…" dim={!!busy && busy !== 'categories'}>Save categories</PbButton>
             {!catsDirty && unchanged}

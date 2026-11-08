@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { friendlyError } from '../../lib/friendlyError';
 import { useBackClose } from '../../hooks/useBackClose';
+import { useConfirm } from '../../components/ui/ConfirmModal';
 import type { AddToast } from '../components/PbToasts';
 import {
   EMPTY_FILTER, PAGE_SIZE, getPbSettingsLite, listProducts, listVendorsLite, listWebsitesLite,
@@ -16,9 +17,11 @@ import ProductFilters from '../components/product/ProductFilters';
 import Pager from '../components/product/Pager';
 import AddProductModal from '../components/product/AddProductModal';
 import ProductResults from '../components/product/list/ProductResults';
-import { PbButton, PbPageHeader } from '../components/ui';
+import { PbButton, PbConfirm, PbPageHeader } from '../components/ui';
+import { discardAsk } from '../components/ui/discard';
 import ProductPage from './ProductPage';
 import { useReturnFocus } from '../hooks/useReturnFocus';
+import { dirtyTitle } from '../hooks/useDirty';
 
 /** How the page opens (a dashboard tile passes a filter, "+ Add product" opens the form). */
 export type ProductsStart = { status?: string; websiteId?: string; add?: boolean };
@@ -37,8 +40,17 @@ export default function Products({ addToast, start = {} }: { addToast: AddToast;
   const [adding, setAdding] = useState(!!start.add);
   const [openId, setOpenId] = useState<string | null>(null);
   const seq = useRef(0);
+  const [lookupErr, setLookupErr] = useState<unknown>(null);
+  const { ask, modalProps } = useConfirm();
 
-  useBackClose(!!openId, () => setOpenId(null));
+  // Leaving the product page (its Back button or the device Back) with edited,
+  // unsaved Facts asks "Discard changes?" first; the nav asks in PlaybookApp.
+  const leave = (force?: boolean): void | boolean => {
+    const what = dirtyTitle();
+    if (what && !force) { void ask(discardAsk(what)).then(ok => { if (ok) setOpenId(null); }); return false; }
+    setOpenId(null);
+  };
+  useBackClose(!!openId, leave);
   useReturnFocus(openId);
 
   const setFilter = (p: Partial<ProductFilter>) => { setFilterState(f => ({ ...f, ...p })); setPage(0); };
@@ -68,8 +80,15 @@ export default function Products({ addToast, start = {} }: { addToast: AddToast;
   useEffect(() => {
     Promise.all([listVendorsLite(), listWebsitesLite(), getPbSettingsLite()])
       .then(([v, w, s]) => { setVendors(v); setSites(w); setCategories(s.categories); })
-      .catch(e => addToast(friendlyError(e), 'error'));
-  }, [addToast]);
+      .catch((e: unknown) => setLookupErr(e ?? new Error('Lookup failed')));
+  }, []);
+  // A failed lookup toasts only once the list has answered, and only if the list
+  // itself loaded: when it failed too, its tile already says so with Try again.
+  useEffect(() => {
+    if (lookupErr == null || loading) return;
+    if (!loadErr) addToast(friendlyError(lookupErr), 'error');
+    setLookupErr(null);
+  }, [lookupErr, loading, loadErr, addToast]);
 
   const onVendorCreated = (v: VendorLite) => setVendors(list => (list.some(x => x.id === v.id) ? list : [...list, v].sort((a, b) => a.name.localeCompare(b.name))));
   const filtered = !!(filter.search || filter.status || filter.vendorId || filter.websiteId);
@@ -78,7 +97,7 @@ export default function Products({ addToast, start = {} }: { addToast: AddToast;
   return (
     <>
       {openId && (
-        <ProductPage id={openId} onClose={() => setOpenId(null)} onChanged={load} addToast={addToast}
+        <ProductPage id={openId} onClose={() => leave()} onChanged={load} addToast={addToast}
           vendors={vendors} onVendorCreated={onVendorCreated} sites={sites} categories={categories} />
       )}
       <div style={{ display: openId ? 'none' : 'block' }}>
@@ -95,6 +114,7 @@ export default function Products({ addToast, start = {} }: { addToast: AddToast;
       <AddProductModal open={adding} onClose={() => setAdding(false)} vendors={vendors} onVendorCreated={onVendorCreated}
         categories={categories} addToast={addToast}
         onSaved={id => { setAdding(false); void load(); setOpenId(id); }} />
+      <PbConfirm {...modalProps} />
     </>
   );
 }

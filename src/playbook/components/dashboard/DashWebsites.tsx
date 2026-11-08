@@ -18,6 +18,8 @@ const GROUP_TINT: Record<string, { bg: string; bd: string }> = {
 
 function SiteTile({ w, n, span, go }: { w: WebsiteLite; n: Record<string, number> | undefined; span: 12 | 6 | 4; go: DashGo }) {
   const headId = `pb-dash-site-${w.id}`;
+  // Off and never sent anything: four zero rows say nothing, one line does.
+  const idle = !w.active && LISTING_GROUPS.every(g => !(n?.[g.id] ?? 0));
   return (
     <PbTile flat as="article" span={span} aria-labelledby={headId} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, minWidth: 0 }}>
@@ -27,7 +29,7 @@ function SiteTile({ w, n, span, go }: { w: WebsiteLite; n: Record<string, number
         </div>
         <PbTag style={{ flexShrink: 0 }}>{w.active ? `On · ${w.publish_mode}` : 'Off'}</PbTag>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      {idle ? <div style={{ ...pbMeta, fontSize: 13 }}>Off · nothing sent yet</div> : <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         {LISTING_GROUPS.map(g => {
           const v = n?.[g.id] ?? 0;
           const tint = v > 0 ? GROUP_TINT[g.id] : undefined;
@@ -44,7 +46,7 @@ function SiteTile({ w, n, span, go }: { w: WebsiteLite; n: Record<string, number
             </button>
           );
         })}
-      </div>
+      </div>}
     </PbTile>
   );
 }

@@ -6,12 +6,15 @@
 // owned by the pages (PbPageHeader). Also the page switch and the toasts.
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useAuth } from '../hooks/useAuth';
+import { useConfirm } from '../components/ui/ConfirmModal';
 import { setDivision } from '../lib/division';
 import { closeAllLayers, closeTopLayer, useBackClose } from '../hooks/useBackClose';
 import { DailyWorkMark, PlaybookMark } from '../components/brand/DivisionLogos';
 import PbNav, { PbTabBar, PB_PAGES, pageLabel, type PbPage } from './components/PbNav';
 import { PbToasts, usePbToasts } from './components/PbToasts';
-import { PbButton } from './components/ui';
+import { PbButton, PbConfirm } from './components/ui';
+import { discardAsk } from './components/ui/discard';
+import { dirtyTitle } from './hooks/useDirty';
 import { PB, pbRootVars, pbTile } from './pbTheme';
 import { useIsPhone } from './hooks/useIsPhone';
 import { useKeyboardInset } from './hooks/useKeyboardInset';
@@ -42,6 +45,7 @@ export default function PlaybookApp() {
   const scroller = useRef<HTMLDivElement>(null);
   const isPhone = useIsPhone();
   useKeyboardInset();
+  const { ask, modalProps } = useConfirm();
   // 'more' is a phone-only page: on desktop it never stays selected (the top bar lists every page).
   const shown: PbPage = page === 'more' && !isPhone ? 'dashboard' : page;
 
@@ -58,7 +62,10 @@ export default function PlaybookApp() {
   }, []);
 
   const pageRef = useRef(page);
-  const go = useCallback((p: PbPage, s?: ProductsStart) => {
+  const go = useCallback(async (p: PbPage, s?: ProductsStart) => {
+    // Unsaved typing on the open page (edited product Facts): ask before leaving.
+    const what = dirtyTitle();
+    if (what && !(await ask(discardAsk(what)))) return;
     closeAllLayers(); // a modal or product page must not outlive its page
     // A plain nav tap opens Products clean: an old tile filter or "+ Add product" must not come back.
     if (s || p !== pageRef.current) setStart(prev => ({ key: prev.key + 1, value: s ?? {} }));
@@ -67,7 +74,7 @@ export default function PlaybookApp() {
     setPage(p);
     try { localStorage.setItem(PAGE_KEY, p); } catch { /* storage blocked: page just isn't remembered */ }
     scroller.current?.scrollTo({ top: 0 });
-  }, []);
+  }, [ask]);
 
   // Phone: Vendors, Settings and Guide sit under More. Their header shows
   // "Back to More", and the device Back returns there instead of leaving Playbook.
@@ -109,11 +116,11 @@ export default function PlaybookApp() {
           </span>
           <PbNav page={shown} onGo={p => go(p)} />
           <span style={{ flex: 1 }} />
-          <PbButton onClick={toDailyWork} aria-label="Switch to DailyWork" style={{ borderRadius: PB.r.pill, flexShrink: 0 }}>
+          <PbButton onClick={toDailyWork} aria-label="Switch to DailyWork" title="Switch to DailyWork" style={{ borderRadius: PB.r.pill, flexShrink: 0 }}>
             <DailyWorkMark size={20} decorative /><span className="pb-wordmark">DailyWork</span>
           </PbButton>
-          {/* Below 1100px the two account buttons go icon-only so the six nav pills fit. */}
-          <PbButton onClick={out} icon="logout" aria-label={signingOut ? 'Signing out…' : 'Log out'} aria-busy={signingOut || undefined}
+          {/* Below 1100px the two account buttons go icon-only so the six nav pills fit (title = the mouse hint). */}
+          <PbButton onClick={out} icon="logout" aria-label={signingOut ? 'Signing out…' : 'Log out'} title={signingOut ? 'Signing out…' : 'Log out'} aria-busy={signingOut || undefined}
             style={{ borderRadius: PB.r.pill, flexShrink: 0, ...(signingOut ? { pointerEvents: 'none', opacity: 0.5 } : null) }}>
             <span className="pb-wordmark">{signingOut ? 'Signing out…' : 'Log out'}</span>
           </PbButton>
@@ -130,6 +137,7 @@ export default function PlaybookApp() {
       </div>
       <PbTabBar page={shown} onGo={p => go(p)} />
       <PbToasts toasts={toasts} dismiss={dismiss} />
+      <PbConfirm {...modalProps} />
     </div>
   );
 }

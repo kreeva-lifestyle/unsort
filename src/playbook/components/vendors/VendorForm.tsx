@@ -1,7 +1,9 @@
 // Add / edit a vendor: a short sheet (4 fields) through PbModal. Desktop
 // footer: Cancel then Save; phone: one full-width Save (Cancel is the ×,
-// swipe down or Back), in the PbModal footer. A filled form is guarded
-// against scrim tap / swipe-down. Enter submits. The page owns the save and the state.
+// swipe down or Back), in the PbModal footer. Typing makes the form dirty:
+// scrim tap / swipe-down are off and ×, Back or Escape ask "Discard …?" first
+// (PbModal). Enter submits. The page owns the save and the state.
+import { useRef } from 'react';
 import { PB, pbErrorBox, pbInput, pbNum, pbTextarea } from '../../pbTheme';
 import { useIsPhone } from '../../hooks/useIsPhone';
 import PbModal from '../product/PbModal';
@@ -12,7 +14,7 @@ import TgHint, { type SavedTg } from './VendorTgHint';
 /** tg = the Telegram channel as typed (@name, name or a t.me link). */
 export type VendorFormState = { id: string | null; name: string; code: string; notes: string; tg: string };
 
-/** Phone only: the row's Deactivate / Activate, shown in the sheet body. */
+/** Editing an existing vendor: Deactivate / Activate at the end of the sheet body (away from Save, off the list rows). */
 export type VendorToggle = { active: boolean; name: string; busy: boolean; dim: boolean; onToggle: () => void };
 
 export default function VendorForm({ form, setForm, saving, err, onSave, onClose, toggle, saved }: {
@@ -20,9 +22,13 @@ export default function VendorForm({ form, setForm, saving, err, onSave, onClose
   toggle?: VendorToggle; saved?: SavedTg;
 }) {
   const phone = useIsPhone();
+  // The form as it opened (the vendor as stored, or blank): dirty = it differs now.
+  const initial = useRef<string | null>(null);
+  if (!form) initial.current = null;
+  else if (initial.current == null) initial.current = JSON.stringify(form);
   return (
     <PbModal open={!!form} title={form?.id ? 'Edit vendor' : 'Add vendor'} onClose={onClose}
-      guard={!!form && !!(form.name.trim() || form.code.trim() || form.notes.trim() || form.tg.trim())}
+      dirty={!!form && JSON.stringify(form) !== initial.current} discardTitle={form?.id ? 'Discard changes to this vendor?' : 'Discard this vendor?'}
       footer={
         <div style={{ display: 'flex', gap: 16, justifyContent: 'flex-end' }}>
           {!phone && <PbButton onClick={onClose} dim={saving}>Cancel</PbButton>}

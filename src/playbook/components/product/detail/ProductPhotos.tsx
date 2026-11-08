@@ -66,7 +66,7 @@ export function PhotosTile({ images, onAdd, busy }: AddProps & { images: Img[] }
       ) : (
         <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', minWidth: 0 }}>
           {photoLink(cover, 0, { height: 'clamp(280px, 30vw, 400px)', aspectRatio: '4 / 5', flex: 'none' }, viewer.open)}
-          <div style={{ flex: 1, minWidth: 0, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(72px, 1fr))', gap: 8, alignContent: 'start' }}>
+          <div style={{ flex: 1, minWidth: 0, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(112px, 1fr))', gap: 8, alignContent: 'start' }}>
             {rest.map((img, i) => photoLink(img, i + 1, { width: '100%', aspectRatio: '4 / 5' }, viewer.open))}
             <AddCell onAdd={onAdd} busy={busy} style={{ width: '100%', aspectRatio: '4 / 5', minHeight: 90, padding: 4, textAlign: 'center' }} />
           </div>

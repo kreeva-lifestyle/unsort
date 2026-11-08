@@ -4,10 +4,10 @@
 // multi-select of chips. V2 look (pbInput / pbLabel / pbActive); every control
 // is 48px on touch (40 on a fine pointer, 44px chip hit boxes).
 import { useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
-import { PB, pbActive, pbBody, pbBtnSecondary, pbInput, pbLabel, pbMeta, pbNum, pbTileFlat, pbTileTitle } from '../../pbTheme';
+import { PB, pbActive, pbActiveSeg, pbBody, pbBtnSecondary, pbInput, pbLabel, pbMeta, pbNum, pbTileFlat, pbTileTitle } from '../../pbTheme';
 
-/** Help copy is body text (13px, tx2), not 12px meta (DESIGN.md §3). */
-const hintText = { ...pbBody, color: PB.tx2 } as const;
+/** Help copy is body text (13px, tx2), not 12px meta (DESIGN.md §3), capped near 90 characters a line. */
+const hintText = { ...pbBody, color: PB.tx2, maxWidth: 640 } as const;
 /** "1,234 becomes 1,230": the figures a reader compares go in mono. */
 const figures = (s: string) => s.split(/(\d[\d,.]*)/).map((part, i) => (i % 2 ? <span key={i} style={pbNum}>{part}</span> : part));
 import PbIcon from '../ui/PbIcon';
@@ -49,7 +49,8 @@ export const Grid2 = ({ children }: { children: ReactNode }) => (
 /** Kept for existing importers: the V2 input recipe (add className="pb-input"). */
 export const input44 = pbInput;
 
-/** Segmented picker: role=radiogroup, roving tabindex, arrows / Home / End move and select. */
+/** Segmented picker: role=radiogroup, roving tabindex, arrows / Home / End move and select.
+ *  One equal cell per option (never a ragged wrap); on phone 3+ options stack (.pb-seg-many, index.css). */
 export function Seg<V extends string>({ value, options, onChange, label }: {
   value: V; options: { id: V; label: string; hint?: string }[]; onChange: (v: V) => void; label: string;
 }) {
@@ -66,18 +67,18 @@ export function Seg<V extends string>({ value, options, onChange, label }: {
     refs.current[i]?.focus();
   };
   return (
-    <div role="radiogroup" aria-label={label} onKeyDown={onKey}
-      style={{ display: 'flex', flexWrap: 'wrap', gap: 4, padding: 4, borderRadius: PB.r.btn, background: 'var(--pb-tile-fill)', border: `1px solid ${PB.tileBd}`, boxShadow: PB.tileHi }}>
+    <div role="radiogroup" aria-label={label} onKeyDown={onKey} className={options.length > 2 ? 'pb-seg pb-seg-many' : 'pb-seg'}
+      style={{ display: 'grid', gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))`, gap: 4, padding: 4, borderRadius: PB.r.btn, background: 'var(--pb-tile-fill)', border: `1px solid ${PB.tileBd}`, boxShadow: PB.tileHi }}>
       {options.map((o, i) => {
         const on = o.id === value;
         return (
           <button key={o.id} ref={el => { refs.current[i] = el; }} type="button" role="radio" aria-checked={on} tabIndex={i === cur ? 0 : -1}
             onClick={() => onChange(o.id)} title={o.hint} className="pb-pill"
             style={{
-              flex: '1 1 auto', minHeight: 'var(--pb-chip-h)', padding: '6px 12px', borderRadius: PB.r.input, cursor: 'pointer',
-              fontFamily: PB.sans, fontSize: 'var(--pb-seg-fs)', fontWeight: 500, textAlign: 'left', lineHeight: 1.3,
+              minWidth: 0, minHeight: 'var(--pb-chip-h)', padding: '6px 12px', borderRadius: PB.r.input, cursor: 'pointer',
+              fontFamily: PB.sans, fontSize: 'var(--pb-seg-fs)', fontWeight: 500, textAlign: 'left', lineHeight: 1.3, overflowWrap: 'anywhere',
               border: '1px solid transparent', background: 'transparent', color: PB.tx2,
-              ...(on ? pbActive : null),
+              ...(on ? pbActiveSeg : null),
             }}>
             {o.label}
             {o.hint && <span style={{ display: 'block', fontSize: 12, color: on ? PB.onActive : PB.tx2, fontWeight: 400, marginTop: 2 }}>{figures(o.hint)}</span>}

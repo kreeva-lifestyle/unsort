@@ -76,7 +76,7 @@ export default function ListingEditor({ listing, site, onClose, onChanged, addTo
   const dirty = changed.length > 0 && !locked;
   const actions = { listing: l, dirty, busy, setBusy, save, onSave, onUpdated: (next: ListingFull) => { reset(next); onChanged(); }, addToast };
   return (
-    <PbModal open title={site?.name ?? 'Listing'} onClose={onClose} guard={changed.length > 0}
+    <PbModal open title={site?.name ?? 'Listing'} onClose={onClose} dirty={changed.length > 0} discardTitle="Discard changes to this listing?"
       footer={listingPrimary(l, dirty) ? <ListingActions part="primary" {...actions} /> : undefined}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 16px', alignItems: 'center', marginBottom: 16, fontSize: 12, color: PB.tx2 }}>
         <Dot color={st.color} label={st.label} />

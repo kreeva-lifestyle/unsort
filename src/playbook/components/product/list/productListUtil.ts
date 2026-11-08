@@ -41,11 +41,11 @@ const GROUPS: { label: string; color: string; of: PbListingStatus[] }[] = [
 ];
 
 /** "Live on 2 websites", "Failed on 1 website"… (removed listings are left out). */
-export function listingSummary(p: ProductRow): { label: string; color: string }[] {
-  const out: { label: string; color: string }[] = [];
+export function listingSummary(p: ProductRow): { label: string; color: string; n: number }[] {
+  const out: { label: string; color: string; n: number }[] = [];
   for (const g of GROUPS) {
     const n = p.pb_listings.filter(l => g.of.includes(l.status)).length;
-    if (n) out.push({ label: `${g.label} ${n} website${n === 1 ? '' : 's'}`, color: g.color });
+    if (n) out.push({ label: `${g.label} ${n} website${n === 1 ? '' : 's'}`, color: g.color, n });
   }
   return out;
 }

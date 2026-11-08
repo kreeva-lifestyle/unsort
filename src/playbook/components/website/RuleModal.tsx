@@ -2,14 +2,18 @@
 // ones must match; an empty one is ignored) and an optional price override.
 // V2: a sheet on phone (one full-width primary in the PbModal footer, outside
 // the scrolling body; Cancel is the ×), a centred modal on desktop (Cancel,
-// then Save rule). An edited rule is guarded against scrim tap / swipe-down.
+// then Save rule). An edited rule is dirty: no scrim tap / swipe-down close,
+// and ×, Back or Escape ask "Discard …?" first (PbModal). On phone an existing
+// rule's "Delete rule" sits at the end of the body (the row has no Delete there).
 import { useState } from 'react';
 import { friendlyError } from '../../../lib/friendlyError';
+import { useConfirm, type ConfirmOptions } from '../../../components/ui/ConfirmModal';
+import PbConfirm from '../ui/PbConfirm';
 import PbSwitch from '../ui/PbSwitch';
 import type { AddToast } from '../PbToasts';
 import type { PbRoutingRule, PbRuleConditions } from '../../types';
 import type { VendorLite } from '../../data/products';
-import { saveRule, type RuleDraft } from '../../data/websites';
+import { deleteRule, saveRule, type RuleDraft } from '../../data/websites';
 import PbModal from '../product/PbModal';
 import { PB, pbErrorBox, pbLabel, pbMeta } from '../../pbTheme';
 import { useIsPhone } from '../../hooks/useIsPhone';
@@ -18,6 +22,13 @@ import { PbButton, PbTag } from '../ui';
 import { ChipsInput, Field, Grid2, NumInput, PickChips, Seg, input44 } from './ui';
 
 const EMPTY: RuleDraft = { name: '', enabled: true, action: 'include', conditions: {}, price_override: null };
+
+/** The one "Delete this rule?" question (row Delete on desktop, sheet Delete on phone). */
+export const deleteRuleAsk = (r: PbRoutingRule): ConfirmOptions => ({
+  title: 'Delete this rule?', confirmLabel: 'Delete', danger: true,
+  message: `“${r.name || 'Unnamed rule'}” will stop sorting products. Products already listed stay listed.${
+    r.price_override ? ' Their own price from this rule is dropped: the next time they are updated or regenerated they get the store\'s normal markup.' : ''}`,
+});
 
 /** Drop empty conditions so the stored jsonb says only what matters. */
 function cleanConditions(c: PbRuleConditions): PbRuleConditions {
@@ -31,15 +42,17 @@ function cleanConditions(c: PbRuleConditions): PbRuleConditions {
   return out;
 }
 
-export default function RuleModal({ siteId, rule, nextPosition, vendors, categories, onClose, onSaved, addToast }: {
+export default function RuleModal({ siteId, rule, nextPosition, vendors, categories, onClose, onSaved, onDeleted, addToast }: {
   siteId: string; rule: PbRoutingRule | null; nextPosition: number; vendors: VendorLite[]; categories: string[];
-  onClose: () => void; onSaved: (r: PbRoutingRule) => void; addToast: AddToast;
+  onClose: () => void; onSaved: (r: PbRoutingRule) => void; onDeleted: (r: PbRoutingRule) => void; addToast: AddToast;
 }) {
   const [d, setD] = useState<RuleDraft>(() => (rule ? { name: rule.name, enabled: rule.enabled, action: rule.action, conditions: { ...rule.conditions }, price_override: rule.price_override } : EMPTY));
   const [initial] = useState(() => JSON.stringify(d));
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [err, setErr] = useState('');
   const phone = useIsPhone();
+  const { ask, modalProps } = useConfirm();
   const c = d.conditions;
   const putC = (x: Partial<PbRuleConditions>) => setD(v => ({ ...v, conditions: { ...v.conditions, ...x } }));
   const vendorOpts = vendors.filter(v => v.active || c.vendor_ids?.includes(v.id)).map(v => ({ id: v.id, label: v.active ? v.name : `${v.name} (inactive)` }));
@@ -59,15 +72,23 @@ export default function RuleModal({ siteId, rule, nextPosition, vendors, categor
     } catch (e) { const m = friendlyError(e); setErr(m); addToast(m, 'error'); setSaving(false); }
   };
 
+  const remove = async () => {
+    if (!rule || !(await ask(deleteRuleAsk(rule)))) return;
+    setDeleting(true); setErr('');
+    try { await deleteRule(rule); addToast('Rule deleted', 'success'); onDeleted(rule); }
+    catch (e) { const m = friendlyError(e); setErr(m); addToast(m, 'error'); setDeleting(false); }
+  };
+
   const none = Object.keys(cleanConditions(c)).length === 0;
   const po = d.price_override;
   const setPo = (x: { markup_pct?: number; add_flat?: number }) => setD(v => ({ ...v, price_override: { ...v.price_override, ...x } }));
   return (
-    <PbModal open title={rule ? 'Edit rule' : 'Add rule'} onClose={onClose} guard={JSON.stringify(d) !== initial}
+    <>
+    <PbModal open title={rule ? 'Edit rule' : 'Add rule'} onClose={onClose} dirty={JSON.stringify(d) !== initial} discardTitle={rule ? 'Discard changes to this rule?' : 'Discard this rule?'}
       footer={
         <div style={{ display: 'flex', gap: 16, justifyContent: 'flex-end' }}>
           {!phone && <PbButton onClick={onClose} dim={saving}>Cancel</PbButton>}
-          <PbButton kind="primary" type="submit" form="pb-rule-form" block={phone} busy={saving} busyLabel="Saving…">Save rule</PbButton>
+          <PbButton kind="primary" type="submit" form="pb-rule-form" block={phone} busy={saving} busyLabel="Saving…" dim={deleting}>Save rule</PbButton>
         </div>
       }>
       <form id="pb-rule-form" onSubmit={e => { e.preventDefault(); void save(); }} style={{ display: 'flex', flexDirection: 'column' }}>
@@ -127,7 +148,14 @@ export default function RuleModal({ siteId, rule, nextPosition, vendors, categor
           </div>
         )}
         {err && <div role="alert" style={{ ...pbErrorBox, marginBottom: 16, overflowWrap: 'anywhere' }}>{err}</div>}
+        {phone && rule && (
+          <div style={{ borderTop: `1px solid ${PB.tileBd}`, paddingTop: 16, display: 'flex' }}>
+            <PbButton kind="danger" icon="trash" onClick={() => void remove()} busy={deleting} busyLabel="Deleting…" dim={saving}>Delete rule</PbButton>
+          </div>
+        )}
       </form>
     </PbModal>
+    <PbConfirm {...modalProps} />
+    </>
   );
 }

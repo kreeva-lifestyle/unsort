@@ -28,7 +28,7 @@ export default function TgCrawlerStep({ config, canManage, busy, newKey, onKey, 
   const running = crawlerRunning(config);
   return (
     <TgStep n={3} id="pbs-tg-crawler" title="Crawler" state={crawlerState(config)}>
-      <p style={{ ...pbBody, color: PB.tx2, margin: 0 }}>
+      <p style={{ ...pbBody, color: PB.tx2, margin: 0, maxWidth: 640 }}>
         A staff Telegram account on a small cloud server checks each vendor channel once a day and forwards the new posts to the admin group, one channel at a time.
       </p>
       <div><PbButton icon="book" onClick={onGuide}>How to set it up</PbButton></div>

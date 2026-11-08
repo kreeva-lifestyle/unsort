@@ -84,7 +84,8 @@ mobile". Playbook instead:
   design"). Tokens and recipes: `src/playbook/pbTheme.ts`; primitives:
   `src/playbook/components/ui/` (`PbTile`, `PbButton`, `PbRow`, `PbConfirm`,
   `PbPageHeader`…) and `components/product/PbModal.tsx` (with `footer` and
-  `guard`); CSS: the
+  `dirty`, which guards scrim tap / swipe and asks "Discard changes?" on ×,
+  Back or Escape); CSS: the
   "Playbook V2" block at the end of `src/index.css` (pb- classes only).
 
 ## Brand

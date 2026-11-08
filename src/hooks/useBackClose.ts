@@ -12,9 +12,15 @@
 // The in-app close button and the device Back run the SAME path: closing from
 // inside pops our history entry (so Back is never left "dead"), and closing via
 // Back skips that pop because the entry is already gone.
+//
+// A layer may VETO a Back press by returning false from close() (a form with
+// unsaved typing that shows "Discard changes?" instead): it stays open and its
+// history entry is put back, so the next Back reaches it again. `force` is true
+// when the page itself is going away (closeAllLayers): nothing may veto that.
 import { useEffect, useRef } from 'react';
 
-type Layer = { id: number; close: () => void };
+type Close = (force?: boolean) => void | boolean;
+type Layer = { id: number; close: Close };
 
 let seq = 0;
 const stack: Layer[] = [];
@@ -36,7 +42,14 @@ function wire() {
     // Close every layer we just navigated back past, topmost first. Nested
     // layers (modal over a sub-view) therefore unwind one press at a time.
     while (stack.length && stack[stack.length - 1].id > currentNavId()) {
-      stack.pop()!.close();
+      const layer = stack.pop()!;
+      if (layer.close() === false) {
+        // Vetoed: the layer stays open, so give it its entry back (same id — the
+        // hook's cleanup still owns the pop when it finally closes from inside).
+        stack.push(layer);
+        window.history.pushState({ navId: layer.id }, '');
+        break;
+      }
     }
     // Landing on an orphaned entry would cost the user a Back press that does
     // nothing visible, so skip straight past it. ids only decrease going back,
@@ -50,7 +63,7 @@ function wire() {
 // document.body and would otherwise float over the next tab). The entries it
 // leaves behind are skipped by the dead-entry check above.
 export function closeAllLayers() {
-  while (stack.length) stack.pop()!.close();
+  while (stack.length) stack.pop()!.close(true);
 }
 
 // How many layers are open — lets a caller tell whether a close() took effect
@@ -59,7 +72,7 @@ export const layerCount = (): number => stack.length;
 
 // Closes the topmost layer, if any. Used by the global Escape handler. It goes
 // through the layer's own close(), so the unmount cleanup below owns the
-// history pop — exactly the same path as tapping ×.
+// history pop — exactly the same path as tapping ×. A veto (false) leaves it open.
 export function closeTopLayer(): boolean {
   const top = stack[stack.length - 1];
   if (!top) return false;
@@ -70,9 +83,10 @@ export function closeTopLayer(): boolean {
 /**
  * Give an open layer its own history entry.
  * @param open  true while the layer is on screen
- * @param close what to run when the device/browser Back dismisses it
+ * @param close what to run when the device/browser Back dismisses it; return
+ *              false to veto (stay open), e.g. to ask "Discard changes?" first
  */
-export function useBackClose(open: boolean, close: () => void) {
+export function useBackClose(open: boolean, close: Close) {
   const closeRef = useRef(close);
   closeRef.current = close;
 
@@ -80,7 +94,7 @@ export function useBackClose(open: boolean, close: () => void) {
     if (!open) return;
     wire();
     const id = ++seq;
-    const layer: Layer = { id, close: () => closeRef.current() };
+    const layer: Layer = { id, close: force => closeRef.current(force) };
     // One layer replacing another in the same commit (challan detail → edit
     // form) must REUSE the entry it is standing on, not stack a second one —
     // otherwise Back closes the new layer and then hits the old layer's

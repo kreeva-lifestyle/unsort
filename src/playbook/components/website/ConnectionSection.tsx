@@ -138,8 +138,8 @@ export default function ConnectionSection({ site, draft, set, onSaved, addToast 
               )}
               <Scopes inventory={draft.track_inventory} />
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <PbButton type="submit" busy={doing === 'save'} busyLabel="Saving…" dim={doing !== '' && doing !== 'save'}>Save credentials</PbButton>
-                <PbButton onClick={() => void run('test')} disabled={moving} title={moving ? 'Save the credentials for the new store first' : undefined}
+                <PbButton type="submit" className="pb-phone-full" busy={doing === 'save'} busyLabel="Saving…" dim={doing !== '' && doing !== 'save'}>Save credentials</PbButton>
+                <PbButton onClick={() => void run('test')} className="pb-phone-full" disabled={moving} title={moving ? 'Save the credentials for the new store first' : undefined}
                   busy={doing === 'test'} busyLabel="Testing…" dim={doing !== '' && doing !== 'test'}>Test connection</PbButton>
               </div>
             </form>

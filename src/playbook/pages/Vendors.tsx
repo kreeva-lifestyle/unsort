@@ -2,6 +2,7 @@
 // products each has in the directory. Spec: docs/playbook/product-directory-spec.md.
 // V2 layout: desktop = (12 toolbar tile) / (12 tile of glass rows) / pager;
 // phone = search + "Show inactive" chip, then the rows straight on the backdrop.
+// Deactivate / Activate sits at the end of the Edit sheet (VendorForm), not on the rows.
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import { friendlyError } from '../../lib/friendlyError';
 import type { AddToast } from '../components/PbToasts';
@@ -106,7 +107,7 @@ export default function Vendors({ addToast, onBack }: { addToast: AddToast; onBa
     <ul aria-label="Vendors" aria-busy={loading || undefined}
       style={{ display: 'flex', flexDirection: 'column', gap: 8, margin: 0, padding: 0, opacity: loading ? 0.6 : 1, transition: 'opacity .3s ease' }}>
       {rows.map(v => (
-        <VendorRow key={v.id} v={v} busy={busy} compact={phone} onToggle={() => void toggle(v)}
+        <VendorRow key={v.id} v={v} busy={busy} compact={phone}
           onEdit={() => setForm({ id: v.id, name: v.name, code: v.code ?? '', notes: v.notes ?? '', tg: v.tg_username ? `@${v.tg_username}` : '' })} />
       ))}
     </ul>
@@ -133,7 +134,7 @@ export default function Vendors({ addToast, onBack }: { addToast: AddToast; onBa
       </div>
       {(count > VENDOR_PAGE || page > 0) && <Pager page={page} pageSize={VENDOR_PAGE} count={count} onPage={setPage} noun="vendor" />}
       <VendorForm form={form} setForm={setForm} saving={saving} err={err} onSave={() => void save()} onClose={close} saved={editing}
-        toggle={phone && editing ? { active: editing.active, name: editing.name, busy: busy === editing.id, dim: !!busy && busy !== editing.id, onToggle: () => void toggle(editing) } : undefined} />
+        toggle={editing ? { active: editing.active, name: editing.name, busy: busy === editing.id, dim: !!busy && busy !== editing.id, onToggle: () => void toggle(editing) } : undefined} />
     </>
   );
 }

@@ -27,9 +27,15 @@ export default function ListingField({ id, label, value, onChange, disabled, kep
       {area
         ? <textarea id={id} value={value} rows={area} disabled={disabled} onChange={e => onChange(e.target.value)} className="pb-input"
             style={{ ...pbTextarea, height: 'auto', fontFamily: mono ? PB.mono : PB.sans, opacity: disabled ? 0.6 : 1 }} />
-        : <input id={id} value={value} disabled={disabled} onChange={e => onChange(e.target.value)} className="pb-input"
-            style={{ ...pbInput, ...(num ? pbNum : null), opacity: disabled ? 0.6 : 1 }}
-            {...(num ? { type: 'number', inputMode: 'decimal' as const, min: 0, step: '0.01', onKeyDown: numKey } : {})} />}
+        : (
+          // ₹ as a visible prefix on a price (mobile.md §8), never inside the value.
+          <div style={{ position: 'relative' }}>
+            {num && <span aria-hidden="true" style={{ ...pbNum, position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: PB.tx2, fontSize: 'var(--pb-input-fs)', pointerEvents: 'none' }}>₹</span>}
+            <input id={id} value={value} disabled={disabled} onChange={e => onChange(e.target.value)} className="pb-input"
+              style={{ ...pbInput, ...(num ? { ...pbNum, paddingLeft: 32 } : null), opacity: disabled ? 0.6 : 1 }}
+              {...(num ? { type: 'number', inputMode: 'decimal' as const, min: 0, step: '0.01', onKeyDown: numKey } : {})} />
+          </div>
+        )}
     </div>
   );
 }

@@ -1,6 +1,8 @@
 // One routing rule as a glass row (no blur): position, a Send / Keep off tag,
 // the name, what it matches, its own price, an On/Off switch, and Move up /
-// Move down / Edit / Delete as real 44px buttons (never swipe-only). Plus the
+// Move down / Edit as real 44px buttons (never swipe-only). Delete sits here
+// on desktop only; on phone it is at the end of the Edit sheet (RuleModal), so
+// the list is not a column of red buttons beside Edit (mobile.md §3). Plus the
 // rules list's loading, first-run and load-error states.
 import type { CSSProperties } from 'react';
 import PbSwitch from '../../ui/PbSwitch';
@@ -47,8 +49,7 @@ export default function RuleRow({ rule: r, index: i, count, summary, price, busy
           <PbIcon name="chevronDown" size={18} />
         </PbButton>
         <PbButton icon="edit" onClick={onEdit} aria-label={`Edit rule ${name}`} style={hold(`edit-${r.id}`)}>Edit</PbButton>
-        {/* Phone (.pb-phone-full): Delete takes its own full-width line instead of wrapping alone, right-aligned. */}
-        <PbButton kind="danger" icon="trash" onClick={onDelete} aria-label={`Delete rule ${name}`} busy={busy === `del-${r.id}`} busyLabel="Deleting…" className="pb-phone-full" style={{ marginLeft: 'auto', ...hold(`del-${r.id}`) }}>Delete</PbButton>
+        <PbButton kind="danger" icon="trash" onClick={onDelete} aria-label={`Delete rule ${name}`} busy={busy === `del-${r.id}`} busyLabel="Deleting…" className="pb-desk-only" style={{ marginLeft: 'auto', ...hold(`del-${r.id}`) }}>Delete</PbButton>
       </div>
     </li>
   );

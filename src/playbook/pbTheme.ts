@@ -86,7 +86,8 @@ const v = {
   sheetFill: 'var(--pb-sheet-fill)', sheetBlur: 'var(--pb-sheet-blur)', scrimBlur: 'var(--pb-scrim-blur)',
 } as const;
 
-const activeShadow = `inset 0 1px 0 oklch(1 0 0 / .50), inset 0 -1px 0 oklch(1 0 0 / .06), 0 8px 24px ${PB.activeGlow}`;
+const activeInset = 'inset 0 1px 0 oklch(1 0 0 / .50), inset 0 -1px 0 oklch(1 0 0 / .06)';
+const activeShadow = `${activeInset}, 0 8px 24px ${PB.activeGlow}`;
 
 /** Glass tile without blur: phone tiles, rows, cards in a results grid. */
 export const pbTileFlat: CSSProperties = {
@@ -102,6 +103,8 @@ export const pbActive: CSSProperties = {
   background: PB.activeFill, border: `1px solid ${PB.activeBd}`, color: PB.onActive, fontWeight: 600,
   boxShadow: activeShadow, backdropFilter: v.activeBlur, WebkitBackdropFilter: v.activeBlur,
 };
+/** Selected segment inside a track: the glow would smear past the track border, so inset parts only. */
+export const pbActiveSeg: CSSProperties = { ...pbActive, boxShadow: activeInset };
 /** Selected item in a side list: pbActive plus the amber inset bar. */
 export const pbActiveSide: CSSProperties = { ...pbActive, boxShadow: `inset 3px 0 0 ${PB.activeBar}, ${activeShadow}` };
 /** One per page. Opaque stops (it nearly always holds text under 18px). No blur. */
