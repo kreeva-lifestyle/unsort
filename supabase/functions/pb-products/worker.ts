@@ -8,9 +8,12 @@
 // outcome (status, error, pb_activity) inside its step, so a failure here is
 // only counted and logged, and the run moves on to the next item.
 // Import from website (import/runner.ts) goes FIRST and gets the first
-// IMPORT_MS of the run (one run, as many pages as fit): it releases the run
-// when its time is up, so read / generate / publish always keep at least
-// soft − IMPORT_MS = 50 s of starting time plus the hard margin. A product
+// IMPORT_MS of the run (one run, as many products as fit): it releases the run
+// when its time is up, so read / generate / publish keep at least
+// soft − IMPORT_MS = 70 s of starting time plus the hard margin. It is skipped
+// while the steps after it have work waiting (importWaits: backpressure), so
+// a 5,000-product store moves at the pace the AI reads and writes, and the
+// other products (Telegram, typed in) are never starved by it. A product
 // being added when the import clock runs out finishes (its photo downloads
 // are bounded by ingest's own timeouts).
 import { claimGenerate, genCandidates, generateOne } from './generate.ts';
@@ -27,7 +30,14 @@ const CAPS = { read: 6, generate: 8, publish: 10 };
 const READ_NEEDS_MS = 45_000;
 const GEN_NEEDS_MS = 80_000;
 /** The slice of each run that an import may use before the other steps start. */
-const IMPORT_MS = 50_000;
+const IMPORT_MS = 30_000;
+/** The import waits while this much is queued after it: products to read, listings to write or to publish. */
+const WAIT_AT = { read: 10, generate: 20, publish: 20 };
+
+async function importWaits(): Promise<boolean> {
+  const [r, g, p] = await Promise.all([readCandidates(WAIT_AT.read), genCandidates(WAIT_AT.generate), pubCandidates(WAIT_AT.publish)]);
+  return r.length >= WAIT_AT.read || g.length >= WAIT_AT.generate || p.length >= WAIT_AT.publish;
+}
 
 export function newBudget(): Budget {
   const t0 = Date.now();
@@ -45,7 +55,7 @@ export async function work(userId: string | null): Promise<WorkResult> {
   };
 
   try {
-    const imp = await advanceImport(Date.now() + IMPORT_MS, userId);
+    const imp = (await importWaits()) ? null : await advanceImport(Date.now() + IMPORT_MS, userId);
     if (imp) out.imported = imp.added;
   } catch (e) { failed('import', 'run', e); } // the run itself records its error; the next tick carries on
 

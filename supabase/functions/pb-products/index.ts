@@ -12,7 +12,7 @@
 //
 // POST JSON { action, ... } → JSON; errors → HTTP 4xx/5xx { ok:false, error:'<plain sentence>' }.
 //   work               secret|staff   –                                   → { ok, read, routed, generated, published, failed, imported? }
-//   ingest             secret         { source:'telegram'|'import', source_ref, raw_text, vendor_name?, image_urls?[], less_amount?, source_url?, intake_notes?[] }
+//   ingest             secret         { source:'telegram'|'import', source_ref, raw_text, vendor_name?, image_urls?[], less_amount?, source_url?, intake_notes?[], sell_price?, price_note?, attributes?{}, sku? } (attributes / sku: source 'import' only)
 //                                                                          → { ok, product_id, duplicate?, images?, warnings? }
 //   read_product       staff          { product_id }                      → { ok, product, routed, warning? }
 //   route_product      staff          { product_id }                      → { ok, routed, repriced, listings, warning? }
@@ -92,6 +92,7 @@ Deno.serve(async (req) => {
   } catch (e) {
     const status = e instanceof HttpError ? e.status : 500;
     if (status >= 500) console.error(`pb-products ${action}:`, e instanceof Error ? e.stack || e.message : e);
-    return fail(req, status, plain(e));
+    // Our own sentences (HttpError) and timeouts as they are; anything else (a TypeError…) stays in the log.
+    return fail(req, status, e instanceof HttpError || e instanceof DOMException ? plain(e) : 'Something went wrong on the Playbook server.');
   }
 });

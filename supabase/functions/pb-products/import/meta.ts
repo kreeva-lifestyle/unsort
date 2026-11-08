@@ -9,7 +9,9 @@
 //   JSON-LD  brand, manufacturer, category, gtin13 / gtin / ean, weight, material, color.
 //   Page     <title> / og:title → seo_title, meta description / og:description
 //            → seo_description, og:price:currency → currency (pageMeta).
-// No I/O (tested with node --test).
+// No I/O (tested with node --test). Page HTML is bounded and read with linear
+// patterns only (text.ts), so a hostile page cannot stall the worker.
+import { MAX_HTML, decode } from './text.ts';
 
 /** Attribute keys a website import owns: the reader never drops or replaces them. */
 export const IMPORT_ATTRS = [
@@ -21,7 +23,7 @@ export type Meta = Record<string, string>;
 type Obj = Record<string, unknown>;
 
 const MAX_VALUE = 500;
-const txt = (v: unknown, max = MAX_VALUE) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
+const txt = (v: unknown, max = MAX_VALUE) => String(v ?? '').slice(0, max * 4).replace(/\u0000/g, '').replace(/\s+/g, ' ').trim().slice(0, max);
 const list = (v: unknown): unknown[] => (Array.isArray(v) ? v : v === undefined || v === null || v === '' ? [] : [v]);
 const nameOf = (v: unknown): string => (v && typeof v === 'object' ? nameOf((v as Obj).name ?? (v as Obj)['@value']) : txt(v));
 const joined = (a: unknown[]) => [...new Set(a.map(nameOf).filter(Boolean))].join(', ').slice(0, MAX_VALUE);
@@ -101,27 +103,52 @@ export function jsonLdMeta(prod: Obj): Meta {
   });
 }
 
-const decode = (s: string) => s
-  .replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'")
-  .replace(/&#x([0-9a-f]+);/gi, (_m, h: string) => String.fromCodePoint(parseInt(h, 16)))
-  .replace(/&#(\d+);/g, (_m, d: string) => String.fromCodePoint(Number(d))).replace(/&amp;/g, '&');
-
-/** The page's own SEO title / description and its currency, from the <head>. */
-export function pageMeta(html: string): Meta {
-  const head = String(html || '').split(/<\/head>/i)[0].slice(0, 400_000);
+/** The <meta> tags of the page's <head> (first value per key), read linearly from at most MAX_HTML characters. */
+export function metaTags(html: string): { head: string; metas: Record<string, string> } {
+  const s = String(html || '').slice(0, MAX_HTML);
+  const end = s.toLowerCase().indexOf('</head');
+  const head = end < 0 ? s : s.slice(0, end);
   const metas: Record<string, string> = {};
-  for (const m of head.matchAll(/<meta\b[^>]*>/gi)) {
+  for (const m of head.matchAll(/<meta\b[^<>]{0,2000}>/gi)) {
     const tag = m[0];
-    const key = /\b(?:name|property|itemprop)\s*=\s*["']([^"']+)["']/i.exec(tag)?.[1].toLowerCase();
+    const key = /\b(?:name|property|itemprop)\s*=\s*["']([^"']{1,100})["']/i.exec(tag)?.[1].toLowerCase();
     const val = /\bcontent\s*=\s*(?:"([^"]*)"|'([^']*)')/i.exec(tag);
     if (key && val && !(key in metas)) metas[key] = decode(val[1] ?? val[2] ?? '');
   }
-  const title = decode(/<title[^>]*>([\s\S]*?)<\/title>/i.exec(head)?.[1] ?? '');
+  return { head, metas };
+}
+
+/** The page's own SEO title / description and its currency, from the <head>. */
+export function pageMeta(html: string): Meta {
+  const { head, metas } = metaTags(html);
+  const title = decode(/<title[^<>]{0,200}>([^<]{0,500})<\/title/i.exec(head)?.[1] ?? '');
   const cur = txt(metas['og:price:currency'] || metas['product:price:currency'] || metas['pricecurrency'], 3).toUpperCase();
   return cleanMeta({
     seo_title: txt(title) || metas['og:title'], seo_description: metas['description'] || metas['og:description'],
     currency: /^[A-Z]{3}$/.test(cur) ? cur : '',
   });
+}
+
+/** The price the page's <head> shows (og:price:amount / product:price:amount), or null. */
+export function pageAmount(html: string): number | null {
+  const { metas } = metaTags(html);
+  const m = /\d[\d,]*(?:\.\d+)?/.exec(String(metas['og:price:amount'] || metas['product:price:amount'] || '').slice(0, 40));
+  const n = m ? Number(m[0].replace(/,/g, '')) : NaN;
+  return Number.isFinite(n) ? n : null;
+}
+
+const IMPORTED = new Set<string>(IMPORT_ATTRS);
+
+/** The reader's attribute merge: every existing key is kept; the AI fills empty keys (any key on a
+ *  manual "Read again"), except that an imported product's IMPORT_ATTRS keys are never touched. */
+export function mergeReadAttrs(current: Record<string, string> | null | undefined, ai: Record<string, unknown> | null | undefined, o: { manual: boolean; imported: boolean }): Record<string, string> {
+  const attrs: Record<string, string> = { ...(current || {}) };
+  for (const [k, v] of Object.entries(ai || {})) {
+    if (o.imported && IMPORTED.has(k)) continue; // the store's own fact wins
+    const s = String(v ?? '').trim().slice(0, 500);
+    if (s && (o.manual || !String(attrs[k] ?? '').trim())) attrs[k] = s;
+  }
+  return attrs;
 }
 
 /** `extra` fills only the keys `m` does not have yet. */

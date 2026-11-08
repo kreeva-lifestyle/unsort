@@ -2,7 +2,7 @@
 // words (dot + label), the estimate, 3 sample products and any warnings in
 // the review tint. Boxes use the control fill (a sheet is not a tile, so
 // nothing here is a tile on a tile).
-import { useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type { ImportCheck } from '../../../data/imports';
 import type { PbImportSample } from '../../../types';
 import { PB, pbBody, pbMeta, pbName, pbNum } from '../../../pbTheme';
@@ -27,9 +27,9 @@ function SampleRow({ s }: { s: PbImportSample }) {
       <Thumb src={s.image} />
       <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
         <span className="pb-clamp2" style={{ ...pbName, fontSize: 13 }}>{s.name || 'Untitled product'}</span>
-        {s.in_stock === false && <PbTag>Out of stock</PbTag>}
+        {s.in_stock === false && <span style={{ alignSelf: 'flex-start' }}><PbTag>Out of stock</PbTag></span>}
       </span>
-      <span style={{ ...pbNum, fontSize: 15, fontWeight: 500, color: PB.tx, flexShrink: 0 }}>{s.price == null ? <span style={pbMeta}>No price</span> : rupees(s.price)}</span>
+      <span style={{ ...pbNum, fontSize: 15, fontWeight: 500, color: PB.tx, flexShrink: 0 }}>{s.price == null ? <span style={pbMeta}>No price</span> : s.currency && s.currency !== 'INR' ? `${s.currency} ${s.price.toLocaleString('en-IN', { maximumFractionDigits: 2 })}` : rupees(s.price)}</span>
     </li>
   );
 }
@@ -37,9 +37,12 @@ function SampleRow({ s }: { s: PbImportSample }) {
 export default function ImportPreview({ check }: { check: ImportCheck }) {
   const plat = PLATFORM[check.platform] ?? PLATFORM.unknown;
   const empty = nothingFound(check);
+  // After a check, focus moves here (the address box was busy), so a screen reader reads the result next.
+  const first = useRef<HTMLDivElement>(null);
+  useEffect(() => { first.current?.focus(); }, [check]);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }} aria-live="polite">
-      <div style={{ ...box, ...(empty ? { background: PB.failedBg, borderColor: PB.failedBd } : null) }}>
+      <div ref={first} tabIndex={-1} id="pb-imp-result" style={{ ...box, outline: 'none', ...(empty ? { background: PB.failedBg, borderColor: PB.failedBd } : null) }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
           <Dot color={plat.color} label={plat.label} style={{ fontSize: 13, color: PB.tx, fontWeight: 600 }} />
           <span style={{ ...pbNum, ...pbMeta, overflowWrap: 'anywhere' }}>{check.host}</span>

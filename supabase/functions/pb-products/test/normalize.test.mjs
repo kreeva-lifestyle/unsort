@@ -10,13 +10,13 @@ const shopify = JSON.parse(read('shopify.products.json')).products;
 const woo = JSON.parse(read('woo.products.json'));
 const page = read('jsonld.page.html');
 
-test('Shopify: one product per listing, min price, max compare-at, any variant available', () => {
+test('Shopify: one product per listing, price and compare-at from the variants on sale, any variant available', () => {
   const f = fromShopify(shopify[0], 'https://kumari.example');
   assert.equal(f.ref, '7001');
   assert.equal(f.name, 'Banarasi Silk Saree - Maroon');
   assert.equal(f.url, 'https://kumari.example/products/banarasi-silk-saree-maroon');
   assert.equal(f.sku, 'KA-5070');
-  assert.equal(f.price, 2299); // lowest variant, even when that variant is sold out
+  assert.equal(f.price, 2499); // lowest AVAILABLE variant: the sold-out gift pack at 2299 is not what the store sells at
   assert.equal(f.compare_at, 3999);
   assert.equal(f.in_stock, true);
   assert.deepEqual(f.sizes, ['Free Size']);
@@ -82,7 +82,7 @@ test('JSON-LD: Product inside @graph, nested offers, InStock when any offer is, 
   assert.equal(f.in_stock, true);
   assert.equal(f.color, 'Teal');
   assert.deepEqual(f.sizes, ['S', 'M']);
-  assert.deepEqual(f.images, ['https://meera.example/img/a1.jpg', 'https://meera.example/img/a2.jpg']);
+  assert.deepEqual(f.images, ['https://cdn.meera-boutique.in/img/a1.jpg', 'https://cdn.meera-boutique.in/img/a2.jpg']);
   assert.equal(f.description, 'Floor length georgette anarkali with embroidery.');
   assert.equal(fromJsonLd('<html><body>no data</body></html>', 'https://x.example/p/1'), null);
 });

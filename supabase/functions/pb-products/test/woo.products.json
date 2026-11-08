@@ -1,12 +1,131 @@
 [
- {"id":31,"name":"Chanderi Suit Set","permalink":"https://example-store.in/product/chanderi-suit-set/","sku":"CH-31","description":"<p>Chanderi silk kurta with dupatta.</p>","short_description":"<p>Set of 3</p>",
-  "is_in_stock":true,"stock_status":"instock",
-  "prices":{"price":"189900","regular_price":"249900","sale_price":"189900","currency_code":"INR","currency_minor_unit":2,"price_range":null},
-  "attributes":[{"name":"Size","terms":[{"name":"M"},{"name":"L"},{"name":"XL"}]},{"name":"Color","terms":[{"name":"Pink"}]}],
-  "images":[{"src":"https://example-store.in/wp-content/uploads/ch1.jpg"},{"src":"https://example-store.in/wp-content/uploads/ch2.jpg"}]},
- {"id":32,"name":"Linen Shirt","permalink":"/product/linen-shirt/","sku":"","description":"",
-  "is_in_stock":false,"stock_status":"outofstock",
-  "prices":{"price":"120000","regular_price":"120000","sale_price":"120000","currency_code":"USD","currency_minor_unit":2,"price_range":{"min_amount":"110000","max_amount":"130000"}},
-  "attributes":[{"name":"Colour","terms":[{"name":"White"},{"name":"Blue"}]}],
-  "images":[]}
+ {
+  "id": 31,
+  "name": "Chanderi Suit Set",
+  "permalink": "https://example-store.in/product/chanderi-suit-set/",
+  "sku": "CH-31",
+  "description": "<p>Chanderi silk kurta with dupatta.</p>",
+  "short_description": "<p>Set of 3</p>",
+  "is_in_stock": true,
+  "stock_status": "instock",
+  "prices": {
+   "price": "189900",
+   "regular_price": "249900",
+   "sale_price": "189900",
+   "currency_code": "INR",
+   "currency_minor_unit": 2,
+   "price_range": null
+  },
+  "attributes": [
+   {
+    "name": "Size",
+    "terms": [
+     {
+      "name": "M"
+     },
+     {
+      "name": "L"
+     },
+     {
+      "name": "XL"
+     }
+    ]
+   },
+   {
+    "name": "Color",
+    "terms": [
+     {
+      "name": "Pink"
+     }
+    ]
+   },
+   {
+    "name": "Fabric",
+    "terms": [
+     {
+      "name": "Chanderi Silk"
+     }
+    ]
+   }
+  ],
+  "images": [
+   {
+    "src": "https://example-store.in/wp-content/uploads/ch1.jpg"
+   },
+   {
+    "src": "https://example-store.in/wp-content/uploads/ch2.jpg"
+   }
+  ],
+  "brands": [
+   {
+    "id": 5,
+    "name": "Chanderi House"
+   }
+  ],
+  "categories": [
+   {
+    "id": 1,
+    "name": "Suits"
+   },
+   {
+    "id": 2,
+    "name": "Festive Wear"
+   }
+  ],
+  "tags": [
+   {
+    "id": 9,
+    "name": "chanderi"
+   },
+   {
+    "id": 10,
+    "name": "silk"
+   }
+  ],
+  "weight": "0.5",
+  "weight_unit": "kg"
+ },
+ {
+  "id": 32,
+  "name": "Linen Shirt",
+  "permalink": "/product/linen-shirt/",
+  "sku": "",
+  "description": "",
+  "is_in_stock": false,
+  "stock_status": "outofstock",
+  "prices": {
+   "price": "120000",
+   "regular_price": "120000",
+   "sale_price": "120000",
+   "currency_code": "USD",
+   "currency_minor_unit": 2,
+   "price_range": {
+    "min_amount": "110000",
+    "max_amount": "130000"
+   }
+  },
+  "attributes": [
+   {
+    "name": "Colour",
+    "terms": [
+     {
+      "name": "White"
+     },
+     {
+      "name": "Blue"
+     }
+    ]
+   },
+   {
+    "name": "Brand",
+    "terms": [
+     {
+      "name": "Linen Co"
+     }
+    ]
+   }
+  ],
+  "images": [],
+  "weight": "450"
+ }
 ]

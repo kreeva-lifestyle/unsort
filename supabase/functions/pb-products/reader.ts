@@ -6,6 +6,9 @@
 // sell_price (import from website: the other store's price is our selling
 // price) needs no cost: the AI's cost_price is ignored for it, because the
 // only price in its text is that selling price, not a cost.
+// Imported attributes (IMPORT_ATTRS: brand, store_tags, seo_title…) are the
+// store's own facts: an imported product keeps them as they are — the AI's
+// attributes are added beside them, never in their place, even on "Read again".
 // AI error: back to 'new' with ai_error, claimed_at kept so it retries after
 // 5 min; the third error in a row → needs_info, or ready (and routed) when
 // cost and category are already filled. The count rides in ai_error
@@ -21,6 +24,7 @@ import { aiPhotos } from './photos.ts';
 import { readerPrompt, readerSchema, type ReadOut } from './readerPrompt.ts';
 import { routeProduct } from './route.ts';
 import { stripLess } from '../pb-telegram/group.ts';
+import { mergeReadAttrs } from './import/meta.ts';
 import { MAX_ATTEMPTS, PRODUCT_COLS, STALE_MS, hasPrice, type Budget, type ProductRow } from './types.ts';
 
 /** Products the worker may read: new (not in a retry wait) or a stuck 'reading'. */
@@ -63,14 +67,7 @@ function merge(p: ProductRow, out: ReadOut, categories: string[], manual: boolea
   const cost = Number(out.cost_price) - (Number(p.less_amount) > 0 ? Number(p.less_amount) : 0);
   const sells = p.sell_price !== null && p.sell_price !== undefined; // imported: the price in the text is the SELLING price
   if (!sells && out.cost_price !== null && Number.isFinite(cost) && cost > 0 && cost < 10_000_000 && can('cost_price')) set.cost_price = Math.round(cost * 100) / 100;
-  if (!locked.has('attributes')) {
-    const attrs: Record<string, string> = { ...(p.attributes || {}) };
-    for (const [k, v] of Object.entries(out.attributes || {})) {
-      const s = String(v ?? '').trim().slice(0, 500);
-      if (s && (manual || !String(attrs[k] ?? '').trim())) attrs[k] = s;
-    }
-    set.attributes = attrs;
-  }
+  if (!locked.has('attributes')) set.attributes = mergeReadAttrs(p.attributes, out.attributes, { manual, imported: p.source === 'import' });
   return set;
 }
 
@@ -89,7 +86,7 @@ export async function readOne(p: ProductRow, o: { manual: boolean; prevStatus?: 
     const photos = await aiPhotos(imgs.map(i => i.path));
     const ai = await askClaude<ReadOut>({
       model: s.reader.model, effort: s.reader.effort,
-      system: readerPrompt(s.categories),
+      system: readerPrompt(s.categories, p.source === 'import'),
       content: [...photos.blocks, { type: 'text', text: factsText(p, vendor?.name ?? '') }],
       schema: readerSchema(s.categories), maxTokens: 8000, timeoutMs: o.budget.hard - Date.now(),
     });

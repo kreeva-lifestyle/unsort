@@ -59,8 +59,8 @@ test('robots.txt: our own group wins over *, wildcards and $, empty file allows 
   assert.equal(robotsRefusal(r, 'woocommerce'), null);
   const all = parseRobots('User-agent: *\nDisallow: /');
   assert.equal(robotsAllow(all, '/products.json'), false);
-  assert.match(robotsRefusal(all, 'shopify'), /does not allow automated access[\s\S]*robots\.txt disallows \/products\.json/);
-  assert.match(robotsRefusal(all, 'generic'), /sitemap\.xml/);
+  assert.equal(robotsRefusal(all, 'shopify'), 'This website does not allow automated access to its product list, so Playbook will not import from it.');
+  assert.equal(robotsRefusal(all, 'generic'), robotsRefusal(all, 'shopify'));
   assert.equal(robotsRefusal(parseRobots(''), 'shopify'), null);
   assert.equal(robotsRefusal(parseRobots('User-agent: *\nDisallow:'), 'shopify'), null);
   assert.equal(robotsRefusal(all, 'unknown'), null);

@@ -1,6 +1,7 @@
 // The choices under the preview: vendor name (prefilled from the site,
 // editable), "Only in-stock products" and "Sell at their price", each a
-// switch row with the consequence spelled out (copy-and-a11y.md §A4).
+// switch row with the consequence spelled out (copy-and-a11y.md §A4). A store
+// pricing in another currency (`foreign`) gets no price switch: nothing is copied.
 import type { ReactNode } from 'react';
 import { PB, pbInput, pbLabel, pbMeta, pbName } from '../../../pbTheme';
 import PbSwitch from '../../ui/PbSwitch';
@@ -19,8 +20,8 @@ function SwitchRow({ title, hint, on, onToggle, label }: { title: string; hint: 
   );
 }
 
-export default function ImportOptions({ value, onChange, disabled, vendorError }: {
-  value: ImportChoices; onChange: (v: ImportChoices) => void; disabled?: boolean; vendorError?: string;
+export default function ImportOptions({ value, onChange, disabled, vendorError, foreign }: {
+  value: ImportChoices; onChange: (v: ImportChoices) => void; disabled?: boolean; vendorError?: string; foreign?: string | null;
 }) {
   const set = (p: Partial<ImportChoices>) => onChange({ ...value, ...p });
   return (
@@ -37,9 +38,16 @@ export default function ImportOptions({ value, onChange, disabled, vendorError }
       <div style={{ display: 'flex', flexDirection: 'column', borderTop: `1px solid ${PB.tileBd}` }}>
         <SwitchRow title="Only in-stock products" label="Only in-stock products" on={value.inStockOnly} onToggle={() => !disabled && set({ inStockOnly: !value.inStockOnly })}
           hint={value.inStockOnly ? 'Products the store shows as sold out are left out.' : 'Sold-out products are copied too.'} />
-        <SwitchRow title="Sell at their price" label="Sell at their price" on={value.theirPrice} onToggle={() => !disabled && set({ theirPrice: !value.theirPrice })}
-          hint={value.theirPrice ? 'Their price becomes our selling price on every website. The pricing rules are skipped.'
-            : 'No price is copied. Each product waits in Needs info until you add a cost price.'} />
+        {foreign ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '8px 0', minWidth: 0 }}>
+            <span style={pbName}>Their price is not copied</span>
+            <span style={pbMeta}>Prices on this store are in {foreign}, so no price is copied. Each product waits in Needs info until you add a cost price.</span>
+          </div>
+        ) : (
+          <SwitchRow title="Sell at their price" label="Sell at their price" on={value.theirPrice} onToggle={() => !disabled && set({ theirPrice: !value.theirPrice })}
+            hint={value.theirPrice ? 'Their price (in rupees) becomes our selling price on every website. The pricing rules are skipped. Prices in another currency are not copied.'
+              : 'No price is copied. Each product waits in Needs info until you add a cost price.'} />
+        )}
       </div>
     </div>
   );

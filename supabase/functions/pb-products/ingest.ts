@@ -5,13 +5,19 @@
 // it before its photos are in; the claim is cleared at the end. Optional
 // less_amount / source_url / intake_notes are stored as given (validated).
 // Import from website (2026-11-08): sell_price = the price seen on the other
-// store, which is OUR selling price (pricing rules skipped), + price_note.
+// store, which is OUR selling price (pricing rules skipped), + price_note;
+// attributes = the store's facts (brand, type, tags, barcode, weight, SEO…;
+// import/meta.ts) and sku — both taken from source 'import' only.
 import { SB_URL, enc, insert, logActivity, nowIso, one, patch, sel, svcHeaders } from './db.ts';
 import { HttpError, fetchT, plain } from './http.ts';
+import { siteBytes } from './import/fetch.ts';
 import { BUCKET } from './types.ts';
 
 const MAX_IMAGES = 10;
 const MAX_BYTES = 15 * 1024 * 1024;
+/** Photos from another store: 5 MB each, one at a time, through the import's polite fetch (import/fetch.ts:
+ *  public hosts only on every redirect, paced, our User-Agent) — the addresses come from that store's data. */
+const MAX_BYTES_IMPORT = 5 * 1024 * 1024;
 
 export interface IngestBody {
   source?: unknown; source_ref?: unknown; raw_text?: unknown; vendor_name?: unknown; image_urls?: unknown;
@@ -19,9 +25,12 @@ export interface IngestBody {
   less_amount?: unknown; source_url?: unknown; intake_notes?: unknown;
   // Optional (import from website, 2026-11-08): sell at exactly this price everywhere, and where it came from.
   sell_price?: unknown; price_note?: unknown;
+  // Import from website only: the store's facts as plain strings, and its SKU.
+  attributes?: unknown; sku?: unknown;
 }
 
-function extras(b: IngestBody): Record<string, unknown> {
+/** The optional fields, validated (exported for the tests). */
+export function extras(b: IngestBody): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   if (b.less_amount !== undefined && b.less_amount !== null && b.less_amount !== '') {
     const n = Number(b.less_amount);
@@ -41,6 +50,20 @@ function extras(b: IngestBody): Record<string, unknown> {
   }
   const note = String(b.price_note ?? '').replace(/\s+/g, ' ').trim();
   if (note) out.price_note = note.slice(0, 300);
+  if ((b.attributes !== undefined && b.attributes !== null) || (b.sku !== undefined && b.sku !== null && b.sku !== '')) {
+    if (b.source !== 'import') throw new HttpError(400, "attributes and sku are taken only from a website import (source 'import').");
+    const sku = String(b.sku ?? '').replace(/\s+/g, ' ').trim();
+    if (sku) out.sku = sku.slice(0, 80);
+    if (b.attributes !== undefined && b.attributes !== null) {
+      if (typeof b.attributes !== 'object' || Array.isArray(b.attributes)) throw new HttpError(400, 'attributes must be an object of short texts.');
+      const attrs: Record<string, string> = {};
+      for (const [k, v] of Object.entries(b.attributes as Record<string, unknown>).slice(0, 30)) {
+        const s = String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, 500);
+        if (/^[a-z][a-z0-9_]{0,39}$/.test(k) && s && typeof v !== 'object') attrs[k] = s;
+      }
+      if (Object.keys(attrs).length) out.attributes = attrs;
+    }
+  }
   return out;
 }
 
@@ -65,10 +88,18 @@ function sniff(b: Uint8Array): { type: string; ext: string } | null {
   return null;
 }
 
-async function download(url: string): Promise<{ bytes: Uint8Array; type: string; ext: string }> {
+/** `store` = the other store's host for an import (its photos go through siteBytes), null for Telegram. */
+async function download(url: string, store: string | null): Promise<{ bytes: Uint8Array; type: string; ext: string }> {
   let u: URL;
   try { u = new URL(url); } catch { throw new Error('is not a web address'); }
   if (u.protocol !== 'https:') throw new Error('is not an https link');
+  if (store !== null) {
+    const g = await siteBytes(u.toString(), MAX_BYTES_IMPORT, store);
+    if (!g.ok) throw new Error(g.status === 413 ? 'is larger than 5 MB' : `could not be downloaded (${g.status})`);
+    const kind = sniff(g.bytes);
+    if (!kind) throw new Error('is not a JPEG, PNG or WebP photo');
+    return { bytes: g.bytes, ...kind };
+  }
   const r = await fetchT(u.toString(), { redirect: 'follow' }, 25_000);
   if (!r.ok || !r.body) throw new Error(`could not be downloaded (${r.status})`);
   if (Number(r.headers.get('content-length') || 0) > MAX_BYTES) throw new Error('is larger than 15 MB');
@@ -114,12 +145,14 @@ export async function ingest(b: IngestBody): Promise<Record<string, unknown>> {
 
   const warnings: string[] = [];
   const rows: { product_id: string; path: string; position: number }[] = [];
+  const store = source === 'import' ? (() => { try { return new URL(String(more.source_url)).host; } catch { return ''; } })() : null;
+  const step = store !== null ? 1 : 3; // three at a time keeps memory in check; an import's one by one (another store's server)
   try {
-    for (let i = 0; i < urls.length; i += 3) { // three at a time keeps memory in check
-      await Promise.all(urls.slice(i, i + 3).map(async (url, k) => {
+    for (let i = 0; i < urls.length; i += step) {
+      await Promise.all(urls.slice(i, i + step).map(async (url, k) => {
         const n = i + k;
         try {
-          const img = await download(url);
+          const img = await download(url, store);
           const path = `${id}/${n + 1}.${img.ext}`;
           const up = await fetchT(`${SB_URL}/storage/v1/object/${BUCKET}/${path}`, {
             method: 'POST', headers: { ...svcHeaders, 'content-type': img.type, 'x-upsert': 'true' }, body: img.bytes.buffer as ArrayBuffer,

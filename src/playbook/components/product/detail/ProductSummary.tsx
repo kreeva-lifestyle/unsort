@@ -73,7 +73,7 @@ export function PhoneNameCard({ p, vendors }: P) {
 
 export function AiReadTile({ p }: { p: ProductDetail }) {
   // Details copied by Import from website have their own tile (WebMetaTile).
-  const attrs = Object.entries(p.attributes ?? {}).filter(([k, v]) => !WEB_META_KEYS.has(k) && v != null && String(v).trim() !== '');
+  const attrs = Object.entries(p.attributes ?? {}).filter(([k, v]) => !(p.source === 'import' && WEB_META_KEYS.has(k)) && v != null && String(v).trim() !== '');
   return (
     <PbTile as="section" variant={p.ai_error ? 'failed' : 'default'} aria-labelledby="pb-ai-title" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>

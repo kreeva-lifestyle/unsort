@@ -6,25 +6,27 @@ import { listingPrice } from '../pricing.ts';
 
 const origin = 'https://kumari.example';
 
-test('Shopify: page counter, Link header rel=next (same origin only), short page ends', () => {
-  assert.equal(nextPath('shopify', {}, true), '/products.json?limit=250&page=1');
-  let s = afterShopify({}, '/products.json?limit=250&page=1', 250, null, origin);
-  assert.deepEqual(s, { cursor: { next: '/products.json?limit=250&page=2', errors: 0 }, done: false });
-  assert.equal(nextPath('shopify', s.cursor, true), '/products.json?limit=250&page=2');
-  const link = '<https://kumari.example/products.json?limit=250&page_info=abc123>; rel="next", <https://kumari.example/products.json?page_info=zzz>; rel="previous"';
-  s = afterShopify(s.cursor, '/products.json?limit=250&page=2', 250, link, origin);
-  assert.equal(s.cursor.next, '/products.json?limit=250&page_info=abc123');
+test('Shopify: page counter (pages of 50), Link header rel=next (same origin only), short page ends, a link to the same page is not followed', () => {
+  assert.equal(nextPath('shopify', {}, true), '/products.json?limit=50&page=1');
+  let s = afterShopify({}, '/products.json?limit=50&page=1', 50, null, origin);
+  assert.deepEqual(s, { cursor: { next: '/products.json?limit=50&page=2', errors: 0 }, done: false });
+  assert.equal(nextPath('shopify', s.cursor, true), '/products.json?limit=50&page=2');
+  const link = '<https://kumari.example/products.json?limit=50&page_info=abc123>; rel="next", <https://kumari.example/products.json?page_info=zzz>; rel="previous"';
+  s = afterShopify(s.cursor, '/products.json?limit=50&page=2', 50, link, origin);
+  assert.equal(s.cursor.next, '/products.json?limit=50&page_info=abc123');
   assert.equal(linkNext('<https://evil.example/x>; rel="next"', origin), null);
   assert.equal(linkNext(null, origin), null);
-  s = afterShopify(s.cursor, '/products.json?limit=250&page_info=abc123', 12, null, origin);
+  const same = '/products.json?limit=50&page_info=abc123';
+  assert.notEqual(afterShopify({ next: same }, same, 50, `<${origin}${same}>; rel="next"`, origin).cursor.next, same);
+  s = afterShopify(s.cursor, '/products.json?limit=50&page_info=abc123', 12, null, origin);
   assert.deepEqual(s, { cursor: { next: null, errors: 0 }, done: true });
 });
 
-test('WooCommerce: per_page 100, in-stock filter, total pages header ends the run', () => {
-  assert.equal(nextPath('woocommerce', {}, true), '/wp-json/wc/store/v1/products?per_page=100&page=1&stock_status=instock');
-  assert.equal(nextPath('woocommerce', { page: 3 }, false), '/wp-json/wc/store/v1/products?per_page=100&page=3');
-  assert.deepEqual(afterWoo({}, 100, 3), { cursor: { page: 2, errors: 0 }, done: false });
-  assert.deepEqual(afterWoo({ page: 3 }, 100, 3), { cursor: { page: 4, errors: 0 }, done: true });
+test('WooCommerce: per_page 50, in-stock filter, total pages header ends the run', () => {
+  assert.equal(nextPath('woocommerce', {}, true), '/wp-json/wc/store/v1/products?per_page=50&page=1&stock_status=instock');
+  assert.equal(nextPath('woocommerce', { page: 3 }, false), '/wp-json/wc/store/v1/products?per_page=50&page=3');
+  assert.deepEqual(afterWoo({}, 50, 3), { cursor: { page: 2, errors: 0 }, done: false });
+  assert.deepEqual(afterWoo({ page: 3 }, 50, 3), { cursor: { page: 4, errors: 0 }, done: true });
   assert.deepEqual(afterWoo({ page: 2 }, 40, null), { cursor: { page: 3, errors: 0 }, done: true });
   assert.equal(nextPath('generic', {}, true), null);
 });

@@ -40,7 +40,7 @@ create table if not exists public.pb_import_runs (
   use_their_price boolean not null default true,
   vendor_id uuid references public.pb_vendors(id) on delete set null,
   -- Where the next page starts (per platform, see pb-products/import/cursor.ts):
-  -- Shopify { next: '/products.json?limit=250&page=2' } · WooCommerce { page }
+  -- Shopify { next: '/products.json?limit=50&page=2', currency } · WooCommerce { page }
   -- · generic { sitemaps[], si, off }. Also { errors: n } consecutive page errors.
   cursor jsonb not null default '{}'::jsonb,
   found int not null default 0,          -- products seen on the site so far
@@ -58,6 +58,10 @@ create table if not exists public.pb_import_runs (
   updated_at timestamptz not null default now()
 );
 create index if not exists pb_import_runs_status_idx on public.pb_import_runs (status, created_at desc);
+-- One open run per site: two quick taps on Start (or two staff members) must not
+-- make two runs that fetch the same store at twice the pace. The edge function
+-- checks first and turns this index's 409 into the same "already running" sentence.
+create unique index if not exists pb_import_runs_one_open on public.pb_import_runs (host) where status in ('queued', 'running');
 drop trigger if exists pb_import_runs_touch on public.pb_import_runs;
 create trigger pb_import_runs_touch before update on public.pb_import_runs for each row execute function public.pb_touch();
 

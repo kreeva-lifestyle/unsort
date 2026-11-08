@@ -133,9 +133,12 @@ export default function ProductPage({ id, onClose, onChanged, addToast, vendors,
             {/* Facts 8 + AI 4 on their own 12-column grid: its lines match the outer grid at 12 and 6 columns, so the row stays full. */}
             <div className="pb-span-12" style={{ display: 'grid', gridTemplateColumns: 'repeat(12, minmax(0, 1fr))', gap: 16 }}>
               <div style={{ gridColumn: 'span 8', display: 'grid', minWidth: 0 }}>{facts}</div>
-              <div style={{ gridColumn: 'span 4', display: 'grid', minWidth: 0 }}><AiReadTile p={p} /></div>
+              {/* The side column: what the AI read (stretching to the Facts height), and below it what the other store showed. */}
+              <div style={{ gridColumn: 'span 4', display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
+                <div style={{ flex: '1 1 auto', display: 'grid', minWidth: 0 }}><AiReadTile p={p} /></div>
+                <WebMetaTile p={p} />
+              </div>
             </div>
-            <WebMetaTile p={p} span={12} />
           </div>
         </div>
       )}

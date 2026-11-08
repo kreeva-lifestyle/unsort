@@ -130,7 +130,7 @@ is_active). Service role for all DB writes. CORS like listing-ai.
 | action | who | body | result |
 |---|---|---|---|
 | `work` | secret or staff | – | `{ ok, read, routed, generated, published, failed }` |
-| `ingest` | secret | `{ source:'telegram'|'import', source_ref, raw_text, vendor_name?, image_urls?[], less_amount?, source_url?, intake_notes?[], sell_price?, price_note? }` | `{ ok, product_id, duplicate?, images?, warnings? }` (downloads images into the bucket; `sell_price` / `price_note` = import from website) |
+| `ingest` | secret | `{ source:'telegram'|'import', source_ref, raw_text, vendor_name?, image_urls?[], less_amount?, source_url?, intake_notes?[], sell_price?, price_note?, attributes?{}, sku? }` | `{ ok, product_id, duplicate?, images?, warnings? }` (downloads images into the bucket; `sell_price` / `price_note` = import from website; `attributes` / `sku` accepted from source 'import' only) |
 | `import_check` | staff | `{ url }` | preview of another store (see "Import from website") → `{ ok, platform, host, origin, estimate, estimate_in_stock (a count, `'5000+'` when counting stopped at the cap, null when unknown), sample[≤3]{ name, price, currency, image, url, in_stock }, warnings[], vendor_suggestion }` |
 | `import_start` | staff | `{ url, in_stock_only?, use_their_price?, vendor_name?, estimate? }` | validates + detects again, creates the vendor if needed, inserts a `queued` pb_import_runs row (`estimate` → `cursor.estimate`, display only) → `{ ok, run_id, platform, host, warnings[] }`; 409 while a run for that host is queued / running |
 | `import_cancel` | staff | `{ run_id }` | `queued` / `running` → `cancelled` (400 when already done / failed / cancelled) → `{ ok }` |
@@ -214,13 +214,33 @@ again skips what is already here.
 **Checks (import/urlCheck.ts).** https only; a public host name (no IP, port,
 login, localhost / .local / .internal…); never our own domains
 (`aryadesigns.co.in`, `supabase.co`, every `pb_websites.shop_domain`);
-redirects (≤ 3) are followed only to hosts that pass the same check.
+redirects (≤ 3) are followed only to hosts that pass the same check (our own
+domains included, `setOwnDomains`); photo URLs from the store's data are
+checked before the first request too. Where the runtime has `Deno.resolveDns`,
+a host whose A / AAAA answers are private (10/8, 127/8, 169.254/16, 172.16/12,
+192.168/16, 100.64/10, fc00::/7, fe80::/10…) is refused on every hop. **Gap
+left open:** DNS can change between that check and the fetch (rebinding) — the
+edge runtime cannot pin the resolved address.
 `robots.txt` is read first (our group `DailyOffice-Playbook`, else `*`;
-longest rule wins): a platform whose paths it disallows (`/products.json` and
+longest rule wins; rules matched by a plain loop, never a regex built from the
+site's text; ≤ 500 rules): every request to the site checks its path + query
+(every redirect hop too), a probe whose path is disallowed is never fetched,
+and a platform whose paths it disallows (`/products.json` and
 `/collections/all/products.json`; `/wp-json/wc/store/v1/products`;
 `/sitemap.xml`) is refused with a plain sentence, on check and again when the
-run starts. Requests: User-Agent `DailyOffice-Playbook/1.0 (+https://dailyoffice.aryadesigns.co.in)`,
-≥ 1 s apart, 20 s each, bodies ≤ 3 MB.
+run starts. robots.txt missing (4xx) = no rules; 5xx or unreachable = "try
+again later" (nothing is fetched). Its `Crawl-delay` sets the pace (1–10 s).
+A redirect between `example.com` and `www.example.com` on robots.txt is
+followed once and that host is stored on the run. Requests: User-Agent
+`DailyOffice-Playbook/1.0 (+https://dailyoffice.aryadesigns.co.in)`, booked
+per host (the store ≥ 1 s apart or its Crawl-delay; image CDNs 250 ms), 20 s
+each, bodies ≤ 3 MB (a bigger body is a 413, never half a page). 429 / 430 /
+503 = the store asks us to slow down: the run waits `Retry-After` (30 s – 10 min,
+default 60 s) in `cursor.wait_until`, not counted as an error, and the
+remaining product pages of that tick are skipped. Parsing is bounded (200 KB
+of HTML per page / description) and linear (no regex that can backtrack on a
+hostile page); a bad character code (`&#99999999;`) becomes a space, and a
+product that still fails to normalise is left out, never its page.
 
 **Detection (import/detect.ts).** Shopify = `GET /products.json?limit=…`
 (or `/collections/all/products.json`) answers `{ products: [...] }`;
@@ -229,7 +249,8 @@ WooCommerce = `GET /wp-json/wc/store/v1/products?per_page=1` answers an array
 robots.txt or `/sitemap.xml` (an index expanded one level, product-looking
 sitemaps first, ≤ 50) list product-looking URLs whose pages carry a JSON-LD
 `Product`; else unknown (check fails with "could not find a product list").
-Estimate: Shopify counts pages of 250 up to 20 (`capped: true` → "5000+") and
+A Shopify store whose products.json lands on `/password` is refused as
+password-protected. Estimate: Shopify counts pages of 250 up to 20 (`capped: true` → "5000+"; pages of 50 when 250 is over 3 MB) and
 the in-stock products on them; Woo `X-WP-Total` with and without
 `stock_status=instock`; generic the product URLs of ≤ 3 sitemaps (in-stock
 unknown). Vendor suggestion: `og:site_name`, else the `<title>` before " | ",
@@ -238,35 +259,102 @@ else the host.
 **Normalisation (import/normalize.ts) — one product per listing, never per
 variant.** `in_stock` = any variant available (Shopify `variants[].available`;
 Woo `is_in_stock` / `stock_status = 'instock'`; JSON-LD any offer InStock /
-LimitedAvailability / PreOrder); `price` = the lowest variant price (Woo minor
-units ÷ 10^currency_minor_unit; JSON-LD `price` / `lowPrice`); `compare_at` =
-the highest compare-at / regular price above it; `sizes` = the values of the
+LimitedAvailability / PreOrder); Shopify `price` = the lowest price among the
+variants ON SALE (sold-out ones only when all are — this becomes our selling
+price), `compare_at` = the compare-at of a variant at that same price, only when
+above it (never paired across variants); Woo minor units ÷
+10^currency_minor_unit, compare-at = regular above sale; JSON-LD `price` /
+`lowPrice` ("Rs. 1,299" → 1299), `@type` as `Product`, an IRI or
+`ProductGroup` (offers from `hasVariant`), raw newlines in the JSON tolerated; `sizes` = the values of the
 option / attribute named Size (variants' values first); `color` = the Color
 option when it has exactly one value; images in the store's order, https only,
 at most 10 (ingest's limit); description = body HTML → plain text (6000 chars).
 
+**Store facts → `pb_products.attributes` (import/meta.ts, 2026-11-08).** "Can
+we get all meta information like price, title, description, manufacturer name
+etc." Every fact the store exposes is kept as a plain string (≤ 500 chars)
+under these keys (`IMPORT_ATTRS`), ONLY when the store gives it — a key is
+never guessed, and brand is never copied into manufacturer:
+
+| key | Shopify | WooCommerce | JSON-LD / page |
+|---|---|---|---|
+| `brand` | `vendor` | `brands[]`, else attribute "Brand" | `brand.name` / `brand` |
+| `manufacturer` | product page JSON-LD | product page JSON-LD | `manufacturer.name` |
+| `product_type` | `product_type` | category names, comma-joined | `category` |
+| `store_tags` | `tags`, comma-joined | tag names, comma-joined | — |
+| `sku` | first variant SKU (also the `sku` column) | `sku` | `sku` / `mpn` |
+| `barcode` | first variant `barcode` | `global_unique_id` | `gtin13` / `gtin` / `gtin14/12/8` / `ean` |
+| `weight` | first variant `grams` → "750 g" / "1.5 kg" | `weight` + `weight_unit` (a bare number with no unit is not stored) | `weight` value + unit (KGM → kg, GRM → g) |
+| `compare_at_price` | "₹3,999" when above the price | regular price above the sale price | — |
+| `currency` | the store's `/meta.json` (once per run, `cursor.currency`); else the product page's `og:price:currency` ONLY when its `og:price:amount` is one of the product's prices (a page converted for the visitor's country is ignored) | `currency_code` | offer `priceCurrency` |
+| `seo_title` / `seo_description` | product page `<title>` (else `og:title`) / `meta[name=description]` (else `og:description`) | same, from the permalink | same page |
+| `material` / `colour` | options named Material or Fabric / Colour (all values) | attributes of those names | `material` / `color` |
+| `source_page_url` | the product page | the permalink | the page |
+
+The product page (Shopify / Woo) is fetched ONCE per new product
+(`import/enrich.ts`): same site (www. or not) and robots.txt-allowed only, a
+redirect off the site not followed, paced like every request, 10 s timeout; a
+page that fails leaves the product as the list gave it. Its JSON-LD only fills
+keys the list lacks (the list wins). A non-INR price is never copied, and a
+Shopify price whose currency is still unknown is not copied either ($29 must
+never become ₹29): `price_note` says so and the product waits in Needs info. Generic stores reuse the product page they already
+read. Ingest takes `attributes` and `sku` from `source='import'` only (keys
+`a-z0-9_`, ≤ 30, string values). `raw_text` keeps the stripped description and
+gains "Product type: …" / "Material: …" lines so the reader can pick the
+category and fabric. **The reader never drops or replaces an imported key**
+(`mergeReadAttrs`: on an imported product the IMPORT_ATTRS keys are skipped
+even on "Read again"; the AI's own keys — work, occasion… — are added beside
+them). The writer is not given `compare_at_price`, `currency`,
+`source_page_url`, `barcode` or the store's SEO wording (it writes its own).
+Tag templates can use them: `{attr:brand}`, `{attr:product_type}`,
+`{attr:manufacturer}`…; `{attr:store_tags}` gives ONE tag per store tag
+(with `{size}` too: one per tag × size); an empty key drops the template.
+
 **Run (import/runner.ts, from the worker).** The `work` run advances AT MOST
-ONE queued / running run for its first 50 s (`IMPORT_MS`), then releases it
-(`claimed_at` null) so read / generate / publish keep ≥ 50 s of starting
-time; a stuck claim is taken over after 5 min. Per page: Shopify
-`/products.json?limit=250&page=N` (a `Link: rel="next"` header — page_info
-pagination — replaces the counter); Woo `?per_page=100&page=N` (+
+ONE queued / running run for its first 30 s (`IMPORT_MS`), then releases it
+(`claimed_at` null) so read / generate / publish keep ≥ 70 s of starting
+time; a stuck claim is taken over after 5 min. **Backpressure
+(`importWaits`, worker.ts):** the import step is skipped while ≥ 10 products
+wait to be read, ≥ 20 listings to be written or ≥ 20 to be published, so a
+5,000-product store moves at the pace of the AI (a day or more) and never
+starves Telegram or typed-in products. Per page: Shopify
+`/products.json?limit=50&page=N` (a `Link: rel="next"` header — page_info
+pagination — replaces the counter, unless it points at the same page; a page
+that starts with the same product as the one before ends the run); Woo `?per_page=50&page=N` (+
 `&stock_status=instock` when in_stock_only; `X-WP-TotalPages` / a 400 past
 the end finish it); generic the next 25 product pages of the current
-sitemap. Each in-stock product (out-of-stock ones count as `out_of_stock`
-when in_stock_only, else they are imported too) goes through `ingest()`,
-three at a time: `source_ref`, `raw_text` = name + description + SKU / Sizes /
-Colour lines + "Selling price on host: ₹X" (ONLY when the price is copied, so
+sitemap (same site, robots.txt-allowed; every URL of a sitemap whose address
+says "product", else product-looking URLs; `<loc>` in CDATA read), pages
+imported before skipped WITHOUT being fetched, the rest fetched only while 20 s
+of the import clock are left (so their products are all added in time). A
+generic store that refuses every page fetched counts as a page error (3 → failed). Each in-stock product (out-of-stock
+ones count as `out_of_stock` when in_stock_only, else they are imported too)
+goes through `ingest()`, three at a time (`import/batch.ts`; Shopify / Woo:
+products already imported are looked up ONCE per page and skipped BEFORE their
+page is fetched; then each new one's product page, see "Store facts"). Because those
+page fetches are paced at ≥ 1 s, a Shopify / Woo page no longer fits one tick:
+no new batch starts in the last 10 s of the import clock (`META_RESERVE_MS`),
+and the run saves `cursor.skip` + `skip_ref` (the last product handled;
+released, still running); the next tick fetches that page again and carries on
+after that product (found by its id, so a product added or removed in between
+does not shift the run; `skip` is the fallback) — roughly 6–15 new products
+per 30 s tick, since photos are downloaded too. Per product: `source_ref`, `raw_text` = name + description + SKU / Sizes /
+Colour / Product type / Material lines + "Selling price on host: ₹X" (ONLY when the price is copied, so
 the reader never takes another store's price for a cost), `vendor_name`,
-`image_urls`, `source_url`, `sell_price` (when `use_their_price` and the
-currency is INR or unknown), `price_note`. `duplicate: true` → `skipped`;
+`image_urls` (photos fetched one at a time through the same polite fetch,
+5 MB each), `source_url`, `sell_price` (when `use_their_price` and the
+currency is INR — or unknown on WooCommerce / generic), `price_note`, `attributes`, `sku`. `duplicate: true` → `skipped`;
 an ingest error → `failed` (logged). Counters, `cursor` and `sample` are
 saved after every page; `done` when the last page is short; `failed` after 3
 consecutive page errors (the count rides in `cursor.errors`, the message in
 `error` "… (try 1 of 3)") or at once on a 400 of our own (no sitemap, unknown
 platform); a run cancelled meanwhile keeps the products already added and
-stays cancelled; `MAX_PRODUCTS` = 5000 → `done` with the note "Stopped at
-5000 products — run the import again later for the rest". `pb_activity`
+stays cancelled (and is not logged as failed); `MAX_PRODUCTS` = 5,000 NEW
+products (added + failed; products already here do not count, so a re-run
+gets the rest) or `MAX_SCANNED` = 20,000 looked at → `done` with the note
+"Stopped at 5,000 new products — run the import again later for the rest".
+One open run per site: checked on check / start (www. or not) and guarded by
+the unique index `pb_import_runs_one_open`. `pb_activity`
 rows: `import_started`, `import_cancelled`, `import_run` (done / failed with
 the counters). `trigger_pb_worker()` also fires while a run is queued /
 running and unclaimed.
@@ -282,10 +370,15 @@ generate.ts (price) and route.ts (re-pricing a published listing). Routing
 rules on `min_cost` / `max_cost` still look at `cost_price` only: an imported
 product without a cost does not match a cost-range rule.
 
-**Limits.** ≤ 1 request/s to the other store, 20 s per request, 3 MB per
-body, 10 images per product (15 MB each, jpeg / png / webp), 25 product pages
-per tick on generic stores, 5000 products per run, 20 runs listed, one open
-run per host at a time.
+**Limits.** ≤ 1 request/s to the other store (or its Crawl-delay; product
+pages and its own photos included), 20 s per request (10 s per product page),
+3 MB per body, 10 images per product (5 MB each for imports, one at a time,
+jpeg / png / webp), 25 product pages per tick on generic stores, 5,000 new
+products per run, 20 runs listed, one open run per host at a time. The other
+store's text goes to the reader and the writer with a rule to treat it as
+facts only (never instructions, links or contact details). Server errors
+that are not our own sentences reach the app as "Something went wrong on the
+Playbook server." (the details stay in the log).
 
 **Legal note (for the Guide).** Photos and text on another store are that
 store's copyright. Playbook rewrites titles and descriptions with the AI for

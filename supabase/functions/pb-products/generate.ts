@@ -65,7 +65,7 @@ export async function generateOne(l: ListingRow, o: { manual: boolean; prevStatu
     const extraMax = tr.ai_extra ? Math.max(0, Math.floor(Number(tr.ai_extra_max) || 0)) : 0;
     const ai = await askClaude<GenOut>({
       model: c.model, effort: c.effort,
-      system: genSystem(site.name, c, extraMax, photos.blocks.length),
+      system: genSystem(site.name, c, extraMax, photos.blocks.length, p.source === 'import'),
       content: [...photos.blocks, { type: 'text', text: genFacts(p, vendor?.name ?? '') }],
       schema: genSchema, maxTokens: 16000, timeoutMs: o.budget.hard - Date.now(),
     });

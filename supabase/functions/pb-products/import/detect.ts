@@ -2,13 +2,22 @@
 // sheet: platform, how many products (and in stock), three sample products,
 // warnings, a vendor name. Order: Shopify (/products.json), WooCommerce (Store
 // API), else "generic" when a sitemap or the home page exposes product pages
-// with JSON-LD Product, else "unknown". robots.txt is read first; a platform
-// whose paths it disallows is refused (urlCheck.robotsRefusal).
+// with JSON-LD Product, else "unknown". robots.txt is read first, and decides:
+//   - the site's own address: a redirect from example.com to www.example.com
+//     (or back) is followed once here and that host is used from then on;
+//   - every probe: a path it disallows is never fetched; when nothing could be
+//     found because of that, the robots refusal sentence is the answer;
+//   - its Crawl-delay sets the pace for this host (fetch.ts setPace).
+// robots.txt missing (4xx) = no rules; broken (5xx) or unreachable = stop and
+// try later (the standard says not to crawl a site whose robots.txt fails).
 import { HttpError } from '../http.ts';
-import { SHOPIFY_PAGE, pickSitemaps, productUrl, sitemapLocs } from './cursor.ts';
-import { siteGet, siteJson } from './fetch.ts';
-import { type Found, type ShopifyProduct, type WooProduct, fromJsonLd, fromShopify, fromWoo } from './normalize.ts';
-import { type Robots, type SiteUrl, parseRobots, robotsRefusal } from './urlCheck.ts';
+import { SHOPIFY_PAGE } from './cursor.ts';
+import { type Got, setPace, siteGet, siteJson } from './fetch.ts';
+import { metaTags } from './meta.ts';
+import { type Found, type ShopifyProduct, type WooProduct, fromShopify, fromWoo } from './normalize.ts';
+import { genericProbe } from './sitemaps.ts';
+import { decode, mapSafe } from './text.ts';
+import { ROBOTS_NO, type Robots, type SiteUrl, parseRobots, robotsAllow, robotsRefusal, sameSite } from './urlCheck.ts';
 
 export type Platform = 'shopify' | 'woocommerce' | 'generic' | 'unknown';
 export interface Estimate { total: number | null; in_stock: number | null; capped: boolean }
@@ -17,35 +26,61 @@ export interface Detected {
   estimate: Estimate; sample: Found[]; warnings: string[]; vendor_suggestion: string; sitemaps: string[];
 }
 
-const ESTIMATE_PAGES = 20; // Shopify: pages of 250 counted before we say "5000+"
+/** The check counts Shopify products in pages of 250 (fewer requests), or of 50 when 250 is over the body limit. */
+const ESTIMATE_PAGE = 250;
+const ESTIMATE_PAGES = 20;
+const UNREACHABLE = 'The website could not be reached right now — try again in a few minutes.';
+const PASSWORD = 'This store is password-protected, so its products cannot be read.';
+export const foreignPrices = (cur: string) => `Prices on this site are in ${cur}, not rupees, so no price is copied — each product waits in Needs info until you add a cost price.`;
 
 export async function readRobots(origin: string): Promise<Robots> {
-  try {
-    const r = await siteGet(`${origin}/robots.txt`, 'text/plain, */*;q=0.5');
-    return parseRobots(r.ok ? r.text : '');
-  } catch { return parseRobots(''); } // unreachable robots.txt = no rules (the standard)
+  let r: Got;
+  try { r = await siteGet(`${origin}/robots.txt`, { accept: 'text/plain, */*;q=0.5' }); } catch (e) {
+    if (e instanceof HttpError) throw e; // RateLimited (wait), or a redirect Playbook may not follow
+    throw new HttpError(502, UNREACHABLE);
+  }
+  if (r.status >= 500) throw new HttpError(502, UNREACHABLE);
+  const host = r.url && sameSite(r.url, origin) ? new URL(r.url).host : new URL(origin).host;
+  return { ...parseRobots(r.ok ? r.text : ''), host };
 }
 
-async function shopifyPage(origin: string, path: string): Promise<ShopifyProduct[] | null> {
-  const { data } = await siteJson<{ products?: unknown }>(`${origin}${path}`);
-  return data && Array.isArray(data.products) ? (data.products as ShopifyProduct[]) : null;
+/** The Shopify store's own currency (/meta.json), null when it does not say. Rate limits / network errors are thrown. */
+export async function shopCurrency(origin: string, robots: Robots): Promise<string | null> {
+  if (!robotsAllow(robots, '/meta.json')) return null;
+  const { data } = await siteJson<{ currency?: unknown }>(`${origin}/meta.json`, { robots });
+  const c = String(data?.currency ?? '').toUpperCase();
+  return /^[A-Z]{3}$/.test(c) ? c : null;
 }
 
-/** Shopify: count pages of 250 until a short page (≤ ESTIMATE_PAGES requests). */
-async function shopifyEstimate(origin: string, first: ShopifyProduct[]): Promise<{ est: Estimate; sample: Found[] }> {
+interface Probe { origin: string; robots: Robots; blocked: boolean }
+/** A JSON probe, only where robots.txt allows it (`blocked` remembers that one was skipped). */
+async function getJson<T>(p: Probe, path: string): Promise<{ data: T | null; got: Got } | null> {
+  if (!robotsAllow(p.robots, path)) { p.blocked = true; return null; }
+  return siteJson<T>(p.origin + path, { robots: p.robots });
+}
+
+async function shopifyList(p: Probe, path: string): Promise<{ products: ShopifyProduct[] | null; status: number }> {
+  const r = await getJson<{ products?: unknown }>(p, path);
+  if (!r) return { products: null, status: 0 };
+  if (r.got.url && new URL(r.got.url).pathname === '/password') throw new HttpError(400, PASSWORD);
+  return { products: r.data && Array.isArray(r.data.products) ? r.data.products as ShopifyProduct[] : null, status: r.got.status };
+}
+
+/** Shopify: count pages until a short one (≤ ESTIMATE_PAGES requests). */
+async function shopifyEstimate(p: Probe, base: string, size: number, first: ShopifyProduct[], currency: string | null): Promise<{ est: Estimate; sample: Found[] }> {
   let total = 0, inStock = 0, capped = false, page = 1, items: ShopifyProduct[] | null = first;
   const sample: Found[] = [];
   while (items) {
     total += items.length;
-    for (const p of items) {
-      const f = fromShopify(p, origin);
-      if (f.in_stock) inStock++;
-      if (sample.length < 3 && f.in_stock) sample.push(f);
+    for (const f of mapSafe(items, x => fromShopify(x, p.origin, currency))) {
+      if (!f.in_stock) continue;
+      inStock++;
+      if (sample.length < 3) sample.push(f);
     }
-    if (items.length < SHOPIFY_PAGE) break;
+    if (items.length < size) break;
     if (page >= ESTIMATE_PAGES) { capped = true; break; }
     page++;
-    items = await shopifyPage(origin, `/products.json?limit=${SHOPIFY_PAGE}&page=${page}`);
+    items = (await shopifyList(p, `${base}?limit=${size}&page=${page}`)).products;
   }
   return { est: { total, in_stock: inStock, capped }, sample };
 }
@@ -54,92 +89,64 @@ const num = (h: Headers, k: string): number | null => { const n = Number(h.get(k
 
 /** Site name from the home page (og:site_name, else <title> before " | " / " – "), else the host. */
 export function siteName(html: string, host: string): string {
-  const og = /<meta[^>]+property=["']og:site_name["'][^>]+content=["']([^"']+)["']/i.exec(html) || /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:site_name["']/i.exec(html);
-  const title = /<title[^>]*>([^<]{1,200})<\/title>/i.exec(html);
-  const raw = (og?.[1] || title?.[1] || '').replace(/&amp;/g, '&').split(/\s+[|–—-]\s+/)[0].replace(/\s+/g, ' ').trim();
+  const { head, metas } = metaTags(html);
+  const title = /<title[^<>]{0,200}>([^<]{1,200})<\/title/i.exec(head)?.[1];
+  const raw = decode(metas['og:site_name'] || title || '').split(/\s+[|–—-]\s+/)[0].replace(/\s+/g, ' ').trim();
   return (raw || host.replace(/^www\./, '').split('.')[0]).slice(0, 120);
 }
 
+async function homePage(p: Probe): Promise<Got | null> {
+  return robotsAllow(p.robots, '/') ? siteGet(p.origin, { robots: p.robots }).catch(() => null) : null;
+}
+
 export async function detect(site: SiteUrl, o: { estimate: boolean }): Promise<Detected> {
-  const { origin, host } = site;
-  const robots = await readRobots(origin);
+  const robots = await readRobots(site.origin);
+  const host = robots.host ?? site.host, origin = `https://${host}`;
+  setPace(host, (robots.crawlDelay ?? 1) * 1000);
   const warnings: string[] = [];
-  if (robots.crawlDelay && robots.crawlDelay > 1) warnings.push(`The site asks robots to wait ${robots.crawlDelay} seconds between pages; Playbook waits at least 1 second, so a big import takes a while.`);
+  if (robots.crawlDelay && robots.crawlDelay > 1) warnings.push(`The site asks visitors to wait ${Math.min(10, robots.crawlDelay)} seconds between pages, and Playbook does, so a big import takes a while.`);
   const base = { origin, host, robots, warnings, sitemaps: [] as string[] };
-  const refuse = (platform: Platform) => { const r = robotsRefusal(robots, platform); if (r) throw new HttpError(400, r); };
+  const probe: Probe = { origin, robots, blocked: false };
+  const vendor = async () => { const h = await homePage(probe); return siteName(h?.ok ? h.text : '', host); };
 
   // Shopify
-  let sp = await shopifyPage(origin, `/products.json?limit=${o.estimate ? SHOPIFY_PAGE : 1}`);
-  if (!sp) sp = await shopifyPage(origin, `/collections/all/products.json?limit=${o.estimate ? SHOPIFY_PAGE : 1}`);
-  if (sp) {
-    refuse('shopify');
-    const { est, sample } = o.estimate ? await shopifyEstimate(origin, sp) : { est: { total: null, in_stock: null, capped: false }, sample: [] };
-    return { ...base, platform: 'shopify', estimate: est, sample, vendor_suggestion: await vendorName(origin, host) };
+  const tryList = async (path: string) => {
+    let size = o.estimate ? ESTIMATE_PAGE : 1;
+    let r = await shopifyList(probe, `${path}?limit=${size}`);
+    if (!r.products && r.status === 413) { size = SHOPIFY_PAGE; r = await shopifyList(probe, `${path}?limit=${size}`); }
+    return { ...r, size, path };
+  };
+  let sp = await tryList('/products.json');
+  if (!sp.products) sp = await tryList('/collections/all/products.json');
+  if (sp.products) {
+    const currency = o.estimate ? await shopCurrency(origin, robots) : null;
+    if (currency && currency !== 'INR') warnings.push(foreignPrices(currency));
+    const { est, sample } = o.estimate ? await shopifyEstimate(probe, sp.path, sp.size, sp.products, currency) : { est: { total: null, in_stock: null, capped: false }, sample: [] };
+    return { ...base, platform: 'shopify', estimate: est, sample, vendor_suggestion: await vendor() };
   }
   // WooCommerce (Store API: public, no key)
-  const woo = await siteJson<WooProduct[]>(`${origin}/wp-json/wc/store/v1/products?per_page=${o.estimate ? 3 : 1}&stock_status=instock`);
-  if (Array.isArray(woo.data)) {
-    refuse('woocommerce');
+  const woo = await getJson<WooProduct[]>(probe, `/wp-json/wc/store/v1/products?per_page=${o.estimate ? 3 : 1}&stock_status=instock`);
+  if (woo && Array.isArray(woo.data)) {
     let total: number | null = null;
-    if (o.estimate) { const all = await siteJson<unknown>(`${origin}/wp-json/wc/store/v1/products?per_page=1`); total = num(all.got.headers, 'x-wp-total'); }
-    const sample = woo.data.map(p => fromWoo(p, origin)).filter(f => f.in_stock).slice(0, 3);
-    if (sample.some(s => s.currency && s.currency !== 'INR')) warnings.push(`Prices on this site are in ${sample.find(s => s.currency)?.currency}, not rupees — the price switch is skipped and the AI reads the cost instead.`);
-    return { ...base, platform: 'woocommerce', estimate: { total, in_stock: num(woo.got.headers, 'x-wp-total'), capped: false }, sample, vendor_suggestion: await vendorName(origin, host) };
+    if (o.estimate) { const all = await getJson<unknown>(probe, '/wp-json/wc/store/v1/products?per_page=1'); total = all ? num(all.got.headers, 'x-wp-total') : null; }
+    const sample = mapSafe(woo.data, p => fromWoo(p, origin)).filter(f => f.in_stock).slice(0, 3);
+    const cur = sample.find(s => s.currency && s.currency !== 'INR')?.currency;
+    if (cur) warnings.push(foreignPrices(cur));
+    return { ...base, platform: 'woocommerce', estimate: { total, in_stock: num(woo.got.headers, 'x-wp-total'), capped: false }, sample, vendor_suggestion: await vendor() };
   }
   // Generic: product pages with JSON-LD, found through the sitemap (or the home page itself)
-  const home = await siteGet(origin).catch(() => null);
-  const vendor = siteName(home?.ok ? home.text : '', host);
+  const home = await homePage(probe);
   const g = await genericProbe(origin, robots, home?.ok ? home.text : '', o.estimate);
+  const vendorName = siteName(home?.ok ? home.text : '', host);
   if (g) {
-    refuse('generic');
+    const r = robotsRefusal(robots, 'generic');
+    if (r) throw new HttpError(400, r);
     warnings.push('This is not a Shopify or WooCommerce store, so Playbook reads each product page one by one (best effort): some products or details may be missed.');
-    if (g.sample.some(s => s.currency && s.currency !== 'INR')) warnings.push(`Prices on this site are in ${g.sample.find(s => s.currency)?.currency}, not rupees — the price switch is skipped and the AI reads the cost instead.`);
-    return { ...base, platform: 'generic', estimate: { total: g.total, in_stock: null, capped: g.capped }, sample: g.sample, warnings, vendor_suggestion: vendor, sitemaps: g.sitemaps };
+    const cur = g.sample.find(s => s.currency && s.currency !== 'INR')?.currency;
+    if (cur) warnings.push(foreignPrices(cur));
+    return { ...base, platform: 'generic', estimate: { total: g.total, in_stock: null, capped: g.capped }, sample: g.sample, warnings, vendor_suggestion: vendorName, sitemaps: g.sitemaps };
   }
-  if (home && !home.ok) warnings.push(`The website answered ${home.status} to Playbook — it may block automated visitors.`);
-  return { ...base, platform: 'unknown', estimate: { total: null, in_stock: null, capped: false }, sample: [], warnings, vendor_suggestion: vendor };
+  if (probe.blocked) throw new HttpError(400, ROBOTS_NO);
+  if (home && !home.ok) warnings.push('The website did not answer Playbook normally — it may block automated visitors.');
+  return { ...base, platform: 'unknown', estimate: { total: null, in_stock: null, capped: false }, sample: [], warnings, vendor_suggestion: vendorName };
 }
-
-async function vendorName(origin: string, host: string): Promise<string> {
-  const home = await siteGet(origin).catch(() => null);
-  return siteName(home?.ok ? home.text : '', host);
-}
-
-/** Sitemaps worth reading (from robots.txt, else /sitemap.xml; an index is expanded one level). */
-export async function findSitemaps(origin: string, robots: Robots): Promise<string[]> {
-  const roots = robots.sitemaps.filter(s => s.startsWith(origin + '/')).length ? robots.sitemaps.filter(s => s.startsWith(origin + '/')) : [`${origin}/sitemap.xml`];
-  const out: string[] = [];
-  for (const root of roots.slice(0, 3)) {
-    const r = await siteGet(root, 'application/xml, text/xml, */*;q=0.5').catch(() => null);
-    if (!r?.ok) continue;
-    const { index, locs } = sitemapLocs(r.text);
-    if (index) out.push(...pickSitemaps(locs.filter(l => l.startsWith(origin + '/'))));
-    else out.push(root);
-  }
-  return [...new Set(out)].slice(0, 50);
-}
-
-async function genericProbe(origin: string, robots: Robots, home: string, estimate: boolean): Promise<{ total: number | null; capped: boolean; sample: Found[]; sitemaps: string[] } | null> {
-  const sitemaps = await findSitemaps(origin, robots);
-  let total = 0, capped = false;
-  const urls: string[] = [];
-  for (const sm of sitemaps.slice(0, estimate ? 3 : 1)) {
-    const r = await siteGet(sm, 'application/xml, text/xml, */*;q=0.5').catch(() => null);
-    if (!r?.ok) continue;
-    const locs = sitemapLocs(r.text).locs.filter(l => l.startsWith(origin + '/') && productUrl(l));
-    total += locs.length;
-    urls.push(...locs);
-  }
-  if (sitemaps.length > 3) capped = true;
-  const sample: Found[] = [];
-  for (const u of urls.slice(0, estimate ? 5 : 1)) { // a few product pages: proof that JSON-LD is there
-    const r = await siteGet(u).catch(() => null);
-    const f = r?.ok ? fromJsonLd(r.text, u) : null;
-    if (f && f.name) sample.push(f);
-    if (sample.length >= 3) break;
-  }
-  if (sample.length) return { total: total || null, capped, sample, sitemaps };
-  const onHome = fromJsonLd(home, origin);
-  return onHome && urls.length ? { total: total || null, capped, sample: [onHome], sitemaps } : null;
-}
-

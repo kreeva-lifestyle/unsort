@@ -34,7 +34,7 @@ export function SourceLine({ p }: { p: ProductDetail }) {
       <span style={{ ...pbMeta, display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', minWidth: 0 }}>
         <span>From a website</span>
         {host && <><span aria-hidden="true">·</span><span style={{ ...pbNum, color: PB.tx, overflowWrap: 'anywhere', minWidth: 0 }}>{host}</span></>}
-        {url && <><span aria-hidden="true">·</span><a href={url} target="_blank" rel="noopener noreferrer" className="pb-pill" style={linkStyle}>Open page<PbIcon name="arrowUpRight" size={14} /><span className="pb-sr"> (opens the other store)</span></a></>}
+        {url && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap' }}><span aria-hidden="true">·</span><a href={url} target="_blank" rel="noopener noreferrer" className="pb-pill" style={linkStyle}>Open page<PbIcon name="arrowUpRight" size={14} /><span className="pb-sr"> (opens the other store)</span></a></span>}
       </span>
     );
   }

@@ -117,7 +117,7 @@ export default function Products({ addToast, start = {}, onGuide }: { addToast: 
           phoneAction={<PbButton kind="primary" iconOnly icon="plus" aria-label="Add product" onClick={add} />} />
         {imp.run && (
           <div style={{ marginBottom: 'var(--pb-pad-tile)' }}>
-            <ImportRunTile run={imp.run} pollError={imp.error} onChanged={() => void imp.reload()} onDismiss={() => imp.dismiss(imp.run!.id)} onRetry={openImport} addToast={addToast} />
+            <ImportRunTile run={imp.run} pollError={imp.error} onChanged={() => void imp.reload()} onDismiss={() => imp.dismiss(imp.run!.id)} onRetry={openImport} onShow={id => { setSearch(''); setFilter({ ...EMPTY_FILTER, vendorId: id }); }} addToast={addToast} />
           </div>
         )}
         {/* Phone: the header holds one action (+), so the import lives as a row at the top of the list. */}
