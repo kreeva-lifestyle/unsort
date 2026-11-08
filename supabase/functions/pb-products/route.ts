@@ -14,9 +14,9 @@
 // becomes 'skipped' with NO_MATCH; one already on Shopify is left as is and
 // reported back as a warning (staff decide whether to remove it).
 import { enc, insert, logActivity, patch, sel } from './db.ts';
-import { computePrice } from './pricing.ts';
+import { listingPrice } from './pricing.ts';
 import { decide } from './routing.ts';
-import { ARCHIVED, LISTING_COLS, RULE_COLS, type ListingRow, type Pricing, type ProductRow, type RuleRow } from './types.ts';
+import { ARCHIVED, LISTING_COLS, RULE_COLS, hasPrice, type ListingRow, type Pricing, type ProductRow, type RuleRow } from './types.ts';
 
 const REQUEUE = ['queued', 'review', 'failed'];
 export const NO_MATCH = "No longer matches this website's rules.";
@@ -58,9 +58,9 @@ export async function routeProduct(p: ProductRow, userId: string | null): Promis
     } else if (waiting(cur) || autoSkipped(cur)) {
       const done = await patch('pb_listings', `id=eq.${enc(cur.id)}&or=(${WAITING_OR},and(status.eq.skipped,shopify_product_id.is.null,error.in.(${AUTO_SKIP.map(quoted).join(',')})))`, fields);
       (done.length ? queued : kept).push(s.name);
-    } else if (cur.status === 'published' && !(cur.locked || []).includes('price') && p.cost_price !== null && p.cost_price !== undefined) {
-      // The cost or the site's pricing changed: only the price moves; the written text stays.
-      const calc = computePrice(Number(p.cost_price), s.pricing || {}, d.rule?.price_override ?? null);
+    } else if (cur.status === 'published' && !(cur.locked || []).includes('price') && hasPrice(p)) {
+      // The cost / copied selling price or the site's pricing changed: only the price moves; the written text stays.
+      const calc = listingPrice(p, s.pricing || {}, d.rule?.price_override ?? null)!;
       const same = Number(cur.price) === calc.price && Number(cur.compare_at_price ?? 0) === Number(calc.compare_at ?? 0);
       if (same || !(calc.price > 0)) { kept.push(s.name); continue; }
       const done = await patch('pb_listings', `id=eq.${enc(cur.id)}&status=eq.published`, {

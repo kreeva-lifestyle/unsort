@@ -2,7 +2,10 @@
 // fills the facts (name, sku, category, fabric, color, sizes, cost_price,
 // attributes). Only fields that are empty AND not locked are filled (a manual
 // "Read again" refreshes every field that is not locked). Then: cost or
-// category missing → needs_info; else ready → route (step 2).
+// category missing → needs_info; else ready → route (step 2). A product with
+// sell_price (import from website: the other store's price is our selling
+// price) needs no cost: the AI's cost_price is ignored for it, because the
+// only price in its text is that selling price, not a cost.
 // AI error: back to 'new' with ai_error, claimed_at kept so it retries after
 // 5 min; the third error in a row → needs_info, or ready (and routed) when
 // cost and category are already filled. The count rides in ai_error
@@ -18,7 +21,7 @@ import { aiPhotos } from './photos.ts';
 import { readerPrompt, readerSchema, type ReadOut } from './readerPrompt.ts';
 import { routeProduct } from './route.ts';
 import { stripLess } from '../pb-telegram/group.ts';
-import { MAX_ATTEMPTS, PRODUCT_COLS, STALE_MS, type Budget, type ProductRow } from './types.ts';
+import { MAX_ATTEMPTS, PRODUCT_COLS, STALE_MS, hasPrice, type Budget, type ProductRow } from './types.ts';
 
 /** Products the worker may read: new (not in a retry wait) or a stuck 'reading'. */
 const due = () => {
@@ -58,7 +61,8 @@ function merge(p: ProductRow, out: ReadOut, categories: string[], manual: boolea
   // A Telegram "Less" comes off the RATE the AI read — in code, never by the AI: cost = rate − less.
   // Less >= rate leaves the cost empty (needs_info) instead of ₹0.
   const cost = Number(out.cost_price) - (Number(p.less_amount) > 0 ? Number(p.less_amount) : 0);
-  if (out.cost_price !== null && Number.isFinite(cost) && cost > 0 && cost < 10_000_000 && can('cost_price')) set.cost_price = Math.round(cost * 100) / 100;
+  const sells = p.sell_price !== null && p.sell_price !== undefined; // imported: the price in the text is the SELLING price
+  if (!sells && out.cost_price !== null && Number.isFinite(cost) && cost > 0 && cost < 10_000_000 && can('cost_price')) set.cost_price = Math.round(cost * 100) / 100;
   if (!locked.has('attributes')) {
     const attrs: Record<string, string> = { ...(p.attributes || {}) };
     for (const [k, v] of Object.entries(out.attributes || {})) {
@@ -91,7 +95,7 @@ export async function readOne(p: ProductRow, o: { manual: boolean; prevStatus?: 
     });
     const set = merge(p, ai.data, s.categories, o.manual);
     const next = { ...p, ...set } as ProductRow;
-    const status = next.cost_price === null || next.cost_price === undefined || !String(next.category || '').trim() ? 'needs_info' : 'ready';
+    const status = !hasPrice(next) || !String(next.category || '').trim() ? 'needs_info' : 'ready';
     const saved = await patch<ProductRow>('pb_products', `id=eq.${enc(p.id)}&status=eq.reading`,
       { ...set, status, ai_read_at: nowIso(), ai_error: null, claimed_at: null }, PRODUCT_COLS);
     if (!saved[0]) throw new HttpError(409, 'The product changed while it was being read — open it again.');
@@ -106,7 +110,7 @@ export async function readOne(p: ProductRow, o: { manual: boolean; prevStatus?: 
     }
     const n = Number(TRY_RE.exec(p.ai_error || '')?.[1] || 0) + 1;
     const giveUp = n >= MAX_ATTEMPTS;
-    const complete = p.cost_price !== null && p.cost_price !== undefined && !!String(p.category || '').trim();
+    const complete = hasPrice(p) && !!String(p.category || '').trim();
     if (giveUp && complete) { // staff already gave what websites need: ready anyway, the error stays as a note
       const r = await patch<ProductRow>('pb_products', `id=eq.${enc(p.id)}&status=eq.reading`, { status: 'ready', ai_error: msg.slice(0, 300), claimed_at: null }, PRODUCT_COLS);
       if (r[0]) await routeAfterRead(r[0], o, p.ai_error);
@@ -153,6 +157,7 @@ function factsText(p: ProductRow, vendor: string): string {
   ].filter(Boolean).join('\n');
   // Every less phrase ("Less: 200", "200 Less", "RATE 1600 LESS 200" → "RATE 1600") is hidden, so it is never taken off twice.
   const post = less ? stripLess(String(p.raw_text || '')) : p.raw_text;
-  const note = less ? '\n\nThe vendor also gives a separate discount ("less"); Playbook subtracts it itself, so cost_price must be the RATE written in the post, before any less.' : '';
+  const note = less ? '\n\nThe vendor also gives a separate discount ("less"); Playbook subtracts it itself, so cost_price must be the RATE written in the post, before any less.'
+    : p.sell_price !== null && p.sell_price !== undefined ? '\n\nThis product was imported from another online store: the price in the text is that store\'s SELLING price, not a vendor cost. Return cost_price null.' : '';
   return `${known ? `Already known:\n${known}\n\n` : ''}Vendor's post:\n${String(post || '(no text — use the photos)').slice(0, 6000)}${note}`;
 }

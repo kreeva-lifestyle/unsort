@@ -130,7 +130,11 @@ is_active). Service role for all DB writes. CORS like listing-ai.
 | action | who | body | result |
 |---|---|---|---|
 | `work` | secret or staff | – | `{ ok, read, routed, generated, published, failed }` |
-| `ingest` | secret | `{ source:'telegram'|'import', source_ref, raw_text, vendor_name?, image_urls?[] }` | `{ ok, product_id, duplicate? }` (downloads images into the bucket) |
+| `ingest` | secret | `{ source:'telegram'|'import', source_ref, raw_text, vendor_name?, image_urls?[], less_amount?, source_url?, intake_notes?[], sell_price?, price_note? }` | `{ ok, product_id, duplicate?, images?, warnings? }` (downloads images into the bucket; `sell_price` / `price_note` = import from website) |
+| `import_check` | staff | `{ url }` | preview of another store (see "Import from website") → `{ ok, platform, host, origin, estimate, estimate_in_stock (a count, `'5000+'` when counting stopped at the cap, null when unknown), sample[≤3]{ name, price, currency, image, url, in_stock }, warnings[], vendor_suggestion }` |
+| `import_start` | staff | `{ url, in_stock_only?, use_their_price?, vendor_name?, estimate? }` | validates + detects again, creates the vendor if needed, inserts a `queued` pb_import_runs row (`estimate` → `cursor.estimate`, display only) → `{ ok, run_id, platform, host, warnings[] }`; 409 while a run for that host is queued / running |
+| `import_cancel` | staff | `{ run_id }` | `queued` / `running` → `cancelled` (400 when already done / failed / cancelled) → `{ ok }` |
+| `import_list` | staff | – | `{ ok, runs[≤20] }` newest first (all columns of pb_import_runs) |
 | `read_product` | staff | `{ product_id }` | re-run step 1 now for one product (ignores locked fields) → `{ ok, product, routed, warning? }` |
 | `route_product` | staff | `{ product_id }` | step 2 now → `{ ok, routed, repriced, listings, warning? }` |
 | `route_website` | staff | `{ website_id }` | step 2 for every Ready product on one active website (new listings + auto-skipped ones back) → `{ ok, queued, matched, more }` |
@@ -180,3 +184,111 @@ use `useBackClose` so device Back closes them.
   "Run now" (calls `work`).
 - **Guide** — the user guide in the app + "Download PDF"
   (`/playbook/product-directory-guide.pdf` in `public/`).
+
+## Import from website (owner, 2026-11-08)
+"A tool where we enter the website and it scrapes all in-stock products." The
+websites are OTHER (competitor) online stores; what is found is added to the
+directory as products (`source='import'`) and then read, routed, written and
+published like any other product. **The price shown on the other store is OUR
+selling price** (not a cost): such a product carries `sell_price` and the
+pricing formulas are skipped for it.
+Migration: `supabase/migrations/20261108090000_pb_website_import.sql`. Code:
+`supabase/functions/pb-products/import/` (tests in `pb-products/test/`, run
+with `node --test --experimental-strip-types supabase/functions/pb-products/test/*.test.mjs`).
+
+**Data.** `pb_products.sell_price numeric(12,2)` — "sell at exactly this price
+on every website; pricing rules are skipped"; `price_note text` — "Price copied
+from example.com on 8 Nov 2026 (shown there as reduced from ₹3999)" or, with the
+switch off, "example.com sells it for ₹2299 (seen 8 Nov 2026); the price was
+not copied." `pb_import_runs`: `url, host, platform (shopify | woocommerce |
+generic | unknown), status (queued → running → done | failed | cancelled),
+in_stock_only, use_their_price, vendor_id, cursor jsonb, found, added, skipped
+(already imported earlier), out_of_stock (left out), failed, sample jsonb (first
+3: name, price, image, url), error, claimed_at, created_by, created_at,
+started_at, finished_at, updated_at`. RLS: staff SELECT only — every write is
+the edge function's (service role), so the URL is always validated server-side.
+Dedupe: `source_ref = '<host>:<Shopify / Woo product id | page path>'` under
+the existing unique index on (source, source_ref) → running the same site
+again skips what is already here.
+
+**Checks (import/urlCheck.ts).** https only; a public host name (no IP, port,
+login, localhost / .local / .internal…); never our own domains
+(`aryadesigns.co.in`, `supabase.co`, every `pb_websites.shop_domain`);
+redirects (≤ 3) are followed only to hosts that pass the same check.
+`robots.txt` is read first (our group `DailyOffice-Playbook`, else `*`;
+longest rule wins): a platform whose paths it disallows (`/products.json` and
+`/collections/all/products.json`; `/wp-json/wc/store/v1/products`;
+`/sitemap.xml`) is refused with a plain sentence, on check and again when the
+run starts. Requests: User-Agent `DailyOffice-Playbook/1.0 (+https://dailyoffice.aryadesigns.co.in)`,
+≥ 1 s apart, 20 s each, bodies ≤ 3 MB.
+
+**Detection (import/detect.ts).** Shopify = `GET /products.json?limit=…`
+(or `/collections/all/products.json`) answers `{ products: [...] }`;
+WooCommerce = `GET /wp-json/wc/store/v1/products?per_page=1` answers an array
+(`X-WP-Total` headers give the counts); generic = the sitemap(s) from
+robots.txt or `/sitemap.xml` (an index expanded one level, product-looking
+sitemaps first, ≤ 50) list product-looking URLs whose pages carry a JSON-LD
+`Product`; else unknown (check fails with "could not find a product list").
+Estimate: Shopify counts pages of 250 up to 20 (`capped: true` → "5000+") and
+the in-stock products on them; Woo `X-WP-Total` with and without
+`stock_status=instock`; generic the product URLs of ≤ 3 sitemaps (in-stock
+unknown). Vendor suggestion: `og:site_name`, else the `<title>` before " | ",
+else the host.
+
+**Normalisation (import/normalize.ts) — one product per listing, never per
+variant.** `in_stock` = any variant available (Shopify `variants[].available`;
+Woo `is_in_stock` / `stock_status = 'instock'`; JSON-LD any offer InStock /
+LimitedAvailability / PreOrder); `price` = the lowest variant price (Woo minor
+units ÷ 10^currency_minor_unit; JSON-LD `price` / `lowPrice`); `compare_at` =
+the highest compare-at / regular price above it; `sizes` = the values of the
+option / attribute named Size (variants' values first); `color` = the Color
+option when it has exactly one value; images in the store's order, https only,
+at most 10 (ingest's limit); description = body HTML → plain text (6000 chars).
+
+**Run (import/runner.ts, from the worker).** The `work` run advances AT MOST
+ONE queued / running run for its first 50 s (`IMPORT_MS`), then releases it
+(`claimed_at` null) so read / generate / publish keep ≥ 50 s of starting
+time; a stuck claim is taken over after 5 min. Per page: Shopify
+`/products.json?limit=250&page=N` (a `Link: rel="next"` header — page_info
+pagination — replaces the counter); Woo `?per_page=100&page=N` (+
+`&stock_status=instock` when in_stock_only; `X-WP-TotalPages` / a 400 past
+the end finish it); generic the next 25 product pages of the current
+sitemap. Each in-stock product (out-of-stock ones count as `out_of_stock`
+when in_stock_only, else they are imported too) goes through `ingest()`,
+three at a time: `source_ref`, `raw_text` = name + description + SKU / Sizes /
+Colour lines + "Selling price on host: ₹X" (ONLY when the price is copied, so
+the reader never takes another store's price for a cost), `vendor_name`,
+`image_urls`, `source_url`, `sell_price` (when `use_their_price` and the
+currency is INR or unknown), `price_note`. `duplicate: true` → `skipped`;
+an ingest error → `failed` (logged). Counters, `cursor` and `sample` are
+saved after every page; `done` when the last page is short; `failed` after 3
+consecutive page errors (the count rides in `cursor.errors`, the message in
+`error` "… (try 1 of 3)") or at once on a 400 of our own (no sitemap, unknown
+platform); a run cancelled meanwhile keeps the products already added and
+stays cancelled; `MAX_PRODUCTS` = 5000 → `done` with the note "Stopped at
+5000 products — run the import again later for the rest". `pb_activity`
+rows: `import_started`, `import_cancelled`, `import_run` (done / failed with
+the counters). `trigger_pb_worker()` also fires while a run is queued /
+running and unclaimed.
+
+**Reader / pricing / publish with sell_price.** `reader.ts`: ready needs a
+category plus a cost price OR a sell_price (`hasPrice`, types.ts); for a
+product with sell_price the AI's `cost_price` is ignored and the prompt says
+the price in the text is a selling price. `pricing.ts listingPrice()`: with
+sell_price the listing price is EXACTLY sell_price on every website — markup,
+add, rounding, min price and any rule `price_override` are skipped; only the
+site's compare-at % still applies (as for a price typed by hand). Used by
+generate.ts (price) and route.ts (re-pricing a published listing). Routing
+rules on `min_cost` / `max_cost` still look at `cost_price` only: an imported
+product without a cost does not match a cost-range rule.
+
+**Limits.** ≤ 1 request/s to the other store, 20 s per request, 3 MB per
+body, 10 images per product (15 MB each, jpeg / png / webp), 25 product pages
+per tick on generic stores, 5000 products per run, 20 runs listed, one open
+run per host at a time.
+
+**Legal note (for the Guide).** Photos and text on another store are that
+store's copyright. Playbook rewrites titles and descriptions with the AI for
+each website, but photos are copied as they are. Use this only on sites whose
+content you are allowed to reuse, or replace the photos before publishing.
+

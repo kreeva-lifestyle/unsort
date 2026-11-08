@@ -25,9 +25,9 @@ export default function ProductCard({ p, sites, onOpen }: { p: ProductRow; sites
           </span>
         )}
         <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-          {p.cost_price == null
-            ? <span style={pbMeta}>No price</span>
-            : <span style={{ ...pbNum, fontSize: 15, fontWeight: 500, color: PB.tx }}>{rupees(p.cost_price)}</span>}
+          {p.cost_price != null ? <span style={{ ...pbNum, fontSize: 15, fontWeight: 500, color: PB.tx }}>{rupees(p.cost_price)}</span>
+            : p.sell_price != null ? <span style={pbMeta}>Sells at <span style={{ ...pbNum, fontSize: 15, fontWeight: 500, color: PB.tx }}>{rupees(p.sell_price)}</span></span>
+              : <span style={pbMeta}>No price</span>}
           <Dot color={st.color} label={st.label} />
         </span>
         {p.pb_listings.length > 0 && (

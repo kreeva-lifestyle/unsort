@@ -52,7 +52,7 @@ export function FirstRunEmpty({ onAdd }: { onAdd: () => void }) {
   return (
     <Shell icon="box" title="No products yet"
       action={<PbButton icon="plus" onClick={onAdd}>Add a product</PbButton>}>
-      Add a product by hand — Telegram posts will land here automatically once that is connected.
+      Add a product by hand, or copy a whole store with Import from website. Telegram posts land here by themselves once that is connected.
     </Shell>
   );
 }

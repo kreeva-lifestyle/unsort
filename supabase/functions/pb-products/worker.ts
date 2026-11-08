@@ -7,18 +7,27 @@
 // at most 6 reads, 8 generations, 10 publishes. Each item records its own
 // outcome (status, error, pb_activity) inside its step, so a failure here is
 // only counted and logged, and the run moves on to the next item.
+// Import from website (import/runner.ts) goes FIRST and gets the first
+// IMPORT_MS of the run (one run, as many pages as fit): it releases the run
+// when its time is up, so read / generate / publish always keep at least
+// soft − IMPORT_MS = 50 s of starting time plus the hard margin. A product
+// being added when the import clock runs out finishes (its photo downloads
+// are bounded by ingest's own timeouts).
 import { claimGenerate, genCandidates, generateOne } from './generate.ts';
+import { advanceImport } from './import/runner.ts';
 import { plain } from './http.ts';
 import { claimPublish, PUBLISH_NEEDS_MS, pubCandidates, publishOne } from './publish.ts';
 import { claimRead, readCandidates, readOne } from './reader.ts';
 import type { Budget } from './types.ts';
 
-export interface WorkResult { read: number; routed: number; generated: number; published: number; failed: number }
+export interface WorkResult { read: number; routed: number; generated: number; published: number; failed: number; imported?: number }
 
 const CAPS = { read: 6, generate: 8, publish: 10 };
 /** Time an AI step needs left before it is claimed: photo checks + a slow answer (Opus / high effort). */
 const READ_NEEDS_MS = 45_000;
 const GEN_NEEDS_MS = 80_000;
+/** The slice of each run that an import may use before the other steps start. */
+const IMPORT_MS = 50_000;
 
 export function newBudget(): Budget {
   const t0 = Date.now();
@@ -34,6 +43,11 @@ export async function work(userId: string | null): Promise<WorkResult> {
     out.failed++;
     console.error(`pb-products ${step} ${id}: ${plain(e)}`);
   };
+
+  try {
+    const imp = await advanceImport(Date.now() + IMPORT_MS, userId);
+    if (imp) out.imported = imp.added;
+  } catch (e) { failed('import', 'run', e); } // the run itself records its error; the next tick carries on
 
   for (const c of await readCandidates(CAPS.read)) {
     if (!left(READ_NEEDS_MS)) break;

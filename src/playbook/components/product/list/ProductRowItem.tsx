@@ -24,7 +24,7 @@ export default function ProductRowItem({ p, onOpen }: { p: ProductRow; onOpen: (
       title={productTitle(p)}
       meta={<>
         {vendor && <>{vendor} · </>}
-        {p.cost_price == null ? 'No price' : <span style={pbNum}>{rupees(p.cost_price)}</span>}
+        {p.cost_price != null ? <span style={pbNum}>{rupees(p.cost_price)}</span> : p.sell_price != null ? <>Sells at <span style={pbNum}>{rupees(p.sell_price)}</span></> : 'No price'}
       </>}
       status={
         <span style={{ display: 'flex', flexWrap: 'wrap', columnGap: 12, rowGap: 4, minWidth: 0 }}>

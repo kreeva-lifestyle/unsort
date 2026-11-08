@@ -4,6 +4,8 @@
 // product is created 'new' with claimed_at = now, so the worker does not read
 // it before its photos are in; the claim is cleared at the end. Optional
 // less_amount / source_url / intake_notes are stored as given (validated).
+// Import from website (2026-11-08): sell_price = the price seen on the other
+// store, which is OUR selling price (pricing rules skipped), + price_note.
 import { SB_URL, enc, insert, logActivity, nowIso, one, patch, sel, svcHeaders } from './db.ts';
 import { HttpError, fetchT, plain } from './http.ts';
 import { BUCKET } from './types.ts';
@@ -15,6 +17,8 @@ export interface IngestBody {
   source?: unknown; source_ref?: unknown; raw_text?: unknown; vendor_name?: unknown; image_urls?: unknown;
   // Optional (Telegram intake, 2026-11-07): the vendor's "Less" (cost = rate − less, see reader.ts), a link to the post, notes.
   less_amount?: unknown; source_url?: unknown; intake_notes?: unknown;
+  // Optional (import from website, 2026-11-08): sell at exactly this price everywhere, and where it came from.
+  sell_price?: unknown; price_note?: unknown;
 }
 
 function extras(b: IngestBody): Record<string, unknown> {
@@ -30,10 +34,18 @@ function extras(b: IngestBody): Record<string, unknown> {
     out.source_url = url;
   }
   if (Array.isArray(b.intake_notes)) out.intake_notes = b.intake_notes.map(n => String(n ?? '').trim().slice(0, 300)).filter(Boolean).slice(0, 20);
+  if (b.sell_price !== undefined && b.sell_price !== null && b.sell_price !== '') {
+    const n = Number(b.sell_price);
+    if (!Number.isFinite(n) || n <= 0 || n >= 10_000_000) throw new HttpError(400, 'sell_price must be a price in rupees above 0.');
+    out.sell_price = Math.round(n * 100) / 100;
+  }
+  const note = String(b.price_note ?? '').replace(/\s+/g, ' ').trim();
+  if (note) out.price_note = note.slice(0, 300);
   return out;
 }
 
-async function vendorId(name: string): Promise<string | null> {
+/** The vendor with this name (created when new; names are unique ignoring case). Also used by import_start. */
+export async function vendorId(name: string): Promise<string | null> {
   if (!name) return null;
   try {
     return (await insert<{ id: string }>('pb_vendors', [{ name }]))[0]?.id ?? null;

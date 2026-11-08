@@ -21,8 +21,23 @@ export function channelName(p: ProductDetail) {
   return v?.tg_title || (v?.tg_username ? `@${v.tg_username}` : fromUrl ? `@${fromUrl}` : null);
 }
 
-/** "From Telegram · KUMARI_ART · Open post". Nothing for other sources. */
+/** Imported products link to the product page on the other store (https only). */
+const pageUrl = (u: string | null) => (u && /^https:\/\/[^\s/]+\/\S*$/.test(u) ? u : null);
+const linkStyle = { display: 'inline-flex', alignItems: 'center', gap: 4, minHeight: 44, color: PB.tx, fontWeight: 600, textDecoration: 'underline', textUnderlineOffset: 3 } as const;
+
+/** "From Telegram · KUMARI_ART · Open post", or "From a website · example.com · Open page". Nothing for manual products. */
 export function SourceLine({ p }: { p: ProductDetail }) {
+  if (p.source === 'import') {
+    const url = pageUrl(p.source_url);
+    const host = p.source_ref?.split(':')[0] || (url ? new URL(url).host : null);
+    return (
+      <span style={{ ...pbMeta, display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', minWidth: 0 }}>
+        <span>From a website</span>
+        {host && <><span aria-hidden="true">·</span><span style={{ ...pbNum, color: PB.tx, overflowWrap: 'anywhere', minWidth: 0 }}>{host}</span></>}
+        {url && <><span aria-hidden="true">·</span><a href={url} target="_blank" rel="noopener noreferrer" className="pb-pill" style={linkStyle}>Open page<PbIcon name="arrowUpRight" size={14} /><span className="pb-sr"> (opens the other store)</span></a></>}
+      </span>
+    );
+  }
   if (p.source !== 'telegram') return null;
   const url = postUrl(p.source_url);
   const name = channelName(p);
@@ -34,8 +49,7 @@ export function SourceLine({ p }: { p: ProductDetail }) {
         <>
           <span aria-hidden="true">·</span>
           {/* A plain link (no window.open): iOS opens it in Telegram or Safari and the app stays where it was. */}
-          <a href={url} target="_blank" rel="noopener noreferrer" className="pb-pill"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, minHeight: 44, color: PB.tx, fontWeight: 600, textDecoration: 'underline', textUnderlineOffset: 3 }}>
+          <a href={url} target="_blank" rel="noopener noreferrer" className="pb-pill" style={linkStyle}>
             Open post<PbIcon name="arrowUpRight" size={14} /><span className="pb-sr"> (opens Telegram)</span>
           </a>
         </>

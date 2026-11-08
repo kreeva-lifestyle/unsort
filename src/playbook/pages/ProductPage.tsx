@@ -16,6 +16,7 @@ import ProductListings from '../components/product/ProductListings';
 import { Dot, PRODUCT_STATUS } from '../components/product/status';
 import ProductActions, { PhoneActionsTile } from '../components/product/detail/ProductActions';
 import { PhonePhotoHero, PhotosTile } from '../components/product/detail/ProductPhotos';
+import WebMetaTile from '../components/product/detail/WebMetaTile';
 import { AiReadTile, PhoneNameCard, ProductHero, WebsitesStat } from '../components/product/detail/ProductSummary';
 import ProductStates from '../components/product/detail/ProductStates';
 import { IntakeNotesTile, SourceLine } from '../components/product/detail/TelegramBits';
@@ -112,6 +113,7 @@ export default function ProductPage({ id, onClose, onChanged, addToast, vendors,
           <IntakeNotesTile p={p} addToast={addToast} onChanged={refresh} />
           {listings}
           {facts}
+          <WebMetaTile p={p} />
           <AiReadTile p={p} />
           <PhoneActionsTile {...actionProps} />
         </>
@@ -133,6 +135,7 @@ export default function ProductPage({ id, onClose, onChanged, addToast, vendors,
               <div style={{ gridColumn: 'span 8', display: 'grid', minWidth: 0 }}>{facts}</div>
               <div style={{ gridColumn: 'span 4', display: 'grid', minWidth: 0 }}><AiReadTile p={p} /></div>
             </div>
+            <WebMetaTile p={p} span={12} />
           </div>
         </div>
       )}

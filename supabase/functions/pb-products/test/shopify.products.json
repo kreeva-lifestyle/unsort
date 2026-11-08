@@ -1,0 +1,17 @@
+{"products":[
+ {"id":7001,"title":"Banarasi Silk Saree - Maroon","handle":"banarasi-silk-saree-maroon","body_html":"<p>Pure <strong>Banarasi</strong> silk saree with zari border.</p><ul><li>Blouse piece included</li><li>Dry clean only</li></ul><script>alert(1)</script>","vendor":"Kumari Art","product_type":"Saree",
+  "variants":[
+   {"id":1,"title":"Free Size / Maroon","option1":"Free Size","option2":"Maroon","sku":"KA-5070","price":"2499.00","compare_at_price":"3999.00","available":true},
+   {"id":2,"title":"Free Size / Maroon (gift pack)","option1":"Free Size","option2":"Maroon","sku":"","price":"2299.00","compare_at_price":null,"available":false}
+  ],
+  "options":[{"name":"Size","position":1,"values":["Free Size"]},{"name":"Color","position":2,"values":["Maroon"]}],
+  "images":[{"position":2,"src":"https://cdn.shopify.com/s/files/1/b.jpg"},{"position":1,"src":"//cdn.shopify.com/s/files/1/a.jpg"},{"position":3,"src":"http://insecure.example/c.jpg"}]},
+ {"id":7002,"title":"Cotton Kurta Set","handle":"cotton-kurta-set","body_html":"",
+  "variants":[
+   {"id":3,"option1":"S","option2":"Blue","price":"899","available":false},
+   {"id":4,"option1":"M","option2":"Green","price":"899","available":false},
+   {"id":5,"option1":"L","option2":"Blue","price":"949","available":false}
+  ],
+  "options":[{"name":"Size","position":1,"values":["S","M","L"]},{"name":"Colour","position":2,"values":["Blue","Green"]}],
+  "images":[{"position":1,"src":"https://cdn.shopify.com/s/files/1/k1.jpg"},{"position":2,"src":"https://cdn.shopify.com/s/files/1/k2.jpg"},{"position":3,"src":"https://cdn.shopify.com/s/files/1/k3.jpg"},{"position":4,"src":"https://cdn.shopify.com/s/files/1/k4.jpg"},{"position":5,"src":"https://cdn.shopify.com/s/files/1/k5.jpg"},{"position":6,"src":"https://cdn.shopify.com/s/files/1/k6.jpg"},{"position":7,"src":"https://cdn.shopify.com/s/files/1/k7.jpg"},{"position":8,"src":"https://cdn.shopify.com/s/files/1/k8.jpg"},{"position":9,"src":"https://cdn.shopify.com/s/files/1/k9.jpg"},{"position":10,"src":"https://cdn.shopify.com/s/files/1/k10.jpg"},{"position":11,"src":"https://cdn.shopify.com/s/files/1/k11.jpg"},{"position":12,"src":"https://cdn.shopify.com/s/files/1/k12.jpg"}]}
+]}

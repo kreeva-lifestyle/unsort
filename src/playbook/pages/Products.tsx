@@ -3,7 +3,9 @@
 // and the product page. Spec: docs/playbook/product-directory-spec.md.
 // V2 layout (layout-and-components.md §4 "List page"): header (Add product is
 // the one gradient), a 12-wide toolbar tile, then cards 4+4+4 on desktop /
-// glass rows on phone, then the pager.
+// glass rows on phone, then the pager. "Import from website" (a secondary
+// action; a glass row at the top on phone) opens ImportSheet; the newest
+// import run shows as a tile above the toolbar while it runs or just finished.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { friendlyError } from '../../lib/friendlyError';
 import { useBackClose } from '../../hooks/useBackClose';
@@ -17,7 +19,10 @@ import ProductFilters from '../components/product/ProductFilters';
 import Pager from '../components/product/Pager';
 import AddProductModal from '../components/product/AddProductModal';
 import ProductResults from '../components/product/list/ProductResults';
-import { PbButton, PbConfirm, PbPageHeader } from '../components/ui';
+import ImportSheet from '../components/product/import/ImportSheet';
+import ImportRunTile from '../components/product/import/ImportRunTile';
+import { PbButton, PbConfirm, PbPageHeader, PbRow } from '../components/ui';
+import { useImportRun } from '../hooks/useImportRun';
 import { discardAsk } from '../components/ui/discard';
 import ProductPage from './ProductPage';
 import { useReturnFocus } from '../hooks/useReturnFocus';
@@ -26,7 +31,7 @@ import { dirtyTitle } from '../hooks/useDirty';
 /** How the page opens (a dashboard tile passes a filter, "+ Add product" opens the form). */
 export type ProductsStart = { status?: string; websiteId?: string; add?: boolean };
 
-export default function Products({ addToast, start = {} }: { addToast: AddToast; start?: ProductsStart }) {
+export default function Products({ addToast, start = {}, onGuide }: { addToast: AddToast; start?: ProductsStart; onGuide?: (section: string) => void }) {
   const [filter, setFilterState] = useState<ProductFilter>({ ...EMPTY_FILTER, status: start.status ?? '', websiteId: start.websiteId ?? '' });
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
@@ -38,6 +43,8 @@ export default function Products({ addToast, start = {} }: { addToast: AddToast;
   const [sites, setSites] = useState<WebsiteLite[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [adding, setAdding] = useState(!!start.add);
+  const [importing, setImporting] = useState<{ open: boolean; url: string }>({ open: false, url: '' });
+  const imp = useImportRun();
   const [openId, setOpenId] = useState<string | null>(null);
   const seq = useRef(0);
   const [lookupErr, setLookupErr] = useState<unknown>(null);
@@ -93,6 +100,10 @@ export default function Products({ addToast, start = {} }: { addToast: AddToast;
   const onVendorCreated = (v: VendorLite) => setVendors(list => (list.some(x => x.id === v.id) ? list : [...list, v].sort((a, b) => a.name.localeCompare(b.name))));
   const filtered = !!(filter.search || filter.status || filter.vendorId || filter.websiteId);
   const add = () => setAdding(true);
+  const openImport = (url = '') => setImporting({ open: true, url });
+  // The products arrive while the run goes; the list refreshes once when it finishes.
+  const runDone = imp.run?.status === 'done';
+  useEffect(() => { if (runDone) void load(); }, [runDone, load]);
 
   return (
     <>
@@ -102,8 +113,17 @@ export default function Products({ addToast, start = {} }: { addToast: AddToast;
       )}
       <div style={{ display: openId ? 'none' : 'block' }}>
         <PbPageHeader title="Products" sub="Every vendor product, and where it is listed"
-          actions={<PbButton kind="primary" icon="plus" onClick={add}>Add product</PbButton>}
+          actions={<><PbButton icon="globe" onClick={() => openImport()}>Import from website</PbButton><PbButton kind="primary" icon="plus" onClick={add}>Add product</PbButton></>}
           phoneAction={<PbButton kind="primary" iconOnly icon="plus" aria-label="Add product" onClick={add} />} />
+        {imp.run && (
+          <div style={{ marginBottom: 'var(--pb-pad-tile)' }}>
+            <ImportRunTile run={imp.run} pollError={imp.error} onChanged={() => void imp.reload()} onDismiss={() => imp.dismiss(imp.run!.id)} onRetry={openImport} addToast={addToast} />
+          </div>
+        )}
+        {/* Phone: the header holds one action (+), so the import lives as a row at the top of the list. */}
+        <div className="pb-phone-only" style={{ marginBottom: 12 }}>
+          <PbRow icon="globe" title="Import from website" meta="Copy another store’s in-stock products" onClick={() => openImport()} />
+        </div>
         <div className="pb-bento pb-bento--auto">
           <ProductFilters search={search} onSearch={setSearch} filter={filter} onFilter={setFilter} vendors={vendors} websites={sites} onClear={clearAll} />
           <ProductResults rows={rows} sites={sites} loading={loading} loadErr={loadErr} filtered={filtered} search={filter.search}
@@ -114,6 +134,8 @@ export default function Products({ addToast, start = {} }: { addToast: AddToast;
       <AddProductModal open={adding} onClose={() => setAdding(false)} vendors={vendors} onVendorCreated={onVendorCreated}
         categories={categories} addToast={addToast}
         onSaved={id => { setAdding(false); void load(); setOpenId(id); }} />
+      <ImportSheet open={importing.open} initialUrl={importing.url} onClose={() => setImporting({ open: false, url: '' })} addToast={addToast} onGuide={onGuide}
+        onStarted={() => { setImporting({ open: false, url: '' }); void imp.reload(); }} />
       <PbConfirm {...modalProps} />
     </>
   );

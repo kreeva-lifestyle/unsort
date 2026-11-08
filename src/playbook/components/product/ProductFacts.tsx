@@ -20,6 +20,7 @@ import GrowArea from './detail/GrowArea';
 import PbButton from '../ui/PbButton';
 import { KeptTag } from './detail/ListingField';
 import { LessLine } from './detail/TelegramBits';
+import { SellPriceLine } from './detail/SellPriceLine';
 import VendorSelect from './VendorSelect';
 import { numKey, splitList } from './status';
 
@@ -43,8 +44,10 @@ export default function ProductFacts({ product, vendors, categories, onVendorCre
   const changed = (Object.keys(f) as (keyof Form)[]).filter(k => f[k].trim() !== orig[k].trim());
   const set = (k: keyof Form) => (v: string) => setF(x => ({ ...x, [k]: v }));
   const reading = product.status === 'reading'; // the AI reader would overwrite what is typed now
-  // Needs info although cost and category are filled (e.g. the AI reader gave up): saving makes it Ready.
-  const promote = product.status === 'needs_info' && product.cost_price != null && !!product.category;
+  // A product imported from a website sells at its copied price, so it needs no cost to be Ready.
+  const priced = (cost: number | null) => cost != null || product.sell_price != null;
+  // Needs info although price and category are filled (e.g. the AI reader gave up): saving makes it Ready.
+  const promote = product.status === 'needs_info' && priced(product.cost_price) && !!product.category;
   const off = saving || (!changed.length && !promote) || reading;
   useDirty(changed.length > 0 && !saving, 'Discard changes to this product?');
 
@@ -62,7 +65,7 @@ export default function ProductFacts({ product, vendors, categories, onVendorCre
     // A cleared field is in `patch` as null — it must count as missing, not as "unchanged".
     const cost2 = 'cost_price' in patch ? patch.cost_price : product.cost_price;
     const cat2 = 'category' in patch ? patch.category : product.category;
-    const complete = cost2 != null && !!cat2;
+    const complete = priced(cost2 ?? null) && !!cat2;
     const nowReady = product.status === 'needs_info' && complete;
     const lostInfo = product.status === 'ready' && !complete;
     if (nowReady) patch.status = 'ready';
@@ -101,7 +104,13 @@ export default function ProductFacts({ product, vendors, categories, onVendorCre
   const cats = f.category && !categories.includes(f.category) ? [f.category, ...categories] : categories;
 
   const lessFirst = Number(product.less_amount) > 0;
-  const costInput = input('cost_price', 'Cost price (₹)', { type: 'number', inputMode: 'decimal', min: 0, step: '0.01', onKeyDown: numKey }, true);
+  const sells = product.sell_price != null;
+  const costInput = (
+    <div style={{ minWidth: 0 }}>
+      {input('cost_price', sells ? 'Cost price (₹) — optional' : 'Cost price (₹)', { type: 'number', inputMode: 'decimal', min: 0, step: '0.01', onKeyDown: numKey, 'aria-describedby': sells ? 'pb-f-cost-hint' : undefined }, true)}
+      {sells && <span id="pb-f-cost-hint" style={{ ...pbMeta, display: 'block', marginTop: 4 }}>Not needed to publish: the selling price below is used.</span>}
+    </div>
+  );
   return (
     <form onSubmit={save} className={className} aria-labelledby="pb-facts-title"
       style={{ ...pbTile, display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -130,6 +139,7 @@ export default function ProductFacts({ product, vendors, categories, onVendorCre
         {input('sizes', 'Sizes (comma list)', { placeholder: 'e.g. S, M, L' })}
         {/* With a Telegram "Less", the cost sits last so its Rate − Less = Cost line is right under it. */}
         {lessFirst && <>{costInput}<div style={{ gridColumn: '1 / -1', minWidth: 0 }}><LessLine p={product} /></div></>}
+        {sells && <div style={{ gridColumn: '1 / -1', minWidth: 0 }}><SellPriceLine p={product} /></div>}
       </div>
       <div style={{ minWidth: 0 }}>
         {label('raw_text', 'Details (vendor’s post)', 'pb-f-raw')}
