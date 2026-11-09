@@ -59,17 +59,24 @@ export function friendlyError(raw: unknown, fallback = 'Something went wrong. Pl
   }
   if (code === 'PGRST301' || l.includes('jwt') && l.includes('expired')) return 'Your session expired. Please sign in again.';
 
-  // Auth (Supabase gotrue)
+  // Auth (Supabase gotrue) — the raw strings are not for staff: "User is
+  // banned", "Auth session missing!", "For security purposes…".
   if (l.includes('invalid login')) return 'Incorrect email or password. Please try again.';
   if (l.includes('email not confirmed')) return 'Email not confirmed. Ask your admin to re-invite you.';
-  if (l.includes('rate limit') || l.includes('too many')) return 'Too many attempts. Wait a minute and try again.';
+  if (l.includes('security purposes')) return 'Please wait a minute before requesting another reset email.';
+  if (l.includes('rate limit') || l.includes('too many') || l.includes('over_request')) return 'Too many attempts. Wait a minute and try again.';
   if (l.includes('user already registered')) return 'This email is already registered.';
+  if (l.includes('user is banned') || l.includes('user_banned')) return 'This account is suspended — contact your admin.';
+  if (l.includes('unable to validate email') || l.includes('invalid email')) return 'That doesn’t look like a valid email address.';
+  if (l.includes('same_password') || l.includes('different from the old')) return 'Choose a password you haven’t used before.';
+  if (l.includes('auth session missing') || l.includes('otp_expired') || l.includes('token has expired or is invalid')) return 'This link has expired or was already used — request a new one from "Forgot password?".';
+  if (l.includes('refresh token')) return 'Your session expired. Please sign in again.';
 
-  // Network
-  if (l.includes('failed to fetch') || l.includes('network') || l.includes('econnrefused')) {
+  // Network ("Load failed" is Safari's wording)
+  if (l.includes('failed to fetch') || l.includes('load failed') || l.includes('network') || l.includes('econnrefused') || l.includes('retryable')) {
     return 'Network error. Check your connection and try again.';
   }
-  if (l.includes('timeout')) return 'Request timed out. Please try again.';
+  if (l.includes('timeout') || l.includes('timed out')) return 'Request timed out. Please try again.';
 
   // Leave reasonable messages alone, otherwise fall back
   if (msg.length < 80 && !/[{<]/.test(msg)) return msg;

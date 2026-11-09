@@ -100,10 +100,13 @@ export const hasStoredSession = (): boolean => {
   return false;
 };
 
-/** Offer the Face ID button only when it can actually work. */
-export const faceIdOffered = (): boolean => !!getFaceIdEnrollment() && hasStoredSession();
-
 export const getFaceIdFails = (): number => { try { return Number(localStorage.getItem(FAILS_KEY)) || 0; } catch { return 0; } };
+
+/** Offer the Face ID button only when it can actually work: an enrolment, a
+ *  kept session, and fewer than the maximum failed prompts (past that every
+ *  tap answered "too many" — email sign-in clears the count). */
+export const faceIdOffered = (): boolean => !!getFaceIdEnrollment() && hasStoredSession() && getFaceIdFails() < FACE_ID_MAX_FAILS;
+
 export const clearFaceIdFails = () => { try { localStorage.removeItem(FAILS_KEY); } catch {} };
 const bumpFails = (): number => { const n = getFaceIdFails() + 1; try { localStorage.setItem(FAILS_KEY, String(n)); } catch {} return n; };
 

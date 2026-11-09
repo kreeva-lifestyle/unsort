@@ -4,7 +4,7 @@
 // 14 s later. While scanning, a tiny request goes out every 12 s: two misses
 // in a row = weak, the next hit = fine. A real "offline" from the phone wins.
 import { useEffect, useState } from 'react';
-import { SUPABASE_URL } from '../../lib/supabase';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../../lib/supabase';
 import { drainOutbox } from './outbox';
 
 export type Connection = 'online' | 'weak' | 'offline';
@@ -16,7 +16,10 @@ async function ping(): Promise<boolean> {
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), PING_TIMEOUT_MS);
   try {
-    const r = await fetch(`${SUPABASE_URL}/auth/v1/health`, { cache: 'no-store', signal: ctl.signal });
+    // The gateway answers 401 without the anon key — every ping then read as
+    // a miss, the badge said "weak" on a good network and the outbox never
+    // drained from a ping (the logs showed hundreds of 401s a day).
+    const r = await fetch(`${SUPABASE_URL}/auth/v1/health`, { cache: 'no-store', signal: ctl.signal, headers: { apikey: SUPABASE_ANON_KEY } });
     return r.ok;
   } catch { return false; }
   finally { clearTimeout(t); }

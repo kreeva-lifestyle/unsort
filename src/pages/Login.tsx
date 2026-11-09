@@ -1,17 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import DivisionPicker from '../components/brand/DivisionPicker';
+import FaceIdChoice from '../components/login/FaceIdChoice';
+import SignInDetails from '../components/login/SignInDetails';
 import { T, S } from '../lib/theme';
 import { supabase } from '../lib/supabase';
+import { friendlyError } from '../lib/friendlyError';
 import { getFaceIdEnrollment, faceIdOffered as faceIdOfferedNow } from '../lib/faceId';
-
-const friendlyAuthError = (raw: string): string => {
-  const m = (raw || '').toLowerCase();
-  if (m.includes('invalid login')) return 'Incorrect email or password. Please try again.';
-  if (m.includes('email not confirmed')) return 'Email not confirmed. Ask your admin to re-invite you.';
-  if (m.includes('rate limit') || m.includes('too many')) return 'Too many attempts. Wait a minute and try again.';
-  if (m.includes('network') || m.includes('fetch')) return 'Network error. Check your connection.';
-  return raw || 'Sign-in failed. Please try again.';
-};
+import { urlAuthErrorMessage } from '../hooks/authSession';
 
 export default function Login({ signIn, locked, unlockWithFaceId }: {
   signIn: (email: string, password: string) => Promise<{ error: any }>;
@@ -26,9 +21,11 @@ export default function Login({ signIn, locked, unlockWithFaceId }: {
   const [forgotSending, setForgotSending] = useState(false);
   const [showPw, setShowPw] = useState(false);
   const [info, setInfo] = useState('');
+  const [failures, setFailures] = useState(0);   // re-reads the "Details" list
   // Two-option entry: Face ID is offered only when it can work — an
-  // enrolment AND a kept session on this device. Re-read every render so the
-  // button disappears the moment the session is gone.
+  // enrolment, a kept session and fewer than the maximum failed prompts on
+  // this device. Re-read every render so the button disappears the moment
+  // the session is gone.
   const enrollment = getFaceIdEnrollment();
   const faceIdOffered = faceIdOfferedNow() && !!unlockWithFaceId;
   const [mode, setMode] = useState<'choose' | 'email'>(faceIdOffered ? 'choose' : 'email');
@@ -37,6 +34,8 @@ export default function Login({ signIn, locked, unlockWithFaceId }: {
   // start two OS prompts (WebKit then aborts the first as "cancelled").
   const inFlight = useRef(false);
   useEffect(() => { if (!faceIdOffered) setMode('email'); }, [faceIdOffered]);
+
+  const fail = (msg: string) => { setError(msg); setFailures(n => n + 1); };
 
   const handleFaceId = async () => {
     if (!unlockWithFaceId || inFlight.current) return;
@@ -48,7 +47,7 @@ export default function Login({ signIn, locked, unlockWithFaceId }: {
       if (res.error) {
         // Session problems are information (blue), prompt problems are errors (red).
         if (res.code === 'session' || res.code === 'offline') setInfo(res.error);
-        else setError(res.error);
+        else fail(res.error);
         if (res.code === 'too_many' || res.code === 'session' || res.code === 'mismatch' || res.code === 'wrong_host') setMode('email');
       }
     } finally { setFaceBusy(false); inFlight.current = false; }
@@ -57,20 +56,32 @@ export default function Login({ signIn, locked, unlockWithFaceId }: {
   // The reason banner is read at mount AND whenever the lock/offer state
   // changes: the login stays mounted across "locked → session gone", so a
   // mount-only read showed the message on a later visit instead of now.
+  // An expired/used reset link comes back in the URL hash (auth-js leaves
+  // it there): explain it once, then strip it so a reload is a plain sign-in.
   useEffect(() => {
     try {
       const reason = localStorage.getItem('signOutReason');
       if (reason === 'session_expired') { setInfo('Session expired — please sign in again.'); localStorage.removeItem('signOutReason'); }
       else if (reason === 'deactivated') { setInfo('Your access was revoked — contact your admin.'); localStorage.removeItem('signOutReason'); }
     } catch {}
+    const urlErr = urlAuthErrorMessage(window.location.hash);
+    if (urlErr) {
+      setInfo(urlErr); setMode('email');
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
   }, [locked, faceIdOffered]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     setError(''); setForgotMsg(''); setLoading(true);
-    const { error } = await signIn(email, password);
-    if (error) setError(friendlyAuthError(error.message));
-    setLoading(false);
+    try {
+      // trim: iOS autocorrect leaves a trailing space after the address.
+      const { error } = await signIn(email.trim(), password);
+      if (error) fail(friendlyError(error, 'Sign-in failed. Please try again.'));
+    } catch (err) {
+      fail(friendlyError(err, 'Sign-in failed. Please try again.'));
+    } finally { setLoading(false); }   // a thrown signIn used to leave "Signing in..." for good
   };
 
   const handleForgotPassword = async () => {
@@ -78,24 +89,31 @@ export default function Login({ signIn, locked, unlockWithFaceId }: {
     setError(''); setForgotMsg('');
     if (!email.trim()) { setError('Enter your email above first, then tap "Forgot password".'); return; }
     setForgotSending(true);
-    const { error: resetErr } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: window.location.origin });
-    setForgotSending(false);
-    if (resetErr) { setError(friendlyAuthError(resetErr.message)); return; }
-    setForgotMsg(`Password reset link sent to ${email.trim()}. Check your email.`);
+    try {
+      const { error: resetErr } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: window.location.origin });
+      if (resetErr) { fail(friendlyError(resetErr, 'Could not send the reset email. Please try again.')); return; }
+      setForgotMsg(`Password reset link sent to ${email.trim()}. Check your email.`);
+    } catch (err) {
+      fail(friendlyError(err, 'Could not send the reset email. Please try again.'));
+    } finally { setForgotSending(false); }
   };
 
   const inp: React.CSSProperties = {
     ...S.fInput, height: 44, fontSize: 15, padding: '12px 16px', borderRadius: 10,
   };
+  const link: React.CSSProperties = { background: 'transparent', border: 'none', color: T.tx2, fontSize: 12, cursor: 'pointer', minHeight: 44, padding: '12px 10px', fontFamily: T.sans, transition: T.transition };
+  const banner = (bg: string, bd: string, color: string): React.CSSProperties => ({ background: bg, border: `1px solid ${bd}`, borderRadius: 10, padding: '10px 14px', fontSize: 13, color, marginBottom: 14 });
 
   return (
     // overflowY auto (NOT hidden): with the iOS keyboard open the fixed frame
     // doesn't shrink, so the centered card's lower half — password + Sign In —
     // sat under the keyboard with no way to scroll to it.
     <div className="login-page" data-launch-end style={{ position: 'fixed', inset: 0, background: T.bg, display: 'flex', flexDirection: 'column', overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}>
-      {/* Ambient orbs */}
-      <div style={{ position: 'absolute', width: 600, height: 600, top: -200, right: -100, background: `radial-gradient(circle, ${T.ac44} 0%, transparent 60%)`, borderRadius: '50%', filter: 'blur(80px)', opacity: 0, animation: 'loginGlowInOut 5s .3s ease forwards' }} />
-      <div style={{ position: 'absolute', width: 500, height: 500, bottom: -200, left: -100, background: `radial-gradient(circle, ${T.bl30} 0%, transparent 60%)`, borderRadius: '50%', filter: 'blur(80px)', opacity: 0, animation: 'loginGlowInOut 5s .5s ease forwards' }} />
+      {/* Ambient orbs, clipped: they overhang the frame and used to add ~200px of empty scroll under the card */}
+      <div aria-hidden="true" style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
+        <div style={{ position: 'absolute', width: 600, height: 600, top: -200, right: -100, background: `radial-gradient(circle, ${T.ac44} 0%, transparent 60%)`, borderRadius: '50%', filter: 'blur(80px)', opacity: 0, animation: 'loginGlowInOut 5s .3s ease forwards' }} />
+        <div style={{ position: 'absolute', width: 500, height: 500, bottom: -200, left: -100, background: `radial-gradient(circle, ${T.bl30} 0%, transparent 60%)`, borderRadius: '50%', filter: 'blur(80px)', opacity: 0, animation: 'loginGlowInOut 5s .5s ease forwards' }} />
+      </div>
 
       {/* Desktop: split layout */}
       <div className="login-split" style={{ position: 'relative', zIndex: 1, display: 'grid', gridTemplateColumns: '1fr 420px', gap: 60, maxWidth: 1080, width: '100%', padding: '20px 40px', alignItems: 'center', margin: 'auto', animation: 'loginBoxEnter 1.2s cubic-bezier(.16,1,.3,1) both' }}>
@@ -135,38 +153,21 @@ export default function Login({ signIn, locked, unlockWithFaceId }: {
             </div>
           </div>
 
-          {info && <div style={{ background: 'oklch(0.77 0.14 230 / .10)', border: '1px solid oklch(0.77 0.14 230 / .3)', borderRadius: 10, padding: '10px 14px', fontSize: 13, color: T.bl, marginBottom: 14 }}>{info}</div>}
-          {error && <div style={{ background: 'oklch(0.63 0.22 25 / .12)', border: '1px solid oklch(0.63 0.22 25 / .3)', borderRadius: 10, padding: '10px 14px', fontSize: 13, color: T.re, marginBottom: 14, animation: 'loginShake .4s ease' }}>{error}</div>}
-          {forgotMsg && <div style={{ background: 'oklch(0.72 0.19 145 / .10)', border: '1px solid oklch(0.72 0.19 145 / .3)', borderRadius: 10, padding: '10px 14px', fontSize: 13, color: T.gr, marginBottom: 14 }}>{forgotMsg}</div>}
+          {info && <div role="status" style={banner('oklch(0.77 0.14 230 / .10)', 'oklch(0.77 0.14 230 / .3)', T.bl)}>{info}</div>}
+          {error && <div role="alert" style={{ ...banner('oklch(0.63 0.22 25 / .12)', 'oklch(0.63 0.22 25 / .3)', T.re), animation: 'loginShake .4s ease' }}>{error}</div>}
+          {forgotMsg && <div role="status" style={banner('oklch(0.72 0.19 145 / .10)', 'oklch(0.72 0.19 145 / .3)', T.gr)}>{forgotMsg}</div>}
 
-          {mode === 'choose' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <button type="button" onClick={handleFaceId} disabled={faceBusy} style={{ width: '100%', padding: 16, borderRadius: 12, border: 'none', cursor: faceBusy ? 'default' : 'pointer', fontSize: 15, fontWeight: 600, fontFamily: T.sora, color: '#fff', background: `linear-gradient(135deg, ${T.ac}, ${T.bl})`, boxShadow: `0 8px 24px ${T.ac44}`, transition: 'all .2s', filter: faceBusy ? 'brightness(0.7)' : 'none', letterSpacing: 0.3, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-                <svg viewBox="0 0 24 24" style={{ width: 20, height: 20, fill: 'none', stroke: '#fff', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round' }}>
-                  <path d="M3 8V6a3 3 0 013-3h2M16 3h2a3 3 0 013 3v2M21 16v2a3 3 0 01-3 3h-2M8 21H6a3 3 0 01-3-3v-2" />
-                  <path d="M9 9.5v1M15 9.5v1M12 9.5v3.2a.8.8 0 01-.8.8" />
-                  <path d="M9 15.2a4.2 4.2 0 006 0" />
-                </svg>
-                {faceBusy ? 'Waiting for Face ID…' : 'Login with Face ID'}
-              </button>
-              <button type="button" onClick={() => { setError(''); setMode('email'); }} style={{ width: '100%', padding: 15, borderRadius: 12, border: '1px solid rgba(255,255,255,.12)', cursor: 'pointer', fontSize: 14, fontWeight: 600, fontFamily: T.sora, color: T.tx2, background: 'rgba(255,255,255,.04)', transition: 'all .2s', letterSpacing: 0.3, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-                <svg viewBox="0 0 24 24" style={{ width: 18, height: 18, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round' }}>
-                  <rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 7l9 6 9-6" />
-                </svg>
-                Login via Email
-              </button>
-            </div>
-          )}
+          {mode === 'choose' && <FaceIdChoice busy={faceBusy} onFaceId={handleFaceId} onEmail={() => { setError(''); setMode('email'); }} />}
 
           <form onSubmit={handleSubmit} style={{ display: mode === 'email' ? 'block' : 'none' }}>
             <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', fontSize: 12, color: T.tx2, fontWeight: 500, marginBottom: 6 }}>Email</label>
-              <input type="email" autoComplete="username" placeholder="you@company.com" value={email} onChange={e => setEmail(e.target.value)} required style={inp} />
+              <label htmlFor="login-email" style={{ display: 'block', fontSize: 12, color: T.tx2, fontWeight: 500, marginBottom: 6 }}>Email</label>
+              <input id="login-email" name="email" type="email" autoComplete="username" inputMode="email" autoCapitalize="none" spellCheck={false} placeholder="you@company.com" value={email} onChange={e => setEmail(e.target.value)} required style={inp} />
             </div>
             <div style={{ marginBottom: 20 }}>
-              <label style={{ display: 'block', fontSize: 12, color: T.tx2, fontWeight: 500, marginBottom: 6 }}>Password</label>
+              <label htmlFor="login-password" style={{ display: 'block', fontSize: 12, color: T.tx2, fontWeight: 500, marginBottom: 6 }}>Password</label>
               <div style={{ position: 'relative' }}>
-                <input type={showPw ? 'text' : 'password'} autoComplete="current-password" placeholder="Enter password" value={password} onChange={e => setPassword(e.target.value)} required style={{ ...inp, paddingRight: 64 }} />
+                <input id="login-password" name="password" type={showPw ? 'text' : 'password'} autoComplete="current-password" enterKeyHint="go" placeholder="Enter password" value={password} onChange={e => setPassword(e.target.value)} required style={{ ...inp, paddingRight: 64 }} />
                 <button type="button" onClick={() => setShowPw(v => !v)} aria-label={showPw ? 'Hide password' : 'Show password'} aria-pressed={showPw}
                   style={{ position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)', minHeight: 40, padding: '0 12px', background: 'transparent', border: 'none', color: T.tx3, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: T.sans }}>{showPw ? 'Hide' : 'Show'}</button>
               </div>
@@ -174,13 +175,14 @@ export default function Login({ signIn, locked, unlockWithFaceId }: {
             <button type="submit" disabled={loading} style={{ width: '100%', padding: 16, borderRadius: 12, border: 'none', cursor: loading ? 'default' : 'pointer', fontSize: 15, fontWeight: 600, fontFamily: T.sora, color: '#fff', background: `linear-gradient(135deg, ${T.ac}, ${T.bl})`, boxShadow: `0 8px 24px ${T.ac44}`, transition: 'all .2s', filter: loading ? 'brightness(0.7)' : 'none', letterSpacing: 0.3 }}>
               {loading ? 'Signing in...' : 'Sign In'}
             </button>
-            <div style={{ marginTop: 16, textAlign: 'center', display: 'flex', justifyContent: 'center', gap: 6 }}>
+            <div style={{ marginTop: 8, textAlign: 'center', display: 'flex', justifyContent: 'center', gap: 6 }}>
               {faceIdOffered && (
-                <button type="button" onClick={() => { setError(''); setMode('choose'); }} style={{ background: 'transparent', border: 'none', color: T.tx3, fontSize: 12, cursor: 'pointer', padding: '6px 10px', fontFamily: T.sans, transition: T.transition }} onMouseEnter={e => (e.currentTarget.style.color = T.tx2)} onMouseLeave={e => (e.currentTarget.style.color = T.tx3)}>← Face ID</button>
+                <button type="button" onClick={() => { setError(''); setMode('choose'); }} style={link}>← Face ID</button>
               )}
-              <button type="button" onClick={handleForgotPassword} disabled={forgotSending} style={{ background: 'transparent', border: 'none', color: T.tx3, fontSize: 12, cursor: 'pointer', padding: '6px 10px', opacity: forgotSending ? 0.5 : 1, pointerEvents: forgotSending ? 'none' : 'auto', fontFamily: T.sans, transition: T.transition }} onMouseEnter={e => (e.currentTarget.style.color = T.tx2)} onMouseLeave={e => (e.currentTarget.style.color = T.tx3)}>{forgotSending ? 'Sending…' : 'Forgot password?'}</button>
+              <button type="button" onClick={handleForgotPassword} disabled={forgotSending} style={{ ...link, opacity: forgotSending ? 0.5 : 1, pointerEvents: forgotSending ? 'none' : 'auto' }}>{forgotSending ? 'Sending…' : 'Forgot password?'}</button>
             </div>
           </form>
+          <SignInDetails tick={failures} />
         </div>
       </div>
     </div>
