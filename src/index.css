@@ -215,6 +215,8 @@ tbody tr:nth-child(even) { background: rgba(255,255,255,0.015); }
 @keyframes loginLogoShine { 0% { filter: brightness(1); } 50% { filter: brightness(1.15); } 100% { filter: brightness(1); } }
 @keyframes loginFadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes loginShake { 0%,100% { transform: translateX(0); } 20%,60% { transform: translateX(-5px); } 40%,80% { transform: translateX(5px); } }
+/* Reduce Motion: the sign-in page's enter, glow and shake stay still (the launch sheen and Playbook already do). */
+@media (prefers-reduced-motion: reduce) { .login-page, .login-page * { animation: none !important; } }
 @keyframes btnSpin { to { transform: rotate(360deg); } }
 @keyframes slideDown { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes scanLine { 0%,100% { transform: translateY(-12px); opacity: .4; } 50% { transform: translateY(12px); opacity: 1; } }

@@ -32,10 +32,15 @@ async function main() {
 
   let previous = [];
   try {
-    const r = await fetch(`${SITE}/assets-manifest.json`, { cache: 'no-store', signal: AbortSignal.timeout(TIMEOUT_MS) });
+    // A fresh cache key per run: the Pages CDN holds the manifest for up to
+    // 10 min, so two deploys inside that window read the one before last
+    // and dropped the just-deployed build's chunks (`cache` only governs the
+    // runner's own fetch cache, not the edge).
+    const r = await fetch(`${SITE}/assets-manifest.json?r=${process.env.GITHUB_RUN_ID || Date.now()}`, { cache: 'no-store', signal: AbortSignal.timeout(TIMEOUT_MS) });
     if (r.ok) {
       const m = await r.json();
       if (Array.isArray(m?.generations)) previous = m.generations.filter(g => g && Array.isArray(g.files));
+      if (previous[0]?.at) console.log(`previous manifest: latest generation built ${previous[0].at}`);
     } else console.log(`previous manifest: HTTP ${r.status} (first deploy with this step?) — nothing carried`);
   } catch (e) { console.log(`previous manifest unreachable (${e.message}) — nothing carried`); }
 

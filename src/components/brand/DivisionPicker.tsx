@@ -27,7 +27,7 @@ export default function DivisionPicker() {
               boxShadow: on ? `0 8px 24px rgba(0,0,0,.35)` : 'none', opacity: on ? 1 : 0.7, transition: 'all .18s ease' }}>
             {d.id === 'playbook' ? <PlaybookMark size={38} decorative /> : <DailyWorkMark size={38} decorative />}
             <span style={{ fontFamily: T.sora, fontSize: 14, fontWeight: 700, color: on ? T.tx : T.tx2, letterSpacing: -0.2 }}>{d.name}</span>
-            <span style={{ fontSize: 10, color: T.tx3, lineHeight: 1.3, textAlign: 'center' }}>{d.tagline}</span>
+            <span style={{ fontSize: 11, color: T.tx3, lineHeight: 1.3, textAlign: 'center' }}>{d.tagline}</span>
           </button>
         );
       })}

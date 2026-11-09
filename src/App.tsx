@@ -80,7 +80,7 @@ const getTabFromHash = () => {
 };
 
 const MainApp = () => {
-  const { profile } = useAuth();
+  const { profile, profileError, reloadProfile } = useAuth();
   const { addToast, notifications, markAsRead, toasts } = useNotifications();
   const [tab, setTabState] = useState(getTabFromHash);
   const [notifItemId, setNotifItemId] = useState<string | null>(null);
@@ -245,7 +245,9 @@ const MainApp = () => {
           <div style={{ padding: 60, textAlign: 'center', color: T.tx3, fontSize: 13, lineHeight: 1.7 }}>
             {profile
               ? <>You don’t have access to this page.<br /><span onClick={() => setTab(fallback())} style={{ color: T.ac2, cursor: 'pointer', textDecoration: 'underline' }}>Go to {titles[fallback()] || 'Home'}</span></>
-              : <><div className="spinner" style={{ margin: '0 auto 14px' }} />Loading your profile…</>}
+              : profileError
+                ? <>Couldn’t load your profile — check your connection.<br /><button type="button" onClick={() => { void reloadProfile(); }} style={{ ...S.btnGhost, marginTop: 12, minHeight: 44 }}>Retry</button></>
+                : <><div className="spinner" style={{ margin: '0 auto 14px' }} />Loading your profile…</>}
           </div>
         )}
         </Suspense>
@@ -299,10 +301,10 @@ const AppContent = () => {
 
   // Password recovery callback — Supabase redirects with #access_token=...&type=recovery
   const hash = window.location.hash;
-  // A real recovery link carries a token; and a locked device must pass
-  // Face ID before it can reach a form that changes the kept session's password.
-  const isRecovery = hash.includes('type=recovery') && /(access_token=|code=)/.test(hash);
-  if (isRecovery && !auth?.locked) return <Suspense fallback={<div style={{ minHeight: '100dvh', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="spinner" /></div>}><PubScroll><LazyPasswordReset /></PubScroll></Suspense>;
+  // useAuth latches the recovery link once (auth-js clears the hash as soon
+  // as it has read the token); a locked device must pass Face ID before it
+  // can reach a form that changes the kept session's password.
+  if (auth?.recovery && !auth.locked) return <Suspense fallback={<div style={{ minHeight: '100dvh', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="spinner" /></div>}><PubScroll><LazyPasswordReset /></PubScroll></Suspense>;
 
   // Seller rate-card link — no auth; the token is validated server-side.
   const rcMatch = hash.match(/^#\/rc\/([a-f0-9]{32})$/);
@@ -311,7 +313,7 @@ const AppContent = () => {
   const shortMatch = hash.match(/^#\/s\/([a-zA-Z0-9_-]{3,32})$/);
   if (shortMatch) return <Suspense fallback={<div style={{ minHeight: '100dvh', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="spinner" /></div>}><LazyTracklyRedirect shortCode={shortMatch[1]} /></Suspense>;
 
-  if (!auth?.ready && auth?.loading) return <div style={{ minHeight: '100dvh', width: '100%', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 14 }}><div style={{ fontSize: 20, fontWeight: 700, fontFamily: T.sora, letterSpacing: -0.5, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>DailyOffice</div><div className="spinner" /><p style={{ color: T.tx3, fontSize: 9, letterSpacing: 1.5, textTransform: 'uppercase' }}>LOADING</p></div>;
+  if (!auth?.ready && auth?.loading) return <div style={{ minHeight: '100dvh', width: '100%', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 14 }}><div style={{ fontSize: 20, fontWeight: 700, fontFamily: T.sora, letterSpacing: -0.5, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>DailyOffice</div><div className="spinner" /><p style={{ color: T.tx3, fontSize: 9, letterSpacing: 1.5, textTransform: 'uppercase' }}>{auth?.slow ? 'Still connecting…' : 'LOADING'}</p></div>;
   if (!auth?.user || auth.locked) return <Login signIn={auth.signIn} locked={auth.locked} unlockWithFaceId={auth.unlockWithFaceId} />;
   return <Divisions division={division} />;
 };

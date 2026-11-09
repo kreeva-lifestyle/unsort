@@ -5,6 +5,10 @@ import App from './App'
 import { installGlobalErrorHandlers } from './lib/errorLogger'
 import { runLaunch } from './lib/launch'
 
+// Read before auth-js clears it: a password-recovery link's hash is gone
+// the moment the token has been read, but the reset form stays on screen.
+const openedFromAuthLink = /type=recovery|error_code=/.test(window.location.hash)
+
 installGlobalErrorHandlers()
 // The splash index.html painted becomes the branded launch: one sheen on
 // the crest, then it flies into the header once the app is up.
@@ -29,9 +33,12 @@ if ('serviceWorker' in navigator) {
   // Only logged-in users should see the "Update Available" prompt — showing it
   // over the login/loading screen is confusing and looks like a stuck load.
   // Not-logged-in: the new SW already controls the page (skipWaiting+claim), so
-  // fresh assets load on the next navigation — no overlay needed.
+  // fresh assets load on the next navigation — no overlay needed. The same
+  // goes for the Face ID lock screen (a kept session, but the user is not
+  // in) and the password-reset form (a reload re-parses a used link).
   const isLoggedIn = () => {
     try {
+      if (localStorage.getItem('doAppLocked') === '1') return false;
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
         if (k && k.startsWith('sb-') && k.endsWith('-auth-token')) {
@@ -44,9 +51,11 @@ if ('serviceWorker' in navigator) {
   };
   navigator.serviceWorker.addEventListener('message', (e) => {
     if (e.data?.type === 'SW_UPDATED') {
-      if (window.location.hash.startsWith('#/s/')) return;
-      if (!isLoggedIn()) return;
+      if (/^#\/(s|rc)\//.test(window.location.hash) || openedFromAuthLink) return;
+      if (!isLoggedIn() || document.querySelector('.login-page')) return;   // sign-in or Face ID lock screen
+      if (document.getElementById('sw-update-overlay')) return;   // two deploys back to back: one prompt
       const overlay = document.createElement('div');
+      overlay.id = 'sw-update-overlay';
       overlay.setAttribute('style', 'position:fixed;inset:0;z-index:99999;background:rgba(6,8,16,.85);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);display:flex;align-items:center;justify-content:center;padding:24px;font-family:Inter,-apple-system,sans-serif');
       overlay.innerHTML = `
         <div style="background:rgba(15,20,32,.95);border:1px solid oklch(0.55 0.22 265 / .2);border-radius:14px;padding:32px 28px;text-align:center;max-width:340px;width:100%">
