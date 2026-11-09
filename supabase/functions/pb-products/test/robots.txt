@@ -1,0 +1,12 @@
+# sample
+User-agent: Googlebot
+Disallow: /private/
+
+User-agent: *
+Disallow: /cart
+Disallow: /checkout
+Disallow: /products.json
+Allow: /collections/all/products.json
+Crawl-delay: 5
+Sitemap: https://example-store.in/sitemap.xml
+Sitemap: https://example-store.in/sitemap_products_1.xml

@@ -1,6 +1,6 @@
 // Product Directory settings: the AI that reads incoming products, the
-// category list, Telegram intake (bot, admin group, crawler), the automation
-// pause switch and "Run now".
+// category list, Telegram intake (bot, admin group, crawler), the history of
+// imports from websites, the automation pause switch and "Run now".
 // V2 layout (layout-and-components.md §4): form tiles 8 wide + the
 // automation status tile 4 wide on desktop; on phone the status tile follows
 // the form. "Run now" is the page's one gradient; the saves are secondary.
@@ -14,6 +14,7 @@ import { pbInput, pbMeta } from '../pbTheme';
 import { PbButton, PbPageHeader, PbSection, PbTile } from '../components/ui';
 import AutomationTile from '../components/settings/AutomationTile';
 import TelegramTile from '../components/settings/telegram/TelegramTile';
+import ImportHistoryTile from '../components/settings/ImportHistoryTile';
 import { SettingsColumns, SettingsError, SettingsSkeleton } from '../components/settings/SettingsStates';
 
 type Busy = '' | 'reader' | 'categories' | 'automation' | 'run';
@@ -103,6 +104,7 @@ export default function PbSettings({ addToast, onBack, onGuide }: { addToast: Ad
         </PbSection>
       </PbTile>
       <TelegramTile addToast={addToast} onGuide={() => onGuide?.('telegram')} />
+      <ImportHistoryTile />
     </>
   );
 

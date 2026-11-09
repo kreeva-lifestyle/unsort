@@ -11,8 +11,8 @@
 // All database writes use the service role; credentials never leave the server.
 //
 // POST JSON { action, ... } → JSON; errors → HTTP 4xx/5xx { ok:false, error:'<plain sentence>' }.
-//   work               secret|staff   –                                   → { ok, read, routed, generated, published, failed }
-//   ingest             secret         { source:'telegram'|'import', source_ref, raw_text, vendor_name?, image_urls?[], less_amount?, source_url?, intake_notes?[] }
+//   work               secret|staff   –                                   → { ok, read, routed, generated, published, failed, imported? }
+//   ingest             secret         { source:'telegram'|'import', source_ref, raw_text, vendor_name?, image_urls?[], less_amount?, source_url?, intake_notes?[], sell_price?, price_note?, attributes?{}, sku? } (attributes / sku: source 'import' only)
 //                                                                          → { ok, product_id, duplicate?, images?, warnings? }
 //   read_product       staff          { product_id }                      → { ok, product, routed, warning? }
 //   route_product      staff          { product_id }                      → { ok, routed, repriced, listings, warning? }
@@ -24,6 +24,10 @@
 //                                                                          → { ok, shop_name, scopes, missing_scopes }
 //   test_connection    staff          { website_id }                      → { ok, shop_name, scopes, missing_scopes }
 //   preview_price      staff          { website_id, cost, rule_id? }      → { ok, price, compare_at }
+//   import_check       staff          { url }                             → { ok, platform, host, origin, estimate, estimate_in_stock (n | 'n+' | null), sample[3], warnings[], vendor_suggestion }
+//   import_start       staff          { url, in_stock_only?, use_their_price?, vendor_name?, estimate? } → { ok, run_id, platform, host, warnings[] }
+//   import_cancel      staff          { run_id }                          → { ok }
+//   import_list        staff          –                                   → { ok, runs[≤20] }
 //
 // Pipeline (worker.ts): read (reader.ts) → route (route.ts / routing.ts) →
 // generate (generate.ts: pricing.ts, content.ts, tags.ts) → publish
@@ -34,6 +38,7 @@
 import * as A from './actions.ts';
 import { userOf, whoIs } from './auth.ts';
 import { HttpError, corsHeaders, fail, json, plain } from './http.ts';
+import { importCancel, importCheck, importList, importStart } from './import/actions.ts';
 import { routeWebsite } from './routeSite.ts';
 import { previewPrice, saveCredentials, testSite } from './siteActions.ts';
 import type { Caller } from './types.ts';
@@ -51,6 +56,10 @@ const ACTIONS: Record<string, { who: Who; run: (b: A.Body, c: Caller) => Promise
   save_credentials: { who: 'admin', run: (b, c) => saveCredentials(b, userOf(c)) },
   test_connection: { who: 'staff', run: (b) => testSite(b) },
   preview_price: { who: 'staff', run: (b) => previewPrice(b) },
+  import_check: { who: 'staff', run: (b) => importCheck(b) },
+  import_start: { who: 'staff', run: (b, c) => importStart(b, userOf(c)) },
+  import_cancel: { who: 'staff', run: (b, c) => importCancel(b, userOf(c)) },
+  import_list: { who: 'staff', run: () => importList() },
 };
 
 function allowed(who: Who, c: Caller): string | null {
@@ -83,6 +92,7 @@ Deno.serve(async (req) => {
   } catch (e) {
     const status = e instanceof HttpError ? e.status : 500;
     if (status >= 500) console.error(`pb-products ${action}:`, e instanceof Error ? e.stack || e.message : e);
-    return fail(req, status, plain(e));
+    // Our own sentences (HttpError) and timeouts as they are; anything else (a TypeError…) stays in the log.
+    return fail(req, status, e instanceof HttpError || e instanceof DOMException ? plain(e) : 'Something went wrong on the Playbook server.');
   }
 });

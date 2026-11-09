@@ -34,10 +34,13 @@ export interface PbProduct {
   ai_read_at: string | null; ai_error: string | null; claimed_at: string | null;
   /** The vendor's separate "200 Less" message: cost = RATE − less (₹). */
   less_amount: number | null;
-  /** https://t.me/<channel>/<message id> when the channel is public. */
+  /** https://t.me/<channel>/<message id> (Telegram), or the product page on the other store (import). */
   source_url: string | null;
   /** Notes from the Telegram intake ("No description arrived…", big videos). */
   intake_notes: string[];
+  /** Import from website (20261108090000_pb_website_import.sql): sell at exactly this price on every
+   *  website (the pricing rules are skipped), and where it came from ("Price copied from example.com on 8 Nov"). */
+  sell_price: number | null; price_note: string | null;
   created_by: string | null; created_at: string; updated_at: string;
 }
 
@@ -174,4 +177,23 @@ export interface PbTgConfig {
   /** The overnight window the channels are checked in, IST minutes of day (may cross midnight; default 23:00–07:00). */
   crawl_window_start: number; crawl_window_end: number;
   last_message_at: string | null; updated_at: string;
+}
+
+// ── Import from website (20261108090000_pb_website_import.sql) ──
+export type PbImportPlatform = 'shopify' | 'woocommerce' | 'generic' | 'unknown';
+export type PbImportStatus = 'queued' | 'running' | 'done' | 'failed' | 'cancelled';
+/** One product of the preview (import_check) and of a run's `sample`. */
+export interface PbImportSample { name: string; price: number | null; currency?: string | null; image: string | null; url: string | null; in_stock?: boolean | null }
+/** One import of one other store. Staff read only; every write is the pb-products edge function's. */
+export interface PbImportRun {
+  id: string; url: string; host: string; platform: PbImportPlatform | null; status: PbImportStatus;
+  in_stock_only: boolean; use_their_price: boolean; vendor_id: string | null;
+  /** Where the next page starts (per platform) plus `errors` = consecutive page errors. */
+  cursor: Record<string, unknown>;
+  found: number; added: number; skipped: number; out_of_stock: number; failed: number;
+  sample: PbImportSample[] | null;
+  /** A plain sentence when failed; a note on done ("Stopped at 5000 products"). */
+  error: string | null;
+  claimed_at: string | null; created_by: string | null;
+  created_at: string; started_at: string | null; finished_at: string | null; updated_at: string;
 }

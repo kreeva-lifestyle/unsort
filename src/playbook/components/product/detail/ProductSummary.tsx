@@ -7,6 +7,7 @@ import PbStatTile from '../../ui/PbStatTile';
 import PbTile from '../../ui/PbTile';
 import { Dot, LISTING_STATUS, PRODUCT_STATUS, rupees, shortDate } from '../status';
 import { SourceLine } from './TelegramBits';
+import { WEB_META_KEYS } from './WebMetaTile';
 
 type P = { p: ProductDetail; vendors: VendorLite[] };
 const vendorName = ({ p, vendors }: P) => vendors.find(v => v.id === p.vendor_id)?.name ?? null;
@@ -28,11 +29,13 @@ export function ProductHero({ p, vendors }: P) {
       </div>
       <span style={{ fontSize: 13, lineHeight: 1.5 }}>{st.hint}</span>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        <span style={{ fontSize: 12, fontWeight: 600 }}>Cost price</span>
+        {/* An imported product leads with its copied selling price (the pricing rules are skipped for it). */}
+        <span style={{ fontSize: 12, fontWeight: 600 }}>{p.sell_price != null ? 'Selling price · every website' : 'Cost price'}</span>
         {/* Mono is for figures: the "not set" sentence is body text. */}
-        {cost(p)
-          ? <span style={{ ...pbNum, fontSize: 'clamp(28px, 3vw, 40px)', fontWeight: 500, lineHeight: 1.1, overflowWrap: 'anywhere' }}>{cost(p)}</span>
+        {p.sell_price != null || cost(p)
+          ? <span style={{ ...pbNum, fontSize: 'clamp(28px, 3vw, 40px)', fontWeight: 500, lineHeight: 1.1, overflowWrap: 'anywhere' }}>{p.sell_price != null ? rupees(p.sell_price) : cost(p)}</span>
           : <span style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.5 }}>Not set — add it in Facts</span>}
+        {p.sell_price != null && cost(p) && <span style={{ fontSize: 12, fontWeight: 600 }}>Cost <span style={pbNum}>{cost(p)}</span></span>}
       </div>
     </PbTile>
   );
@@ -55,7 +58,9 @@ export function PhoneNameCard({ p, vendors }: P) {
     <PbTile as="section" variant={st.tint ?? 'default'} aria-labelledby="pb-product-title" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <h1 id="pb-product-title" tabIndex={-1} style={{ ...pbPageTitle, lineHeight: 1.5, outline: 'none' }}>{p.name || p.sku || 'Untitled product'}</h1>
       <div style={{ ...pbMeta, overflowWrap: 'anywhere' }}>
-        {bits.join(' · ')}{bits.length > 0 && ' · '}<span style={{ ...pbNum, color: PB.tx }}>{cost(p) ?? 'No cost price'}</span>
+        {bits.join(' · ')}{bits.length > 0 && ' · '}
+        {p.sell_price != null ? <span style={{ color: PB.tx }}>Sells at <span style={pbNum}>{rupees(p.sell_price)}</span></span>
+          : <span style={{ ...pbNum, color: PB.tx }}>{cost(p) ?? 'No cost price'}</span>}
         {p.sku && <> · <span style={{ ...pbNum, display: 'inline-block' }}>{p.sku}</span></>}
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -67,7 +72,8 @@ export function PhoneNameCard({ p, vendors }: P) {
 }
 
 export function AiReadTile({ p }: { p: ProductDetail }) {
-  const attrs = Object.entries(p.attributes ?? {}).filter(([, v]) => v != null && String(v).trim() !== '');
+  // Details copied by Import from website have their own tile (WebMetaTile).
+  const attrs = Object.entries(p.attributes ?? {}).filter(([k, v]) => !(p.source === 'import' && WEB_META_KEYS.has(k)) && v != null && String(v).trim() !== '');
   return (
     <PbTile as="section" variant={p.ai_error ? 'failed' : 'default'} aria-labelledby="pb-ai-title" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>

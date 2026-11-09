@@ -127,7 +127,7 @@ export default function PlaybookApp() {
         </header>
         <main id="pb-main" tabIndex={-1}>
           {shown === 'dashboard' && <PlaybookDashboard name={profile?.full_name?.split(' ')[0] || ''} addToast={addToast} go={go} />}
-          {shown === 'products' && <Products key={start.key} addToast={addToast} start={start.value} />}
+          {shown === 'products' && <Products key={start.key} addToast={addToast} start={start.value} onGuide={id => { go('guide'); setGuideAt(id); }} />}
           {shown === 'websites' && <Websites addToast={addToast} />}
           {shown === 'vendors' && <Vendors addToast={addToast} onBack={backToMore} />}
           {shown === 'settings' && <PbSettings addToast={addToast} onBack={backToMore} onGuide={id => { go('guide'); setGuideAt(id); }} />}

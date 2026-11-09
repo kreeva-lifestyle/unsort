@@ -8,13 +8,13 @@ import { ago, enc, logActivity, nowIso, one, patch, sel } from './db.ts';
 import { genFacts, genSchema, genSystem, type GenOut } from './genPrompt.ts';
 import { HttpError, plain } from './http.ts';
 import { aiPhotos } from './photos.ts';
-import { compareAt, computePrice } from './pricing.ts';
+import { compareAt, listingPrice } from './pricing.ts';
 import { buildTags } from './tags.ts';
-import { ARCHIVED, LISTING_COLS, MAX_ATTEMPTS, NEEDS_INFO, PRODUCT_COLS, STALE_MS, WEBSITE_COLS, type Budget, type ListingRow, type ProductRow, type WebsiteRow } from './types.ts';
+import { ARCHIVED, LISTING_COLS, MAX_ATTEMPTS, NEEDS_INFO, PRODUCT_COLS, STALE_MS, WEBSITE_COLS, hasPrice, type Budget, type ListingRow, type ProductRow, type WebsiteRow } from './types.ts';
 
 const MAX_PHOTOS = 8; // photos sent to the writer (alt text for the rest is derived from the title)
 /** Product fields the price, content or tags are made from: if any changes while the AI writes, the result is stale. */
-const FACTS: (keyof ProductRow)[] = ['status', 'cost_price', 'category', 'fabric', 'color', 'name', 'sku', 'sizes', 'vendor_id', 'attributes', 'raw_text'];
+const FACTS: (keyof ProductRow)[] = ['status', 'cost_price', 'sell_price', 'category', 'fabric', 'color', 'name', 'sku', 'sizes', 'vendor_id', 'attributes', 'raw_text'];
 const factsOf = (x: ProductRow) => JSON.stringify(FACTS.map(k => x[k] ?? null));
 
 const due = () => {
@@ -44,7 +44,7 @@ export async function generateOne(l: ListingRow, o: { manual: boolean; prevStatu
       return r[0] ?? l;
     }
     if (p.status === 'needs_info') throw new HttpError(400, NEEDS_INFO);
-    if (p.cost_price === null || p.cost_price === undefined) throw new HttpError(400, 'The product has no cost price yet — add it on the product page.');
+    if (!hasPrice(p)) throw new HttpError(400, 'The product has no cost price yet — add it on the product page.');
     const [vendor, imgs, rule] = await Promise.all([
       p.vendor_id ? one<{ name: string; code: string | null }>(`pb_vendors?id=eq.${enc(p.vendor_id)}&select=name,code`) : Promise.resolve(null),
       sel<{ path: string }>(`pb_product_images?product_id=eq.${enc(p.id)}&kind=eq.image&select=path&order=position.asc&limit=20`),
@@ -54,8 +54,8 @@ export async function generateOne(l: ListingRow, o: { manual: boolean; prevStatu
     const c = site.content || ({} as WebsiteRow['content']);
     const tr = site.tag_rules || ({} as WebsiteRow['tag_rules']);
 
-    // Price
-    const calc = computePrice(Number(p.cost_price), site.pricing || {}, rule?.price_override ?? null);
+    // Price (a copied sell_price is used as is — pricing.ts listingPrice)
+    const calc = listingPrice(p, site.pricing || {}, rule?.price_override ?? null)!;
     const price = locked.has('price') && l.price !== null ? Number(l.price) : calc.price;
     if (!(price > 0)) throw new HttpError(400, 'The price for this website comes out at ₹0 — check the cost price and the website\'s pricing.');
     const compare = locked.has('price') ? compareAt(price, site.pricing || {}) : calc.compare_at;
@@ -65,7 +65,7 @@ export async function generateOne(l: ListingRow, o: { manual: boolean; prevStatu
     const extraMax = tr.ai_extra ? Math.max(0, Math.floor(Number(tr.ai_extra_max) || 0)) : 0;
     const ai = await askClaude<GenOut>({
       model: c.model, effort: c.effort,
-      system: genSystem(site.name, c, extraMax, photos.blocks.length),
+      system: genSystem(site.name, c, extraMax, photos.blocks.length, p.source === 'import'),
       content: [...photos.blocks, { type: 'text', text: genFacts(p, vendor?.name ?? '') }],
       schema: genSchema, maxTokens: 16000, timeoutMs: o.budget.hard - Date.now(),
     });

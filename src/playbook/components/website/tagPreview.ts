@@ -9,6 +9,7 @@ export interface TagFacts {
 }
 
 const PH = /\{\s*(attr:[^}]+|[a-z_]+)\s*\}/gi;
+const STORE_TAGS = /\{\s*attr:\s*store_tags\s*\}/i;
 
 /** Fill one template; null when any placeholder in it is empty (the tag is dropped). */
 export function fillTemplate(tpl: string, f: TagFacts, size = ''): string | null {
@@ -36,15 +37,25 @@ function applyCase(t: string, c: string): string {
   return t;
 }
 
+/** The facts once — or, for a template with {attr:store_tags}, once per store tag (none when it has none). */
+function perStoreTag(tpl: string, f: TagFacts): TagFacts[] {
+  if (!STORE_TAGS.test(tpl)) return [f];
+  const key = Object.keys(f.attributes || {}).find(k => k.toLowerCase() === 'store_tags');
+  const items = key ? String(f.attributes[key] ?? '').split(',').map(s => s.trim()).filter(Boolean) : [];
+  return items.map(item => ({ ...f, attributes: { ...f.attributes, [key as string]: item } }));
+}
+
 export function buildTags(rules: Partial<PbTagRules>, f: TagFacts, aiExtra: string[]): string[] {
   const raw: string[] = [];
   for (const tpl of Array.isArray(rules.templates) ? rules.templates : []) {
     if (!String(tpl || '').trim()) continue;
-    if (/\{\s*size\s*\}/i.test(tpl)) {
-      for (const s of f.sizes || []) { const t = fillTemplate(tpl, f, s); if (t) raw.push(t); }
-    } else {
-      const t = fillTemplate(tpl, f);
-      if (t) raw.push(t);
+    for (const facts of perStoreTag(tpl, f)) {
+      if (/\{\s*size\s*\}/i.test(tpl)) {
+        for (const s of f.sizes || []) { const t = fillTemplate(tpl, facts, s); if (t) raw.push(t); }
+      } else {
+        const t = fillTemplate(tpl, facts);
+        if (t) raw.push(t);
+      }
     }
   }
   for (const s of Array.isArray(rules.static) ? rules.static : []) raw.push(String(s || ''));

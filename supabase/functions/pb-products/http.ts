@@ -2,7 +2,8 @@
 // carries an HTTP status and a plain sentence that the app shows as-is.
 
 export class HttpError extends Error {
-  constructor(public status: number, message: string) { super(message); }
+  status: number; // a plain field (not a parameter property), so node --test can strip the types
+  constructor(status: number, message: string) { super(message); this.status = status; }
 }
 
 /** A short, readable message for anything thrown (never a stack trace). */
