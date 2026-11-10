@@ -96,7 +96,7 @@ export default function DbHealth() {
             <DbBars title="Biggest tables" rows={snap.stats.tables} />
             <DbBars title="Storage by folder" rows={snap.stats.buckets} />
           </div>
-          <DbSlow rows={snap.stats.slow} />
+          <DbSlow rows={snap.stats.slow} totalS={snap.stats.slow_total_s} since={snap.stats.slow_since} at={snap.taken_at} />
         </>
       )}
     </div>
