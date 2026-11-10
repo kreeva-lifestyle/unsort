@@ -10,16 +10,12 @@ import { T, S, alpha } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
 import { tileCard, TileLabel } from '../ui/StatTile';
 import { DbBars, DbSpark, DbSlow, gb, type Snap, type Hist } from './DbHealthParts';
+import { tableName, folderName, agoText } from './dbHealthWords';
 
 const DB_LIMIT = 8 * 1024 ** 3;          // Pro: 8 GB database included
 const STORAGE_LIMIT = 100 * 1024 ** 3;   // Pro: 100 GB file storage included
 
 const level = (pct: number) => (pct >= 85 ? T.re : pct >= 65 ? T.yl : T.gr);
-const ago = (iso: string) => {
-  const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
-  return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : `${Math.round(m / 60)} h ago`;
-};
-
 function Meter({ label, used, limit, note }: { label: string; used: number; limit: number; note: string }) {
   const pct = Math.min(100, (used / limit) * 100);
   return (
@@ -30,7 +26,7 @@ function Meter({ label, used, limit, note }: { label: string; used: number; limi
         style={{ height: 6, borderRadius: 3, background: alpha(T.tx3, 0.2), overflow: 'hidden' }}>
         <div style={{ width: `${Math.max(pct, 1)}%`, height: '100%', background: level(pct) }} />
       </div>
-      <div style={{ fontSize: 11, color: T.tx3, marginTop: 6 }}>{pct.toFixed(pct < 10 ? 1 : 0)}% of {gb(limit)} · {note}</div>
+      <div style={{ fontSize: 11, color: T.tx3, marginTop: 6 }}>{pct.toFixed(pct < 10 ? 1 : 0)}% of {gb(limit)} used · {note}</div>
     </div>
   );
 }
@@ -65,12 +61,13 @@ export default function DbHealth() {
 
   const c = snap?.stats.connections;
   const connPct = c && c.max ? (c.total / c.max) * 100 : 0;
+  const cache = snap?.stats.cache_hit == null ? null : +Number(snap.stats.cache_hit).toFixed(1);
   return (
     <div ref={box} style={{ marginTop: 16 }}>
       <div style={{ ...S.flexBetween, gap: 8, marginBottom: 8 }}>
         <div>
           <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora }}>Database &amp; server</div>
-          <div style={{ fontSize: 11, color: T.tx3 }}>{snap ? `Measured ${ago(snap.taken_at)} · checked every hour` : 'Admins only · checked every hour'}</div>
+          <div style={{ fontSize: 11, color: T.tx3 }}>{snap ? `Measured ${agoText(snap.taken_at)} · updates every hour` : 'Only admins see this · updates every hour'}</div>
         </div>
         <button type="button" onClick={() => void load(true)} disabled={busy}
           style={{ ...S.btnGhost, minHeight: 44, pointerEvents: busy ? 'none' : 'auto', opacity: busy ? 0.5 : 1 }}>
@@ -82,19 +79,19 @@ export default function DbHealth() {
       {snap && (
         <>
           <div className="db-health-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: 10 }}>
-            <Meter label="Database" used={snap.db_bytes} limit={DB_LIMIT} note="Pro plan" />
-            <Meter label="File storage" used={snap.storage_bytes} limit={STORAGE_LIMIT} note="photos, PDFs" />
+            <Meter label="Database" used={snap.db_bytes} limit={DB_LIMIT} note="included in your plan" />
+            <Meter label="File storage" used={snap.storage_bytes} limit={STORAGE_LIMIT} note="photos and files" />
             <div style={{ ...tileCard }}>
               <TileLabel>Server load</TileLabel>
-              <div style={{ fontFamily: T.sora, fontSize: 22, fontWeight: 800, color: level(connPct), margin: '4px 0 6px' }}>{c ? `${c.total} / ${c.max}` : '—'}</div>
-              <div style={{ fontSize: 11, color: T.tx3 }}>connections · {c?.active ?? 0} busy now</div>
-              <div style={{ fontSize: 11, color: T.tx3, marginTop: 4 }}>Cache hits {snap.stats.cache_hit ?? '—'}%{(snap.stats.cache_hit ?? 100) < 95 ? ' — low, ask for a check' : ''}</div>
+              <div style={{ fontFamily: T.sora, fontSize: 22, fontWeight: 800, color: level(connPct), margin: '4px 0 6px' }}>{c ? `${c.total} of ${c.max}` : '—'}</div>
+              <div style={{ fontSize: 11, color: T.tx3 }}>connections in use · {c?.active ?? 0} working right now</div>
+              {cache != null && <div style={{ fontSize: 11, color: T.tx3, marginTop: 4 }}>{cache < 95 ? `Only ${cache}% of reads come from memory — low, ask for a check` : `${cache}% of reads come straight from memory (good)`}</div>}
             </div>
           </div>
           <DbSpark hist={hist} />
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: 10, marginTop: 10 }}>
-            <DbBars title="Biggest tables" rows={snap.stats.tables} />
-            <DbBars title="Storage by folder" rows={snap.stats.buckets} />
+            <DbBars title="What fills the database" rows={snap.stats.tables} name={tableName} />
+            <DbBars title="What fills file storage" rows={snap.stats.buckets} name={folderName} />
           </div>
           <DbSlow rows={snap.stats.slow} totalS={snap.stats.slow_total_s} since={snap.stats.slow_since} at={snap.taken_at} />
         </>
