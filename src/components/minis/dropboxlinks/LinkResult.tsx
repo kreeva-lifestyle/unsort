@@ -4,7 +4,7 @@
 // the SKU's IMAGE column. Split out of DropboxLinkGenerator to stay within the
 // file budget.
 import { T, S, Icon } from '../../../lib/theme';
-import { thumbUrl, GenResult } from './api';
+import { thumbSrc, GenResult } from './api';
 
 const IMG_RE = /\.(jpe?g|png|webp|heic|heif|gif|bmp|tiff?)$/i;
 
@@ -41,8 +41,8 @@ export default function LinkResult({ result, saveUrl, canSave, saving, busy, onP
       ))}
       {links.map((l, i) => (
         <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '7px 0', borderTop: i > 0 ? `1px solid ${T.bd}` : 'none' }}>
-          {l.url && IMG_RE.test(l.name) && (
-            <img src={thumbUrl(l.url)} alt="" loading="lazy"
+          {l.url && IMG_RE.test(l.name) && thumbSrc(l) && (
+            <img src={thumbSrc(l)!} alt="" loading="lazy"
               onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
               style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: 6, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.03)', flexShrink: 0 }} />
           )}
