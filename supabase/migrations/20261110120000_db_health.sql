@@ -11,21 +11,28 @@
 --
 -- Plan limits shown in the widget (Pro): 8 GB database, 100 GB storage included;
 -- connections are compared with max_connections.
+--
+-- The snapshot table and the measuring function live in schema `private`: the
+-- API serves `public` only and anon/authenticated have no USAGE on `private`,
+-- so the app can reach them only through get_db_stats() — no REVOKE needed.
+-- Written purely additively (no DROP/REVOKE) because the Supabase MCP server
+-- now stops on those for a confirmation the app does not show.
 
-create table if not exists public.app_db_stats (
+create schema if not exists private;
+
+create table if not exists private.app_db_stats (
   id bigserial primary key,
   taken_at timestamptz not null default now(),
   db_bytes bigint not null,
   storage_bytes bigint not null,
   stats jsonb not null default '{}'::jsonb   -- tables, buckets, connections, cache, slow queries
 );
-create index if not exists app_db_stats_taken_idx on public.app_db_stats (taken_at desc);
-alter table public.app_db_stats enable row level security;
-revoke all on public.app_db_stats from anon, authenticated;
+create index if not exists app_db_stats_taken_idx on private.app_db_stats (taken_at desc);
+alter table private.app_db_stats enable row level security;
 -- No policies: only the two functions below (SECURITY DEFINER) touch it.
 
 -- Takes one snapshot. Cheap catalog reads; the storage sum is one aggregate.
-create or replace function public.take_db_stats()
+create or replace function private.take_db_stats()
 returns void language plpgsql security definer
 set search_path = pg_catalog, public, storage, extensions, pg_temp as $$
 declare v jsonb; slow jsonb := '[]'::jsonb;
@@ -60,12 +67,11 @@ begin
     'deadlocks', (select deadlocks from pg_stat_database where datname = current_database()),
     'slow', slow);
 
-  insert into public.app_db_stats (db_bytes, storage_bytes, stats)
+  insert into private.app_db_stats (db_bytes, storage_bytes, stats)
   values (pg_database_size(current_database()),
           (select coalesce(sum((metadata->>'size')::bigint), 0) from storage.objects), v);
-  delete from public.app_db_stats where taken_at < now() - interval '7 days';
+  delete from private.app_db_stats where taken_at < now() - interval '7 days';
 end $$;
-revoke all on function public.take_db_stats() from public, anon, authenticated;
 
 -- What the widget reads: admins only. p_refresh = true re-measures first, but
 -- only when the latest snapshot is older than 5 minutes.
@@ -77,18 +83,17 @@ begin
   if not exists (select 1 from public.profiles where id = auth.uid() and role = 'admin' and is_active) then
     raise exception 'Only admins can see database health.' using errcode = '42501';
   end if;
-  select max(taken_at) into last_at from public.app_db_stats;
+  select max(taken_at) into last_at from private.app_db_stats;
   if last_at is null or (p_refresh and last_at < now() - interval '5 minutes') then
-    perform public.take_db_stats();
+    perform private.take_db_stats();
   end if;
   return jsonb_build_object(
-    'latest', (select to_jsonb(s) from public.app_db_stats s order by taken_at desc limit 1),
+    'latest', (select to_jsonb(s) from private.app_db_stats s order by taken_at desc limit 1),
     'history', (select coalesce(jsonb_agg(jsonb_build_object('t', taken_at, 'db', db_bytes, 'st', storage_bytes) order by taken_at), '[]'::jsonb)
-                from public.app_db_stats where taken_at > now() - interval '7 days'));
+                from private.app_db_stats where taken_at > now() - interval '7 days'));
 end $$;
-revoke all on function public.get_db_stats(boolean) from public, anon;
 grant execute on function public.get_db_stats(boolean) to authenticated;
 
 -- Hourly snapshot (minute 17 so it does not pile onto the on-the-hour jobs).
-select cron.schedule('db-health-snapshot', '17 * * * *', $$select public.take_db_stats()$$);
-select public.take_db_stats();
+select cron.schedule('db-health-snapshot', '17 * * * *', $$select private.take_db_stats()$$);
+select private.take_db_stats();
