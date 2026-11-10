@@ -62,6 +62,7 @@ begin
   return null;
 end $$;
 
+-- (Superseded the same day by 20261110160000: fires on every running → idle.)
 create or replace trigger master_sync_refresh_catalog
   after update of changed_rows on public.master_sheet_sync
   for each row when (new.status = 'idle' and coalesce(new.changed_rows, 0) > 0)
