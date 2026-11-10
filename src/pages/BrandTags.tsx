@@ -2,31 +2,27 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { numericKeyDown } from '../lib/numericInput';
 import { printOrQueue } from '../lib/printQueue';
-import * as XLSX from 'xlsx';
-import { saveWorkbook } from '../lib/xlsxDownload';
 import { supabase } from '../lib/supabase';
 import { useNotifications } from '../hooks/useNotifications';
 import BrandTagModalNew from '../components/ui/BrandTagModal';
 import ConfirmModal, { useConfirm } from '../components/ui/ConfirmModal';
 import ActionSheet from '../components/ui/ActionSheet';
 import { friendlyError } from '../lib/friendlyError';
-import type { BrandTag, BrandTagInsert } from '../types/database';
-// Bundle JsBarcode instead of loading it from a CDN inside the print iframe. A
-// remote <script> with no SRI ran third-party code in the app's own origin every
-// time a label printed; inlining the already-installed dependency removes that
-// CDN-compromise surface and makes label printing work offline. `?raw` gives the
-// minified source as a string at build time. Any literal `</script` inside it
-// would close the iframe's <script> early, so neutralise it once here.
-import jsBarcodeSrc from 'jsbarcode/dist/JsBarcode.all.min.js?raw';
-const JSBARCODE_INLINE = jsBarcodeSrc.replace(/<\/script/gi, '<\\/script');
+import type { BrandTagInsert } from '../types/database';
 
 
 // ── Design Tokens ──────────────────────────────────────────────────────────────
 import { T, S, Icon } from '../lib/theme';
 import { useBackClose } from '../hooks/useBackClose';
-import { exportName, fileDate, docTitle } from '../lib/exportName';
+import { exportName, fileDate } from '../lib/exportName';
 import { useModalLock } from '../hooks/useModalLock';
-import { escHtml } from '../lib/escape';
+import { TAG_COLUMNS, toRow, blankRow, sampleRow, validateRow, fmtMrp, type BrandTagRow, type BrandTagDb } from '../components/brandtags/tagModel';
+import { SIZE_OPTIONS, PRODUCT_OPTIONS, COLOR_OPTIONS, QTY_OPTIONS } from '../components/brandtags/tagOptions';
+import { buildLabelsHtml } from '../components/brandtags/labelPrint';
+import { matchOrderSheet, type OrderRow } from '../components/brandtags/orderSheet';
+import { readSheet, saveSheet, rowsFromSheet, importProblems, importTags, importSummary } from '../components/brandtags/importTags';
+import { useTagLive } from '../components/brandtags/useTagLive';
+import { useCopies } from '../components/brandtags/useCopies';
 
 const btnGhost: React.CSSProperties = S.btnGhost;
 const btnSm: React.CSSProperties = { ...S.btnGhost, ...S.btnSm };
@@ -41,201 +37,6 @@ const thS: React.CSSProperties = {
   whiteSpace: 'nowrap', fontFamily: T.sans, textTransform: 'uppercase', letterSpacing: '0.1em',
 };
 const tdS: React.CSSProperties = { padding: '11px 14px', fontSize: 13, borderBottom: `1px solid ${T.bd}`, color: T.tx2, fontFamily: T.sans };
-
-// ── Types ──────────────────────────────────────────────────────────────────────
-// UI view model: central BrandTag fields renamed for camelCase ergonomics
-// (jio_code -> jioCode). Omit server-managed columns that the UI doesn't need.
-interface BrandTagRow {
-  id: string;
-  brand: string;
-  ean: string;
-  sku: string;
-  qty: string;
-  mrp: number;
-  size: string;
-  product: string;
-  color: string;
-  mktd: string;
-  jioCode: string;
-  copies: number;
-}
-
-const uid = (): string => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
-
-const sampleRow = (): BrandTagRow => ({
-  id: uid(), brand: 'BRAND NAME: TANUKA', ean: '8905738880431', sku: 'TNDRS177-S',
-  qty: 'INCLUDES: 1 U Top, 1 U Bottom, 1 U Dupatta', mrp: 6800, size: 'S',
-  product: 'PRODUCT DESC: Co-ord Set', color: 'Pink',
-  mktd: 'Arya Designs, 16, Amba Bhuvan, Nr. Kasanagar Circle, Opp. Kumar Gurukul Vidhyalaya Katargam, Surat-395004',
-  jioCode: '702342013006', copies: 0,
-});
-
-const _DEFAULT_MKTD = 'Arya Designs, 16, Amba Bhuvan, Near Kasanagar Circle, Opp- Kumar Gurukul Vidhyalay Katargam, Surat-395004, Gujarat, India';
-const blankRow = (): BrandTagRow => ({
-  id: uid(), brand: '', ean: '', sku: '', qty: '', mrp: 0,
-  size: '', product: '', color: '', mktd: _DEFAULT_MKTD, jioCode: '', copies: 0,
-});
-
-const REQUIRED_FIELDS: (keyof BrandTagRow)[] = ['brand', 'ean', 'sku', 'qty', 'size', 'product', 'color', 'mktd', 'jioCode'];
-const validateRow = (r: BrandTagRow): string | null => {
-  for (const f of REQUIRED_FIELDS) { if (!r[f] || String(r[f]).trim() === '') return f; }
-  if (!r.mrp || r.mrp <= 0) return 'mrp';
-  return null;
-};
-
-const fmtMrp = (v: number): string => '\u20B9' + v.toLocaleString('en-IN');
-
-// ── Order Sheet Types & Mapping ──
-const MARKETPLACE_BRAND: Record<string, string> = { 'ajio b2c': 'FUSIONIC', 'ajio tanuka': 'TANUKA', 'ajio svaraa': 'SVARAA' };
-interface OrderRow { sku: string; marketplace: string; brand: string; copies: number; found: boolean; masterData?: BrandTagRow; }
-
-const BRAND_PREFIX: Record<string, string> = { 'SVARAA': 'SW', 'TANUKA': 'TN' };
-
-const parseOrderSheet = (data: any[], masterRows: BrandTagRow[]): OrderRow[] => {
-  const map = new Map<string, OrderRow>();
-  const masterMap = new Map<string, BrandTagRow>();
-  masterRows.forEach(r => masterMap.set(r.sku.toUpperCase(), r));
-
-  const findMaster = (sku: string, brand: string): BrandTagRow | undefined => {
-    const upper = sku.toUpperCase();
-    // 1. Exact match
-    let m = masterMap.get(upper);
-    if (m) return m;
-    // 2. Try with brand prefix (SW for Svaraa, TN for Tanuka)
-    const prefix = BRAND_PREFIX[brand];
-    if (prefix) {
-      m = masterMap.get(prefix + upper);
-      if (m) return m;
-    }
-    // 3. Try stripping prefix if SKU already has it
-    for (const [, px] of Object.entries(BRAND_PREFIX)) {
-      if (upper.startsWith(px)) { m = masterMap.get(upper.slice(px.length)); if (m) return m; }
-    }
-    return undefined;
-  };
-
-  for (const row of data) {
-    const mp = String(row['Marketplace'] || row['marketplace'] || '').trim();
-    const rawSku = String(row['SKU'] || row['sku'] || '').trim();
-    if (!mp || !rawSku) continue;
-    const brand = MARKETPLACE_BRAND[mp.toLowerCase()] || 'UNKNOWN';
-
-    const skuEntries = rawSku.split(',').map(s => s.trim()).filter(Boolean);
-    for (const entry of skuEntries) {
-      const [skuPart, copiesStr] = entry.split('*');
-      const sku = skuPart.trim();
-      if (!sku) continue;
-      const copies = Math.max(1, parseInt(copiesStr) || 1);
-      const key = sku.toUpperCase() + '::' + brand;
-
-      if (map.has(key)) { map.get(key)!.copies += copies; }
-      else {
-        const master = findMaster(sku, brand);
-      map.set(key, { sku: master?.sku || sku, marketplace: mp, brand, copies, found: !!master, masterData: master });
-      }
-    }
-  }
-  return Array.from(map.values());
-};
-
-// ── Build label print HTML (rendered inside an in-app iframe instead of a popup) ─
-const esc = escHtml;
-
-// Serialize data for embedding INSIDE an inline <script>. JSON.stringify alone
-// is unsafe there: it leaves `<` intact, so a value containing `</script>` closes
-// the tag and injects markup (a SKU is user data, bulk-imported from Excel).
-// Escaping the `<` character keeps the JS-array literal valid while making that
-// impossible; U+2028/U+2029 are also escaped as they're illegal in JS string
-// literals. The invalid-barcode fallback in the script uses textContent, never
-// innerHTML, so the values are never parsed as HTML at runtime either.
-const scriptJson = (v: unknown) =>
-  JSON.stringify(v).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
-
-const buildLabelsHtml = (labels: BrandTagRow[]): string => {
-  const html = labels.map(r => {
-    const brand = r.brand.replace(/^BRAND NAME:\s*/i, '').trim().toUpperCase();
-    const product = r.product.replace(/^PRODUCT DESC:\s*/i, '').trim();
-    const qty = r.qty.replace(/^INCLUDES:\s*/i, '').trim();
-    const mrp = '\u20B9' + r.mrp.toLocaleString('en-IN');
-    return `<div class="label">
-  <div class="main">
-    <div class="row b">BRAND NAME: ${esc(brand)}</div>
-    <div class="row b">SKU: ${esc(r.sku)}</div>
-    <div class="row">PRODUCT DESC: ${esc(product)}</div>
-    <div class="row">${esc(qty)}</div>
-    <div class="row">SIZE: ${esc(r.size)}</div>
-    <div class="row">COLOR: ${esc(r.color)}</div>
-    <div class="row b">MRP: ${esc(mrp)}</div>
-    <div class="row sm">MKTD &amp; DIST. BY: ${esc(r.mktd)}</div>
-    <div class="row">JIO CODE: ${esc(r.jioCode)}</div>
-    <div class="barcode"><svg id="bc-${esc(r.id)}"></svg></div>
-  </div>
-  <div class="ean"><span>EAN: ${esc(r.sku)}</span></div>
-</div>`;
-  }).join('');
-  return `<!DOCTYPE html><html><head>
-<title>${esc(docTitle('Brand-Tags', labels.length === 1 ? labels[0].sku : `${labels.length}-labels`, fileDate()))}</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:Arial,Helvetica,sans-serif;background:#fff;color:#000}
-.label{width:1.97in;height:2.97in;display:flex;overflow:hidden;page-break-after:always}
-.main{flex:1;padding:6px 7px 4px;display:flex;flex-direction:column}
-.row{font-size:7.5pt;line-height:1.35;margin-bottom:2px}
-.b{font-weight:700;font-size:8pt}
-.sm{font-size:6pt;line-height:1.2;color:#222}
-.barcode{margin-top:auto;text-align:center;padding:4px 0 2px}
-.barcode svg{width:100%;height:36px}
-.ean{width:26px;min-width:26px;background:#e8e8e8;display:flex;align-items:center;justify-content:center}
-.ean span{writing-mode:vertical-rl;transform:rotate(180deg);white-space:nowrap;font-weight:900;font-size:9pt;font-family:Arial,sans-serif;color:#000;letter-spacing:1px}
-@media print{
-  @page{margin:0;size:1.97in 2.97in}
-  body{margin:0}
-  .label{width:100%;height:100%;border:none}.label:last-child{page-break-after:auto}
-}
-@media screen{.label{border:1px solid #ccc;margin:8px auto}}
-</style>
-<script>${JSBARCODE_INLINE}<\/script>
-</head><body>${html}
-<script>
-document.querySelectorAll('.barcode svg').forEach(function(svg){
-  var id=svg.id.replace('bc-','');
-  var row=${scriptJson(labels.map(r => ({ id: r.id, jio: r.jioCode, sku: r.sku })))}.find(function(r){return r.id===id});
-  if(row&&row.jio)try{JsBarcode(svg,row.jio,{format:'CODE128',width:1.5,height:34,displayValue:true,text:row.sku,fontSize:8,font:'Arial',margin:0,textMargin:1})}catch(e){if(svg){var d=document.createElement('div');d.style.cssText='color:#c00;font-size:10px;border:1px dashed #c00;padding:4px;text-align:center';d.textContent='[Invalid barcode: '+(row.sku||row.jio||'?')+']';svg.replaceWith(d);}}
-});
-<\/script></body></html>`;
-};
-
-const SIZE_OPTIONS = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'Semi-Stitched'];
-const PRODUCT_OPTIONS = ['PRODUCT DESC: Co-ord Set', 'PRODUCT DESC: Dress', 'PRODUCT DESC: Fusion Wear', 'PRODUCT DESC: Gown', 'PRODUCT DESC: Gown Set', 'PRODUCT DESC: Jumpsuit', 'PRODUCT DESC: Kurta', 'PRODUCT DESC: Kurta Set', 'PRODUCT DESC: Kurti', 'PRODUCT DESC: Lehenga Choli', 'PRODUCT DESC: Saree', 'PRODUCT DESC: Top'];
-
-
-const COLOR_OPTIONS = ['Aqua', 'Beige', 'Black', 'Blue', 'Bronze', 'Brown', 'Burgundy', 'Coral', 'Cream', 'Fuchsia', 'Gold', 'Green', 'Grey', 'Lavender', 'Lime', 'Magenta', 'Maroon', 'Mauve', 'Multi', 'Mustard', 'Navy Blue', 'Nude', 'Off White', 'Olive', 'Orange', 'Peach', 'Pink', 'Pistachio', 'Purple', 'Rama', 'Red', 'Rose Gold', 'Rust', 'Sea Green', 'Silver', 'Tan', 'Taupe', 'Teal', 'Turquoise', 'Violet', 'White', 'Wine', 'Yellow'];
-
-const QTY_OPTIONS = [
-  'INCLUDES: 1 U Top, 1 U Bottom, 1 U Dupatta', 'INCLUDES: 1 U Lehenga, 1 U Blouse, 1 U Dupatta',
-  'INCLUDES: 1 U Top, 1 U Bottom', 'INCLUDES: 1 U Gown, 1 U Dupatta', 'INCLUDES: 1 U Blouse, 1 U Saree',
-  'INCLUDES: 1 U Gown', 'INCLUDES: 1 U Top', 'INCLUDES: 1 U Top, 1 U Pant',
-  'INCLUDES: 1 U Bottom, 1 U Kurta, 1 U Dupatta', 'INCLUDES: 1 U Blouse, 1 U Jacket, 1 U Sharara',
-  'INCLUDES: 1 U Top, 1 U Koti, 1 U Bottom', 'INCLUDES: 1 U Top, 1 U Sharara, 1 U Dupatta',
-  'INCLUDES: 1 U Blouse, 1 U Saree, 1 U Belt', 'INCLUDES: 1 U Pant, 1 U Kurta, 1 U Dupatta',
-  'INCLUDES: 1 U Top, 1 U Pant, 1 U Dupatta, 1 U Belt', 'INCLUDES: 1 U Dress, 1 U Belt, 1 U Dupatta',
-  'INCLUDES: 1 U Top, 1 U Palazzo', 'INCLUDES: 1 U Top, 1 U Tube, 1 U Bottom',
-  'INCLUDES: 1 U Gown, 1 U Sleeves', 'INCLUDES: 1 U Top, 1 U Pant, 1 U Jacket',
-  'INCLUDES: 1 U Jumpsuit', 'INCLUDES: 1 U Shirt, 1 U Trouser', 'INCLUDES: 1 U Top, 1 U Pant, 1 U Dupatta',
-  'INCLUDES: 1 U Top, 1 U Bottom, 1 U Sleeve', 'INCLUDES: 1 U Top, 1 U Dupatta',
-  'INCLUDES: 1 U Kurti, 1 U Jacket', 'INCLUDES: 1 U Gown, 1 U Bottom',
-  'INCLUDES: 1 U Blouse, 1 U Shrug, 1 U Pant', 'INCLUDES: 1 U Blouse, 1 U Palazzo, 1 U Jacket',
-  'INCLUDES: 1 U Dress', 'INCLUDES: 1 U One Piece', 'INCLUDES: 1 U Palazzo, 1 U Top',
-  'INCLUDES: 1 U Pant, 1 U Kurta', 'INCLUDES: 1 U Top, 1 U Jumpsuit',
-  'INCLUDES: 1 U Gown, 1 U Dupatta, 1 U Pant', 'INCLUDES: 1 U Blouse, 1 U Bottom',
-  'INCLUDES: 1 U Dress, 1 U Bottom, 1 U Dupatta', 'INCLUDES: 1 U Kurta',
-  'INCLUDES: 1 U Kurta, 1 U Bottom, 1 U Dupatta', 'INCLUDES: 1 U Palazzo, 1 U Blouse, 1 U Koti',
-  'INCLUDES: 1 U Lehenga, 1 U Blouse', 'INCLUDES: 1 U Lehenga, 1 U Blouse, 1 U Dupatta, 1 U Jacket',
-  'INCLUDES: 1 U Saree, 1 U Blouse, 1 U Dupatta', 'INCLUDES: 1 U Kurta, 1 U Sharara, 1 U Dupatta',
-  'INCLUDES: 1 U Lehenga, 1 U Choli, 1 U Jacket', 'INCLUDES: 1 U Lehenga, 1 U Blouse, 2 U Dupatta',
-];
-
-// Add/Edit modal moved to src/components/ui/BrandTagModal.tsx
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 export default function BrandTagPrinter() {
@@ -280,19 +81,17 @@ export default function BrandTagPrinter() {
 
   // Fetch current page from Supabase (server-side pagination)
   const fetchPage = useCallback(async () => {
-    let query = supabase.from('brand_tags').select('id, brand, ean, sku, qty, mrp, size, product, color, mktd, jio_code, copies', { count: 'estimated' });
+    let query = supabase.from('brand_tags').select(TAG_COLUMNS, { count: 'estimated' });
     if (search) query = query.ilike('search_text', `%${search.toLowerCase().replace(/[%_]/g, '\\$&')}%`);
     if (brandFilter) query = query.ilike('brand', `%${brandFilter.replace(/[%_]/g, '\\$&')}%`);
     if (sizeFilter) query = query.eq('size', sizeFilter);
     const from = btPage * btPerPage;
     const { data, count, error } = await query.order('created_at', { ascending: false }).range(from, from + btPerPage - 1);
     if (error) { addToast(friendlyError(error), 'error'); setLoading(false); return; }
-    type BrandTagFetchRow = Pick<BrandTag, 'id' | 'brand' | 'ean' | 'sku' | 'qty' | 'mrp' | 'size' | 'product' | 'color' | 'mktd' | 'jio_code' | 'copies'>;
-    if (data) setRows((data as BrandTagFetchRow[]).map((d): BrandTagRow => ({ id: d.id, brand: d.brand, ean: d.ean, sku: d.sku, qty: d.qty, mrp: Number(d.mrp), size: d.size, product: d.product, color: d.color, mktd: d.mktd, jioCode: d.jio_code, copies: d.copies })));
+    if (data) setRows((data as BrandTagDb[]).map(toRow));
     if (count !== null) setTotalCount(count);
     setLoading(false);
   }, [btPage, btPerPage, search, brandFilter, sizeFilter, addToast]);
-
   useEffect(() => { fetchPage(); }, [fetchPage]);
 
   // Lock body scroll when any modal/popup is open
@@ -302,26 +101,9 @@ export default function BrandTagPrinter() {
   useBackClose(!!confirmDel, () => setConfirmDel(null));
   useBackClose(!!printHtml, () => setPrintHtml(null));
 
-  // Smart realtime: apply individual row changes without re-fetching entire page
-  useEffect(() => {
-    const mapRow = (d: BrandTag): BrandTagRow => ({ id: d.id, brand: d.brand, ean: d.ean, sku: d.sku, qty: d.qty, mrp: Number(d.mrp), size: d.size, product: d.product, color: d.color, mktd: d.mktd, jioCode: d.jio_code, copies: d.copies });
-    let debounceTimer: ReturnType<typeof setTimeout>;
-    const debounced = (fn: () => void) => { clearTimeout(debounceTimer); debounceTimer = setTimeout(fn, 1500); };
-    const ch = supabase.channel('bt-smart')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'brand_tags' }, (payload) => {
-        const updated = mapRow(payload.new as BrandTag);
-        debounced(() => setRows(prev => prev.map(r => r.id === updated.id ? updated : r)));
-      })
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'brand_tags' }, (payload) => {
-        const id = (payload.old as Partial<BrandTag> | null)?.id;
-        if (id) { setRows(prev => prev.filter(r => r.id !== id)); setTotalCount(c => c - 1); }
-      })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'brand_tags' }, () => {
-        debounced(() => setTotalCount(c => c + 1));
-      })
-      .subscribe();
-    return () => { clearTimeout(debounceTimer); supabase.removeChannel(ch); };
-  }, []);
+  // Copies + / − (saved once the taps stop) and live updates from other screens.
+  const { bump, isBusy } = useCopies(setRows, addToast);
+  useTagLive(setRows, setTotalCount, isBusy);
 
   // Debounce search to avoid hammering DB on every keystroke
   const searchTimeout = useRef<any>(null);
@@ -349,100 +131,50 @@ export default function BrandTagPrinter() {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = async (evt) => {
+      // Warn on refresh during import
+      const beforeUnload = (ev: BeforeUnloadEvent) => { ev.preventDefault(); return ''; };
       try {
-        const data = new Uint8Array(evt.target?.result as ArrayBuffer);
-        const wb = XLSX.read(data, { type: 'array' });
-        if (!wb.SheetNames.length) { addToast('Excel file has no sheets', 'error'); setImporting(false); return; }
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const json: any[] = XLSX.utils.sheet_to_json(ws);
-        const imported: BrandTagRow[] = json.map(d => {
-          // Auto-map brand from Marketplace column if BRAND NAME is missing
-          let brand = String(d['BRAND NAME'] ?? '');
-          if (!brand) {
-            const mp = String(d['Marketplace'] || d['marketplace'] || '').trim().toLowerCase();
-            if (mp) brand = 'BRAND NAME: ' + (MARKETPLACE_BRAND[mp] || mp.toUpperCase());
-          }
-          return {
-          id: uid(),
-          brand,
-          ean: String(d['EAN'] ?? ''),
-          sku: String(d['SKU'] ?? '').split('*')[0].trim(), // strip *copies if present
-          qty: String(d['QTY'] ?? ''),
-          mrp: Number(d['MRP']) || 0,
-          size: String(d['SIZE'] ?? ''),
-          product: String(d['PRODUCT'] ?? ''),
-          color: String(d['Color'] ?? ''),
-          mktd: String(d['MKTD & DIST. BY'] ?? '') || _DEFAULT_MKTD,
-          jioCode: String(d['Jio Code'] ?? ''),
-          copies: Number(d['COPIES']) || 0,
-        }});
+        const json = await readSheet(evt.target?.result as ArrayBuffer);
+        if (!json) { addToast('Excel file has no sheets', 'error'); return; }
+        const imported = rowsFromSheet(json);
         if (imported.length === 0) {
           addToast('No rows found. Check that column headers match the expected format.', 'error');
           return;
         }
         // Validate all rows - reject file if any row has missing data
-        const errors: string[] = [];
-        imported.forEach((r, i) => {
-          const bad = validateRow(r);
-          if (bad) errors.push(`Row ${i + 1} (SKU: ${r.sku || 'empty'}): missing "${bad}"`);
-        });
-        if (errors.length > 0) {
+        const problems = importProblems(imported);
+        if (problems.length > 0) {
           // Actionable error report — user can fix in Excel and re-import (audit P2)
-          const errorRows = imported.map((r, i) => {
-            const bad = validateRow(r);
-            return bad ? { Row: i + 2, SKU: r.sku || '(empty)', MissingField: bad, EAN: r.ean, Size: r.size, Brand: r.brand } : null;
-          }).filter(Boolean);
-          const ws = XLSX.utils.json_to_sheet(errorRows as any[]);
-          const wb = XLSX.utils.book_new();
-          XLSX.utils.book_append_sheet(wb, ws, 'Import Errors');
-          saveWorkbook(wb, exportName('Brand-Tags-Import-Errors', [fileDate()], 'xlsx'));
-          addToast(`Import rejected — ${errors.length} row(s) missing data. Error report downloaded.`, 'error');
+          await saveSheet(problems, 'Import Errors', exportName('Brand-Tags-Import-Errors', [fileDate()], 'xlsx'));
+          addToast(`Import rejected — ${problems.length} row(s) missing data. Error report downloaded.`, 'error');
           return;
         }
-        // Smart import with queue persistence
-        const toUpsert: BrandTagInsert[] = imported.map(r => ({
-          brand: r.brand, ean: r.ean, sku: r.sku, qty: r.qty, mrp: r.mrp,
-          size: r.size, product: r.product, color: r.color, mktd: r.mktd,
-          jio_code: r.jioCode, copies: r.copies,
-          updated_at: new Date().toISOString(),
-        }));
-
-        // Warn on refresh during import
-        const beforeUnload = (e: BeforeUnloadEvent) => { e.preventDefault(); return ''; };
         window.addEventListener('beforeunload', beforeUnload);
         setImporting(true);
-
-        const batchSize = 500;
-        let failed = 0;
-        const failedBatches: number[] = [];
-        for (let i = 0; i < toUpsert.length; i += batchSize) {
-          const batch = toUpsert.slice(i, i + batchSize);
-          const { error } = await supabase.from('brand_tags')
-            .upsert(batch, { onConflict: 'ean,sku,size', ignoreDuplicates: false });
-          if (error) { failed += batch.length; failedBatches.push(Math.floor(i / batchSize) + 1); addToast(`Batch ${Math.floor(i / batchSize) + 1} failed — ${friendlyError(error)}`, 'error'); }
-          const done = Math.min(i + batchSize, toUpsert.length);
-          setImportProgress(`${done} / ${toUpsert.length}`);
-        }
-
-        window.removeEventListener('beforeunload', beforeUnload);
-        setImporting(false);
-        setImportProgress('');
-        addToast(failed > 0 ? `Import done with errors: ${failed} of ${toUpsert.length} rows failed (batch${failedBatches.length > 1 ? 'es' : ''} ${failedBatches.join(', ')})` : `Import complete! ${toUpsert.length} rows processed.`, failed > 0 ? 'error' : 'success');
+        const res = await importTags(imported, (done, total) => setImportProgress(`${done} / ${total}`));
+        res.errors.forEach((msg, i) => addToast(`Batch ${res.failedBatches[i]} failed — ${msg}`, 'error'));
+        addToast(res.failed > 0
+          ? `Import done with errors: ${res.failed} of ${imported.length} rows failed (batch${res.failedBatches.length > 1 ? 'es' : ''} ${res.failedBatches.join(', ')}). Saved: ${importSummary(res)}.`
+          : `Import complete — ${importSummary(res)}.`, res.failed > 0 ? 'error' : 'success');
         fetchPage();
-      } catch (e: any) {
-        const errMsg = e?.message || '';
+      } catch (err: any) {
+        const errMsg = err?.message || '';
         if (errMsg.toLowerCase().includes('column') || errMsg.toLowerCase().includes('header')) {
           addToast('Invalid columns. Expected headers: SKU, JIO, Brand, Size. Check your template.', 'error');
         } else if (errMsg.toLowerCase().includes('zip') || errMsg.toLowerCase().includes('format')) {
           addToast('File format unsupported. Use .xlsx, .xls, or .csv (not encrypted).', 'error');
         } else {
-          addToast('Failed to parse Excel — ' + friendlyError(e), 'error');
+          addToast('Failed to parse Excel — ' + friendlyError(err), 'error');
         }
+      } finally {
+        window.removeEventListener('beforeunload', beforeUnload);
+        setImporting(false);
+        setImportProgress('');
       }
     };
     reader.readAsArrayBuffer(file);
     e.target.value = '';
-  }, [addToast]);
+  }, [addToast, fetchPage]);
 
   // ── Export Excel ──
   const handleExport = useCallback(async () => {
@@ -460,10 +192,9 @@ export default function BrandTagPrinter() {
       'Jio Code': r.jioCode,
       'COPIES': r.copies,
     }));
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Brand Tags');
-    if (await saveWorkbook(wb, exportName('Brand-Tags', [fileDate()], 'xlsx'))) addToast(`Exported ${rows.length} brand tag${rows.length !== 1 ? 's' : ''}`, 'success');
+    try {
+      if (await saveSheet(data, 'Brand Tags', exportName('Brand-Tags', [fileDate()], 'xlsx'))) addToast(`Exported ${rows.length} brand tag${rows.length !== 1 ? 's' : ''}`, 'success');
+    } catch (err) { addToast(friendlyError(err), 'error'); }
   }, [rows, addToast]);
 
   // ── Row Mutations ──
@@ -521,22 +252,9 @@ export default function BrandTagPrinter() {
       try {
         setOrderLoading(true);
         setOrderLoadMsg('Parsing file...');
-        const d = new Uint8Array(evt.target?.result as ArrayBuffer);
-        const wb = XLSX.read(d, { type: 'array' });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const json: any[] = XLSX.utils.sheet_to_json(ws);
-        setOrderLoadMsg(`${json.length} rows parsed. Loading master data...`);
-        const allMaster: BrandTag[] = [];
-        let from = 0; let more = true;
-        while (more) {
-          const { data } = await supabase.from('brand_tags').select('id, brand, ean, sku, qty, mrp, size, product, color, mktd, jio_code, copies').range(from, from + 999);
-          if (data && data.length > 0) { allMaster.push(...(data as BrandTag[])); from += 1000; }
-          if (!data || data.length < 1000) more = false;
-          setOrderLoadMsg(`${json.length} rows parsed. Master data: ${allMaster.length} loaded...`);
-        }
-        setOrderLoadMsg(`Matching ${json.length} orders against ${allMaster.length} SKUs...`);
-        const masterRows: BrandTagRow[] = allMaster.map((d): BrandTagRow => ({ id: d.id, brand: d.brand, ean: d.ean, sku: d.sku, qty: d.qty, mrp: Number(d.mrp), size: d.size, product: d.product, color: d.color, mktd: d.mktd, jioCode: d.jio_code, copies: d.copies }));
-        const parsed = parseOrderSheet(json, masterRows);
+        const json = (await readSheet(evt.target?.result as ArrayBuffer)) || [];
+        setOrderLoadMsg(`${json.length} rows parsed. Matching against master labels...`);
+        const parsed = await matchOrderSheet(json);
         setOrderRows(parsed); setOrderPage(0);
         setOrderLoading(false); setOrderLoadMsg('');
       } catch (e: any) { addToast('Failed to parse order sheet — ' + friendlyError(e), 'error'); setOrderLoading(false); setOrderLoadMsg(''); }
@@ -649,9 +367,9 @@ export default function BrandTagPrinter() {
                 <td style={{ ...tdS, fontFamily: T.mono, fontSize: 11, color: T.tx3 }}>{row.jioCode}</td>
                 <td style={{ ...tdS, whiteSpace: 'nowrap' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 0 }} onClick={e => e.stopPropagation()}>
-                    <button type="button" onClick={() => { const old = row.copies || 0; const v = Math.max(0, old - 1); setRows(prev => prev.map(r => r.id === row.id ? { ...r, copies: v } : r)); supabase.from('brand_tags').update({ copies: v }).eq('id', row.id).then(({ error }) => { if (error) { setRows(prev => prev.map(r => r.id === row.id ? { ...r, copies: old } : r)); addToast(friendlyError(error), 'error'); } }); }} style={{ width: 36, height: 36, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer', borderRadius: '6px 0 0 6px', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Decrease copies" className="step44">−</button>
+                    <button type="button" onClick={() => bump(row, -1)} style={{ width: 36, height: 36, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer', borderRadius: '6px 0 0 6px', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Decrease copies" className="step44">−</button>
                     <span className="step44-val" style={{ width: 32, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', borderTop: `1px solid ${T.bd}`, borderBottom: `1px solid ${T.bd}`, fontFamily: T.mono, fontSize: 12, fontWeight: 600, color: row.copies > 0 ? T.ac2 : T.tx3, background: row.copies > 0 ? 'oklch(0.55 0.22 265 / .06)' : 'transparent' }}>{row.copies || 0}</span>
-                    <button type="button" onClick={() => { const old = row.copies || 0; const v = old + 1; setRows(prev => prev.map(r => r.id === row.id ? { ...r, copies: v } : r)); supabase.from('brand_tags').update({ copies: v }).eq('id', row.id).then(({ error }) => { if (error) { setRows(prev => prev.map(r => r.id === row.id ? { ...r, copies: old } : r)); addToast(friendlyError(error), 'error'); } }); }} style={{ width: 36, height: 36, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer', borderRadius: '0 6px 6px 0', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Increase copies" className="step44">+</button>
+                    <button type="button" onClick={() => bump(row, 1)} style={{ width: 36, height: 36, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer', borderRadius: '0 6px 6px 0', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Increase copies" className="step44">+</button>
                   </div>
                 </td>
                 <td style={{ ...tdS, whiteSpace: 'nowrap' }} className="bt-actions-col">
@@ -709,10 +427,8 @@ export default function BrandTagPrinter() {
                     'Size': r.found ? r.masterData?.size : '', 'MRP': r.found ? r.masterData?.mrp : '',
                     'Copies': r.copies, 'Status': r.found ? 'Ready' : 'Missing',
                   }));
-                  const ws = XLSX.utils.json_to_sheet(exportData);
-                  const wb = XLSX.utils.book_new();
-                  XLSX.utils.book_append_sheet(wb, ws, 'Order Preview');
-                  saveWorkbook(wb, exportName('Brand-Tags-Order', [orderRows?.[0]?.marketplace, fileDate()], 'xlsx'));
+                  saveSheet(exportData, 'Order Preview', exportName('Brand-Tags-Order', [orderRows?.[0]?.marketplace, fileDate()], 'xlsx'))
+                    .catch(err => addToast(friendlyError(err), 'error'));
                 }}>Export</button>
                 <button onClick={() => setOrderRows(null)} style={S.btnIcon} aria-label="Close">✕</button>
               </div>
