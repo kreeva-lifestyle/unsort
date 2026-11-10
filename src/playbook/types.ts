@@ -25,7 +25,7 @@ export interface PbVendor {
 export interface PbProduct {
   id: string; vendor_id: string | null; source: 'manual' | 'telegram' | 'import'; source_ref: string | null;
   raw_text: string | null; sku: string | null; name: string | null; category: string | null;
-  fabric: string | null; color: string | null; sizes: string[]; cost_price: number | null;
+  fabric: string | null; color: string | null; sizes: string[]; cost_price: number | null; tags: string[]; // its own clean tags (20261110090000_pb_tags.sql); websites use them through {tags}; library: tagTypes.ts
   /** Anything else the AI read: work, occasion, pattern, set_contents, wash_care, notes… (string values). */
   attributes: Record<string, string>;
   status: PbProductStatus;
@@ -69,7 +69,7 @@ export interface PbTagRules {
   case: PbTagCase;
   /** Let the AI add style/occasion tags too (at most ai_extra_max). */
   ai_extra: boolean;
-  ai_extra_max: number;
+  ai_extra_max: number; max_tags?: number; // max_tags: cap per product on this site, applied last (default 30; older rows lack it)
 }
 
 export interface PbContent {

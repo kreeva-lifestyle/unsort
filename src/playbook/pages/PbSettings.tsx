@@ -1,20 +1,28 @@
 // Product Directory settings: the AI that reads incoming products, the
 // category list, Telegram intake (bot, admin group, crawler), the history of
-// imports from websites, the automation pause switch and "Run now".
+// imports from websites, the Tags tile (opens the Tags page in place: full
+// screen on phone with Back to Settings; device Back returns here), the
+// automation pause switch and "Run now".
 // V2 layout (layout-and-components.md §4): form tiles 8 wide + the
 // automation status tile 4 wide on desktop; on phone the status tile follows
 // the form. "Run now" is the page's one gradient; the saves are secondary.
 import { useCallback, useEffect, useState } from 'react';
+import { useBackClose } from '../../hooks/useBackClose';
+import { useConfirm } from '../../components/ui/ConfirmModal';
 import { friendlyError } from '../../lib/friendlyError';
+import { dirtyTitle } from '../hooks/useDirty';
+import { discardAsk } from '../components/ui/discard';
 import type { AddToast } from '../components/PbToasts';
 import { PB_EFFORTS, PB_MODELS, type PbSettings as Settings } from '../types';
 import { DEFAULT_SETTINGS, getSettings, runWorker, saveSetting, type WorkResult } from '../data/settings';
 import { ChipsInput, Field, Grid2 } from '../components/website/ui';
 import { pbInput, pbMeta } from '../pbTheme';
-import { PbButton, PbPageHeader, PbSection, PbTile } from '../components/ui';
+import { PbButton, PbConfirm, PbPageHeader, PbSection, PbTile } from '../components/ui';
 import AutomationTile from '../components/settings/AutomationTile';
 import TelegramTile from '../components/settings/telegram/TelegramTile';
 import ImportHistoryTile from '../components/settings/ImportHistoryTile';
+import TagsTile from '../components/settings/TagsTile';
+import Tags from './Tags';
 import { SettingsColumns, SettingsError, SettingsSkeleton } from '../components/settings/SettingsStates';
 
 type Busy = '' | 'reader' | 'categories' | 'automation' | 'run';
@@ -28,6 +36,15 @@ export default function PbSettings({ addToast, onBack, onGuide }: { addToast: Ad
   const [run, setRun] = useState<WorkResult | null>(null);
   const [loadErr, setLoadErr] = useState('');
   const [retrying, setRetrying] = useState(false);
+  const [tagsOpen, setTagsOpen] = useState(false);
+  const { ask, modalProps } = useConfirm();
+  // Back to Settings (the button or device Back) asks "Discard changes to the tag rules?" while the rules form has typing.
+  const closeTags = () => {
+    const what = dirtyTitle();
+    if (what) { void ask(discardAsk(what)).then(ok => { if (ok) setTagsOpen(false); }); return false; }
+    setTagsOpen(false);
+  };
+  useBackClose(tagsOpen, closeTags);
 
   const load = useCallback(() => getSettings()
     .then(s => { setSaved(s); setReader(s.reader); setCats(s.categories); setLoadErr(''); })
@@ -57,6 +74,7 @@ export default function PbSettings({ addToast, onBack, onGuide }: { addToast: Ad
 
   const header = <PbPageHeader title="Settings" sub="How the Product Directory reads products, how Telegram posts come in, and when the automation runs"
     back={onBack ? { label: 'More', onBack } : undefined} />;
+  if (tagsOpen) return <><Tags addToast={addToast} onBack={closeTags} /><PbConfirm {...modalProps} /></>;
   if (!saved) return <>{header}{loadErr ? <SettingsError message={loadErr} onRetry={retry} busy={retrying} /> : <SettingsSkeleton />}</>;
   const paused = saved.automation.paused;
   const readerDirty = !same(reader, saved.reader), catsDirty = !same(cats, saved.categories);
@@ -103,6 +121,7 @@ export default function PbSettings({ addToast, onBack, onGuide }: { addToast: Ad
           </div>
         </PbSection>
       </PbTile>
+      <TagsTile onOpen={() => setTagsOpen(true)} />
       <TelegramTile addToast={addToast} onGuide={() => onGuide?.('telegram')} />
       <ImportHistoryTile />
     </>

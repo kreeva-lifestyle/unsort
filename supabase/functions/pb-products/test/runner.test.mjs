@@ -20,7 +20,7 @@ const products = [1, 2, 3, 4, 5, 6, 7].map(n => ({ ...base, id: 800 + n, handle:
 const pageHtml = read('shopify.page.html');
 
 function fakeWorld(run, store = null) {
-  const calls = { site: [], inserts: [], saves: [], known: [] };
+  const calls = { site: [], inserts: [], saves: [], known: [], bumps: [] };
   globalThis.fetch = async (url, init = {}) => {
     const u = String(url), method = init.method || 'GET';
     const ok = (body, status = 200, headers = {}) => new Response(typeof body === 'string' ? body : JSON.stringify(body), { status, headers });
@@ -42,6 +42,9 @@ function fakeWorld(run, store = null) {
       return ok([{ id: run.id }]);
     }
     if (path.startsWith('pb_vendors?id=')) return ok([{ name: 'Kumari Art' }]);
+    if (path.startsWith('pb_settings?')) return ok([]); // tag rules: the defaults
+    if (path.startsWith('pb_tags?')) return ok([]);
+    if (path.startsWith('rpc/pb_tags_bump')) { calls.bumps.push(JSON.parse(init.body)); return ok(1); }
     if (path.startsWith('pb_websites?')) return ok([{ shop_domain: 'aryadesigns.myshopify.com' }]);
     if (path.startsWith('pb_products?source=eq.import&source_ref=in.')) { calls.known.push(path); return ok([{ source_ref: 'kumari.example:801' }]); }
     if (path.startsWith('pb_products?source=eq.import&source_ref=eq.')) return ok([]);
@@ -77,6 +80,9 @@ test('out of time mid-page: known product skipped without its page, cursor.skip 
   assert.equal(row.attributes.manufacturer, 'Varanasi Weavers Co-op');
   assert.equal(row.attributes.brand, 'Kumari Art');
   assert.equal(row.attributes.source_page_url, 'https://kumari.example/products/saree-2');
+  // The store's tags are cleaned into the product's own tags at once; the library is told first.
+  assert.ok(Array.isArray(row.tags) && row.tags.length > 0 && row.tags.every(t => !t.startsWith('_')), JSON.stringify(row.tags));
+  assert.ok(calls.bumps.some(b => b.p_source === 'store' && b.p_names.length === row.tags.length));
 
   calls = fakeWorld(runRow({ status: 'running', cursor: save1.cursor, found: 4, added: 3, skipped: 1, sample: save1.sample }));
   out = await advanceImport(Date.now() + 60_000, null);

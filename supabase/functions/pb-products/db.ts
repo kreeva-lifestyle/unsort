@@ -2,6 +2,7 @@
 // function does its own auth in auth.ts). Every failure becomes an HttpError
 // with a plain sentence.
 import { HttpError } from './http.ts';
+import { tagSettings } from './tagClean.ts';
 import type { Settings } from './types.ts';
 
 export const SB_URL = Deno.env.get('SUPABASE_URL') ?? '';
@@ -75,7 +76,20 @@ export async function getSettings(): Promise<Settings> {
     reader: { model: String(reader.model || ''), effort: String(reader.effort || '') },
     categories: uniqueCi(Array.isArray(cats) ? cats.map(c => String(c ?? '')) : []),
     automation: { paused: auto.paused === true },
+    tags: tagSettings(m.get('tags')),
   };
+}
+
+/** POST /rest/v1/rpc/<fn> → its result (service role). */
+export async function rpc<T>(fn: string, args: Record<string, unknown>): Promise<T> {
+  const r = await fetch(`${SB_URL}/rest/v1/rpc/${fn}`, { method: 'POST', headers: { ...svcHeaders, 'content-type': 'application/json' }, body: JSON.stringify(args) });
+  if (!r.ok) {
+    const body = await r.json().catch(() => ({})) as { message?: string; code?: string };
+    // Our own `raise exception` sentences (pb_tag_merge…, SQLSTATE P0001) are shown as they are.
+    if (body?.code === 'P0001' && body.message) throw new HttpError(400, String(body.message).slice(0, 200));
+    return dbFail(r, 'refused the change');
+  }
+  return await r.json() as T;
 }
 
 /** Timeline entry. Written after the change it describes; a failed log write is reported in the

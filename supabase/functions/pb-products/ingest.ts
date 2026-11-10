@@ -7,10 +7,12 @@
 // Import from website (2026-11-08): sell_price = the price seen on the other
 // store, which is OUR selling price (pricing rules skipped), + price_note;
 // attributes = the store's facts (brand, type, tags, barcode, weight, SEO…;
-// import/meta.ts) and sku — both taken from source 'import' only.
+// import/meta.ts) and sku — both taken from source 'import' only. The store's
+// tags are cleaned into the product's own tags at once (tagStore.ts).
 import { SB_URL, enc, insert, logActivity, nowIso, one, patch, sel, svcHeaders } from './db.ts';
 import { HttpError, fetchT, plain } from './http.ts';
 import { siteBytes } from './import/fetch.ts';
+import { bumpLibrary, computeTags, tagCtx } from './tagStore.ts';
 import { BUCKET } from './types.ts';
 
 const MAX_IMAGES = 10;
@@ -80,6 +82,15 @@ export async function vendorId(name: string): Promise<string | null> {
   }
 }
 
+/** A new product's tags: its store tags through the rules (tagEngine.ts); [] when it has none. */
+async function initialTags(attributes: Record<string, string>): Promise<string[]> {
+  if (!String(attributes.store_tags || '').trim()) return [];
+  const ctx = await tagCtx();
+  const r = computeTags({ id: '', category: null, fabric: null, color: null, attributes, tags: [], locked: [] }, ctx);
+  await bumpLibrary(r, ctx);
+  return r.tags;
+}
+
 function sniff(b: Uint8Array): { type: string; ext: string } | null {
   if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return { type: 'image/jpeg', ext: 'jpg' };
   if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return { type: 'image/png', ext: 'png' };
@@ -134,9 +145,11 @@ export async function ingest(b: IngestBody): Promise<Record<string, unknown>> {
   const dup = await findDup();
   if (dup) return { ok: true, product_id: dup.id, duplicate: true };
   const vendor_id = await vendorId(String(b.vendor_name ?? '').replace(/\s+/g, ' ').trim().slice(0, 120));
+  // The store's tags, cleaned, become the product's own tags from the start (the reader adds the facts later).
+  const tags = await initialTags((more.attributes as Record<string, string> | undefined) || {});
   let id: string;
   try {
-    id = (await insert<{ id: string }>('pb_products', [{ source, source_ref: ref, raw_text: rawText || null, vendor_id, status: 'new', claimed_at: nowIso(), ...more }]))[0].id;
+    id = (await insert<{ id: string }>('pb_products', [{ source, source_ref: ref, raw_text: rawText || null, vendor_id, status: 'new', claimed_at: nowIso(), ...more, tags }]))[0].id;
   } catch (e) {
     const again = e instanceof HttpError && e.status === 409 ? await findDup() : null;
     if (again) return { ok: true, product_id: again.id, duplicate: true };

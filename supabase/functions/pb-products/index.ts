@@ -28,9 +28,16 @@
 //   import_start       staff          { url, in_stock_only?, use_their_price?, vendor_name?, estimate? } → { ok, run_id, platform, host, warnings[] }
 //   import_cancel      staff          { run_id }                          → { ok }
 //   import_list        staff          –                                   → { ok, runs[≤20] }
+//   set_product_tags   staff          { product_id, tags[] }              → { ok, tags, flagged, hidden, locked } (locks 'tags')
+//   tags_library       staff          { q?, kind?, hidden?, aliases?, page?, per? } → { ok, rows, count, page, per, counts:{all, hidden, review} }
+//   tags_review        staff          { days? }                           → { ok, rows[{…tag, examples[≤3]}], days }
+//   tags_act           staff          { ids[], action:keep|hide|unhide|merge|rename|kind, into?, name?, kind? } → { ok, done }
+//   tags_test          staff          { tags[], rules? }                  → { ok, results[{tag, name, kept, reason?, pattern?}], rules }
+//   tags_settings_save admin|manager  { rules }                           → { ok, rules }
+//   tags_reclean       admin|manager  { dry_run (default true) }          → { ok, dry_run, products, locked, changed, sample[≤10: {id, name, before, after, added, removed}] }
 //
 // Pipeline (worker.ts): read (reader.ts) → route (route.ts / routing.ts) →
-// generate (generate.ts: pricing.ts, content.ts, tags.ts) → publish
+// generate (generate.ts: pricing.ts, content.ts, tags.ts + the product's own tags, tagEngine.ts / tagStore.ts) → publish
 // (publish.ts / productInput.ts / shopifyProduct.ts / shopify.ts). Every step writes pb_activity.
 // Shopify requests go only to a …myshopify.com host on a supported Admin API version (shopify.ts).
 // Only pb_product_images rows with kind = 'image' go to the AI and Shopify (videos are for staff).
@@ -41,6 +48,7 @@ import { HttpError, corsHeaders, fail, json, plain } from './http.ts';
 import { importCancel, importCheck, importList, importStart } from './import/actions.ts';
 import { routeWebsite } from './routeSite.ts';
 import { previewPrice, saveCredentials, testSite } from './siteActions.ts';
+import { setTags, tagsAct, tagsLibrary, tagsReclean, tagsReview, tagsSettingsSave, tagsTest } from './tagsActions.ts';
 import type { Caller } from './types.ts';
 
 type Who = 'secret' | 'staff' | 'any' | 'admin';
@@ -60,13 +68,20 @@ const ACTIONS: Record<string, { who: Who; run: (b: A.Body, c: Caller) => Promise
   import_start: { who: 'staff', run: (b, c) => importStart(b, userOf(c)) },
   import_cancel: { who: 'staff', run: (b, c) => importCancel(b, userOf(c)) },
   import_list: { who: 'staff', run: () => importList() },
+  set_product_tags: { who: 'staff', run: (b, c) => setTags(b, userOf(c)) },
+  tags_library: { who: 'staff', run: (b) => tagsLibrary(b) },
+  tags_review: { who: 'staff', run: (b) => tagsReview(b) },
+  tags_act: { who: 'staff', run: (b, c) => tagsAct(b, userOf(c)) },
+  tags_test: { who: 'staff', run: (b) => tagsTest(b) },
+  tags_settings_save: { who: 'admin', run: (b, c) => tagsSettingsSave(b, userOf(c)) },
+  tags_reclean: { who: 'admin', run: (b, c) => tagsReclean(b, userOf(c)) },
 };
 
 function allowed(who: Who, c: Caller): string | null {
   if (who === 'any') return null;
   if (who === 'secret') return c.kind === 'secret' ? null : 'Only the automation bridge can use this.';
   if (c.kind !== 'staff') return 'Sign in as a staff member for this.';
-  if (who === 'admin' && !['admin', 'manager'].includes(c.role)) return 'Only an admin or manager can change store credentials.';
+  if (who === 'admin' && !['admin', 'manager'].includes(c.role)) return 'Only an admin or manager can change this.';
   return null;
 }
 

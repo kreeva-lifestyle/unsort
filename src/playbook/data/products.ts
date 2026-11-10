@@ -48,7 +48,7 @@ export type ProductDetail = Omit<PbProduct, 'claimed_at' | 'created_by'> & {
   pb_product_images: Pick<PbProductImage, 'id' | 'path' | 'position' | 'kind' | 'bytes'>[];
   pb_listings: ListingFull[];
 };
-const PRODUCT_COLS = 'id,vendor_id,source,source_ref,raw_text,sku,name,category,fabric,color,sizes,cost_price,attributes,status,locked,ai_read_at,ai_error,less_amount,source_url,intake_notes,sell_price,price_note,created_at,updated_at';
+const PRODUCT_COLS = 'id,vendor_id,source,source_ref,raw_text,sku,name,category,fabric,color,sizes,cost_price,tags,attributes,status,locked,ai_read_at,ai_error,less_amount,source_url,intake_notes,sell_price,price_note,created_at,updated_at';
 
 export async function getProduct(id: string): Promise<ProductDetail> {
   const { data, error } = await supabase.from('pb_products')

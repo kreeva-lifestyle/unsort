@@ -6,6 +6,9 @@
 // sell_price (import from website: the other store's price is our selling
 // price) needs no cost: the AI's cost_price is ignored for it, because the
 // only price in its text is that selling price, not a cost.
+// After the merge the product's own tags are rebuilt from the new facts
+// (tagStore.ts nextTags: category, fabric, colour, occasion / work / pattern +
+// the store's cleaned tags) unless staff locked 'tags'.
 // Imported attributes (IMPORT_ATTRS: brand, store_tags, seo_title…) are the
 // store's own facts: an imported product keeps them as they are — the AI's
 // attributes are added beside them, never in their place, even on "Read again".
@@ -25,6 +28,7 @@ import { readerPrompt, readerSchema, type ReadOut } from './readerPrompt.ts';
 import { routeProduct } from './route.ts';
 import { stripLess } from '../pb-telegram/group.ts';
 import { mergeReadAttrs } from './import/meta.ts';
+import { nextTags, tagCtx } from './tagStore.ts';
 import { MAX_ATTEMPTS, PRODUCT_COLS, STALE_MS, hasPrice, type Budget, type ProductRow } from './types.ts';
 
 /** Products the worker may read: new (not in a retry wait) or a stuck 'reading'. */
@@ -92,6 +96,9 @@ export async function readOne(p: ProductRow, o: { manual: boolean; prevStatus?: 
     });
     const set = merge(p, ai.data, s.categories, o.manual);
     const next = { ...p, ...set } as ProductRow;
+    // The product's own tags from the facts just read (+ its store tags); a locked 'tags' is left alone.
+    const tags = await nextTags(next, await tagCtx(s));
+    if (tags) { set.tags = tags; next.tags = tags; }
     const status = !hasPrice(next) || !String(next.category || '').trim() ? 'needs_info' : 'ready';
     const saved = await patch<ProductRow>('pb_products', `id=eq.${enc(p.id)}&status=eq.reading`,
       { ...set, status, ai_read_at: nowIso(), ai_error: null, claimed_at: null }, PRODUCT_COLS);

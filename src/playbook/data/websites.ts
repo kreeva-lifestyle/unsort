@@ -11,7 +11,7 @@ import type { PbAuthMode, PbContent, PbPricing, PbRoutingRule, PbTagRules, PbWeb
 // Same values as the column defaults in 20261105090000_pb_product_directory.sql —
 // only used to fill a key missing from an older jsonb value.
 export const DEFAULT_PRICING: PbPricing = { markup_pct: 100, add_flat: 0, rounding: 'end_99', compare_at_pct: 0, min_price: null };
-export const DEFAULT_TAGS: PbTagRules = { templates: ['{category}', '{fabric}', '{color}', 'Vendor_{vendor}'], static: [], case: 'as_is', ai_extra: true, ai_extra_max: 5 };
+export const DEFAULT_TAGS: PbTagRules = { templates: ['{category}', '{fabric}', '{color}', 'Vendor_{vendor}', '{tags}'], static: [], case: 'as_is', ai_extra: true, ai_extra_max: 5, max_tags: 30 };
 export const DEFAULT_CONTENT: PbContent = {
   model: 'claude-haiku-5-5', effort: '', language: 'English', brand_voice: '', title_template: '{ai_title}',
   title_max: 70, description_words: 120, meta_title_max: 60, meta_desc_max: 155, extra_instructions: '', alt_text: true,

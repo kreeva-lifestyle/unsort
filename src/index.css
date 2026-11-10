@@ -798,6 +798,8 @@ body.modal-open .pb-scroll { overflow: hidden !important; }
   .pb-phone-full { flex: 1 1 100% !important; margin-left: 0 !important; }
   /* Segmented control with 3+ options: one option per line, every cell the same width. */
   .pb-seg-many { grid-template-columns: minmax(0, 1fr) !important; }
+  /* …except a 3-way filter with one-word options (All / Visible / Hidden): one line, three equal cells. */
+  .pb-seg-3 .pb-seg-many { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
   /* Settings: form first, help / status after it (layout §4); the side column stops sticking. */
   /* Stretched (not shrink-to-fit): a wide chip or value can never widen a stacked column past the viewport. */
   .pb-settings-cols { flex-direction: column; align-items: stretch !important; }
@@ -872,6 +874,8 @@ body.modal-open .pb-tabbar { visibility: hidden; }
 .pb-clamp2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
 .pb-chiprow { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; }
 .pb-chiprow::-webkit-scrollbar { display: none; }
+/* Tags: the 44px checkbox (TagCheck) shows the focus ring on its drawn box. */
+.pb-check input:focus-visible + span { outline: 2px solid var(--pb-focus); outline-offset: 2px; }
 @media (max-width: 768px) { .pb-chiprow { margin: 0 -16px; padding: 0 16px; scroll-padding: 0 16px; } }
 .pb-skel { background: linear-gradient(90deg, oklch(1 0 0 / .08) 0%, oklch(1 0 0 / .14) 50%, oklch(1 0 0 / .08) 100%); background-size: 200% 100%; animation: shimmer 1.5s linear infinite; border-radius: 8px; }
 .pb-row-cv { content-visibility: auto; contain-intrinsic-size: auto 96px; }

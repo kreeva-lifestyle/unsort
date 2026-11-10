@@ -22,6 +22,7 @@ import { KeptTag } from './detail/ListingField';
 import { LessLine } from './detail/TelegramBits';
 import { SellPriceLine } from './detail/SellPriceLine';
 import VendorSelect from './VendorSelect';
+import ProductTags from './ProductTags';
 import { numKey, splitList } from './status';
 
 type Form = { name: string; sku: string; vendor_id: string; category: string; fabric: string; color: string; sizes: string; cost_price: string; raw_text: string };
@@ -145,6 +146,8 @@ export default function ProductFacts({ product, vendors, categories, onVendorCre
         {label('raw_text', 'Details (vendor’s post)', 'pb-f-raw')}
         <GrowArea id="pb-f-raw" value={f.raw_text} onChange={set('raw_text')} rows={4} maxLength={8000} autoCapitalize="sentences" className="pb-input" style={pbTextarea} />
       </div>
+      {/* Its own Save (set_product_tags): the tags are not part of the facts patch above; unsaved chips survive Save facts. */}
+      <ProductTags product={product} addToast={addToast} onSaved={onSaved} />
       {err && <div role="alert" style={pbErrorBox}>{err}</div>}
       {reading && <div style={pbMeta}>The AI is reading this product — wait a moment, then reload to edit.</div>}
       {phone && changed.length > 0 ? (

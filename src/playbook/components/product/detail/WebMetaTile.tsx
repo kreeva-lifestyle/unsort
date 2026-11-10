@@ -14,7 +14,7 @@ import PbTile, { type PbSpan } from '../../ui/PbTile';
 const META: { key: string; label: string; mono?: boolean; wide?: boolean }[] = [
   { key: 'brand', label: 'Brand' }, { key: 'manufacturer', label: 'Manufacturer', wide: true },
   { key: 'product_type', label: 'Product type' }, { key: 'material', label: 'Material' }, { key: 'colour', label: 'Colour' },
-  { key: 'store_tags', label: 'Store tags', wide: true },
+  { key: 'store_tags', label: 'Store tags (raw)', wide: true },
   { key: 'sku', label: 'SKU', mono: true }, { key: 'barcode', label: 'Barcode', mono: true },
   { key: 'weight', label: 'Weight', mono: true }, { key: 'compare_at_price', label: 'Was price', mono: true },
   { key: 'currency', label: 'Currency', mono: true },
@@ -50,7 +50,8 @@ export default function WebMetaTile({ p, span }: { p: ProductDetail; span?: PbSp
         ))}
       </dl>
       <span style={pbMeta}>
-        Copied from the other store as it was. Tag templates can use these, e.g. <span style={pbNum}>{'{attr:brand}'}</span> or <span style={pbNum}>{'{attr:product_type}'}</span>.
+        Copied from the other store as it was. The store tags are cleaned into the <strong style={{ color: PB.tx, fontWeight: 600 }}>Tags</strong> above (junk such as <span style={pbNum}>_altnew_</span> codes is left out; Settings → Tags has the rules).
+        Tag templates can use these, e.g. <span style={pbNum}>{'{attr:brand}'}</span> or <span style={pbNum}>{'{attr:product_type}'}</span>.
       </span>
     </PbTile>
   );

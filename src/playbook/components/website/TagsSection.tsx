@@ -1,10 +1,11 @@
-// Tags: this store's tag structure — templates with placeholders, fixed tags,
-// letter case and AI extras — with an example built from a sample product.
-// Layout: (Templates 12) / (Fixed tags 6)(Letter case 6) / (AI extra 6)(Example 6);
-// the pairs stack at 6 columns and on phone.
+// Tags: this store's tag structure — templates with placeholders ({tags} =
+// the product's own cleaned tags, Settings → Tags), fixed tags, letter case,
+// AI extras and the per-product cap — with an example built from a sample
+// product. Layout: (Templates 12) / (Fixed tags 6)(Letter case 6) /
+// (AI extra 6)(Example 6) / (Cap 12); the pairs stack at 6 columns and on phone.
 import PbSwitch from '../ui/PbSwitch';
 import type { PbTagRules } from '../../types';
-import { buildTags, type TagFacts } from './tagPreview';
+import { DEFAULT_MAX_TAGS, buildTags, type TagFacts } from './tagPreview';
 import { PB, pbMeta } from '../../pbTheme';
 import { PbTag } from '../ui';
 import { ChipsInput, Field, NumInput, Section, Seg } from './ui';
@@ -12,13 +13,14 @@ import { Cell, SectionGrid } from './sections/SectionGrid';
 import type { Draft, SetDraft } from './WebsiteEditor';
 
 const PLACEHOLDERS: [string, string][] = [
-  ['{category}', 'Saree, Kurta Set…'], ['{fabric}', 'Silk, Cotton…'], ['{color}', 'Red, Navy…'], ['{vendor}', 'vendor name'],
+  ['{tags}', 'the product’s cleaned tags (Settings → Tags), one tag each'], ['{category}', 'Saree, Kurta Set…'], ['{fabric}', 'Silk, Cotton…'], ['{color}', 'Red, Navy…'], ['{vendor}', 'vendor name'],
   ['{vendor_code}', 'vendor short code'], ['{size}', 'one tag per size'], ['{sku}', 'product code'], ['{attr:occasion}', 'any AI-read detail: work, occasion, pattern…'],
   ['{attr:brand}', 'brand, product type… copied by Import from website'], ['{attr:store_tags}', 'one tag per tag on the other store'],
 ];
 const SAMPLE: TagFacts = {
   category: 'Saree', fabric: 'Banarasi Silk', color: 'Maroon', vendor: 'Rangoli', vendor_code: 'RG', sku: 'RG-101',
   sizes: ['Free Size'], attributes: { occasion: 'Festive', work: 'Zari', wash_care: 'Dry clean only' },
+  tags: ['Saree', 'Banarasi Silk', 'Maroon', 'Festive', 'Zari', 'Wedding Guest'],
 };
 const AI_MARK = '+ AI tags';
 
@@ -35,7 +37,7 @@ export default function TagsSection({ draft, set }: { draft: Draft; set: SetDraf
   return (
     <SectionGrid>
       <Cell>
-        <Section title="Tag templates" hint="Each line becomes one tag. A template whose placeholder is empty for a product is skipped.">
+        <Section title="Tag templates" hint="Each line becomes one tag. A template whose placeholder is empty for a product is skipped. {tags} sends the product’s own cleaned tags — the usual choice; {attr:store_tags} sends the other store’s tags raw.">
           <Field label="Templates" htmlFor="pbt-tpl">
             <ChipsInput id="pbt-tpl" mono values={r.templates} onChange={v => put({ templates: v })} placeholder="e.g. Fabric_{fabric}" maxLen={255} />
           </Field>
@@ -82,7 +84,7 @@ export default function TagsSection({ draft, set }: { draft: Draft; set: SetDraf
         </Section>
       </Cell>
       <Cell span={6}>
-        <Section title="Example" hint="A maroon Banarasi silk saree from vendor Rangoli (RG), free size, would get:">
+        <Section title="Example" hint="A maroon Banarasi silk saree from vendor Rangoli (RG), free size, with the product tags Festive, Zari and Wedding Guest, would get:">
           {tags.length ? (
             <ul aria-label="Example tags" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, listStyle: 'none', margin: 0, padding: 0 }}>
               {tags.map(t => (
@@ -92,6 +94,15 @@ export default function TagsSection({ draft, set }: { draft: Draft; set: SetDraf
               ))}
             </ul>
           ) : <div style={pbMeta}>No tags yet — add a template or a fixed tag.</div>}
+        </Section>
+      </Cell>
+      <Cell>
+        <Section title="How many tags" hint="Applied last, after the templates, fixed tags and AI extras. Shopify allows 250; a long list is harder to browse.">
+          <div style={{ maxWidth: 200 }}>
+            <Field label="At most, per product" htmlFor="pbt-cap" hint={`Default ${DEFAULT_MAX_TAGS}.`}>
+              <NumInput id="pbt-cap" value={r.max_tags ?? DEFAULT_MAX_TAGS} min={1} max={250} onChange={v => put({ max_tags: Math.max(1, Math.round(v ?? DEFAULT_MAX_TAGS)) })} />
+            </Field>
+          </div>
         </Section>
       </Cell>
     </SectionGrid>
