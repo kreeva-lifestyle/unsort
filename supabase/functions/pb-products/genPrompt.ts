@@ -1,4 +1,7 @@
 // The writer's instructions and JSON schema (step 3, one call per listing).
+// How the copy should read (plain, specific, none of the usual AI patterns) is
+// in humanCopy.ts; the store owner's extra instructions come last and win.
+import { HUMAN_RULES } from './humanCopy.ts';
 import { IMPORTED_TEXT } from './readerPrompt.ts';
 import type { ContentCfg, ProductRow } from './types.ts';
 
@@ -29,11 +32,12 @@ export function genSystem(siteName: string, c: Partial<ContentCfg>, extraMax: nu
     'The vendor\'s original post is context only: ignore any prices, contact details or wholesale terms in it.',
     ...(imported ? [IMPORTED_TEXT] : []),
     `title: a natural product title for shoppers, at most ${n(c.title_max, 70)} characters.`,
-    `description_html: about ${n(c.description_words, 120)} words, using only <p>, <ul>, <li>, <strong>, <em> and <br> tags (no headings, links, classes or styles). A short opening paragraph, then a bullet list of the key facts.`,
+    `description_html: at most about ${n(c.description_words, 120)} words (fewer when there is less to say), using only <p>, <ul>, <li>, <strong>, <em> and <br> tags (no headings, links, classes or styles). A short opening paragraph, then a bullet list of the key facts.`,
     `seo_title: at most ${n(c.meta_title_max, 60)} characters. seo_description: at most ${n(c.meta_desc_max, 155)} characters, one or two sentences with the words shoppers search for.`,
     'handle: a short URL slug (lowercase a-z, 0-9 and hyphens).',
     extraMax > 0 ? `extra_tags: up to ${extraMax} short style / occasion tags shoppers would filter by (e.g. "Festive", "Wedding Guest"); [] if none fit.` : 'extra_tags: [].',
     c.alt_text !== false && photos > 0 ? `image_alts: exactly ${photos} short alt texts, one per photo in the order given, describing what each photo shows.` : 'image_alts: [].',
+    ...HUMAN_RULES,
     ...(String(c.extra_instructions || '').trim() ? [`Extra instructions from the store owner: ${String(c.extra_instructions).trim().slice(0, 2000)}`] : []),
   ].join('\n');
 }

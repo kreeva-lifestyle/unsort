@@ -7,6 +7,7 @@ import { askClaude } from './ai.ts';
 import { cleanHtml, cut, fillTitle, makeHandle, stripTags } from './content.ts';
 import { ago, enc, logActivity, nowIso, one, patch, sel } from './db.ts';
 import { genFacts, genSchema, genSystem, type GenOut } from './genPrompt.ts';
+import { copyTells, tidyCopy } from './humanCopy.ts';
 import { HttpError, plain } from './http.ts';
 import { aiPhotos } from './photos.ts';
 import { compareAt, listingPrice } from './pricing.ts';
@@ -71,7 +72,11 @@ export async function generateOne(l: ListingRow, o: { manual: boolean; prevStatu
       content: [...photos.blocks, { type: 'text', text: genFacts(p, vendor?.name ?? '') }],
       schema: genSchema, maxTokens: 16000, timeoutMs: o.budget.hard - Date.now(),
     });
-    const g = ai.data;
+    // What the writer wrote, with the fixes a program can make safely (humanCopy.ts).
+    const g: GenOut = { ...ai.data, title: tidyCopy(ai.data.title), description_html: tidyCopy(ai.data.description_html),
+      seo_title: tidyCopy(ai.data.seo_title), seo_description: tidyCopy(ai.data.seo_description),
+      image_alts: Array.isArray(ai.data.image_alts) ? ai.data.image_alts.map(tidyCopy) : [] };
+    const tells = copyTells(`${g.title}. ${g.description_html} ${g.seo_title}. ${g.seo_description}`);
     const extra = Array.isArray(g.extra_tags) ? g.extra_tags.slice(0, extraMax) : [];
     const valueTags = locked.has('tags') ? [] : await siteValueTags(p.id, tr.tag_style);
     const vars = { category: p.category || '', fabric: p.fabric || '', color: p.color || '', vendor: vendor?.name || '', sku: p.sku || '', name: p.name || '' };
@@ -100,7 +105,7 @@ export async function generateOne(l: ListingRow, o: { manual: boolean; prevStatu
     }
     const saved = await patch<ListingRow>('pb_listings', `id=eq.${enc(l.id)}&status=eq.generating`, set, LISTING_COLS);
     if (!saved[0]) throw new HttpError(409, 'The listing changed while it was being written — open it again.');
-    await logActivity({ product_id: l.product_id, website_id: l.website_id, listing_id: l.id, action: 'generated', details: { model: ai.model, effort: ai.effort, usd: ai.usd, price, next: set.status }, user_id: o.userId });
+    await logActivity({ product_id: l.product_id, website_id: l.website_id, listing_id: l.id, action: 'generated', details: { model: ai.model, effort: ai.effort, usd: ai.usd, price, next: set.status, ...(tells.length ? { tells } : {}) }, user_id: o.userId });
     return saved[0];
   } catch (e) {
     const msg = plain(e);
