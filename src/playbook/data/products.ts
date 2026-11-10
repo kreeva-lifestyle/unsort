@@ -10,7 +10,7 @@ export type { ListingFull } from './listings';
 
 export const PAGE_SIZE = 25;
 
-export type ProductRow = Pick<PbProduct, 'id' | 'name' | 'sku' | 'cost_price' | 'sell_price' | 'status' | 'category' | 'ai_error' | 'created_at'> & {
+export type ProductRow = Pick<PbProduct, 'id' | 'name' | 'sku' | 'cost_price' | 'sell_price' | 'status' | 'category' | 'missing_attrs' | 'ai_error' | 'created_at'> & {
   pb_vendors: { name: string } | null;
   pb_product_images: { path: string; position: number }[];
   pb_listings: { id: string; website_id: string; status: PbListingStatus }[];
@@ -19,7 +19,7 @@ export type ProductRow = Pick<PbProduct, 'id' | 'name' | 'sku' | 'cost_price' | 
 export type ProductFilter = { search: string; status: string; vendorId: string; websiteId: string };
 export const EMPTY_FILTER: ProductFilter = { search: '', status: '', vendorId: '', websiteId: '' };
 
-const LIST_COLS = 'id,name,sku,cost_price,sell_price,status,category,ai_error,created_at,pb_vendors(name),pb_product_images(path,position),pb_listings(id,website_id,status)';
+const LIST_COLS = 'id,name,sku,cost_price,sell_price,status,category,missing_attrs,ai_error,created_at,pb_vendors(name),pb_product_images(path,position),pb_listings(id,website_id,status)';
 
 export async function listProducts(f: ProductFilter, page: number): Promise<{ rows: ProductRow[]; count: number }> {
   const lStatus = f.status.startsWith('l:') ? f.status.slice(2) : '';
@@ -48,7 +48,7 @@ export type ProductDetail = Omit<PbProduct, 'claimed_at' | 'created_by'> & {
   pb_product_images: Pick<PbProductImage, 'id' | 'path' | 'position' | 'kind' | 'bytes'>[];
   pb_listings: ListingFull[];
 };
-const PRODUCT_COLS = 'id,vendor_id,source,source_ref,raw_text,sku,name,category,fabric,color,sizes,cost_price,attributes,status,locked,ai_read_at,ai_error,less_amount,source_url,intake_notes,sell_price,price_note,created_at,updated_at';
+const PRODUCT_COLS = 'id,vendor_id,source,source_ref,raw_text,sku,name,category,fabric,color,sizes,cost_price,tags,missing_attrs,attributes,status,locked,ai_read_at,ai_error,less_amount,source_url,intake_notes,sell_price,price_note,created_at,updated_at';
 
 export async function getProduct(id: string): Promise<ProductDetail> {
   const { data, error } = await supabase.from('pb_products')

@@ -7,7 +7,7 @@ import { pbNum } from '../../../pbTheme';
 import PbRow from '../../ui/PbRow';
 import { Dot, PRODUCT_STATUS, rupees } from '../status';
 import ProductPhoto from './ProductPhoto';
-import { listingSummary, productTitle, productTone } from './productListUtil';
+import { listingSummary, productTitle, productTone, statusLabel } from './productListUtil';
 
 export default function ProductRowItem({ p, onOpen }: { p: ProductRow; onOpen: () => void }) {
   const st = PRODUCT_STATUS[p.status];
@@ -28,7 +28,7 @@ export default function ProductRowItem({ p, onOpen }: { p: ProductRow; onOpen: (
       </>}
       status={
         <span style={{ display: 'flex', flexWrap: 'wrap', columnGap: 12, rowGap: 4, minWidth: 0 }}>
-          <Dot color={st.color} label={st.label} />
+          <Dot color={st.color} label={statusLabel(p)} style={{ whiteSpace: 'normal' }} />
           {first && <Dot color={first.color} label={more ? `${first.label} · ${more} more website${more === 1 ? '' : 's'}` : first.label} style={{ whiteSpace: 'normal' }} />}
         </span>
       }

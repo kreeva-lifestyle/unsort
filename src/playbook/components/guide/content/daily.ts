@@ -34,7 +34,7 @@ export const DAILY: GuideSection[] = [
       table(['Status', 'What it means', 'What you do'],
         ['**New**', 'Waiting for the AI to read it', 'Nothing — within a minute'],
         ['**Reading**', 'The AI is reading it now', 'Wait; editing is off for a moment'],
-        ['**Needs info**', 'Cost price or category is missing — or the AI could not read it after 3 tries (red "AI reader" note)', 'Open it, fill **Cost price (₹)** / **Category** in **Facts**, tap **Save facts** — it becomes Ready and is sent to the websites. Both already filled? Tap **Mark ready**'],
+        ['**Needs info**', 'Cost price, category or a required tag is missing ("Missing: Colour") — or the AI could not read it after 3 tries (red "AI reader" note)', 'Open it, fill **Cost price (₹)** / **Category** in **Facts**, tap **Save facts**; for a missing tag tap it under **Tags** or **Let AI decide** — then it becomes Ready and is sent to the websites. All filled? Tap **Mark ready**'],
         ['**Ready**', 'Read, and checked against every website\'s rules', 'Nothing. See where it went in the **Websites** box'],
         ['**Archived**', 'Hidden from the list and not sent anywhere', '**Restore** brings it back'],
       ),

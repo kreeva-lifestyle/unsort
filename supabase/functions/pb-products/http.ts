@@ -3,7 +3,9 @@
 
 export class HttpError extends Error {
   status: number; // a plain field (not a parameter property), so node --test can strip the types
-  constructor(status: number, message: string) { super(message); this.status = status; }
+  /** Extra fields for the JSON reply (e.g. the look-alikes of a 409). */
+  extra?: Record<string, unknown>;
+  constructor(status: number, message: string, extra?: Record<string, unknown>) { super(message); this.status = status; this.extra = extra; }
 }
 
 /** A short, readable message for anything thrown (never a stack trace). */
@@ -34,7 +36,7 @@ export function corsHeaders(req: Request): Record<string, string> {
 export const json = (req: Request, body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders(req), 'content-type': 'application/json' } });
 
-export const fail = (req: Request, status: number, error: string) => json(req, { ok: false, error }, status);
+export const fail = (req: Request, status: number, error: string, extra?: Record<string, unknown>) => json(req, { ...(extra || {}), ok: false, error }, status);
 
 /** fetch with a time limit (ms); a timeout surfaces as a plain sentence via plain(). */
 export function fetchT(url: string, init: RequestInit, ms: number): Promise<Response> {

@@ -13,6 +13,7 @@ const EXTRA: Record<string, string> = {
   chevronRight: 'M9 6l6 6-6 6',
   chevronLeft: 'M15 6l-6 6 6 6',
   chevronDown: 'M6 9l6 6 6-6',
+  chevronUp: 'M6 15l6-6 6 6',
   plus: 'M12 5v14M5 12h14',
   x: 'M18 6L6 18M6 6l12 12',
   logout: 'M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9',
@@ -25,6 +26,9 @@ const EXTRA: Record<string, string> = {
   copy: 'M9 9h10a1 1 0 011 1v10a1 1 0 01-1 1H9a1 1 0 01-1-1V10a1 1 0 011-1zM5 15H4a1 1 0 01-1-1V4a1 1 0 011-1h10a1 1 0 011 1v1',
   key: 'M15.5 7.5a3 3 0 11-6 0 3 3 0 016 0zM12.5 10.5L4 19v2h3v-2h2v-2h2l1.5-1.5',
   edit: 'M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4 12.5-12.5z',
+  eye: 'M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12zM12 15a3 3 0 100-6 3 3 0 000 6z',
+  eyeOff: 'M3 3l18 18M10.6 10.6A3 3 0 0013.4 13.4M9.9 5.2A10.5 10.5 0 0112 5c6.5 0 10 7 10 7a17 17 0 01-3.2 4.1M6.6 6.6C3.7 8.5 2 12 2 12s3.5 7 10 7c1.6 0 3-.4 4.3-1',
+  merge: 'M7 4v7a4 4 0 004 4h6M17 15l-3-3M17 15l-3 3M7 4L4 7M7 4l3 3',
 };
 
 export default function PbIcon({ name, size = 16 }: { name: string; size?: number }) {

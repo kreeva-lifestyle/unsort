@@ -26,18 +26,17 @@ export interface PbProduct {
   id: string; vendor_id: string | null; source: 'manual' | 'telegram' | 'import'; source_ref: string | null;
   raw_text: string | null; sku: string | null; name: string | null; category: string | null;
   fabric: string | null; color: string | null; sizes: string[]; cost_price: number | null;
+  /** tags: its chosen values' names (cache; pb_product_values, tagTypes.ts) · missing_attrs: required attributes still empty → Needs info. */
+  tags: string[]; missing_attrs: string[];
   /** Anything else the AI read: work, occasion, pattern, set_contents, wash_care, notes… (string values). */
   attributes: Record<string, string>;
   status: PbProductStatus;
-  /** Fields staff edited by hand — the AI reader never overwrites these. */
-  locked: string[];
+  locked: string[]; // fields staff edited by hand — the AI reader never overwrites these
   ai_read_at: string | null; ai_error: string | null; claimed_at: string | null;
-  /** The vendor's separate "200 Less" message: cost = RATE − less (₹). */
-  less_amount: number | null;
+  less_amount: number | null; // the vendor's separate "200 Less" message: cost = RATE − less (₹)
   /** https://t.me/<channel>/<message id> (Telegram), or the product page on the other store (import). */
   source_url: string | null;
-  /** Notes from the Telegram intake ("No description arrived…", big videos). */
-  intake_notes: string[];
+  intake_notes: string[]; // notes from the Telegram intake ("No description arrived…", big videos)
   /** Import from website (20261108090000_pb_website_import.sql): sell at exactly this price on every
    *  website (the pricing rules are skipped), and where it came from ("Price copied from example.com on 8 Nov"). */
   sell_price: number | null; price_note: string | null;
@@ -69,7 +68,8 @@ export interface PbTagRules {
   case: PbTagCase;
   /** Let the AI add style/occasion tags too (at most ai_extra_max). */
   ai_extra: boolean;
-  ai_extra_max: number;
+  ai_extra_max: number; max_tags?: number; // max_tags: cap per product on this site, applied last (default 30; older rows lack it)
+  tag_style?: 'plain' | 'prefixed'; // {tags}: "Black" (default) or "Colour_Black"
 }
 
 export interface PbContent {

@@ -1,6 +1,7 @@
 // Step 3 — Generate one CLAIMED listing ('generating'): price (pricing.ts),
-// content (one Claude call with the site's model / effort), tags (tags.ts).
-// Locked fields are kept. Next status: publish_mode review → 'review'
+// content (one Claude call with the site's model / effort), tags (tags.ts;
+// {tags} = the product's chosen attribute values in the site's tag style,
+// tagStore.ts siteValueTags). Locked fields are kept. Next status: publish_mode review → 'review'
 // (waits for a person); live / draft → 'publishing'.
 import { askClaude } from './ai.ts';
 import { cleanHtml, cut, fillTitle, makeHandle, stripTags } from './content.ts';
@@ -10,6 +11,7 @@ import { HttpError, plain } from './http.ts';
 import { aiPhotos } from './photos.ts';
 import { compareAt, listingPrice } from './pricing.ts';
 import { buildTags } from './tags.ts';
+import { siteValueTags } from './tagStore.ts';
 import { ARCHIVED, LISTING_COLS, MAX_ATTEMPTS, NEEDS_INFO, PRODUCT_COLS, STALE_MS, WEBSITE_COLS, hasPrice, type Budget, type ListingRow, type ProductRow, type WebsiteRow } from './types.ts';
 
 const MAX_PHOTOS = 8; // photos sent to the writer (alt text for the rest is derived from the title)
@@ -70,6 +72,8 @@ export async function generateOne(l: ListingRow, o: { manual: boolean; prevStatu
       schema: genSchema, maxTokens: 16000, timeoutMs: o.budget.hard - Date.now(),
     });
     const g = ai.data;
+    const extra = Array.isArray(g.extra_tags) ? g.extra_tags.slice(0, extraMax) : [];
+    const valueTags = locked.has('tags') ? [] : await siteValueTags(p.id, tr.tag_style);
     const vars = { category: p.category || '', fabric: p.fabric || '', color: p.color || '', vendor: vendor?.name || '', sku: p.sku || '', name: p.name || '' };
     const titleMax = Number(c.title_max) > 0 ? Number(c.title_max) : 70;
     const fresh = fillTitle(c.title_template, vars, cut(g.title, titleMax), titleMax) || cut(p.name || [p.color, p.fabric, p.category].filter(Boolean).join(' '), titleMax);
@@ -81,7 +85,7 @@ export async function generateOne(l: ListingRow, o: { manual: boolean; prevStatu
       seo_title: locked.has('seo_title') && l.seo_title !== null ? l.seo_title : cut(g.seo_title || title, Number(c.meta_title_max) || 60),
       seo_description: locked.has('seo_description') && l.seo_description !== null ? l.seo_description : cut(g.seo_description || stripTags(description), Number(c.meta_desc_max) || 155),
       handle: keepHandle && l.handle ? l.handle : makeHandle(g.handle || title, p.sku, p.id),
-      tags: locked.has('tags') ? l.tags : buildTags(tr, { ...vars, vendor_code: vendor?.code || '', sizes: p.sizes || [], attributes: p.attributes || {} }, Array.isArray(g.extra_tags) ? g.extra_tags.slice(0, extraMax) : []),
+      tags: locked.has('tags') ? l.tags : buildTags(tr, { ...vars, vendor_code: vendor?.code || '', sizes: p.sizes || [], attributes: p.attributes || {}, tags: valueTags }, extra),
       product_type: p.category || null,
       image_alts: c.alt_text === false ? [] : imgs.map((_, i) => cut(String(g.image_alts?.[photos.sent.indexOf(i)] || '') || `${title} - view ${i + 1}`, 250)),
       ai_model: ai.model, ai_effort: ai.effort || null, ai_cost_usd: ai.usd, generated_at: nowIso(),

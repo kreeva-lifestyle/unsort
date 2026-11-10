@@ -78,6 +78,18 @@ export async function getSettings(): Promise<Settings> {
   };
 }
 
+/** POST /rest/v1/rpc/<fn> → its result (service role). */
+export async function rpc<T>(fn: string, args: Record<string, unknown>): Promise<T> {
+  const r = await fetch(`${SB_URL}/rest/v1/rpc/${fn}`, { method: 'POST', headers: { ...svcHeaders, 'content-type': 'application/json' }, body: JSON.stringify(args) });
+  if (!r.ok) {
+    const body = await r.json().catch(() => ({})) as { message?: string; code?: string };
+    // Our own `raise exception` sentences (pb_tag_merge…, SQLSTATE P0001) are shown as they are.
+    if (body?.code === 'P0001' && body.message) throw new HttpError(400, String(body.message).slice(0, 200));
+    return dbFail(r, 'refused the change');
+  }
+  return await r.json() as T;
+}
+
 /** Timeline entry. Written after the change it describes; a failed log write is reported in the
  *  function logs but never undoes the work it describes. */
 export async function logActivity(a: { product_id?: string | null; website_id?: string | null; listing_id?: string | null; action: string; details?: Record<string, unknown>; user_id?: string | null }) {

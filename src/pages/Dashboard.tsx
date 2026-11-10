@@ -10,6 +10,7 @@ import ConfirmModal, { useConfirm } from '../components/ui/ConfirmModal';
 import CountUp from '../components/ui/CountUp';
 import Skeleton from '../components/ui/Skeleton';
 import QuickChips from '../components/dashboard/QuickChips';
+import DbHealth from '../components/dashboard/DbHealth';
 
 type OverdueAlert = { name: string; amount: number; days: number };
 type DryCleanAlert = { days: number };
@@ -381,6 +382,7 @@ export default function Dashboard({ navigateTo, active }: { navigateTo?: (tab: s
           {tasks.length === TASK_LIMIT && <div style={{ fontSize: 10, color: T.yl, padding: '6px 10px', textAlign: 'center' }}>Showing first {TASK_LIMIT} notes.</div>}
         </div>
       </div>
+      {profile?.role === 'admin' && <DbHealth />}
       <ConfirmModal {...modalProps} />
     </div>
   );

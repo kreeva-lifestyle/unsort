@@ -1,23 +1,42 @@
 // Pure: a website's Shopify tags for one product.
 // Templates (one tag each) with placeholders {category} {fabric} {color} {vendor}
-// {vendor_code} {size} {sku} {attr:<key>}; a template with {size} gives one tag per
-// size, and {attr:store_tags} (an imported store's own tags, comma-joined) gives one
-// tag per store tag; a template whose placeholder is empty is dropped. Then the static tags, then
-// the AI's extra tags (at most ai_extra_max, only when ai_extra). Apply case, trim,
-// drop empties, dedupe case-insensitively, each ≤ 255 chars (commas would split a
-// Shopify tag, so they become spaces).
-import type { TagRules } from './types.ts';
+// {vendor_code} {size} {sku} {tags} {attr:<key>}; a template with {size} gives one tag per
+// size, {tags} (the product's chosen attribute values — the taxonomy on the Tags page;
+// valueTags below: "Black" plain, or "Colour_Black" when the site's tag_style is
+// 'prefixed', prefix = the attribute's Shopify prefix or its name) gives one tag per
+// value, and {attr:store_tags} (an
+// imported store's own tags, comma-joined, RAW) gives one tag per store tag; a template
+// whose placeholder is empty is dropped. Then the static tags, then the AI's extra tags
+// (at most ai_extra_max, only when ai_extra). Apply case, trim, drop empties, dedupe
+// case-insensitively, each ≤ 255 chars (commas would split a Shopify tag, so they become
+// spaces), and at most max_tags (default MAX_SITE_TAGS) in all.
+import { MAX_SITE_TAGS, type TagRules } from './types.ts';
 
 export interface TagFacts {
   category: string; fabric: string; color: string; vendor: string; vendor_code: string; sku: string;
   sizes: string[]; attributes: Record<string, string>;
+  /** The product's chosen values, already in the site's tag style (valueTags). */
+  tags?: string[];
+}
+
+/** One chosen value with its attribute (pb_product_values → pb_attribute_values → pb_attributes). */
+export interface ChosenTag { name: string; attribute: string; prefix: string | null }
+
+/** {tags}: the chosen values as tags — plain names, or `${prefix}_${name}` for tag_style 'prefixed'. */
+export function valueTags(vals: ChosenTag[], style: unknown): string[] {
+  return vals.map(v => {
+    const name = String(v.name ?? '').trim();
+    const pre = String(v.prefix ?? '').trim() || String(v.attribute ?? '').trim();
+    return style === 'prefixed' && pre && name ? `${pre}_${name}` : name;
+  }).filter(Boolean);
 }
 
 const PH = /\{\s*(attr:[^}]+|[a-z_]+)\s*\}/gi;
 const STORE_TAGS = /\{\s*attr:\s*store_tags\s*\}/i;
+const TAGS = /\{\s*tags\s*\}/i;
 
 /** Fill one template; null when any placeholder in it is empty (the tag is dropped). */
-export function fillTemplate(tpl: string, f: TagFacts, size = ''): string | null {
+export function fillTemplate(tpl: string, f: TagFacts, size = '', tag = ''): string | null {
   let empty = false;
   const out = tpl.replace(PH, (_m, key: string) => {
     const k = key.trim().toLowerCase();
@@ -27,7 +46,8 @@ export function fillTemplate(tpl: string, f: TagFacts, size = ''): string | null
       const hit = Object.keys(f.attributes || {}).find(a => a.toLowerCase() === want);
       v = hit ? String(f.attributes[hit] ?? '') : '';
     } else if (k === 'size') v = size;
-    else if (k in f && k !== 'sizes' && k !== 'attributes') v = String((f as unknown as Record<string, unknown>)[k] ?? '');
+    else if (k === 'tags') v = tag;
+    else if (k in f && k !== 'sizes' && k !== 'attributes' && k !== 'tags') v = String((f as unknown as Record<string, unknown>)[k] ?? '');
     if (!v.trim()) empty = true;
     return v.trim();
   });
@@ -50,16 +70,26 @@ function perStoreTag(tpl: string, f: TagFacts): TagFacts[] {
   return items.map(item => ({ ...f, attributes: { ...f.attributes, [key as string]: item } }));
 }
 
+/** The per-site cap (older tag_rules rows have no max_tags). */
+export const maxSiteTags = (rules: Partial<TagRules>) => {
+  const n = Math.floor(Number(rules.max_tags));
+  return Number.isFinite(n) && n > 0 ? Math.min(250, n) : MAX_SITE_TAGS;
+};
+
 export function buildTags(rules: Partial<TagRules>, f: TagFacts, aiExtra: string[]): string[] {
   const raw: string[] = [];
   for (const tpl of Array.isArray(rules.templates) ? rules.templates : []) {
     if (!String(tpl || '').trim()) continue;
+    // {tags}: once per product tag (none when the product has none); {size}: once per size — both: per tag × size.
+    const perTag = TAGS.test(tpl) ? (f.tags || []).map(String).filter(t => t.trim()) : [''];
     for (const facts of perStoreTag(tpl, f)) {
-      if (/\{\s*size\s*\}/i.test(tpl)) {
-        for (const s of f.sizes || []) { const t = fillTemplate(tpl, facts, s); if (t) raw.push(t); }
-      } else {
-        const t = fillTemplate(tpl, facts);
-        if (t) raw.push(t);
+      for (const tag of perTag) {
+        if (/\{\s*size\s*\}/i.test(tpl)) {
+          for (const s of f.sizes || []) { const t = fillTemplate(tpl, facts, s, tag); if (t) raw.push(t); }
+        } else {
+          const t = fillTemplate(tpl, facts, '', tag);
+          if (t) raw.push(t);
+        }
       }
     }
   }
@@ -77,5 +107,5 @@ export function buildTags(rules: Partial<TagRules>, f: TagFacts, aiExtra: string
     seen.add(key);
     out.push(t);
   }
-  return out;
+  return out.slice(0, maxSiteTags(rules));
 }

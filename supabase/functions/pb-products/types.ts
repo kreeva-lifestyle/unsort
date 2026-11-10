@@ -1,5 +1,5 @@
 // Row shapes the pb-products edge function reads and writes. They mirror
-// supabase/migrations/20261105090000_pb_product_directory.sql and the client's
+// supabase/migrations/20261105090000_pb_product_directory.sql (+ …_pb_tags.sql: taxonomy, product values, missing_attrs) and the client's
 // src/playbook/types.ts (kept separate: an edge function bundles only its own
 // folder). jsonb shapes: docs/playbook/product-directory-spec.md.
 
@@ -10,6 +10,10 @@ export interface ProductRow {
   /** Import from website: sell at exactly this price on every website (pricing rules skipped); price_note says where it came from. */
   sell_price: number | null; price_note: string | null;
   attributes: Record<string, string>; status: string; locked: string[];
+  /** The chosen attribute values' names (a cache kept by pb_products_refresh); websites use the values through {tags}. */
+  tags: string[];
+  /** Required attributes of its category with no value yet ("Colour"); non-empty = Needs info. */
+  missing_attrs: string[];
   ai_read_at: string | null; ai_error: string | null; claimed_at: string | null;
   created_at: string; updated_at: string;
 }
@@ -20,7 +24,12 @@ export interface Pricing {
 
 export interface TagRules {
   templates: string[]; static: string[]; case: string; ai_extra: boolean; ai_extra_max: number;
+  /** At most this many tags per listing, applied last (default MAX_SITE_TAGS; older rows lack it). */
+  max_tags?: number;
+  /** {tags} as plain value names (default) or `${prefix}_${name}` ('prefixed'). */
+  tag_style?: 'plain' | 'prefixed';
 }
+export const MAX_SITE_TAGS = 30;
 
 export interface ContentCfg {
   model: string; effort: string; language: string; brand_voice: string; title_template: string;
@@ -67,13 +76,14 @@ export interface Settings {
   automation: { paused: boolean };
 }
 
+
 /** Who is calling: the cron / Telegram bridge (shared secret) or a signed-in staff member. */
 export type Caller = { kind: 'secret' } | { kind: 'staff'; id: string; role: string };
 
 /** Per-call time limits: stop starting new items after `soft`; every outside call ends by `hard`. */
 export interface Budget { soft: number; hard: number }
 
-export const PRODUCT_COLS = 'id,vendor_id,source,source_ref,raw_text,sku,name,category,fabric,color,sizes,cost_price,less_amount,sell_price,price_note,attributes,status,locked,ai_read_at,ai_error,claimed_at,created_at,updated_at';
+export const PRODUCT_COLS = 'id,vendor_id,source,source_ref,raw_text,sku,name,category,fabric,color,sizes,cost_price,less_amount,sell_price,price_note,attributes,tags,missing_attrs,status,locked,ai_read_at,ai_error,claimed_at,created_at,updated_at';
 export const LISTING_COLS = 'id,product_id,website_id,status,rule_id,price,compare_at_price,title,description_html,seo_title,seo_description,handle,tags,product_type,image_alts,locked,ai_model,ai_effort,ai_cost_usd,generated_at,shopify_product_id,shopify_status,published_at,attempts,claimed_at,error,created_at,updated_at';
 export const WEBSITE_COLS = 'id,name,shop_domain,auth_mode,api_version,active,publish_mode,routing_default,track_inventory,pricing,tag_rules,content,connected_at,shop_name,last_error';
 export const RULE_COLS = 'id,website_id,position,name,enabled,action,conditions,price_override';
@@ -87,7 +97,7 @@ export const MAX_ATTEMPTS = 3;
 /** Listing error written when its product was archived; routing undoes this skip once the product is ready again. */
 export const ARCHIVED = 'The product was archived.';
 /** A listing is not written or published while its product lacks the cost price (or a copied selling price) or category. */
-export const NEEDS_INFO = 'The product needs its cost price and category before it can go to websites — fill them on the product page.';
+export const NEEDS_INFO = 'The product needs its cost price, category and a value for every attribute of its category before it can go to websites — fill them on the product page.';
 /** Ready for websites: a category plus EITHER a cost price (priced by the website's rules) OR a selling price copied from another store. */
 export const hasPrice = (p: { cost_price: number | null; sell_price?: number | null }) =>
   (p.cost_price !== null && p.cost_price !== undefined) || (p.sell_price !== null && p.sell_price !== undefined);

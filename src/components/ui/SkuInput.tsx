@@ -14,6 +14,7 @@
 import { useMemo, useEffect, useRef, useState } from 'react';
 import { T } from '../../lib/theme';
 import AnchoredList from './AnchoredList';
+import SkuRefreshHint from './SkuRefreshHint';
 import {
   useProductCatalog, searchProducts, resolveSku, needsSize, variantSku, type Product,
 } from '../../hooks/useProductCatalog';
@@ -174,6 +175,9 @@ export default function SkuInput({
           ))}
         </div>
       )}
+
+      {/* Nothing matches: offer a one-tap refresh (new SKUs added to the sheet). */}
+      {!disabled && index && !product && q.length >= MIN_CHARS && !showList && <SkuRefreshHint sku={q} />}
 
       {product && !showSizes && (
         <div style={{ fontSize: 9, color: product.is_active ? T.tx3 : T.yl, marginTop: 2, lineHeight: 1.4 }}>

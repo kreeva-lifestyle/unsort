@@ -28,9 +28,27 @@
 //   import_start       staff          { url, in_stock_only?, use_their_price?, vendor_name?, estimate? } → { ok, run_id, platform, host, warnings[] }
 //   import_cancel      staff          { run_id }                          → { ok }
 //   import_list        staff          –                                   → { ok, runs[≤20] }
+//   Tags (a controlled taxonomy built on the Tags page; docs/playbook/product-directory-spec.md "Tags"):
+//   taxonomy_get       staff          –                                   → { ok, categories, attributes[{…, values[{…, uses}]}], links, stats, category_products, suggestions_pending, fill }
+//   categories_save    admin|manager  { categories[] }                    → { ok, categories, regated }
+//   attribute_save     admin|manager  { id?, name, multi?, shopify_prefix? } → { ok, attribute }
+//   attribute_delete   admin|manager  { id }                              → { ok, regated }
+//   attribute_order    admin|manager  { ids[] }                           → { ok }
+//   value_check        staff          { attribute_id, name, exclude_id? } → { ok, matches[], exists }
+//   value_save         admin|manager  { attribute_id, id?, name, aliases?, force? } → { ok, value } | 409 { error, matches[] }
+//   value_delete       admin|manager  { id }                              → { ok, regated }
+//   value_merge        admin|manager  { from, into }                      → { ok, moved }
+//   category_link_check staff         { category, attribute_id }          → { ok, lacking }
+//   category_link_save admin|manager  { category, attribute_ids[] }       → { ok, to_needs_info, to_ready }
+//   suggestions_list   staff          { status?, attribute_id?, page? }   → { ok, rows[{…, example_names, matches}], count, page, per }
+//   suggestion_act     admin|manager  { ids, action:add|alias|ignore|move, attribute_id?, value_id?, name?, force? } → { ok, done, conflicts{id: matches[]}, retagged }
+//   product_values_set staff          { product_id, value_ids[], attribute_id? } → { ok, status, missing, locked, routed } (locks 'tags')
+//   retag              admin|manager  { dry_run (default true) }          → { ok, dry_run, products, locked, changed, to_needs_info, to_ready, sample[≤10] }
+//   tags_ai_fill       staff          { product_ids? | category? | attribute_id? | needs_info?, missing_only?, now? } → { ok, run_id, queued } | now: { ok, filled, left, status, missing, routed }
+//   tags_fill_status   staff          –                                   → { ok, fill }
 //
 // Pipeline (worker.ts): read (reader.ts) → route (route.ts / routing.ts) →
-// generate (generate.ts: pricing.ts, content.ts, tags.ts) → publish
+// generate (generate.ts: pricing.ts, content.ts, tags.ts + the product's values, tagStore.ts) → publish
 // (publish.ts / productInput.ts / shopifyProduct.ts / shopify.ts). Every step writes pb_activity.
 // Shopify requests go only to a …myshopify.com host on a supported Admin API version (shopify.ts).
 // Only pb_product_images rows with kind = 'image' go to the AI and Shopify (videos are for staff).
@@ -41,6 +59,9 @@ import { HttpError, corsHeaders, fail, json, plain } from './http.ts';
 import { importCancel, importCheck, importList, importStart } from './import/actions.ts';
 import { routeWebsite } from './routeSite.ts';
 import { previewPrice, saveCredentials, testSite } from './siteActions.ts';
+import * as T from './tagsActions.ts';
+import { fillStatus, suggestionAct, suggestionsList, tagsAiFill } from './tagsQueue.ts';
+import { productValuesSet, retag } from './tagsProduct.ts';
 import type { Caller } from './types.ts';
 
 type Who = 'secret' | 'staff' | 'any' | 'admin';
@@ -60,13 +81,30 @@ const ACTIONS: Record<string, { who: Who; run: (b: A.Body, c: Caller) => Promise
   import_start: { who: 'staff', run: (b, c) => importStart(b, userOf(c)) },
   import_cancel: { who: 'staff', run: (b, c) => importCancel(b, userOf(c)) },
   import_list: { who: 'staff', run: () => importList() },
+  taxonomy_get: { who: 'staff', run: () => T.taxonomyGet() },
+  categories_save: { who: 'admin', run: (b, c) => T.categoriesSave(b, userOf(c)) },
+  attribute_save: { who: 'admin', run: (b, c) => T.attributeSave(b, userOf(c)) },
+  attribute_delete: { who: 'admin', run: (b, c) => T.attributeDelete(b, userOf(c)) },
+  attribute_order: { who: 'admin', run: (b) => T.attributeOrder(b) },
+  value_check: { who: 'staff', run: (b) => T.valueCheck(b) },
+  value_save: { who: 'admin', run: (b, c) => T.valueSave(b, userOf(c)) },
+  value_delete: { who: 'admin', run: (b, c) => T.valueDelete(b, userOf(c)) },
+  value_merge: { who: 'admin', run: (b, c) => T.valueMerge(b, userOf(c)) },
+  category_link_check: { who: 'staff', run: (b) => T.categoryLinkCheck(b) },
+  category_link_save: { who: 'admin', run: (b, c) => T.categoryLinkSave(b, userOf(c)) },
+  suggestions_list: { who: 'staff', run: (b) => suggestionsList(b) },
+  suggestion_act: { who: 'admin', run: (b, c) => suggestionAct(b, userOf(c)) },
+  product_values_set: { who: 'staff', run: (b, c) => productValuesSet(b, userOf(c)) },
+  retag: { who: 'admin', run: (b, c) => retag(b, userOf(c)) },
+  tags_ai_fill: { who: 'staff', run: (b, c) => tagsAiFill(b, userOf(c)) },
+  tags_fill_status: { who: 'staff', run: async () => ({ ok: true, fill: await fillStatus() }) },
 };
 
 function allowed(who: Who, c: Caller): string | null {
   if (who === 'any') return null;
   if (who === 'secret') return c.kind === 'secret' ? null : 'Only the automation bridge can use this.';
   if (c.kind !== 'staff') return 'Sign in as a staff member for this.';
-  if (who === 'admin' && !['admin', 'manager'].includes(c.role)) return 'Only an admin or manager can change store credentials.';
+  if (who === 'admin' && !['admin', 'manager'].includes(c.role)) return 'Only an admin or manager can change this.';
   return null;
 }
 
@@ -93,6 +131,6 @@ Deno.serve(async (req) => {
     const status = e instanceof HttpError ? e.status : 500;
     if (status >= 500) console.error(`pb-products ${action}:`, e instanceof Error ? e.stack || e.message : e);
     // Our own sentences (HttpError) and timeouts as they are; anything else (a TypeError…) stays in the log.
-    return fail(req, status, e instanceof HttpError || e instanceof DOMException ? plain(e) : 'Something went wrong on the Playbook server.');
+    return fail(req, status, e instanceof HttpError || e instanceof DOMException ? plain(e) : 'Something went wrong on the Playbook server.', e instanceof HttpError ? e.extra : undefined);
   }
 });

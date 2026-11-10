@@ -1,6 +1,8 @@
 // The product's facts, editable. A field staff change joins `locked`, so the AI
 // reader never overwrites it. Filling the missing cost / category of a
-// "Needs info" product makes it Ready and sends it to the matching websites.
+// "Needs info" product makes it Ready and sends it to the matching websites —
+// once its required tags are there too: after the save the database re-applies
+// the gate (refreshGate → pb_products_refresh), which decides Ready / Needs info.
 // V2: a glass tile (the page places it with `className`); Save is the page's
 // gradient only when `primary` (no listing is waiting for approval) AND there
 // is something to save. On phone the edited tile's Discard / Save ride in a
@@ -22,6 +24,8 @@ import { KeptTag } from './detail/ListingField';
 import { LessLine } from './detail/TelegramBits';
 import { SellPriceLine } from './detail/SellPriceLine';
 import VendorSelect from './VendorSelect';
+import ProductValues from './ProductValues';
+import { refreshGate } from '../../data/tags';
 import { numKey, splitList } from './status';
 
 type Form = { name: string; sku: string; vendor_id: string; category: string; fabric: string; color: string; sizes: string; cost_price: string; raw_text: string };
@@ -66,9 +70,7 @@ export default function ProductFacts({ product, vendors, categories, onVendorCre
     const cost2 = 'cost_price' in patch ? patch.cost_price : product.cost_price;
     const cat2 = 'category' in patch ? patch.category : product.category;
     const complete = priced(cost2 ?? null) && !!cat2;
-    const nowReady = product.status === 'needs_info' && complete;
-    const lostInfo = product.status === 'ready' && !complete;
-    if (nowReady) patch.status = 'ready';
+    let lostInfo = product.status === 'ready' && !complete;
     if (lostInfo) patch.status = 'needs_info';
     // A ready product whose routing / price inputs changed is checked against the websites again.
     const reroute = product.status === 'ready' && !lostInfo && changed.some(k => ROUTE_KEYS.includes(k));
@@ -76,8 +78,13 @@ export default function ProductFacts({ product, vendors, categories, onVendorCre
     const kept = product.pb_listings.filter(l => l.status === 'published' && l.locked.includes('price')).length;
     setSaving(true); setErr('');
     try {
-      await updateProduct(product, patch, changed);
-      if (nowReady || reroute) {
+      if (changed.length || lostInfo) await updateProduct(product, patch, changed);
+      // The gate (price, category AND a value for every attribute of the category) decides the status.
+      const g = await refreshGate(product.id);
+      const nowReady = product.status === 'needs_info' && g?.status === 'ready';
+      lostInfo = lostInfo || (product.status === 'ready' && g?.status === 'needs_info');
+      const still = g?.status === 'needs_info' && g.missing.length ? ` — still needs ${g.missing.join(', ')}` : '';
+      if ((nowReady || reroute) && !lostInfo) {
         try {
           const r = await pbCall<{ warning?: string; repriced?: number }>('route_product', { product_id: product.id });
           const done = nowReady ? 'Saved — sent to the matching websites'
@@ -85,7 +92,7 @@ export default function ProductFacts({ product, vendors, categories, onVendorCre
               + (costChanged && kept ? `. ${kept} listing${kept > 1 ? 's have' : ' has'} a price typed by hand and keep${kept > 1 ? '' : 's'} it` : '');
           if (r.warning) addToast(`${done}, but: ${r.warning}`, 'error'); else addToast(done, 'success');
         } catch (e2) { addToast(`Saved, but checking the websites failed: ${friendlyError(e2)}`, 'error'); }
-      } else addToast(lostInfo ? 'Saved — cost price or category is now missing, so it is back to Needs info' : 'Saved', 'success');
+      } else addToast(lostInfo ? `Saved — back to Needs info${still || ': cost price or category is missing'}` : `Saved${still}`, still ? 'info' : 'success');
       onSaved();
     } catch (e2) { setErr(friendlyError(e2)); } finally { setSaving(false); }
   };
@@ -145,6 +152,8 @@ export default function ProductFacts({ product, vendors, categories, onVendorCre
         {label('raw_text', 'Details (vendor’s post)', 'pb-f-raw')}
         <GrowArea id="pb-f-raw" value={f.raw_text} onChange={set('raw_text')} rows={4} maxLength={8000} autoCapitalize="sentences" className="pb-input" style={pbTextarea} />
       </div>
+      {/* Its own saves (product_values_set): the values are not part of the facts patch above. */}
+      <ProductValues product={product} addToast={addToast} onSaved={onSaved} />
       {err && <div role="alert" style={pbErrorBox}>{err}</div>}
       {reading && <div style={pbMeta}>The AI is reading this product — wait a moment, then reload to edit.</div>}
       {phone && changed.length > 0 ? (

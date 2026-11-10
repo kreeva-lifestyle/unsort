@@ -13,7 +13,7 @@ export const HELP: GuideSection[] = [
         ['Client ID + secret refused although they are right', 'The app is in a different Shopify organisation, or not installed on this store', 'Create the app in the store\'s own organisation and install it on the store'],
         ['**Active** will not switch on', 'The store has never passed a test', '**Save credentials**, then a green **Test connection**'],
         ['Products stay **New** for more than a few minutes', 'Automation is paused, or a big batch is being worked through', 'Dashboard banner → **Open Settings** → switch Automation on; or tap **Run now**'],
-        ['Product in **Needs info**', 'Cost price or category missing, or the AI could not read it (red "AI reader" note)', 'Fill the facts → **Save facts** (already filled: **Mark ready**); or **Read again with AI**'],
+        ['Product in **Needs info**', 'Cost price, category or a required tag missing ("Missing: Colour"), or the AI could not read it (red "AI reader" note)', 'Fill the facts → **Save facts** (already filled: **Mark ready**); a tag: **Let AI decide** or choose it under **Tags**; or **Read again with AI**'],
         ['Product **Ready** but on no website', 'No rule matched and the website is on **Do not list it**; or the website is Off', 'Check the rules (conditions, order, switches) and **Active**, then **Check websites again**'],
         ['Product went to the wrong website', 'A wide rule matched first', 'Move a "Keep it off" rule above it; **Remove from site** on the wrong one'],
         ['Failed: "The AI answer was cut off — try a lower effort setting"', 'Effort too high for the length limits', '**Content & AI** → lower **Effort** → **Save changes** → **Regenerate**'],

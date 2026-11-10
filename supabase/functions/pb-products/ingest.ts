@@ -7,10 +7,16 @@
 // Import from website (2026-11-08): sell_price = the price seen on the other
 // store, which is OUR selling price (pricing rules skipped), + price_note;
 // attributes = the store's facts (brand, type, tags, barcode, weight, SEO…;
-// import/meta.ts) and sku — both taken from source 'import' only.
+// import/meta.ts) and sku — both taken from source 'import' only. Tags: the
+// rules step (tagStore.ts autoTag) runs at once over EVERY attribute (the
+// category is not known before the read), and the store's tags that match no
+// value go to the suggestions queue after the junk filter (tagClean.ts).
+// Best effort: a tag failure is logged and never loses the product.
 import { SB_URL, enc, insert, logActivity, nowIso, one, patch, sel, svcHeaders } from './db.ts';
 import { HttpError, fetchT, plain } from './http.ts';
 import { siteBytes } from './import/fetch.ts';
+import { autoTag } from './tagStore.ts';
+import { loadTaxonomy } from './taxonomy.ts';
 import { BUCKET } from './types.ts';
 
 const MAX_IMAGES = 10;
@@ -80,6 +86,15 @@ export async function vendorId(name: string): Promise<string | null> {
   }
 }
 
+/** The rules step for a product just made (values for every attribute; the reader narrows them to its category). */
+async function tagAtIngest(p: { id: string; name: string | null; raw_text: string | null; attributes: Record<string, string> }): Promise<void> {
+  try {
+    const tax = await loadTaxonomy();
+    if (!tax.values.length) return;
+    await autoTag({ ...p, fabric: null, color: null, category: null, locked: [] }, tax, { byCategory: false });
+  } catch (e) { console.error(`pb-products ingest tags ${p.id}: ${plain(e)}`); }
+}
+
 function sniff(b: Uint8Array): { type: string; ext: string } | null {
   if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return { type: 'image/jpeg', ext: 'jpg' };
   if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return { type: 'image/png', ext: 'png' };
@@ -142,6 +157,8 @@ export async function ingest(b: IngestBody): Promise<Record<string, unknown>> {
     if (again) return { ok: true, product_id: again.id, duplicate: true };
     throw e;
   }
+  // While the product is still held (claimed), so the reader never races this write.
+  await tagAtIngest({ id, name: typeof more.name === 'string' ? more.name : null, raw_text: rawText || null, attributes: (more.attributes as Record<string, string> | undefined) || {} });
 
   const warnings: string[] = [];
   const rows: { product_id: string; path: string; position: number }[] = [];

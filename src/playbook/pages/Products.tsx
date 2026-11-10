@@ -2,11 +2,12 @@
 // status, per-website chips), with search, filters, 25 per page, "Add product"
 // and the product page. Spec: docs/playbook/product-directory-spec.md.
 // V2 layout (layout-and-components.md §4 "List page"): header (Add product is
-// the one gradient), a 12-wide toolbar tile, then cards 4+4+4 on desktop /
+// the one gradient), on the Needs-info filter the "Let AI decide" bar, a 12-wide toolbar tile, then cards 4+4+4 on desktop /
 // glass rows on phone, then the pager. "Import from website" (a secondary
 // action; a glass row at the top on phone) opens ImportSheet; the newest
 // import run shows as a tile above the toolbar while it runs or just finished.
 import { useCallback, useEffect, useRef, useState } from 'react';
+import MissingTagsBar from '../components/product/list/MissingTagsBar';
 import { friendlyError } from '../../lib/friendlyError';
 import { useBackClose } from '../../hooks/useBackClose';
 import { useConfirm } from '../../components/ui/ConfirmModal';
@@ -124,6 +125,7 @@ export default function Products({ addToast, start = {}, onGuide }: { addToast: 
         <div className="pb-phone-only" style={{ marginBottom: 12 }}>
           <PbRow icon="globe" title="Import from website" meta="Copy another store’s in-stock products" onClick={() => openImport()} />
         </div>
+        {filter.status === 'needs_info' && <MissingTagsBar addToast={addToast} onQueued={() => void load()} />}
         <div className="pb-bento pb-bento--auto">
           <ProductFilters search={search} onSearch={setSearch} filter={filter} onFilter={setFilter} vendors={vendors} websites={sites} onClear={clearAll} />
           <ProductResults rows={rows} sites={sites} loading={loading} loadErr={loadErr} filtered={filtered} search={filter.search}
