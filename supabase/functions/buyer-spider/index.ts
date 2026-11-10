@@ -38,6 +38,10 @@
 //   resume          (admin/manager/operator)  -> status := running
 //   stop            (admin/manager/operator)  -> status := done (a paused run you no longer want)
 //
+// step / pause / resume / stop act only on the caller's OWN run (an admin may
+// act on anyone's) — see ownedRun(). Every action needs a signed-in user;
+// there is no scheduler path.
+//
 // Several runs can go at once (MAX_ACTIVE_RUNS per person). A business already
 // on the buyer list never comes back, whatever its web address or the status
 // staff gave it: buyer_same_business() matches the domain, the business part
@@ -554,10 +558,19 @@ async function start(who: { id: string; role: string }, body: any, req: Request)
   return json({ ok: true, run, search_usage: usageInfo(monthUsed) }, req);
 }
 
-async function step(who: { id: string }, body: any, req: Request): Promise<Response> {
+// The run as the caller may drive it: their own, or anyone's for an admin.
+// buyer_runs is readable to every signed-in user (RLS), so a run id is no
+// secret — ownership is checked here, in the same query that loads the run.
+// Someone else's run reads as "not found", exactly like a wrong id.
+async function ownedRun(who: { id: string; role: string }, runId: string, cols: string): Promise<any | null> {
+  const mine = who.role === 'admin' ? '' : `&created_by=eq.${who.id}`;
+  return (await rest(`buyer_runs?id=eq.${runId}${mine}&select=${cols}`))?.[0] ?? null;
+}
+
+async function step(who: { id: string; role: string }, body: any, req: Request): Promise<Response> {
   const runId = str(body.run_id, 40);
   if (!/^[0-9a-f-]{36}$/.test(runId)) return fail(400, 'Missing run', req);
-  const run0 = (await rest(`buyer_runs?id=eq.${runId}&select=*`))?.[0];
+  const run0 = await ownedRun(who, runId, '*');
   if (!run0) return fail(404, 'Run not found', req);
   let monthUsed = await monthUsage();
   const usage = () => usageInfo(monthUsed);
@@ -741,10 +754,12 @@ Deno.serve(async (req) => {
     if (action === 'pause' || action === 'resume' || action === 'stop') {
       const runId = str(body?.run_id, 40);
       if (!/^[0-9a-f-]{36}$/.test(runId)) return fail(400, 'Missing run', req);
-      const run = (await rest(`buyer_runs?id=eq.${runId}&select=id,status`))?.[0];
+      const run = await ownedRun(who, runId, 'id,status,created_by');
       if (!run) return fail(404, 'Run not found', req);
       if (run.status === 'done' || run.status === 'failed') return fail(400, 'That run has finished', req);
-      if (action === 'resume' && await activeRuns(who.id, runId) >= MAX_ACTIVE_RUNS) return fail(429, `${MAX_ACTIVE_RUNS} runs are already going — pause or stop one first`, req);
+      // The active-run cap is the run owner's (an admin resuming a colleague's
+      // run counts against that colleague, not against the admin).
+      if (action === 'resume' && await activeRuns(run.created_by, runId) >= MAX_ACTIVE_RUNS) return fail(429, `${MAX_ACTIVE_RUNS} runs are already going — pause or stop one first`, req);
       const to = { pause: ['paused', 'Paused'], resume: ['running', 'Resumed'], stop: ['done', 'Stopped'] }[action];
       const updated = await bump(runId, { status: to[0], note: to[1], error: null });
       return json({ ok: true, run: updated, search_usage: usageInfo(await monthUsage()) }, req);

@@ -21,6 +21,9 @@
 //
 // Auth: a signed-in active profile (Bearer token), or the x-sync-secret
 // header matching app_secrets.packtime_sync_secret (the scheduler).
+// 'init' is open to any active profile; sync / verify / batch / delete need
+// the scheduler or an admin / manager / operator; verify's notify is honoured
+// for the scheduler only.
 //
 // Secrets required in the Supabase project (supabase secrets set ...):
 //   GOOGLE_CLIENT_EMAIL   service-account email
@@ -362,15 +365,21 @@ Deno.serve(async (req) => {
   if (!fromScheduler && !who) return fail(401, 'Sign in to DailyOffice first', req);
   // Writing scan rows needs the same authority as writing the scan itself
   // (packtime_scans is operator+): the legacy batch/delete actions used to be
-  // open to any signed-in role. Security audit 2026-10-31.
+  // open to any signed-in role. Security audit 2026-10-31. sync / verify
+  // drive the same sheet writes (drain + re-queue), so they sit behind the
+  // same gate — they used to run before it (security audit 2026-11-04).
+  // Only 'init' (read-only) stays open to every active profile.
   const canWrite = fromScheduler || ['admin', 'manager', 'operator'].includes(who?.role || '');
+  if (['sync', 'verify', 'batch', 'delete'].includes(action) && !canWrite) return fail(403, 'Only PackStation staff can change the courier sheet', req);
 
   try {
     if (action === 'sync') return json({ ok: true, ...(await runSync()) }, req);
     if (action === 'verify') {
       const day = /^\d{4}-\d{2}-\d{2}$/.test(String(body.day || '')) ? String(body.day) : todayIST();
       const checks = await runVerify(day, body.repair !== false);
-      if (body.notify) await notifyManagers(day, checks);
+      // Notifying every admin/manager is the evening scheduler's job; the
+      // in-app "Check sheet" button never asks for it, so a session can't.
+      if (body.notify && fromScheduler) await notifyManagers(day, checks);
       return json({ ok: true, day, sheets: checks }, req);
     }
 
@@ -386,7 +395,6 @@ Deno.serve(async (req) => {
       const awbs = rows.slice(1).map(r => r[1]).filter(Boolean).map(String);
       return json({ ok: true, awbs, totalRows: Math.max(0, rows.length - 1), columnsOk: col.ok, columnsInfo: col.info }, req);
     }
-    if ((action === 'batch' || action === 'delete') && !canWrite) return fail(403, 'Only PackStation staff can change the courier sheet', req);
     if (action === 'batch') {   // old app versions only
       if (!Array.isArray(body.rows) || body.rows.length === 0) return fail(400, 'rows missing or empty', req);
       await sheetsAppend(sheetName, body.rows);
