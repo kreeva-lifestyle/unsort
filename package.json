@@ -15,6 +15,7 @@
     "barcode-detector": "^3.1.2",
     "fflate": "^0.8.3",
     "jsbarcode": "^3.12.3",
+    "motion": "^14.12.0",
     "pdfjs-dist": "^4.10.38",
     "qrcode": "^1.5.4",
     "qz-tray": "^2.2.6",
