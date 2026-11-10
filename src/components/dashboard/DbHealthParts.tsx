@@ -1,0 +1,91 @@
+// Pieces of the Dashboard's "Database & server" tile (DbHealth.tsx): the size
+// bars, the 7-day growth line and the "busiest work" list. Plain text only —
+// query text from the database is shown as text, never as HTML.
+import { T, alpha } from '../../lib/theme';
+import { tileCard, TileLabel } from '../ui/StatTile';
+
+export type Row = { name: string; bytes: number; rows?: number; files?: number };
+export type Slow = { q: string; calls: number; mean_ms: number; total_s: number };
+export type Snap = {
+  taken_at: string; db_bytes: number; storage_bytes: number;
+  stats: { tables: Row[]; buckets: Row[]; slow: Slow[]; cache_hit: number | null;
+    connections: { total: number; active: number; idle: number; max: number } };
+};
+export type Hist = { t: string; db: number; st: number };
+
+export const gb = (b: number) => (b >= 1024 ** 3 ? `${(b / 1024 ** 3).toFixed(2)} GB` : b >= 1024 ** 2 ? `${Math.round(b / 1024 ** 2)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
+const int = (n: number) => n.toLocaleString('en-IN');
+
+export function DbBars({ title, rows }: { title: string; rows: Row[] }) {
+  const max = Math.max(1, ...rows.map(r => r.bytes));
+  return (
+    <div style={{ ...tileCard }}>
+      <TileLabel>{title}</TileLabel>
+      {rows.length === 0 && <div style={{ fontSize: 11, color: T.tx3, marginTop: 8 }}>Nothing yet</div>}
+      {rows.map(r => (
+        <div key={r.name} style={{ marginTop: 8 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12, color: T.tx2 }}>
+            <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name.replace(/_/g, ' ')}</span>
+            <span style={{ fontFamily: T.mono, flexShrink: 0 }}>{gb(r.bytes)}</span>
+          </div>
+          <div style={{ height: 4, borderRadius: 2, background: alpha(T.tx3, 0.15), marginTop: 3 }}>
+            <div style={{ width: `${Math.max(2, (r.bytes / max) * 100)}%`, height: '100%', borderRadius: 2, background: T.ac2 }} />
+          </div>
+          <div style={{ fontSize: 10, color: T.tx3, marginTop: 2 }}>{r.rows != null ? `${int(r.rows)} rows` : `${int(r.files ?? 0)} files`}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** 7 days of database + storage size, one point per hourly measurement. */
+export function DbSpark({ hist }: { hist: Hist[] }) {
+  if (hist.length < 2) return null;
+  const W = 300, H = 40;
+  const line = (k: 'db' | 'st') => {
+    const v = hist.map(h => h[k]); const lo = Math.min(...v), hi = Math.max(...v), span = hi - lo || 1;
+    return v.map((y, i) => `${(i / (v.length - 1)) * W},${H - 4 - ((y - lo) / span) * (H - 8)}`).join(' ');
+  };
+  const grow = (k: 'db' | 'st') => hist[hist.length - 1][k] - hist[0][k];
+  const sign = (b: number) => (b >= 0 ? `+${gb(b)}` : `−${gb(-b)}`);
+  return (
+    <div style={{ ...tileCard, marginTop: 10 }}>
+      <TileLabel>Growth since {new Date(hist[0].t).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' })}</TileLabel>
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label="Database and storage size over the last days" style={{ width: '100%', height: 40, marginTop: 6 }}>
+        <polyline points={line('db')} fill="none" stroke={T.ac2} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+        <polyline points={line('st')} fill="none" stroke={T.yl} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+      </svg>
+      <div style={{ display: 'flex', gap: 16, fontSize: 11, color: T.tx3, marginTop: 4, flexWrap: 'wrap' }}>
+        <span><span aria-hidden style={{ color: T.ac2 }}>●</span> Database {sign(grow('db'))}</span>
+        <span><span aria-hidden style={{ color: T.yl }}>●</span> Storage {sign(grow('st'))}</span>
+      </div>
+    </div>
+  );
+}
+
+/** Turn a database statement into words an owner can read. */
+const plain = (q: string) => {
+  if (/^select wal->>/i.test(q)) return 'Live updates (screens that refresh by themselves)';
+  const t = q.match(/from\s+"?public"?\."?([a-z_]+)"?/i) || q.match(/public\.([a-z_]+)\(/i);
+  if (/^with pgrst_source/i.test(q) && t) return `App reading ${t[1].replace(/_/g, ' ')}`;
+  if (/^select public\./i.test(q) && t) return `Background job: ${t[1].replace(/_/g, ' ')}`;
+  return q.length > 70 ? `${q.slice(0, 70)}…` : q;
+};
+
+export function DbSlow({ rows }: { rows: Slow[] }) {
+  if (!rows?.length) return null;
+  const total = rows.reduce((a, r) => a + r.total_s, 0) || 1;
+  return (
+    <div style={{ ...tileCard, marginTop: 10 }}>
+      <TileLabel>Where the server spends its time</TileLabel>
+      {rows.map((r, i) => (
+        <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'baseline', marginTop: 8, fontSize: 12 }}>
+          <span style={{ fontFamily: T.mono, color: T.tx, width: 44, flexShrink: 0, textAlign: 'right' }}>{Math.round((r.total_s / total) * 100)}%</span>
+          <span style={{ flex: 1, minWidth: 0, color: T.tx2 }} title={r.q}>{plain(r.q)}</span>
+          <span style={{ fontFamily: T.mono, fontSize: 11, color: T.tx3, flexShrink: 0 }}>{int(r.calls)}× · {r.mean_ms} ms</span>
+        </div>
+      ))}
+      <div style={{ fontSize: 10, color: T.tx3, marginTop: 8 }}>Share of the top 5 since the last database restart.</div>
+    </div>
+  );
+}
