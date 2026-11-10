@@ -16,16 +16,21 @@
 // other products (Telegram, typed in) are never starved by it. A product
 // being added when the import clock runs out finishes (its photo downloads
 // are bounded by ingest's own timeouts).
+// Tags (tagFill.ts) go LAST, with whatever time is left: products a tag
+// change made Ready are routed (route_due, at most 10), then up to 5 queued
+// "Let AI decide" products get their values-only pass.
 import { claimGenerate, genCandidates, generateOne } from './generate.ts';
 import { advanceImport } from './import/runner.ts';
 import { plain } from './http.ts';
 import { claimPublish, PUBLISH_NEEDS_MS, pubCandidates, publishOne } from './publish.ts';
 import { claimRead, readCandidates, readOne } from './reader.ts';
+import { FILL_NEEDS_MS, fillCandidates, fillQueued, routeDue } from './tagFill.ts';
+import { loadTaxonomy } from './taxonomy.ts';
 import type { Budget } from './types.ts';
 
-export interface WorkResult { read: number; routed: number; generated: number; published: number; failed: number; imported?: number }
+export interface WorkResult { read: number; routed: number; generated: number; published: number; failed: number; imported?: number; tagged?: number }
 
-const CAPS = { read: 6, generate: 8, publish: 10 };
+const CAPS = { read: 6, generate: 8, publish: 10, route: 10, fill: 5 };
 /** Time an AI step needs left before it is claimed: photo checks + a slow answer (Opus / high effort). */
 const READ_NEEDS_MS = 45_000;
 const GEN_NEEDS_MS = 80_000;
@@ -88,5 +93,16 @@ export async function work(userId: string | null): Promise<WorkResult> {
       if (r.status === 'published') out.published++;
     } catch (e) { failed('publish', c.id, e); }
   }
+
+  try { if (inTime()) out.routed += await routeDue(CAPS.route, userId, inTime); } catch (e) { failed('route_due', 'run', e); }
+  try {
+    const queued = left(FILL_NEEDS_MS) ? await fillCandidates(CAPS.fill) : [];
+    const tax = queued.length ? await loadTaxonomy() : null;
+    for (const c of queued) {
+      if (!tax || !left(FILL_NEEDS_MS)) break;
+      await fillQueued(c, tax, userId, budget);
+      out.tagged = (out.tagged ?? 0) + 1;
+    }
+  } catch (e) { failed('tags_fill', 'run', e); }
   return out;
 }

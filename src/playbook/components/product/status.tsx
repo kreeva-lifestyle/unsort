@@ -12,7 +12,7 @@ export type StatusTint = 'review' | 'failed';
 export const PRODUCT_STATUS: Record<PbProductStatus, { label: string; color: string; hint: string; tint?: StatusTint }> = {
   new: { label: 'New', color: PB.busy, hint: 'Waiting for the AI to read it' },
   reading: { label: 'Reading', color: PB.busy, hint: 'The AI is reading it now' },
-  needs_info: { label: 'Needs info', color: PB.review, hint: 'Cost price or category missing', tint: 'review' },
+  needs_info: { label: 'Needs info', color: PB.review, hint: 'Cost price, category or a required tag missing', tint: 'review' },
   ready: { label: 'Ready', color: PB.live, hint: 'Read and sent to the matching websites' },
   archived: { label: 'Archived', color: NEUTRAL, hint: 'Hidden from the list' },
 };

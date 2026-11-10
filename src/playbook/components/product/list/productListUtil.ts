@@ -52,3 +52,7 @@ export function listingSummary(p: ProductRow): { label: string; color: string; n
 
 /** Name to show; never blank. */
 export const productTitle = (p: ProductRow) => p.name || p.sku || 'Untitled product';
+
+/** The status label, with the missing required attributes on a Needs-info product: "Needs info · Missing: Colour". */
+export const statusLabel = (p: Pick<ProductRow, 'status' | 'missing_attrs'>) =>
+  p.status === 'needs_info' && p.missing_attrs?.length ? `${PRODUCT_STATUS.needs_info.label} · Missing: ${p.missing_attrs.join(', ')}` : PRODUCT_STATUS[p.status].label;

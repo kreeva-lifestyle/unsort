@@ -20,7 +20,7 @@ const products = [1, 2, 3, 4, 5, 6, 7].map(n => ({ ...base, id: 800 + n, handle:
 const pageHtml = read('shopify.page.html');
 
 function fakeWorld(run, store = null) {
-  const calls = { site: [], inserts: [], saves: [], known: [], bumps: [] };
+  const calls = { site: [], inserts: [], saves: [], known: [], values: [], suggest: [] };
   globalThis.fetch = async (url, init = {}) => {
     const u = String(url), method = init.method || 'GET';
     const ok = (body, status = 200, headers = {}) => new Response(typeof body === 'string' ? body : JSON.stringify(body), { status, headers });
@@ -42,9 +42,14 @@ function fakeWorld(run, store = null) {
       return ok([{ id: run.id }]);
     }
     if (path.startsWith('pb_vendors?id=')) return ok([{ name: 'Kumari Art' }]);
-    if (path.startsWith('pb_settings?')) return ok([]); // tag rules: the defaults
-    if (path.startsWith('pb_tags?')) return ok([]);
-    if (path.startsWith('rpc/pb_tags_bump')) { calls.bumps.push(JSON.parse(init.body)); return ok(1); }
+    // The taxonomy (Tags page): Fabric {Silk}; nothing linked to a category yet.
+    if (path.startsWith('pb_settings?')) return ok([{ key: 'categories', value: ['Saree'] }]);
+    if (path.startsWith('pb_attributes?')) return ok([{ id: 'a-fab', name: 'Fabric', key: 'fabric', multi: false, position: 1, shopify_prefix: null }]);
+    if (path.startsWith('pb_attribute_values?')) return ok([{ id: 'v-silk', attribute_id: 'a-fab', name: 'Silk', key: 'silk', aliases: [], position: 1 }]);
+    if (path.startsWith('pb_category_attributes?')) return ok([]);
+    if (path.startsWith('pb_product_values?')) return ok([]);
+    if (path.startsWith('rpc/pb_product_values_set')) { calls.values.push(JSON.parse(init.body)); return ok([{ id: 'p', status: 'new', was: 'new', missing: [] }]); }
+    if (path.startsWith('rpc/pb_tag_suggest')) { calls.suggest.push(...JSON.parse(init.body).p_rows); return ok(1); }
     if (path.startsWith('pb_websites?')) return ok([{ shop_domain: 'aryadesigns.myshopify.com' }]);
     if (path.startsWith('pb_products?source=eq.import&source_ref=in.')) { calls.known.push(path); return ok([{ source_ref: 'kumari.example:801' }]); }
     if (path.startsWith('pb_products?source=eq.import&source_ref=eq.')) return ok([]);
@@ -80,9 +85,13 @@ test('out of time mid-page: known product skipped without its page, cursor.skip 
   assert.equal(row.attributes.manufacturer, 'Varanasi Weavers Co-op');
   assert.equal(row.attributes.brand, 'Kumari Art');
   assert.equal(row.attributes.source_page_url, 'https://kumari.example/products/saree-2');
-  // The store's tags are cleaned into the product's own tags at once; the library is told first.
-  assert.ok(Array.isArray(row.tags) && row.tags.length > 0 && row.tags.every(t => !t.startsWith('_')), JSON.stringify(row.tags));
-  assert.ok(calls.bumps.some(b => b.p_source === 'store' && b.p_names.length === row.tags.length));
+  // Tags at ingest: the rules over every attribute ("Banarasi Silk Saree" → Fabric: Silk), written in one
+  // call while the product is held; the store's tags that match no value go to suggestions, junk filtered.
+  assert.equal('tags' in row, false);
+  const first = calls.values.find(v => v.p_product === 'p1');
+  assert.deepEqual(first.p_rows, [{ value_id: 'v-silk', source: 'rules' }]);
+  assert.equal(first.p_mode, 'auto');
+  assert.ok(calls.suggest.length > 0 && calls.suggest.every(s => !s.phrase.startsWith('_') && s.source === 'store'), JSON.stringify(calls.suggest));
 
   calls = fakeWorld(runRow({ status: 'running', cursor: save1.cursor, found: 4, added: 3, skipped: 1, sample: save1.sample }));
   out = await advanceImport(Date.now() + 60_000, null);

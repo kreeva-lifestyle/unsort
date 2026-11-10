@@ -46,8 +46,10 @@ export async function routeOne(b: Body, userId: string | null) {
   const p = await one<ProductRow>(`pb_products?id=eq.${enc(id)}&select=${PRODUCT_COLS}`);
   if (!p) throw new HttpError(404, 'That product no longer exists.');
   if (p.status === 'archived') throw new HttpError(400, 'This product is archived.');
-  if (p.status !== 'ready') throw new HttpError(400, 'Add the cost price and category first — only ready products go to websites.');
+  if (p.status !== 'ready') throw new HttpError(400, 'Add the cost price, category and the missing tags first — only ready products go to websites.');
   const r = await routeProduct(p, userId);
+  // routed now: the worker's route_due step (tagFill.ts) need not route it again
+  await patch('pb_products', `id=eq.${enc(id)}&route_due=eq.true`, { route_due: false });
   return { ok: true, routed: r.routed, repriced: r.repriced, listings: r.listings, ...(r.warning ? { warning: r.warning } : {}) };
 }
 

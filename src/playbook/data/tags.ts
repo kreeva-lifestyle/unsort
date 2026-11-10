@@ -1,84 +1,111 @@
-// Tags data access: the library and review queue, staff actions on tags, the
-// cleaning rules, re-clean, and a product's own tags. Every write goes through
-// the pb-products edge function (the SQL functions rewrite product tags in one
-// transaction); reads of the library and the rules are direct (RLS: staff).
-// Contract (actions): tags_library, tags_review, tags_act, tags_settings_save,
-// tags_reclean, set_product_tags — docs/playbook/product-directory-spec.md "Tags".
-// Errors are thrown as-is; callers show them with friendlyError().
+// Tags data access: the taxonomy (categories → attributes → values), the
+// suggestions queue, a product's values, retag and "Let AI decide". Every
+// write goes through the pb-products edge function (look-alike checks,
+// admin / manager for structure); a product's values and its category's
+// attributes are read directly (RLS: staff). Contract:
+// docs/playbook/product-directory-spec.md "Tags". Errors are thrown as-is;
+// callers show them with friendlyError(). A look-alike refusal comes back as
+// LookAlikeError with the matches, so the UI can ask "same thing or new?".
 import { supabase } from '../../lib/supabase';
 import { pbCall } from './pbFunctions';
-import { DEFAULT_TAG_SETTINGS, TAG_PAGE, type PbHidden, type PbTag, type PbTagAction, type PbTagKind, type PbTagReview, type PbTagSettings } from '../tagTypes';
-import { patternProblem } from '../components/tags/tagCleanPreview';
+import type { PbAttrValue, PbAttribute, PbFillRun, PbLookAlike, PbProductValue, PbRetagResult, PbSuggestion, PbSuggestionStatus, PbTaxonomy } from '../tagTypes';
 
-export type LibraryFilter = { q: string; kind: PbTagKind | ''; hidden: '' | 'visible' | 'hidden' };
-export const EMPTY_LIBRARY_FILTER: LibraryFilter = { q: '', kind: '', hidden: '' };
-export type LibraryPage = { rows: PbTag[]; count: number; counts: { all: number; hidden: number; review: number } };
-export type RecleanResult = { dry_run: boolean; products: number; changed: number; sample: { name: string; added: string[]; removed: string[] }[] };
-export type ActResult = { done: number };
-export type SetTagsResult = { tags: string[]; hidden: PbHidden[]; flagged: string[] };
+export class LookAlikeError extends Error {
+  matches: PbLookAlike[];
+  constructor(message: string, matches: PbLookAlike[]) { super(message); this.matches = matches; }
+}
+/** A 409 with look-alikes → LookAlikeError; anything else as it came. */
+const lookAlike = (e: unknown): never => {
+  const m = (e as { data?: { matches?: PbLookAlike[] } })?.data?.matches;
+  throw Array.isArray(m) && m.length ? new LookAlikeError((e as Error).message, m) : e;
+};
 
-/** The library, 25 a page, most used first. */
-export const tagsLibrary = (f: LibraryFilter, page: number) =>
-  pbCall<LibraryPage>('tags_library', { q: f.q, kind: f.kind || undefined, hidden: f.hidden === '' ? undefined : f.hidden === 'hidden', page, per: TAG_PAGE })
-    .then(r => ({ rows: r.rows ?? [], count: r.count ?? 0, counts: { all: r.counts?.all ?? 0, hidden: r.counts?.hidden ?? 0, review: r.counts?.review ?? 0 } }));
+export const getTaxonomy = () => pbCall<PbTaxonomy>('taxonomy_get').then(r => ({
+  categories: r.categories ?? [], attributes: r.attributes ?? [], links: r.links ?? [], stats: r.stats ?? [],
+  category_products: r.category_products ?? [], suggestions_pending: r.suggestions_pending ?? 0, fill: r.fill ?? null,
+}));
+export const saveCategories = (categories: string[]) => pbCall<{ categories: string[] }>('categories_save', { categories }).then(r => r.categories ?? categories);
+export const saveAttribute = (a: { id?: string; name: string; multi: boolean; shopify_prefix: string }) =>
+  pbCall<{ attribute: PbAttribute }>('attribute_save', a).then(r => r.attribute);
+export const deleteAttribute = (id: string) => pbCall<{ regated: number }>('attribute_delete', { id });
+export const orderAttributes = (ids: string[]) => pbCall('attribute_order', { ids });
+export const checkValue = (attributeId: string, name: string, excludeId?: string) =>
+  pbCall<{ matches: PbLookAlike[]; exists: { id: string; name: string } | null }>('value_check', { attribute_id: attributeId, name, exclude_id: excludeId })
+    .then(r => ({ matches: r.matches ?? [], exists: r.exists ?? null }));
+export const saveValue = (v: { attribute_id: string; id?: string; name: string; aliases?: string[]; force?: boolean }) =>
+  pbCall<{ value: PbAttrValue }>('value_save', v).then(r => r.value).catch(lookAlike);
+export const deleteValue = (id: string) => pbCall<{ regated: number }>('value_delete', { id });
+export const mergeValue = (from: string, into: string) => pbCall<{ moved: number }>('value_merge', { from, into });
+export const linkCheck = (category: string, attributeId: string) => pbCall<{ lacking: number }>('category_link_check', { category, attribute_id: attributeId }).then(r => r.lacking ?? 0);
+export const saveLinks = (category: string, attributeIds: string[]) =>
+  pbCall<{ to_needs_info: number; to_ready: number }>('category_link_save', { category, attribute_ids: attributeIds });
 
-/** Tags never reviewed, or first seen in the last 30 days, with example products. */
-export const tagsReview = () => pbCall<{ rows: PbTagReview[] }>('tags_review').then(r => r.rows ?? []);
+export type SuggestionPage = { rows: PbSuggestion[]; count: number };
+export const listSuggestions = (status: PbSuggestionStatus, page: number, attributeId = '') =>
+  pbCall<SuggestionPage>('suggestions_list', { status, page, attribute_id: attributeId || undefined }).then(r => ({ rows: r.rows ?? [], count: r.count ?? 0 }));
+export type SuggestionAct = { ids: string[]; action: 'add' | 'alias' | 'ignore' | 'move'; attribute_id?: string | null; value_id?: string; name?: string; force?: boolean };
+export const actSuggestions = (a: SuggestionAct) =>
+  pbCall<{ done: number; conflicts: Record<string, PbLookAlike[]>; retagged: number }>('suggestion_act', a)
+    .then(r => ({ done: r.done ?? 0, conflicts: r.conflicts ?? {}, retagged: r.retagged ?? 0 }));
 
-/** keep / hide / unhide / merge (`into`) / rename (`name`, one id) / kind (`kind`). Sets reviewed_at. */
-export const tagsAct = (ids: string[], action: PbTagAction, extra: { into?: string; name?: string; kind?: PbTagKind } = {}) =>
-  pbCall<ActResult>('tags_act', { ids, action, ...extra }).then(r => ({ done: r.done ?? ids.length }));
+export const retag = (dryRun: boolean) => pbCall<PbRetagResult>('retag', { dry_run: dryRun });
+export type FillScope = { product_ids?: string[]; category?: string; attribute_id?: string; needs_info?: boolean };
+export const aiFill = (scope: FillScope) => pbCall<{ run_id: string; queued: number }>('tags_ai_fill', { ...scope, missing_only: true }).then(r => r.queued ?? 0);
+export const aiFillNow = (productId: string) =>
+  pbCall<{ filled: string[]; left: string[]; status: string; missing: string[]; routed: number }>('tags_ai_fill', { product_ids: [productId], now: true });
+export const fillStatus = () => pbCall<{ fill: PbFillRun | null }>('tags_fill_status').then(r => r.fill ?? null);
 
-/** The cleaning rules (pb_settings 'tags'); defaults fill a missing or old row. A pattern the server would refuse
- *  (the row is staff-writable) is left out, as the server does on every read, so it never runs in the tester. */
-export async function getTagSettings(): Promise<PbTagSettings> {
-  const { data, error } = await supabase.from('pb_settings').select('value').eq('key', 'tags').maybeSingle();
-  if (error) throw error;
-  const v = (data?.value && typeof data.value === 'object' ? data.value : {}) as Partial<PbTagSettings>;
+/** What the product page needs: its category's attributes (in order, with their values) and its chosen values. */
+export async function productTaxonomy(productId: string, category: string | null): Promise<{ attributes: PbAttribute[]; values: PbProductValue[] }> {
+  const [vals, links] = await Promise.all([
+    supabase.from('pb_product_values').select('value_id,source').eq('product_id', productId).limit(500),
+    category ? supabase.from('pb_category_attributes').select('attribute_id,position').ilike('category', category.replace(/[%_\\]/g, '\\$&')).order('position') : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (vals.error) throw vals.error;
+  if (links.error) throw links.error;
+  const ids = (links.data ?? []).map(l => l.attribute_id as string);
+  if (!ids.length) return { attributes: [], values: (vals.data ?? []) as PbProductValue[] };
+  const [attrs, values] = await Promise.all([
+    supabase.from('pb_attributes').select('id,name,key,multi,position,shopify_prefix').in('id', ids),
+    supabase.from('pb_attribute_values').select('id,attribute_id,name,key,aliases,position').in('attribute_id', ids).order('position').order('name').limit(5000),
+  ]);
+  if (attrs.error) throw attrs.error;
+  if (values.error) throw values.error;
+  const byId = new Map((attrs.data ?? []).map(a => [a.id as string, a]));
   return {
-    hide_patterns: Array.isArray(v.hide_patterns) ? v.hide_patterns.map(String).filter(p => !patternProblem(p)) : DEFAULT_TAG_SETTINGS.hide_patterns,
-    hide_exact: Array.isArray(v.hide_exact) ? v.hide_exact.map(String) : [],
-    max_per_product: Number(v.max_per_product) > 0 ? Number(v.max_per_product) : DEFAULT_TAG_SETTINGS.max_per_product,
-    min_len: Number(v.min_len) > 0 ? Number(v.min_len) : DEFAULT_TAG_SETTINGS.min_len,
-    title_case: v.title_case !== false, auto_hide_codes: v.auto_hide_codes !== false,
+    attributes: ids.map(id => byId.get(id)).filter(Boolean).map(a => ({ ...(a as Omit<PbAttribute, 'values'>), values: (values.data ?? []).filter(v => v.attribute_id === a!.id) as PbAttrValue[] })),
+    values: (vals.data ?? []) as PbProductValue[],
   };
 }
 
-/** Admin / manager: the server validates every pattern (length, safety) and answers with the saved rules. */
-export const saveTagSettings = (rules: PbTagSettings) => pbCall<{ rules: PbTagSettings }>('tags_settings_save', { rules }).then(r => r.rules ?? rules);
+/** Staff's choice for one attribute (or all): saved as 'manual', 'tags' locked; the gate runs (Ready → routed). */
+export const setProductValues = (productId: string, valueIds: string[], attributeId?: string) =>
+  pbCall<{ status: string; missing: string[]; routed: number }>('product_values_set', { product_id: productId, value_ids: valueIds, attribute_id: attributeId });
 
-/** Re-run the rules over every product's store tags + current tags (hand-edited tags are kept). Dry run first. */
-export const recleanTags = (dryRun: boolean) =>
-  pbCall<RecleanResult>('tags_reclean', { dry_run: dryRun })
-    .then(r => ({ dry_run: dryRun, products: r.products ?? 0, changed: r.changed ?? 0, sample: Array.isArray(r.sample) ? r.sample : [] }));
-
-/** Save the tags staff typed on a product: normalized and deduped (the hide rules do not apply to what staff typed),
- *  library aliases applied, 'tags' locked so the AI adds but never replaces. `flagged` = kept but hidden in the library. */
-export const setProductTags = (productId: string, tags: string[]) =>
-  pbCall<SetTagsResult>('set_product_tags', { product_id: productId, tags })
-    .then(r => ({ tags: r.tags ?? tags, hidden: Array.isArray(r.hidden) ? r.hidden : [], flagged: Array.isArray(r.flagged) ? r.flagged : [] }));
-
-export type TagSuggestion = Pick<PbTag, 'id' | 'name' | 'kind' | 'hidden' | 'uses'>;
-/** Library names that contain `q` (canonical tags only), most used first — for the product's tag picker. */
-export async function suggestTags(q: string, limit = 8): Promise<TagSuggestion[]> {
-  const s = q.trim().toLowerCase().replace(/[%_\\,()]/g, ' ').replace(/\s+/g, ' ').trim();
-  let query = supabase.from('pb_tags').select('id,name,kind,hidden,uses').is('merged_into', null).order('uses', { ascending: false }).order('name').limit(limit);
-  if (s) query = query.ilike('key', `%${s}%`);
-  const { data, error } = await query;
+/** Re-apply the ready gate after a facts save (pb_products_refresh): the product's new status and missing attributes. */
+export async function refreshGate(productId: string): Promise<{ status: string; was: string; missing: string[] } | null> {
+  const { data, error } = await supabase.rpc('pb_products_refresh', { p_ids: [productId] });
   if (error) throw error;
-  return (data ?? []) as TagSuggestion[];
+  return (data as { status: string; was: string; missing: string[] }[] | null)?.[0] ?? null;
 }
 
-/** How many tags wait in the review queue (the Settings tile). */
-export async function countTagsToReview(): Promise<number> {
-  const { count, error } = await supabase.from('pb_tags').select('id', { count: 'exact', head: true }).is('reviewed_at', null).is('merged_into', null);
+/** Needs-info products waiting for a required tag (Products → Needs info: "Let AI decide for N products"). */
+export async function countMissingTags(): Promise<number> {
+  const { count, error } = await supabase.from('pb_products').select('id', { count: 'exact', head: true }).eq('status', 'needs_info').neq('missing_attrs', '{}');
   if (error) throw error;
   return count ?? 0;
 }
 
-/** Everything the Tags page needs, as one object so the screenshot harness can pass fakes. */
-export interface TagsApi {
-  review: typeof tagsReview; library: typeof tagsLibrary; act: typeof tagsAct;
-  settings: typeof getTagSettings; saveSettings: typeof saveTagSettings; reclean: typeof recleanTags; suggest: typeof suggestTags;
+/** How many suggestions wait (the Settings tile). */
+export async function countSuggestions(): Promise<number> {
+  const { count, error } = await supabase.from('pb_tag_suggestions').select('id', { count: 'exact', head: true }).eq('status', 'pending');
+  if (error) throw error;
+  return count ?? 0;
 }
-export const TAGS_API: TagsApi = { review: tagsReview, library: tagsLibrary, act: tagsAct, settings: getTagSettings, saveSettings: saveTagSettings, reclean: recleanTags, suggest: suggestTags };
+
+/** Everything the Tags page calls, as one object so the screenshot harness can pass fakes. */
+export const TAGS_API = {
+  taxonomy: getTaxonomy, saveCategories, saveAttribute, deleteAttribute, orderAttributes, checkValue, saveValue, deleteValue, mergeValue,
+  linkCheck, saveLinks, listSuggestions, actSuggestions, retag, aiFill, fillStatus,
+};
+export type TagsApi = typeof TAGS_API;

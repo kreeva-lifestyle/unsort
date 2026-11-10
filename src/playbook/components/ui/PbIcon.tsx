@@ -13,6 +13,7 @@ const EXTRA: Record<string, string> = {
   chevronRight: 'M9 6l6 6-6 6',
   chevronLeft: 'M15 6l-6 6 6 6',
   chevronDown: 'M6 9l6 6 6-6',
+  chevronUp: 'M6 15l6-6 6 6',
   plus: 'M12 5v14M5 12h14',
   x: 'M18 6L6 18M6 6l12 12',
   logout: 'M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9',

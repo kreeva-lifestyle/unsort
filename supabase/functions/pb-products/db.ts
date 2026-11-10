@@ -2,7 +2,6 @@
 // function does its own auth in auth.ts). Every failure becomes an HttpError
 // with a plain sentence.
 import { HttpError } from './http.ts';
-import { tagSettings } from './tagClean.ts';
 import type { Settings } from './types.ts';
 
 export const SB_URL = Deno.env.get('SUPABASE_URL') ?? '';
@@ -76,7 +75,6 @@ export async function getSettings(): Promise<Settings> {
     reader: { model: String(reader.model || ''), effort: String(reader.effort || '') },
     categories: uniqueCi(Array.isArray(cats) ? cats.map(c => String(c ?? '')) : []),
     automation: { paused: auto.paused === true },
-    tags: tagSettings(m.get('tags')),
   };
 }
 

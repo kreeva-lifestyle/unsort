@@ -149,13 +149,19 @@ is_active). Service role for all DB writes. CORS like listing-ai.
 | `save_credentials` | admin/manager | `{ website_id, auth_mode, access_token?, client_id?, client_secret?, shop_domain? }` | stores in pb_website_secrets, then test → `{ ok, shop_name }`. A different `shop_domain` moves the site to that store: needs full new credentials; site switched off; old secrets wiped; non-skipped listings re-queued without Shopify ids; skipped ones lose their old-store ids |
 | `test_connection` | staff | `{ website_id }` | `{ ok, shop_name, scopes[] , missing_scopes[] }`, sets connected_at / last_error |
 | `preview_price` | staff | `{ website_id, cost, rule_id? }` | `{ price, compare_at }` |
-| `set_product_tags` | staff | `{ product_id, tags[≤100] }` | staff's tags for one product: normalized, deduped, library aliases applied, capped (the hide rules do NOT apply to what staff typed); writes `pb_products.tags`, locks `tags` → `{ ok, tags, flagged (library-hidden ones), hidden[{tag, reason}], locked }` |
-| `tags_library` | staff | `{ q?, kind?, hidden?: boolean, aliases?: boolean, page?, per? (≤200) }` | library rows (aliases left out unless `aliases`), most used first → `{ ok, rows, count, page, per, counts: { all, hidden, review } }` |
-| `tags_review` | staff | `{ days? (30) }` | `pb_tags_review`: canonical tags never reviewed or first seen in the last `days` days, with up to 3 example product names → `{ ok, rows[{ …tag, examples[] }], days }` |
-| `tags_act` | staff | `{ ids[≤200], action: 'keep'|'hide'|'unhide'|'merge'|'rename'|'kind', into?, name?, kind? }` | keep = reviewed; hide / unhide = `pb_tag_hide`; merge = `pb_tag_merge(id, into)` each; rename (one id) = `pb_tag_rename`; kind = set kind. All set `reviewed_at` → `{ ok, done }` |
-| `tags_test` | staff | `{ tags[≤50], rules? }` | the live tester: each tag's clean name and whether the rules (saved, or the unsaved `rules` given) would hide it → `{ ok, results[{ tag, name, kept, reason?, pattern? }], rules }` |
-| `tags_settings_save` | admin/manager | `{ rules }` | validates (≤ 50 patterns, each ≤ 80 chars, compiles, no stacked quantifiers / backreferences / lookbehind; numbers clamped) and saves pb_settings `tags`; nothing is re-cleaned → `{ ok, rules }` |
-| `tags_reclean` | admin/manager | `{ dry_run (default true) }` | every non-archived product's tags rebuilt by the engine with the current rules; products with `tags` locked are skipped. Dry run counts; apply writes in batches (`pb_products_set_tags`) → `{ ok, dry_run, products, locked, changed, sample[≤10: { id, name, before, after, added, removed }] }` |
+| `taxonomy_get` | staff | – | categories (pb_settings), attributes with values (+ `uses`), links, per-link `stats {products, lacking}`, `category_products`, `suggestions_pending`, `fill` (latest "Let AI decide" run) |
+| `categories_save` | admin/manager | `{ categories[] }` | the reader's category list; links of removed categories are dropped and their products re-gated → `{ ok, categories, regated }` |
+| `attribute_save` / `attribute_delete` / `attribute_order` | admin/manager | `{ id?, name, multi?, shopify_prefix? }` / `{ id }` / `{ ids[] }` | create / rename (products of its categories re-gated: "Missing: …" holds the name) / delete (values, links and product values cascade; products re-gated) / order |
+| `value_check` | staff | `{ attribute_id, name, exclude_id? }` | live look-alike check → `{ ok, matches[LookAlike], exists }` |
+| `value_save` | admin/manager | `{ attribute_id, id?, name, aliases?, force? }` | a new name (or rename) with look-alikes → **409** `{ error, matches }` unless `force`; an alias another value of the same attribute uses → 409 → `{ ok, value }` |
+| `value_delete` / `value_merge` | admin/manager | `{ id }` / `{ from, into }` | `pb_value_delete` / `pb_value_merge` (same attribute; products move, from's key + aliases become into's aliases) |
+| `category_link_check` / `category_link_save` | staff / admin | `{ category, attribute_id }` / `{ category, attribute_ids[] }` | products lacking it → `{ lacking }`; replace the category's attributes in order and re-gate → `{ to_needs_info, to_ready }` |
+| `suggestions_list` | staff | `{ status?, attribute_id? ('none'), page? }` | 20 a page by uses → rows `{ …, example_names[≤3], matches[≤3] }`, `count` |
+| `suggestion_act` | admin/manager | `{ ids[≤100], action: add/alias/ignore/move, attribute_id?, value_id?, name?, force? }` | add runs the look-alike check first: rows with look-alikes come back in `conflicts {id: matches}` (not added) unless `force`; add / alias re-run the rules for the example products → `{ done, conflicts, retagged }` |
+| `product_values_set` | staff | `{ product_id, value_ids[], attribute_id? }` | staff's choice ('manual') for one attribute or all; checked against the category's allowed values and one-value attributes; locks `tags`; gate; routes it when it became Ready → `{ status, missing, locked, routed }` |
+| `retag` | admin/manager | `{ dry_run (default true) }` | the rules again for every unlocked product (AI rows kept where the rules find nothing; 'manual' never touched) → `{ products, locked, changed, to_needs_info, to_ready, sample[≤10] }`; apply in batches of 100 (`pb_product_values_bulk`) |
+| `tags_ai_fill` | staff | `{ product_ids? / category? / attribute_id? / needs_info?, missing_only?, now? }` | queue (status ready/needs_info, not locked, missing ≠ {}) → `{ run_id, queued }`; `now` + one product: fill it at once → `{ filled, left, status, missing, routed }` |
+| `tags_fill_status` | staff | – | latest run `{ total, done, waiting, filled, left_empty, finished_at }` |
 Errors: HTTP 4xx/5xx with `{ error: '<plain sentence>' }`. A SQL `raise exception` from a `pb_tag_*` function reaches the app as its own sentence (SQLSTATE P0001).
 
 ## UI (src/playbook/, owner's Playbook rules apply)
@@ -194,7 +200,7 @@ use `useBackClose` so device Back closes them.
   Content & AI (model, effort, language, brand voice, title template,
   limits, extra instructions, alt text).
 - **Vendors** — list, add, edit, deactivate; product count per vendor.
-- **Settings** — reader model/effort, category list, pause automation,
+- **Settings** — reader model/effort, the Tags page (categories, attributes, values, suggestions), pause automation,
   "Run now" (calls `work`).
 - **Guide** — the user guide in the app + "Download PDF"
   (`/playbook/product-directory-guide.pdf` in `public/`).
@@ -400,128 +406,78 @@ each website, but photos are copied as they are. Use this only on sites whose
 content you are allowed to reuse, or replace the photos before publishing.
 
 
-## Tags (owner, 2026-11-10)
-"Product tags are not getting fetched. We need a unified way to tackle a lot
-of tags — scraping a website gives a lot of them." Before, a product's tags
-lived only in `attributes.store_tags` (one comma string from the other store,
-junk included: `_altnew_KBSUIT25`, `_label_BUY 1 GET 1 FREE`, `SIZE_CHART`…)
-and reached a website only through `{attr:store_tags}`. Migration
-`20261110090000_pb_tags.sql`; engine `tagClean.ts` + `tagEngine.ts` (pure,
-node tests `test/tagClean.test.mjs`, `test/tagEngine.test.mjs`,
-`test/tags.test.mjs`); database glue `tagStore.ts`; actions `tagsActions.ts`.
+## Tags (owner, 2026-11-10) — a controlled taxonomy
+Owner: "manually enter all tags and from that AI choose automatically …
+structure first category then attribute then attribute tags … tags will grow
+a lot", "on simple click adds to our library … we don't want look-alike
+tags", "We will create category, attributes and attribute values from the
+backend called Tags", "for each attribute of its category a tag is a must",
+and "Let AI decide". This replaces the free tag library of the first draft
+(never applied). Migration `20261110090000_pb_tags.sql`.
 
-**The product's own tags — `pb_products.tags text[]` (GIN index).** The one
-clean set every website builds from. Built by the engine as a union, in this
-order, deduped by key: (1) **facts** — category, fabric, colour (each split
-on commas: `Pink, Gold` → two tags), and the reader's `occasion` / `work` /
-`pattern` attributes split on commas (pieces ≤ 40 chars and ≤ 4 words only; a
-sentence is not a tag); (2) the **store's tags** (`attributes.store_tags`,
-which stays as the raw string); (3) the tags **already on the product**;
-(4) the **writer's `extra_tags`** — last, so new extras only fill the room
-left under the cap and a regenerate never evicts older tags. Every candidate
-goes through the rules (below), except the tags already on the product: a
-read or a write keeps them as they are (`keepExisting`), only the re-clean
-re-checks them; library aliases are replaced by the canonical name;
-library-hidden tags STAY on the product (flagged in the app, left out of every
-website's tags; once on a product they bypass the rules, so un-hiding
-restores them); at most `max_per_product`. **Where it runs:** ingest (store
-tags → tags at once, so an import is tagged before the AI reads it), after
-the reader (facts added — `nextTags`, the reader owns the row while
-`reading`), when the writer's extra tags come back (`addTags` →
-`pb_product_add_tags`: the new tags are appended in ONE SQL statement, so two
-websites writing the same product at once, or staff saving meanwhile, never
-overwrite each other; `tags` is not in generate's staleness check),
-`set_product_tags` and `tags_reclean`. **Locked `tags`** (staff set them on
-the product page → `set_product_tags`): the engine never changes that product
-automatically — reader, writer and re-clean skip it. A Woo tag that itself
-holds a comma (`Red, Blue`) arrives as two store tags: inherent to the
-comma-joined `store_tags` string (a Shopify tag cannot hold a comma either).
+**Model.** `pb_attributes` (name, key unique, `multi`, position,
+`shopify_prefix`) → `pb_attribute_values` (name, key, `aliases[]` = "also
+known as" keys; unique (attribute, key); the edge refuses an alias another
+value of the same attribute uses) → `pb_category_attributes` (category text =
+an entry of pb_settings `categories`, attribute, position). A product's
+choices: `pb_product_values` (product, value, source `rules` | `ai` |
+`manual`). `pb_products.tags` caches the chosen names (taxonomy order),
+`missing_attrs` the category's attributes with no value, `route_due` "became
+Ready by a tag change", `tag_fill_run` the "Let AI decide" queue
+(`pb_tag_fill_runs` counts progress). `pb_tag_suggestions` (phrase, key,
+attribute?, status pending/added/aliased/ignored, uses, ≤ 5 example product
+ids, source store/ai/text; unique (key, attribute) via an expression index;
+an ignored key is never suggested again). RLS: staff read; every write goes
+through the edge function (service role). The Tags page also owns the
+category list (it moved from Settings).
 
-**Cleaning rules — pb_settings `tags`** `{ hide_patterns[], hide_exact[],
-max_per_product: 25, min_len: 2, title_case: true, auto_hide_codes: true }`
-(defaults: `^_`, `^size[_ ]?chart$`, `^label[_ ]`, `^[a-z]{1,3}\d{2,}$`).
-`normalizeTag`: trim, one space between words, surrounding quotes / `#` off,
-commas → spaces (a comma splits a Shopify tag), control and zero-width
-characters off, ≤ 255 chars, **Title Case** when the input is all lower or
-all upper (`KURTAS & SUITS` → `Kurtas & Suits`; mixed case such as `iPhone`
-or `Co-ord Set` is kept; in an all-upper tag a word of 1–2 letters, a word
-with a digit, a size run or a 3-letter tag on its own stays upper: `XL`,
-`3XL`, `UK 10`, `USA`, `BUY 1 GET 1 FREE` → `Buy 1 Get 1 Free`). Hidden, with
-a reason: empty; shorter than `min_len`; matches a hide pattern
-(case-insensitive, `pattern` named); in `hide_exact` (by key); looks like a
-**code** when `auto_hide_codes` (`_` prefix; letters+digits with no vowel and
-no space like `kb261`, `nkb55`; one token of letters then ≥ 2 digits like
-`KBSUIT25`; > 60 % digits like `2024` — a size such as `3XL` / `XS` is never a
-code); duplicate (by key, first spelling kept); over the cap. A tag staff
-**reviewed and kept** in the library passes the rules from then on; what
-staff typed on a product skips the rules entirely. A tag the rules hide
-(pattern / exact / code) still gets a library row — hidden, reviewed, 0 uses —
-so staff can see it under the Library's Hidden filter and un-hide it (it then
-counts as reviewed-and-kept and joins the product on the next read or
-re-clean); plausible collection tags such as `Eid2025` or `Diwali2024` are
-hidden as codes by default and are recovered that way. Hide patterns are
-checked before they are saved or tried (`patternProblem`, mirrored in the
-app): ≤ 50, ≤ 80 chars each, no repeated group (`(x+)+`, `(a|aa)+`), no
-stacked quantifiers, no backreferences or lookbehind, at most 3 repeats — a
-pattern cannot hang the function on a long tag. The key (`tagKey` = SQL
-`pb_tag_key`): lower, trimmed, single spaces. On the owner's bahupalace
-import: `_altnew_*`, `_label_*`, `SIZE_CHART` hidden; `Ideal Collection`,
-`Kurtas & Suits`, `Lehenga` kept.
+**Required attributes — the gate.** `pb_products_refresh(ids)` (SQL; twin
+`tagGate.ts`): Ready needs a price (cost or copied selling price), a category
+and a value for every attribute linked to the category; else Needs info with
+`missing_attrs` ("Missing: Colour" on the product page and the list rows).
+new / reading / archived never move; a never-read Needs-info product (photos
+uploading) is not made Ready. It runs after every value write, link change,
+attribute / value delete or merge, category prune, and after a facts save on
+the product page (staff may call it). Becoming Ready sets `route_due`; the
+worker routes those (≤ 10 a run) unless the action already routed it.
+Generation / publishing keep refusing Needs-info products (`NEEDS_INFO`).
 
-**The library — `pb_tags`** `(id, name, key unique, kind in collection |
-category | fabric | colour | occasion | style | work | size | other, hidden,
-merged_into → pb_tags, source in store | ai | manual | facts, uses,
-reviewed_at, first_seen_at, last_seen_at)`, RLS staff (select / insert /
-update / delete). `uses` = products carrying the tag, owned by the trigger
-`pb_products_tags_count` on `pb_products.tags` (insert / update / delete;
-SECURITY INVOKER; a missing row is created as 'manual'); the edge function
-calls `pb_tags_bump(names, source, hidden = false)` BEFORE writing a product
-so new rows carry the right source (`hidden = true` makes the reviewed hidden
-rows for tags the rules refused). The trigger and `pb_tags_bump` touch
-`pb_tags` rows one at a time in KEY ORDER, so two products saved at once
-(reader + writer + re-clean run together) cannot deadlock on their shared
-tags. Partial index `pb_tags_engine_idx` backs the engine's load (hidden,
-alias or reviewed rows — the ones that change a result — up to 20 000, plus
-the 5 000 most used for "known"). SQL (staff + service role, SECURITY
-INVOKER): `pb_tag_merge(from, into)` (alias chain re-pointed, every product's
-tags rewritten `from` → `into` by key and deduped; `uses` follow through the
-trigger; the target must be canonical, never itself), `pb_tag_hide(id,
-hidden)` (products untouched; `tags_act` hide / unhide does the same in one
-PATCH), `pb_tag_rename(id, name)` (new name + key, must stay unique — "merge
-instead" when a real tag has it; an alias row that holds the key is dropped;
-products rewritten under a transaction-local flag so `uses` do not move),
-`pb_tags_review(days, limit)` (the queue: canonical, never reviewed or first
-seen lately, + 3 example product names; the app's "N new tags to review"
-counts the never-reviewed ones, the same number as the Settings tile),
-`pb_products_set_tags(jsonb [{id, tags}])` (the re-clean's bulk write; only
-existing products change; JSON nulls skipped), `pb_product_add_tags(id,
-names, max)` (the writer's extras appended atomically; null when the product
-is being read, locked or gone). **Backfill** in the migration (safe to
-re-run: only products with empty tags and `tags` not locked): facts + store
-tags through the DEFAULT rules in SQL (`pg_temp` helpers mirroring the
-engine, Title Case rule included) into a temp table, library rows via
-`pb_tags_bump` first (facts, then store, then the refused store tags as
-hidden), then the products — the trigger fills the counts.
+**Auto-tagging.** (1) Rules (`tagMatch.ts`, pure): `tagKey` (lower, accents
+off, punctuation → spaces) + a small stemmer (`tagText.ts`: sequins → sequin,
+printed / printing → print, embroidered / embroidery → embroider) and
+whole-word phrase matching of every value name and alias of the category's
+attributes in: label lines naming the attribute ("COLOUR :- 2 (Pink, Wine)",
+"FABRICS & WORK :- … embroidery-work"; weight 5), the name (4), store tags and
+the reader's facts (3), the text (1). A longer phrase beats a shorter one it
+covers; a one-value attribute keeps the strongest / earliest. At ingest the
+rules run over every attribute (category unknown); the reader then replaces
+the rules / AI rows for its category. (2) AI (`tagPrompt.ts`): the reader's
+ONE call gets, per attribute linked to any category, an enum of allowed names
++ `other` phrases, and the category → attributes map; only attributes the
+rules left empty take the AI's choice; "pick the closest value when the
+evidence reasonably supports it, never invent one". 'manual' attributes and
+locked `tags` are never touched. (3) "Let AI decide" (`tagFill.ts`): a
+values-only pass (reader model, text + 1 photo) for the empty required
+attributes, 'add' mode; queued by `tags_ai_fill`, run by the worker after
+read / write / publish (≤ 5 a run, 35 s needed), or at once from the
+product page.
 
-**Websites.** `{tags}` in a site's `tag_rules.templates` gives one tag per
-product tag the library does not hide (a template with `{tags}` and `{size}`
-gives one per tag × size; a product with none gives none for that template);
-`{attr:store_tags}` keeps giving the RAW store tags. `tag_rules.max_tags`
-(optional, default 30, ≤ 250) caps the listing's final list after templates,
-static and AI tags. New websites default to `["{category}", "{fabric}",
-"{color}", "Vendor_{vendor}", "{tags}"]` with `max_tags: 30` (the vendor tag
-before `{tags}`, so a big tag set never pushes it past the cap); existing
-sites keep their rules. There is no per-site store-tags mode: a site that wants the
-raw store tags uses `{attr:store_tags}`, one that wants the clean ones uses
-`{tags}`.
+**Suggestions and the look-alike guard.** Candidates: store tags matching
+nothing (after the junk filter `tagClean.ts`: `_…`, SIZE_CHART, label_…,
+codes, a category's own name), unmatched label-line items (with that
+attribute), the AI's `other` phrases; anything already a value / alias is
+dropped; an unassigned one takes its closest look-alike's attribute.
+`lookAlikes` (`tagLook.ts`) compares a phrase with every value + alias of
+every attribute: same key, same stem, same words in another order, the Hindi
+/ Hinglish list (`tagDict.ts`: kala → black, kadhai → embroidery, gota →
+gota patti…), a colour shade (rani pink → pink), Damerau–Levenshtein ≤ 1
+(≤ 6 letters) / ≤ 2, Jaro–Winkler ≥ 0.92; a hit in another attribute is
+flagged (`other_attribute`: "Silk" under Work is a Fabric value).
 
-**App.** Settings → Tags: the review queue ("N new tags to review": tag,
-uses, first seen, 3 example products, source; Keep / Hide / Merge into… /
-Rename / Kind, bulk select, "Hide all that look like codes"), the library
-(search, kind / hidden filters, by uses; hidden struck through), the rules
-(pattern chips + the live tester `tags_test`, max per product, title case,
-"Re-clean all products" = `tags_reclean` dry run → confirm → apply). Product
-page → Facts → Tags: chips with suggestions from the library (hidden ones
-marked), saved through `set_product_tags` (locks `tags`); "From the website"
-keeps the raw store tags and says "cleaned into the Tags above". Website
-editor → Tags: `{tags}` listed first, "At most N tags per product".
+**Websites.** `{tags}` = the chosen values in the site's `tag_rules.tag_style`:
+`plain` ("Black", default) or `prefixed` (`${shopify_prefix || attribute}_${name}`);
+`max_tags` (default 30) caps the list. New sites' templates include `{tags}`.
+
+Tests: `test/tagText`, `tagClean`, `tagLook`, `tagMatch` (+ tagAuto),
+`tagGate`, `tagPrompt`, `tagFill` (queue with a fake database and AI),
+`tags`, `runner` (ingest tagging).

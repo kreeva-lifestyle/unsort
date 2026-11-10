@@ -1,8 +1,10 @@
 // Pure: a website's Shopify tags for one product.
 // Templates (one tag each) with placeholders {category} {fabric} {color} {vendor}
 // {vendor_code} {size} {sku} {tags} {attr:<key>}; a template with {size} gives one tag per
-// size, {tags} (the product's own cleaned tags, pb_products.tags minus the library's
-// hidden ones — tagEngine.ts) gives one tag per product tag, and {attr:store_tags} (an
+// size, {tags} (the product's chosen attribute values — the taxonomy on the Tags page;
+// valueTags below: "Black" plain, or "Colour_Black" when the site's tag_style is
+// 'prefixed', prefix = the attribute's Shopify prefix or its name) gives one tag per
+// value, and {attr:store_tags} (an
 // imported store's own tags, comma-joined, RAW) gives one tag per store tag; a template
 // whose placeholder is empty is dropped. Then the static tags, then the AI's extra tags
 // (at most ai_extra_max, only when ai_extra). Apply case, trim, drop empties, dedupe
@@ -13,8 +15,20 @@ import { MAX_SITE_TAGS, type TagRules } from './types.ts';
 export interface TagFacts {
   category: string; fabric: string; color: string; vendor: string; vendor_code: string; sku: string;
   sizes: string[]; attributes: Record<string, string>;
-  /** The product's own tags a website may use (visibleTags in tagEngine.ts). */
+  /** The product's chosen values, already in the site's tag style (valueTags). */
   tags?: string[];
+}
+
+/** One chosen value with its attribute (pb_product_values → pb_attribute_values → pb_attributes). */
+export interface ChosenTag { name: string; attribute: string; prefix: string | null }
+
+/** {tags}: the chosen values as tags — plain names, or `${prefix}_${name}` for tag_style 'prefixed'. */
+export function valueTags(vals: ChosenTag[], style: unknown): string[] {
+  return vals.map(v => {
+    const name = String(v.name ?? '').trim();
+    const pre = String(v.prefix ?? '').trim() || String(v.attribute ?? '').trim();
+    return style === 'prefixed' && pre && name ? `${pre}_${name}` : name;
+  }).filter(Boolean);
 }
 
 const PH = /\{\s*(attr:[^}]+|[a-z_]+)\s*\}/gi;

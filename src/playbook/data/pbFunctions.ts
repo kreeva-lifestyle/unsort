@@ -16,7 +16,8 @@ export async function pbFnCall<T = Record<string, unknown>>(fn: PbFunction, acti
     body: JSON.stringify({ action, ...body }),
   });
   const out = await r.json().catch(() => ({ error: `The Playbook server answered ${r.status}` }));
-  if (!r.ok || out?.error) throw new Error(out?.error || `The Playbook server answered ${r.status}`);
+  // The reply rides on the error (`data`), e.g. a 409's look-alike matches (data/tags.ts).
+  if (!r.ok || out?.error) throw Object.assign(new Error(out?.error || `The Playbook server answered ${r.status}`), { status: r.status, data: out });
   return out as T;
 }
 

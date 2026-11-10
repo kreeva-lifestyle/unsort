@@ -1,14 +1,24 @@
 // The SAME tag rules as supabase/functions/pb-products/tags.ts (copied exactly,
 // like the price preview) — so the example on the Tags tab is what Shopify gets.
-// Change both together. {tags} = one tag per product tag (pb_products.tags, the
-// library's hidden ones left out); max_tags caps the site's list last.
+// Change both together. {tags} = one tag per chosen attribute value (valueTags:
+// plain "Black" or prefixed "Colour_Black"); max_tags caps the site's list last.
 import type { PbTagRules } from '../../types';
 
 export interface TagFacts {
   category: string; fabric: string; color: string; vendor: string; vendor_code: string; sku: string;
   sizes: string[]; attributes: Record<string, string>;
-  /** The product's own clean tags (pb_products.tags) with the library's hidden ones already left out. */
+  /** The product's chosen values, already in the site's tag style (valueTags). */
   tags?: string[];
+}
+
+export interface ChosenTag { name: string; attribute: string; prefix: string | null }
+/** {tags}: plain value names, or `${prefix}_${name}` for tag_style 'prefixed' (prefix = Shopify prefix || attribute). */
+export function valueTags(vals: ChosenTag[], style: unknown): string[] {
+  return vals.map(v => {
+    const name = String(v.name ?? '').trim();
+    const pre = String(v.prefix ?? '').trim() || String(v.attribute ?? '').trim();
+    return style === 'prefixed' && pre && name ? `${pre}_${name}` : name;
+  }).filter(Boolean);
 }
 
 const PH = /\{\s*(attr:[^}]+|[a-z_]+)\s*\}/gi;

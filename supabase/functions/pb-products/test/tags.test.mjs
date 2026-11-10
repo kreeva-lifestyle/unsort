@@ -1,7 +1,7 @@
 // node --test --experimental-strip-types supabase/functions/pb-products/test/
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildTags, fillTemplate, maxSiteTags } from '../tags.ts';
+import { buildTags, fillTemplate, maxSiteTags, valueTags } from '../tags.ts';
 
 const facts = {
   category: 'Kurta Set', fabric: 'Cotton', color: 'Pink', vendor: 'Bahu Palace', vendor_code: 'BP', sku: 'KB261', sizes: ['S', 'M'],
@@ -43,4 +43,12 @@ test('AI extras still come last and are capped by ai_extra_max', () => {
 test('fillTemplate: {tags} is empty without a tag (the template is dropped)', () => {
   assert.equal(fillTemplate('{tags}', facts), null);
   assert.equal(fillTemplate('{tags}', facts, '', 'Festive'), 'Festive');
+});
+
+test('valueTags: {tags} as plain value names, or Prefix_Value with the Shopify prefix (else the attribute name)', () => {
+  const vals = [{ name: 'Black', attribute: 'Colour', prefix: null }, { name: 'Embroidery', attribute: 'Work', prefix: 'Work Type' }];
+  assert.deepEqual(valueTags(vals, 'plain'), ['Black', 'Embroidery']);
+  assert.deepEqual(valueTags(vals, undefined), ['Black', 'Embroidery']);
+  assert.deepEqual(valueTags(vals, 'prefixed'), ['Colour_Black', 'Work Type_Embroidery']);
+  assert.deepEqual(buildTags({ templates: ['{tags}'], max_tags: 1 }, { ...facts, tags: valueTags(vals, 'prefixed') }, []), ['Colour_Black']);
 });

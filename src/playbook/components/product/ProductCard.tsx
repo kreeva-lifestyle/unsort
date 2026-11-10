@@ -7,7 +7,7 @@ import { PB, pbMeta, pbName, pbNum } from '../../pbTheme';
 import PbTile from '../ui/PbTile';
 import { Dot, LISTING_STATUS, PRODUCT_STATUS, rupees } from './status';
 import ProductPhoto from './list/ProductPhoto';
-import { productTitle, productTone, siteNamer } from './list/productListUtil';
+import { productTitle, productTone, siteNamer, statusLabel } from './list/productListUtil';
 
 export default function ProductCard({ p, sites, onOpen }: { p: ProductRow; sites: WebsiteLite[]; onOpen: () => void }) {
   const st = PRODUCT_STATUS[p.status];
@@ -28,7 +28,7 @@ export default function ProductCard({ p, sites, onOpen }: { p: ProductRow; sites
           {p.cost_price != null ? <span style={{ ...pbNum, fontSize: 15, fontWeight: 500, color: PB.tx }}>{rupees(p.cost_price)}</span>
             : p.sell_price != null ? <span style={pbMeta}>Sells at <span style={{ ...pbNum, fontSize: 15, fontWeight: 500, color: PB.tx }}>{rupees(p.sell_price)}</span></span>
               : <span style={pbMeta}>No price</span>}
-          <Dot color={st.color} label={st.label} />
+          <Dot color={st.color} label={statusLabel(p)} style={{ whiteSpace: 'normal' }} />
         </span>
         {p.pb_listings.length > 0 && (
           <span style={{ display: 'flex', flexWrap: 'wrap', columnGap: 12, rowGap: 4, borderTop: `1px solid ${PB.tileBd}`, paddingTop: 8, marginTop: 'auto' }}>

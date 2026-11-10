@@ -1,43 +1,58 @@
-// Tags (owner, 2026-11-10): the tag library (pb_tags), the cleaning rules
-// (pb_settings key 'tags') and the shapes the pb-products tag actions answer
-// with. Mirrors supabase/migrations/20261110090000_pb_tags.sql and
-// supabase/functions/pb-products/tagClean.ts. A product's own tags are
-// PbProduct.tags (types.ts); websites use them through the {tags} placeholder.
+// Tags as a controlled taxonomy (owner, 2026-11-10): Category → Attributes →
+// Attribute values, built by hand on the Tags page; Playbook only chooses
+// from it. Mirrors supabase/migrations/20261110090000_pb_tags.sql and the
+// pb-products tag actions (docs/playbook/product-directory-spec.md "Tags").
 
-export type PbTagKind = 'collection' | 'category' | 'fabric' | 'colour' | 'occasion' | 'style' | 'work' | 'size' | 'other';
-export type PbTagSource = 'store' | 'ai' | 'manual' | 'facts';
-
-export const TAG_KINDS: { id: PbTagKind; label: string }[] = [
-  { id: 'other', label: 'Other' }, { id: 'collection', label: 'Collection' }, { id: 'category', label: 'Category' },
-  { id: 'fabric', label: 'Fabric' }, { id: 'colour', label: 'Colour' }, { id: 'occasion', label: 'Occasion' },
-  { id: 'style', label: 'Style' }, { id: 'work', label: 'Work' }, { id: 'size', label: 'Size' },
-];
-export const TAG_SOURCE_LABEL: Record<PbTagSource, string> = { store: 'From a website', ai: 'From the AI', manual: 'Typed by staff', facts: 'From the facts' };
-
-/** One library row. `hidden`: never sent to a website, but it stays on the products. `merged_into`: an alias of that tag. */
-export interface PbTag {
-  id: string; name: string; key: string; kind: PbTagKind; hidden: boolean; merged_into: string | null;
-  source: PbTagSource; uses: number; reviewed_at: string | null; first_seen_at: string; last_seen_at: string;
-  created_at: string; updated_at: string;
+export interface PbAttrValue {
+  id: string; attribute_id: string; name: string; key: string;
+  /** "Also known as" words (normalized keys): kala, kaala… */
+  aliases: string[];
+  position: number;
+  /** Products carrying it (taxonomy_get). */
+  uses?: number;
 }
 
-/** A review-queue row (pb_tags_review): the library row plus up to 3 example product names. */
-export type PbTagReview = Pick<PbTag, 'id' | 'name' | 'key' | 'kind' | 'hidden' | 'source' | 'uses' | 'reviewed_at' | 'first_seen_at'> & { examples: string[] };
-
-/** The cleaning rules (Settings → Tags → Rules). Patterns are case-insensitive regular expressions. */
-export interface PbTagSettings {
-  hide_patterns: string[]; hide_exact: string[]; max_per_product: number; min_len: number;
-  title_case: boolean; auto_hide_codes: boolean;
+export interface PbAttribute {
+  id: string; name: string; key: string;
+  /** Several values per product (Colour) or one only (Fabric). */
+  multi: boolean;
+  position: number;
+  /** Tags as "Colour_Black" on stores with the prefixed tag style; null = the attribute's name. */
+  shopify_prefix: string | null;
+  values: PbAttrValue[];
 }
-export const DEFAULT_TAG_SETTINGS: PbTagSettings = {
-  hide_patterns: ['^_', '^size[_ ]?chart$', '^label[_ ]', '^[a-z]{1,3}\\d{2,}$'],
-  hide_exact: [], max_per_product: 25, min_len: 2, title_case: true, auto_hide_codes: true,
+
+export interface PbCategoryLink { category: string; attribute_id: string; position: number }
+export interface PbLinkStat { category: string; attribute_id: string; products: number; lacking: number }
+
+export interface PbFillRun { id: string; total: number; done: number; waiting: number; filled: number; left_empty: number; created_at: string; finished_at: string | null }
+
+export interface PbTaxonomy {
+  categories: string[]; attributes: PbAttribute[]; links: PbCategoryLink[]; stats: PbLinkStat[];
+  category_products: { category: string; products: number }[]; suggestions_pending: number; fill: PbFillRun | null;
+}
+
+export type PbLookReason = 'same' | 'same_word' | 'word_order' | 'translation' | 'shade' | 'typo' | 'similar';
+/** A value that looks like a phrase (the look-alike guard). */
+export interface PbLookAlike {
+  value_id: string; value: string; attribute_id: string; attribute: string; via: string;
+  reason: PbLookReason; score: number; other_attribute: boolean;
+}
+
+export type PbSuggestionStatus = 'pending' | 'added' | 'aliased' | 'ignored';
+export interface PbSuggestion {
+  id: string; phrase: string; key: string; attribute_id: string | null; status: PbSuggestionStatus;
+  uses: number; examples: string[]; example_names: string[]; source: 'store' | 'ai' | 'text';
+  first_seen_at: string; last_seen_at: string; matches: PbLookAlike[];
+}
+
+export type PbValueSource = 'rules' | 'ai' | 'manual';
+export interface PbProductValue { value_id: string; source: PbValueSource }
+
+export const SOURCE_LABEL: Record<PbValueSource, string> = { rules: 'Auto', ai: 'AI', manual: 'You' };
+export const REASON_LABEL: Record<PbLookReason, string> = {
+  same: 'same word', same_word: 'same word, another form', word_order: 'same words, another order', translation: 'Hindi / English',
+  shade: 'a shade of it', typo: 'a likely typo', similar: 'spelled almost the same',
 };
-export const TAG_LIMITS = { patterns: 50, patternLen: 80, maxPerProduct: 100, minLen: 20 } as const;
 
-/** Why a tag was dropped (tagClean.ts). */
-export type PbHideReason = 'empty' | 'short' | 'pattern' | 'exact' | 'code' | 'duplicate' | 'cap';
-export interface PbHidden { tag: string; reason: PbHideReason; pattern?: string }
-
-export type PbTagAction = 'keep' | 'hide' | 'unhide' | 'merge' | 'rename' | 'kind';
-export const TAG_PAGE = 25;
+export interface PbRetagResult { dry_run: boolean; products: number; locked: number; changed: number; to_needs_info: number; to_ready: number; sample: { name: string; added: string[]; removed: string[] }[] }

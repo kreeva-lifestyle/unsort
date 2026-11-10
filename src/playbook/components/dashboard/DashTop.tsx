@@ -56,7 +56,7 @@ export default function DashTop({ d, go }: { d: DashData; go: DashGo }) {
     <>
       <Hero d={d} />
       <PbStatTile span={3} phoneHalf label="Needs info" dot={PB.review} tone={d.products.needs_info ? 'review' : undefined}
-        value={count(d.products.needs_info)} meta="Cost price or category missing" onClick={() => go('products', { status: 'needs_info' })} />
+        value={count(d.products.needs_info)} meta="Cost, category or a tag missing" onClick={() => go('products', { status: 'needs_info' })} />
       <PbStatTile span={3} phoneHalf label="Needs review" dot={PB.review} tone={d.review ? 'review' : undefined}
         value={count(d.review)} meta="Written, waiting for approval" onClick={() => go('products', { status: 'l:review' })} />
       <PbStatTile span={3} phoneHalf label="Failed" dot={PB.failed} tone={d.failed ? 'failed' : undefined}

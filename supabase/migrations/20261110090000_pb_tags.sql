@@ -1,340 +1,394 @@
--- Playbook · Tags (owner, 2026-11-10): "product tags are not getting fetched;
--- we need a unified way to tackle a lot of tags — scraping a website gives a
--- lot of them."
+-- Playbook · Tags as a controlled taxonomy (owner, 2026-11-10).
+-- Owner: "manually enter all tags and from that AI choose automatically …
+-- structure first category then attribute then attribute tags … tags will grow
+-- a lot and would be difficult to manage", "a UX where it recommends new tags
+-- and on simple click adds to our library … we don't want look-alike tags",
+-- "We will create category, attributes and attribute values from the backend
+-- called Tags", and "for each attribute of its category a tag is a must".
 --
--- Before: a product's tags lived only in attributes.store_tags (one comma
--- string copied from the other store, junk included: _altnew_KBSUIT25,
--- _label_BUY 1 GET 1 FREE, SIZE_CHART…) and reached a website only through
--- the {attr:store_tags} template. Now:
---   pb_products.tags   the product's OWN clean tag set — the one source every
---                      website builds from ({tags} in a site's templates).
---                      Built by the edge function's tag engine (tagEngine.ts)
---                      from the facts (category, fabric, colour, occasion,
---                      work, pattern), the store's tags after cleaning, the
---                      AI's extra tags and what staff typed.
---   pb_tags            the library: one row per distinct tag with its kind,
---                      hidden (never sent to any website; a tag staff hid STAYS
---                      on the products so un-hiding restores it; a tag the
---                      rules hid is listed hidden with 0 products so staff can
---                      see it and un-hide it), merged_into (alias → canonical),
---                      source, uses (how many products carry it — kept by a
---                      trigger on pb_products.tags, never by hand), reviewed_at
---                      (the review queue = never reviewed; rows the rules hid
---                      arrive reviewed so the queue holds only real decisions).
---   pb_settings 'tags' the cleaning rules (hide patterns, max per product…).
--- SQL functions (staff + service role): pb_tags_bump (library rows for new
--- names), pb_tag_merge, pb_tag_hide, pb_tag_rename, pb_tags_review (queue with
--- example products), pb_products_set_tags (bulk re-clean write),
--- pb_product_add_tags (the writer's extra tags, added in one statement so two
--- websites writing the same product never lose each other's tags).
--- Every writer takes pb_tags row locks in KEY ORDER (the trigger, pb_tags_bump),
--- so two products saved at once cannot deadlock on their shared tags.
--- Safe to re-run: every statement is "if not exists" / "or replace" and the
--- backfill touches only products whose tags are still empty.
+-- WHY this shape: a free tag library filled itself with another store's junk
+-- (_altnew_KBSUIT25, SIZE_CHART) and spellings of one thing. Now the owner
+-- builds the list by hand and Playbook only ever CHOOSES from it:
+--   pb_attributes            Colour, Work, Fabric… (one value or several; an
+--                            optional Shopify prefix for "Colour_Black" tags)
+--   pb_attribute_values      Black, Pink… with "also known as" words (aliases,
+--                            stored as normalized keys); the edge function
+--                            refuses a key or alias another value of the same
+--                            attribute already uses, and warns on look-alikes
+--   pb_category_attributes   which attributes a category uses, in order; every
+--                            linked attribute is REQUIRED for the gate below
+--   pb_product_values        a product's chosen values: 'rules' (found in its
+--                            text), 'ai' (the reader / "Let AI decide"),
+--                            'manual' (staff — never overwritten)
+--   pb_tag_suggestions       phrases seen that are not values yet (store tags,
+--                            the AI's "other", label lines), with uses and up
+--                            to 5 example products; an ignored phrase is never
+--                            suggested again
+--   pb_tag_fill_runs         "Let AI decide" progress (queued products point
+--                            at their run through pb_products.tag_fill_run)
+--   pb_products.tags         cache of the chosen value names ({tags}, filters)
+--   pb_products.missing_attrs required attributes still empty → Needs info
+--   pb_products.route_due    became Ready by a tag change: the worker routes it
+-- The ready gate (pb_products_refresh) is the SQL twin of the edge function's
+-- tagGate.ts: Ready needs a price, a category and a value for each attribute of
+-- the category. Structure writes go through the pb-products edge function
+-- (service role: look-alike checks, admin / manager only); staff read
+-- everything. Replaces the never-applied first draft of this file (free tags).
+-- Safe to re-run: every statement is "if not exists" / "or replace".
 
--- ── pb_products.tags ──────────────────────────────────────────────────────
+-- ── pb_products ──────────────────────────────────────────────────────────
 alter table public.pb_products add column if not exists tags text[] not null default '{}';
+alter table public.pb_products add column if not exists missing_attrs text[] not null default '{}';
+alter table public.pb_products add column if not exists tag_fill_run uuid;
+alter table public.pb_products add column if not exists route_due boolean not null default false;
 create index if not exists pb_products_tags_idx on public.pb_products using gin (tags);
+create index if not exists pb_products_fill_idx on public.pb_products (tag_fill_run, updated_at) where tag_fill_run is not null;
+create index if not exists pb_products_route_due_idx on public.pb_products (updated_at) where route_due;
 
--- ── pb_tags (the library) ─────────────────────────────────────────────────
-create table if not exists public.pb_tags (
+-- ── taxonomy ─────────────────────────────────────────────────────────────
+create table if not exists public.pb_attributes (
   id uuid primary key default gen_random_uuid(),
-  name text not null,                               -- display form ("Kurtas & Suits")
-  key text not null unique,                         -- lower, trimmed, single spaces
-  kind text not null default 'other' check (kind in ('collection','category','fabric','colour','occasion','style','work','size','other')),
-  hidden boolean not null default false,            -- never sent to a website; stays on the products
-  merged_into uuid references public.pb_tags(id) on delete set null,  -- alias → canonical tag
-  source text not null default 'store' check (source in ('store','ai','manual','facts')),
-  uses int not null default 0,                      -- products carrying it (trigger-owned)
-  reviewed_at timestamptz,                          -- null = still in the review queue
-  first_seen_at timestamptz not null default now(),
-  last_seen_at timestamptz not null default now(),
+  name text not null check (length(name) between 1 and 60),
+  key text not null unique check (key <> ''),
+  multi boolean not null default true,
+  position int not null default 0,
+  shopify_prefix text check (shopify_prefix is null or length(shopify_prefix) between 1 and 40),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-create index if not exists pb_tags_uses_idx on public.pb_tags (uses desc, name);
-create index if not exists pb_tags_kind_idx on public.pb_tags (kind, hidden);
-create index if not exists pb_tags_review_idx on public.pb_tags (first_seen_at desc) where reviewed_at is null;
-create index if not exists pb_tags_merged_idx on public.pb_tags (merged_into) where merged_into is not null;
--- The rows the tag engine loads on every run (tagStore.ts loadLibrary): hidden, aliases and reviewed tags.
-create index if not exists pb_tags_engine_idx on public.pb_tags (key) where hidden or merged_into is not null or reviewed_at is not null;
-drop trigger if exists pb_tags_touch on public.pb_tags;
-create trigger pb_tags_touch before update on public.pb_tags for each row execute function public.pb_touch();
+create index if not exists pb_attributes_position_idx on public.pb_attributes (position, name);
 
-alter table public.pb_tags enable row level security;
-revoke all on public.pb_tags from anon;
-drop policy if exists "pb staff read" on public.pb_tags;
-drop policy if exists "pb staff insert" on public.pb_tags;
-drop policy if exists "pb staff update" on public.pb_tags;
-drop policy if exists "pb staff delete" on public.pb_tags;
-create policy "pb staff read" on public.pb_tags for select to authenticated using ((select public.app_is_staff()));
-create policy "pb staff insert" on public.pb_tags for insert to authenticated with check ((select public.app_is_staff()));
-create policy "pb staff update" on public.pb_tags for update to authenticated using ((select public.app_is_staff())) with check ((select public.app_is_staff()));
-create policy "pb staff delete" on public.pb_tags for delete to authenticated using ((select public.app_is_staff()));
+create table if not exists public.pb_attribute_values (
+  id uuid primary key default gen_random_uuid(),
+  attribute_id uuid not null references public.pb_attributes(id) on delete cascade,
+  name text not null check (length(name) between 1 and 80),
+  key text not null check (key <> ''),
+  aliases text[] not null default '{}',
+  position int not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (attribute_id, key)
+);
+create index if not exists pb_attribute_values_attr_idx on public.pb_attribute_values (attribute_id, position, name);
+create index if not exists pb_attribute_values_alias_idx on public.pb_attribute_values using gin (aliases);
 
--- ── settings: cleaning rules (the edge function validates edits) ─────────
-insert into public.pb_settings (key, value) values
-  ('tags', '{"hide_patterns": ["^_", "^size[_ ]?chart$", "^label[_ ]", "^[a-z]{1,3}\\d{2,}$"], "hide_exact": [], "max_per_product": 25, "min_len": 2, "title_case": true, "auto_hide_codes": true}'::jsonb)
-on conflict (key) do nothing;
+create table if not exists public.pb_category_attributes (
+  category text not null check (length(category) between 1 and 60),
+  attribute_id uuid not null references public.pb_attributes(id) on delete cascade,
+  position int not null default 0,
+  created_at timestamptz not null default now(),
+  primary key (category, attribute_id)
+);
+create index if not exists pb_category_attributes_attr_idx on public.pb_category_attributes (attribute_id);
 
--- New websites start with {tags} in their templates and a 30-tag cap; existing sites keep their rules.
--- Vendor_{vendor} comes before {tags} so a big tag set never pushes the vendor tag past the cap.
+create table if not exists public.pb_product_values (
+  product_id uuid not null references public.pb_products(id) on delete cascade,
+  value_id uuid not null references public.pb_attribute_values(id) on delete cascade,
+  source text not null check (source in ('rules','ai','manual')),
+  created_at timestamptz not null default now(),
+  primary key (product_id, value_id)
+);
+create index if not exists pb_product_values_value_idx on public.pb_product_values (value_id);
+
+create table if not exists public.pb_tag_suggestions (
+  id uuid primary key default gen_random_uuid(),
+  phrase text not null check (length(phrase) between 1 and 80),
+  key text not null check (key <> ''),
+  attribute_id uuid references public.pb_attributes(id) on delete set null,
+  status text not null default 'pending' check (status in ('pending','added','aliased','ignored')),
+  uses int not null default 0,
+  examples uuid[] not null default '{}' check (cardinality(examples) <= 5),
+  source text not null default 'store' check (source in ('store','ai','text')),
+  first_seen_at timestamptz not null default now(),
+  last_seen_at timestamptz not null default now(),
+  resolved_value_id uuid references public.pb_attribute_values(id) on delete set null,
+  updated_at timestamptz not null default now()
+);
+create unique index if not exists pb_tag_suggestions_key_attr on public.pb_tag_suggestions (key, (coalesce(attribute_id, '00000000-0000-0000-0000-000000000000'::uuid)));
+create index if not exists pb_tag_suggestions_queue_idx on public.pb_tag_suggestions (status, uses desc, last_seen_at desc);
+create index if not exists pb_tag_suggestions_attr_idx on public.pb_tag_suggestions (attribute_id, status);
+
+create table if not exists public.pb_tag_fill_runs (
+  id uuid primary key default gen_random_uuid(),
+  total int not null default 0,
+  filled int not null default 0,
+  left_empty int not null default 0,
+  scope jsonb not null default '{}'::jsonb,
+  created_by uuid,
+  created_at timestamptz not null default now(),
+  finished_at timestamptz,
+  updated_at timestamptz not null default now()
+);
+create index if not exists pb_tag_fill_runs_recent_idx on public.pb_tag_fill_runs (created_at desc);
+
+do $$ declare t text; begin
+  foreach t in array array['pb_attributes','pb_attribute_values','pb_tag_suggestions','pb_tag_fill_runs'] loop
+    execute format('drop trigger if exists %I on public.%I', t || '_touch', t);
+    execute format('create trigger %I before update on public.%I for each row execute function public.pb_touch()', t || '_touch', t);
+  end loop;
+  -- Staff read; every write goes through the pb-products edge function (service role, which RLS does not stop).
+  foreach t in array array['pb_attributes','pb_attribute_values','pb_category_attributes','pb_product_values','pb_tag_suggestions','pb_tag_fill_runs'] loop
+    execute format('alter table public.%I enable row level security', t);
+    execute format('revoke all on public.%I from anon', t);
+    execute format('revoke insert, update, delete on public.%I from authenticated', t);
+    execute format('drop policy if exists "pb staff read" on public.%I', t);
+    execute format('create policy "pb staff read" on public.%I for select to authenticated using ((select public.app_is_staff()))', t);
+  end loop;
+end $$;
+
+-- ── websites: {tags} in new stores' templates; tag style + cap ───────────
 alter table public.pb_websites alter column tag_rules set default
-  '{"templates": ["{category}", "{fabric}", "{color}", "Vendor_{vendor}", "{tags}"], "static": [], "case": "as_is", "ai_extra": true, "ai_extra_max": 5, "max_tags": 30}'::jsonb;
+  '{"templates": ["{category}", "{fabric}", "{color}", "Vendor_{vendor}", "{tags}"], "static": [], "case": "as_is", "ai_extra": true, "ai_extra_max": 5, "max_tags": 30, "tag_style": "plain"}'::jsonb;
 
--- ── helpers ──────────────────────────────────────────────────────────────
--- The library key of a display name: lower, trimmed, single spaces (tagClean.ts tagKey does the same).
-create or replace function public.pb_tag_key(p_name text) returns text
-language sql immutable strict set search_path = public as $$
-  select lower(trim(regexp_replace(p_name, '\s+', ' ', 'g')));
-$$;
 
--- Replace one tag by another in a product's tag array (matched by key), keeping order and dropping repeats.
-create or replace function public.pb_tags_replace(p_tags text[], p_from text, p_to text) returns text[]
-language plpgsql immutable set search_path = public as $$
-declare t text; out_tags text[] := '{}'; seen text[] := '{}'; k text; v text;
-begin
-  foreach t in array coalesce(p_tags, '{}') loop
-    v := case when pb_tag_key(t) = pb_tag_key(p_from) then p_to else t end;
-    k := pb_tag_key(v);
-    if k is null or k = '' or k = any(seen) then continue; end if;
-    seen := seen || k; out_tags := out_tags || v;
-  end loop;
-  return out_tags;
-end $$;
-
--- ── library rows for names (first spelling kept; counts are the trigger's) ─
--- p_hidden = true: rows for tags the RULES hid (so staff can see and un-hide them); they arrive
--- reviewed, so the queue stays for real decisions. An existing row only gets last_seen_at.
-drop function if exists public.pb_tags_bump(text[], text);
-create or replace function public.pb_tags_bump(p_names text[], p_source text default 'store', p_hidden boolean default false) returns int
-language plpgsql security invoker set search_path = public as $$
-declare n int := 0; t text; k text;
-begin
-  if p_source not in ('store','ai','manual','facts') then p_source := 'store'; end if;
-  -- key order: every writer locks pb_tags rows in the same order (no deadlocks)
-  foreach t in array (select coalesce(array_agg(x order by pb_tag_key(x)), '{}') from unnest(coalesce(p_names, '{}')) x) loop
-    t := trim(regexp_replace(t, '\s+', ' ', 'g')); k := pb_tag_key(t);
-    if k = '' or length(t) > 255 then continue; end if;
-    insert into pb_tags (name, key, source, hidden, reviewed_at) values (t, k, p_source, p_hidden, case when p_hidden then now() end)
-      on conflict (key) do update set last_seen_at = now();
-    n := n + 1;
-  end loop;
-  return n;
-end $$;
-
--- uses = products carrying the tag. One trigger owns it (CLAUDE.md: let triggers own derived fields):
--- added keys +1 (a missing library row is created as 'manual'), removed keys −1. Rows are touched
--- one at a time in key order (see pb_tags_bump). SECURITY INVOKER: every writer of pb_products is
--- staff (RLS lets staff insert / update pb_tags) or the service role.
-create or replace function public.pb_products_tags_count() returns trigger
-language plpgsql security invoker set search_path = public as $$
-declare old_keys text[] := '{}'; new_keys text[] := '{}'; t text; k text;
-begin
-  -- pb_tag_rename rewrites the same tag under a new name: the counts do not move
-  if current_setting('pb.skip_tag_count', true) = '1' then return null; end if;
-  if tg_op <> 'INSERT' then select coalesce(array_agg(distinct pb_tag_key(x)), '{}') into old_keys from unnest(old.tags) x; end if;
-  if tg_op <> 'DELETE' then
-    foreach t in array (select coalesce(array_agg(x order by pb_tag_key(x)), '{}') from unnest(coalesce(new.tags, '{}')) x) loop
-      k := pb_tag_key(t);
-      if k = '' or k = any(new_keys) then continue; end if;
-      new_keys := new_keys || k;
-      if not (k = any(old_keys)) then
-        insert into pb_tags (name, key, source) values (trim(regexp_replace(t, '\s+', ' ', 'g')), k, 'manual')
-          on conflict (key) do update set last_seen_at = now();
-      end if;
-    end loop;
-  end if;
-  for k in select x from unnest(new_keys) x except select x from unnest(old_keys) x order by 1 loop
-    update pb_tags set uses = uses + 1 where key = k;
-  end loop;
-  for k in select x from unnest(old_keys) x except select x from unnest(new_keys) x order by 1 loop
-    update pb_tags set uses = greatest(0, uses - 1) where key = k;
-  end loop;
-  return null;
-end $$;
-drop trigger if exists pb_products_tags_count on public.pb_products;
-create trigger pb_products_tags_count after insert or update of tags or delete on public.pb_products
-  for each row execute function public.pb_products_tags_count();
-
--- ── staff actions on the library ─────────────────────────────────────────
--- Merge: p_from becomes an alias of p_into (and so does anything already merged into p_from);
--- every product's tags are rewritten from the alias to the canonical name (uses follow via the trigger).
-create or replace function public.pb_tag_merge(p_from uuid, p_into uuid) returns int
-language plpgsql security invoker set search_path = public as $$
-declare f pb_tags; i pb_tags; n int;
-begin
-  select * into f from pb_tags where id = p_from;
-  select * into i from pb_tags where id = p_into;
-  if f.id is null or i.id is null then raise exception 'That tag no longer exists.'; end if;
-  -- the target must be canonical: follow one alias hop, never a loop
-  if i.merged_into is not null then select * into i from pb_tags where id = i.merged_into; end if;
-  if i.id = f.id or i.merged_into is not null then raise exception 'Those tags cannot be merged into each other.'; end if;
-  update pb_tags set merged_into = i.id, reviewed_at = coalesce(reviewed_at, now()) where id = f.id or merged_into = f.id;
-  update pb_products set tags = pb_tags_replace(tags, f.name, i.name) where tags && array[f.name] or exists (select 1 from unnest(tags) x where pb_tag_key(x) = f.key);
-  get diagnostics n = row_count;
-  return n;
-end $$;
-
--- Hide / un-hide: a hidden tag is left out of every website's tags but stays on the products.
-create or replace function public.pb_tag_hide(p_id uuid, p_hidden boolean) returns void
+-- ── the ready gate + the tags cache (tagGate.ts is the edge twin) ────────
+-- For each product: missing_attrs = the category's attributes with no value
+-- (in the category's order), tags = the chosen value names (taxonomy order),
+-- and Ready ↔ Needs info: Ready needs a price (cost or a copied selling price),
+-- a category and nothing missing. new / reading / archived never move, and a
+-- Needs-info product that was never read (held while its photos upload from
+-- the app) is not made Ready. route_due marks one that just became Ready (the
+-- worker routes it). Rows are written only when something changed (no
+-- updated_at churn); every product asked about is returned.
+create index if not exists pb_products_category_lower_idx on public.pb_products (lower(category), status);
+create or replace function public.pb_products_refresh(p_ids uuid[])
+returns table (id uuid, status text, was text, missing text[])
 language sql security invoker set search_path = public as $$
-  update pb_tags set hidden = p_hidden, reviewed_at = coalesce(reviewed_at, now()) where id = p_id;
+  with cur as (
+    select p.id, p.status as was, p.category, p.cost_price, p.sell_price, p.ai_read_at, p.ai_error, p.missing_attrs, p.tags, p.route_due
+    from pb_products p where p.id = any(coalesce(p_ids, '{}')) for update
+  ), calc as (
+    select c.*,
+      coalesce((select array_agg(a.name order by ca.position, a.position, a.name)
+        from pb_category_attributes ca join pb_attributes a on a.id = ca.attribute_id
+        where lower(ca.category) = lower(c.category)
+          and not exists (select 1 from pb_product_values pv join pb_attribute_values v on v.id = pv.value_id
+                          where pv.product_id = c.id and v.attribute_id = a.id)), '{}') as miss,
+      coalesce((select array_agg(v.name order by a.position, a.name, v.position, v.name)
+        from pb_product_values pv join pb_attribute_values v on v.id = pv.value_id join pb_attributes a on a.id = v.attribute_id
+        where pv.product_id = c.id), '{}') as names
+    from cur c
+  ), gate as (
+    select calc.*, case
+      when calc.was not in ('ready', 'needs_info') then calc.was
+      when not ((calc.cost_price is not null or calc.sell_price is not null) and coalesce(trim(calc.category), '') <> '' and cardinality(calc.miss) = 0) then 'needs_info'
+      when calc.was = 'needs_info' and calc.ai_read_at is null and calc.ai_error is null then 'needs_info'
+      else 'ready' end as next
+    from calc
+  ), upd as (
+    update pb_products p set missing_attrs = g.miss, tags = g.names, status = g.next,
+      route_due = case when g.next = 'ready' and g.was = 'needs_info' then true when g.next <> 'ready' then false else g.route_due end
+    from gate g
+    where p.id = g.id and (g.missing_attrs is distinct from g.miss or g.tags is distinct from g.names or g.was is distinct from g.next)
+    returning p.id
+  )
+  select g.id, g.next, g.was, g.miss from gate g;
 $$;
 
--- Rename: new display name + key (must stay unique: merge instead when a real tag has it; an alias
--- row that holds the key is dropped, since the renamed tag takes its place); products are rewritten.
-create or replace function public.pb_tag_rename(p_id uuid, p_name text) returns int
+-- ── a product's values in one transaction ────────────────────────────────
+-- p_rows = [{"value_id": uuid, "source": "rules"|"ai"}]. Modes:
+--   auto    the rules / AI rows are replaced; an attribute holding a 'manual'
+--           value is left alone (reader, retag, ingest)
+--   manual  staff's choice: the rows of p_attributes (or all) are replaced, as
+--           'manual' (product_values_set)
+--   add     only attributes with no value at all get the rows ("Let AI decide")
+-- Unknown value ids are skipped. Returns the product after the gate.
+create or replace function public.pb_product_values_set(p_product uuid, p_rows jsonb, p_mode text default 'auto', p_attributes uuid[] default null)
+returns table (id uuid, status text, was text, missing text[])
 language plpgsql security invoker set search_path = public as $$
-declare r pb_tags; nm text; k text; n int;
+#variable_conflict use_column
 begin
-  nm := trim(regexp_replace(coalesce(p_name, ''), '\s+', ' ', 'g')); k := pb_tag_key(nm);
-  if k = '' or length(nm) > 255 then raise exception 'Give the tag a name.'; end if;
-  select * into r from pb_tags where id = p_id;
-  if r.id is null then raise exception 'That tag no longer exists.'; end if;
-  if exists (select 1 from pb_tags where key = k and id <> p_id and merged_into is null) then raise exception 'A tag with that name already exists — merge into it instead.'; end if;
-  delete from pb_tags where key = k and id <> p_id and merged_into is not null;
-  update pb_tags set name = nm, key = k, reviewed_at = coalesce(reviewed_at, now()) where id = p_id;
-  -- the same products keep the same tag under its new name: the counting trigger must not move uses
-  perform set_config('pb.skip_tag_count', '1', true);
-  update pb_products set tags = pb_tags_replace(tags, r.name, nm) where exists (select 1 from unnest(tags) x where pb_tag_key(x) = r.key);
-  get diagnostics n = row_count;
-  perform set_config('pb.skip_tag_count', '', true);
-  return n;
+  if p_mode not in ('auto', 'manual', 'add') then raise exception 'Unknown way to save values.'; end if;
+  perform 1 from pb_products p where p.id = p_product for update;
+  if not found then raise exception 'That product no longer exists.'; end if;
+  if p_mode in ('auto', 'manual') then
+    delete from pb_product_values pv using pb_attribute_values v
+    where pv.product_id = p_product and v.id = pv.value_id and (p_mode = 'manual' or pv.source <> 'manual')
+      and (p_attributes is null or v.attribute_id = any(p_attributes));
+  end if;
+  insert into pb_product_values (product_id, value_id, source)
+  select p_product, v.id, case when p_mode = 'manual' then 'manual' else r.src end
+  from (select (x->>'value_id') vid, coalesce(nullif(x->>'source', ''), 'rules') src from jsonb_array_elements(coalesce(p_rows, '[]'::jsonb)) x) r
+  join pb_attribute_values v on v.id::text = r.vid
+  where (p_mode = 'manual' or r.src in ('rules', 'ai'))
+    and (p_mode = 'manual' or not exists (
+      select 1 from pb_product_values x join pb_attribute_values xv on xv.id = x.value_id
+      where x.product_id = p_product and xv.attribute_id = v.attribute_id and (x.source = 'manual' or p_mode = 'add')))
+  on conflict on constraint pb_product_values_pkey do nothing;
+  return query select * from pb_products_refresh(array[p_product]);
 end $$;
 
--- The review queue: never reviewed, or first seen in the last p_days days; canonical tags only;
--- with up to 3 example product names each.
-create or replace function public.pb_tags_review(p_days int default 30, p_limit int default 200)
-returns table (id uuid, name text, key text, kind text, hidden boolean, source text, uses int, reviewed_at timestamptz, first_seen_at timestamptz, examples text[])
+-- Retag in batches: p_rows = [{"product_id": uuid, "rows": [...]}, …] in 'auto' mode; gone products skipped.
+create or replace function public.pb_product_values_bulk(p_rows jsonb)
+returns table (id uuid, status text, was text, missing text[])
+language plpgsql security invoker set search_path = public as $$
+#variable_conflict use_column
+declare x jsonb;
+begin
+  for x in select e from jsonb_array_elements(coalesce(p_rows, '[]'::jsonb)) e order by e->>'product_id' loop
+    if exists (select 1 from pb_products p where p.id::text = x->>'product_id') then
+      return query select * from pb_product_values_set((x->>'product_id')::uuid, x->'rows', 'auto', null);
+    end if;
+  end loop;
+end $$;
+
+-- ── structure changes that move products ────────────────────────────────
+-- Products in a category that lack a value of an attribute (the "12 products will need a Colour" warning).
+create or replace function public.pb_category_lacking(p_category text, p_attribute uuid) returns int
 language sql security invoker stable set search_path = public as $$
-  select t.id, t.name, t.key, t.kind, t.hidden, t.source, t.uses, t.reviewed_at, t.first_seen_at,
-    coalesce((select array_agg(x.nm) from (select coalesce(p.name, p.sku, 'Untitled') nm from pb_products p
-      where p.tags && array[t.name] and p.status <> 'archived' order by p.created_at desc limit 3) x), '{}')
-  from pb_tags t
-  where t.merged_into is null and (t.reviewed_at is null or t.first_seen_at > now() - make_interval(days => greatest(1, p_days)))
-  order by t.reviewed_at nulls first, t.uses desc, t.name
-  limit greatest(1, least(p_limit, 1000));
+  select count(*)::int from pb_products p
+  where lower(p.category) = lower(p_category) and p.status <> 'archived'
+    and not exists (select 1 from pb_product_values pv join pb_attribute_values v on v.id = pv.value_id
+                    where pv.product_id = p.id and v.attribute_id = p_attribute);
 $$;
 
--- Bulk tag write for the re-clean: p_rows = [{"id": uuid, "tags": [..]}, …]; only existing products change.
-create or replace function public.pb_products_set_tags(p_rows jsonb) returns int
+-- Per link: products in the category and how many lack the attribute; per category: products.
+create or replace function public.pb_tag_link_stats()
+returns table (category text, attribute_id uuid, products int, lacking int)
+language sql security invoker stable set search_path = public as $$
+  select ca.category, ca.attribute_id, count(p.id)::int,
+    count(p.id) filter (where not exists (select 1 from pb_product_values pv join pb_attribute_values v on v.id = pv.value_id
+                                          where pv.product_id = p.id and v.attribute_id = ca.attribute_id))::int
+  from pb_category_attributes ca
+  left join pb_products p on lower(p.category) = lower(ca.category) and p.status <> 'archived'
+  group by ca.category, ca.attribute_id;
+$$;
+-- How many products carry each value (the Tags page chips).
+create or replace function public.pb_tag_value_uses()
+returns table (value_id uuid, n int)
+language sql security invoker stable set search_path = public as $$
+  select pv.value_id, count(*)::int from pb_product_values pv group by pv.value_id;
+$$;
+create or replace function public.pb_tag_category_counts()
+returns table (category text, products int)
+language sql security invoker stable set search_path = public as $$
+  select p.category, count(*)::int from pb_products p where p.status <> 'archived' and coalesce(p.category, '') <> '' group by p.category;
+$$;
+
+-- A category's attributes, replaced in the given order; its products re-gated.
+create or replace function public.pb_category_links_set(p_category text, p_attribute_ids uuid[])
+returns table (to_needs_info int, to_ready int)
 language plpgsql security invoker set search_path = public as $$
-declare n int;
 begin
-  update pb_products p set tags = r.tags
-  from (select (x->>'id')::uuid id, coalesce(array(select e from jsonb_array_elements_text(x->'tags') e where e is not null), '{}') tags
-        from jsonb_array_elements(coalesce(p_rows, '[]'::jsonb)) x) r
-  where p.id = r.id and p.tags is distinct from r.tags;
-  get diagnostics n = row_count;
+  if coalesce(trim(p_category), '') = '' then raise exception 'Pick a category.'; end if;
+  delete from pb_category_attributes ca where lower(ca.category) = lower(p_category);
+  insert into pb_category_attributes (category, attribute_id, position)
+  select trim(p_category), a.id, u.ord::int from unnest(coalesce(p_attribute_ids, '{}')) with ordinality u(aid, ord)
+  join pb_attributes a on a.id = u.aid
+  on conflict (category, attribute_id) do nothing;
+  return query
+    select (count(*) filter (where r.was = 'ready' and r.status = 'needs_info'))::int, (count(*) filter (where r.was = 'needs_info' and r.status = 'ready'))::int
+    from pb_products_refresh(array(select p.id from pb_products p where lower(p.category) = lower(p_category) and p.status <> 'archived')) r;
+end $$;
+
+-- Categories removed from the list (Tags page) lose their links; their products are re-gated.
+create or replace function public.pb_categories_prune(p_keep text[]) returns int
+language plpgsql security invoker set search_path = public as $$
+declare gone text[]; n int;
+begin
+  select coalesce(array_agg(distinct lower(ca.category)), '{}') into gone from pb_category_attributes ca
+  where not (lower(ca.category) = any(array(select lower(k) from unnest(coalesce(p_keep, '{}')) k)));
+  delete from pb_category_attributes ca where lower(ca.category) = any(gone);
+  select count(*) into n from pb_products_refresh(array(select p.id from pb_products p where lower(p.category) = any(gone) and p.status <> 'archived'));
   return n;
 end $$;
 
--- The writer's extra tags (generate.ts): added to the product's tags in ONE statement, so two websites
--- writing the same product at once, or staff saving tags meanwhile, never overwrite each other. The
--- tags already there always stay; new ones fill the room up to p_max. Null = not added (the product is
--- being read, its 'tags' are locked, or it no longer exists).
-create or replace function public.pb_product_add_tags(p_id uuid, p_names text[], p_max int default 25) returns text[]
+-- Delete an attribute (its values, links and product values cascade); the products it touched are re-gated.
+create or replace function public.pb_attribute_delete(p_id uuid) returns int
 language plpgsql security invoker set search_path = public as $$
-declare cur text[]; out_tags text[] := '{}'; seen text[] := '{}'; t text; k text;
+declare ids uuid[]; n int;
 begin
-  select tags into cur from pb_products where id = p_id and status <> 'reading' and not ('tags' = any(locked)) for update;
-  if not found then return null; end if;
-  foreach t in array coalesce(cur, '{}') loop
-    k := pb_tag_key(t);
-    if k = '' or k = any(seen) then continue; end if;
-    seen := seen || k; out_tags := out_tags || t;
-  end loop;
-  foreach t in array coalesce(p_names, '{}') loop
-    t := trim(regexp_replace(t, '\s+', ' ', 'g')); k := pb_tag_key(t);
-    if k = '' or length(t) > 255 or k = any(seen) then continue; end if;
-    if coalesce(array_length(out_tags, 1), 0) >= greatest(1, p_max) then exit; end if;
-    seen := seen || k; out_tags := out_tags || t;
-  end loop;
-  if out_tags is distinct from cur then update pb_products set tags = out_tags where id = p_id; end if;
-  return out_tags;
+  select array(select p.id from pb_products p where p.status <> 'archived' and (
+      exists (select 1 from pb_category_attributes ca where ca.attribute_id = p_id and lower(ca.category) = lower(p.category))
+      or exists (select 1 from pb_product_values pv join pb_attribute_values v on v.id = pv.value_id where pv.product_id = p.id and v.attribute_id = p_id)))
+    into ids;
+  delete from pb_attributes where pb_attributes.id = p_id;
+  if not found then raise exception 'That attribute no longer exists.'; end if;
+  select count(*) into n from pb_products_refresh(ids);
+  return n;
 end $$;
+
+create or replace function public.pb_value_delete(p_id uuid) returns int
+language plpgsql security invoker set search_path = public as $$
+declare ids uuid[]; n int;
+begin
+  select array(select pv.product_id from pb_product_values pv where pv.value_id = p_id) into ids;
+  delete from pb_attribute_values where pb_attribute_values.id = p_id;
+  if not found then raise exception 'That value no longer exists.'; end if;
+  select count(*) into n from pb_products_refresh(ids);
+  return n;
+end $$;
+
+-- Merge p_from into p_into (same attribute): products move over (a 'manual' choice stays manual),
+-- p_from's name and "also known as" words become p_into's, p_from is deleted. Returns products moved.
+create or replace function public.pb_value_merge(p_from uuid, p_into uuid) returns int
+language plpgsql security invoker set search_path = public as $$
+declare f pb_attribute_values; i pb_attribute_values; ids uuid[];
+begin
+  select * into f from pb_attribute_values where pb_attribute_values.id = p_from for update;
+  select * into i from pb_attribute_values where pb_attribute_values.id = p_into for update;
+  if f.id is null or i.id is null then raise exception 'That value no longer exists.'; end if;
+  if f.id = i.id then raise exception 'Pick another value to merge into.'; end if;
+  if f.attribute_id <> i.attribute_id then raise exception 'Values can only be merged within one attribute.'; end if;
+  select array(select pv.product_id from pb_product_values pv where pv.value_id = f.id) into ids;
+  insert into pb_product_values (product_id, value_id, source)
+    select pv.product_id, i.id, pv.source from pb_product_values pv where pv.value_id = f.id
+    on conflict on constraint pb_product_values_pkey do update set source = case when excluded.source = 'manual' then 'manual' else pb_product_values.source end;
+  update pb_attribute_values set aliases = array(select distinct x from unnest(i.aliases || f.key || f.aliases) x where x <> i.key and x <> '' order by 1)
+    where pb_attribute_values.id = i.id;
+  update pb_tag_suggestions set resolved_value_id = i.id where resolved_value_id = f.id;
+  delete from pb_attribute_values where pb_attribute_values.id = f.id;
+  perform 1 from pb_products_refresh(ids);
+  return coalesce(cardinality(ids), 0);
+end $$;
+
+-- ── suggestions ──────────────────────────────────────────────────────────
+-- p_rows = [{"phrase", "key", "attribute_id"?, "source", "product_id"?}]. A key staff ignored (under any
+-- attribute) is skipped; a pending one gets uses + 1 for a product not yet counted in its examples (≤ 5
+-- examples kept) and last_seen_at; added / aliased ones are left as they are. Returns rows written.
+create or replace function public.pb_tag_suggest(p_rows jsonb) returns int
+language plpgsql security invoker set search_path = public as $$
+declare r jsonb; k text; a uuid; pid uuid; src text; n int := 0;
+begin
+  for r in select x from jsonb_array_elements(coalesce(p_rows, '[]'::jsonb)) x order by x->>'key', x->>'attribute_id' loop
+    k := nullif(trim(r->>'key'), '');
+    if k is null or length(k) > 80 then continue; end if;
+    if exists (select 1 from pb_tag_suggestions s where s.key = k and s.status = 'ignored') then continue; end if;
+    select at.id into a from pb_attributes at where at.id::text = r->>'attribute_id';
+    select p.id into pid from pb_products p where p.id::text = r->>'product_id';
+    src := case when r->>'source' in ('store', 'ai', 'text') then r->>'source' else 'store' end;
+    insert into pb_tag_suggestions (phrase, key, attribute_id, uses, examples, source)
+    values (left(coalesce(nullif(trim(r->>'phrase'), ''), k), 80), k, a, 1, case when pid is null then '{}' else array[pid] end, src)
+    on conflict (key, (coalesce(attribute_id, '00000000-0000-0000-0000-000000000000'::uuid))) do update set
+      uses = pb_tag_suggestions.uses + case when pid is null or pid = any(pb_tag_suggestions.examples) then 0 else 1 end,
+      examples = case when pid is null or pid = any(pb_tag_suggestions.examples) or cardinality(pb_tag_suggestions.examples) >= 5
+                      then pb_tag_suggestions.examples else pb_tag_suggestions.examples || pid end,
+      last_seen_at = now()
+    where pb_tag_suggestions.status = 'pending';
+    n := n + 1;
+    a := null; pid := null;
+  end loop;
+  return n;
+end $$;
+
+-- ── "Let AI decide" progress: one product done ───────────────────────────
+create or replace function public.pb_tag_fill_tick(p_run uuid, p_filled int, p_left int) returns void
+language sql security invoker set search_path = public as $$
+  update pb_tag_fill_runs r set filled = r.filled + greatest(0, p_filled), left_empty = r.left_empty + greatest(0, p_left),
+    finished_at = case when exists (select 1 from pb_products p where p.tag_fill_run = p_run) then null else coalesce(r.finished_at, now()) end
+  where r.id = p_run;
+$$;
 
 do $$ declare f text; begin
   foreach f in array array[
-    'pb_tag_key(text)', 'pb_tags_replace(text[], text, text)', 'pb_tags_bump(text[], text, boolean)', 'pb_tag_merge(uuid, uuid)',
-    'pb_tag_hide(uuid, boolean)', 'pb_tag_rename(uuid, text)', 'pb_tags_review(int, int)', 'pb_products_set_tags(jsonb)',
-    'pb_product_add_tags(uuid, text[], int)'
+    'pb_product_values_set(uuid, jsonb, text, uuid[])', 'pb_product_values_bulk(jsonb)', 'pb_category_lacking(text, uuid)',
+    'pb_tag_link_stats()', 'pb_tag_value_uses()', 'pb_tag_category_counts()', 'pb_category_links_set(text, uuid[])', 'pb_categories_prune(text[])',
+    'pb_attribute_delete(uuid)', 'pb_value_delete(uuid)', 'pb_value_merge(uuid, uuid)', 'pb_tag_suggest(jsonb)', 'pb_tag_fill_tick(uuid, int, int)'
   ] loop
-    execute format('revoke all on function public.%s from public, anon', f);
-    execute format('grant execute on function public.%s to authenticated, service_role', f);
+    execute format('revoke all on function public.%s from public, anon, authenticated', f);
+    execute format('grant execute on function public.%s to service_role', f);
   end loop;
-  -- The counting trigger fires inside every staff write of pb_products.tags, so the
-  -- writer keeps EXECUTE (a trigger function cannot be called directly anyway).
-  revoke all on function public.pb_products_tags_count() from public, anon;
-  grant execute on function public.pb_products_tags_count() to authenticated, service_role;
+  -- The product page re-applies the gate after a facts save (ProductFacts.tsx): staff may run it (RLS applies).
+  revoke all on function public.pb_products_refresh(uuid[]) from public, anon;
+  grant execute on function public.pb_products_refresh(uuid[]) to authenticated, service_role;
 end $$;
-
--- ── BACKFILL (one-off, safe to re-run: only products with no tags yet and 'tags' not locked) ──
--- Mirrors tagEngine.ts for the products that exist today: facts (category, fabric, colour,
--- occasion, work, pattern — each split on commas, short pieces only), then the store's tags,
--- cleaned with the DEFAULT rules (hide patterns, min length 2, codes: '_' prefix, letters+digits
--- without a vowel, letters then a number like KBSUIT25, > 60 % digits; sizes like XL / 3XL are
--- words), title-cased when all lower / all upper (short all-caps words such as XL, UK, USA stay),
--- deduped by key, at most 25. Library rows are made first with the right source (facts, then
--- store, then the store tags the rules hid as hidden + reviewed); the trigger then only counts.
-create or replace function pg_temp.pb_tag_title(s text) returns text language plpgsql immutable as $$
--- tagClean.ts titleCase: every word lower-cased with its first letter (and the one after - _ /) upper;
--- in an all-upper tag a word of 1–2 letters, a word with a digit, a size (XXL) or a 3-letter tag on its own stays.
-declare words text[] := string_to_array(s, ' '); up boolean := s = upper(s); w text; r text; c text; prev text; i int; out_w text[] := '{}';
-begin
-  foreach w in array words loop
-    if up and (w ~ '^[A-Z]{1,2}$' or w ~ '\d' or w ~ '^X{0,4}[SML]$' or (array_length(words, 1) = 1 and w ~ '^[A-Z]{1,3}$')) then
-      out_w := out_w || w; continue;
-    end if;
-    r := ''; prev := '';
-    for i in 1..length(w) loop
-      c := substr(w, i, 1);
-      r := r || case when i = 1 or prev in ('-', '_', '/') then upper(c) else lower(c) end;
-      prev := c;
-    end loop;
-    out_w := out_w || r;
-  end loop;
-  return array_to_string(out_w, ' ');
-end $$;
-create or replace function pg_temp.pb_tag_norm(s text) returns text language sql immutable as $$
-  -- tagClean.ts normalizeTag: commas → spaces, single spaces, surrounding quotes / # off, Title Case when all lower or all upper
-  select case when x = lower(x) or x = upper(x) then pg_temp.pb_tag_title(x) else x end
-  from (select trim(both '"''#' from trim(regexp_replace(regexp_replace(coalesce(s, ''), ',', ' ', 'g'), '\s+', ' ', 'g')))) v(x);
-$$;
-create or replace function pg_temp.pb_tag_keep(s text) returns boolean language sql immutable as $$
-  select s is not null and length(s) >= 2 and length(s) <= 255
-    and s !~ '^_' and s !~* '^size[_ ]?chart$' and s !~* '^label[_ ]' and s !~* '^[a-z]{1,3}\d{2,}$'
-    and (s ~* '^\d?x{0,4}[sml]$' or (
-      s !~* '^[a-z]+\d{2,}$' and not (s ~* '^[a-z0-9_-]+$' and s ~ '\d' and s !~* '[aeiou]')
-      and not (length(regexp_replace(s, '\D', '', 'g'))::numeric / length(s) > 0.6)));
-$$;
-drop table if exists pb_tag_fill;
-create temp table pb_tag_fill as
-with cand as (
-  select p.id, c.ord, pg_temp.pb_tag_norm(c.raw) tag, c.src
-  from pb_products p
-  cross join lateral (
-    select u.i ord, u.v raw, 'facts' src
-      from unnest(string_to_array(concat_ws(',', p.category, p.fabric, p.color, p.attributes->>'occasion', p.attributes->>'work', p.attributes->>'pattern'), ',')) with ordinality u(v, i)
-    union all
-    select 100 + u.i, u.st, 'store' from unnest(string_to_array(coalesce(p.attributes->>'store_tags', ''), ',')) with ordinality u(st, i)
-  ) c
-  where p.tags = '{}' and not ('tags' = any(p.locked)) and c.raw is not null and trim(c.raw) <> ''
-    and (c.src = 'store' or (length(trim(c.raw)) <= 40 and array_length(regexp_split_to_array(trim(c.raw), '\s+'), 1) <= 4))
-), dedup as (
-  select id, ord, tag, src, pg_temp.pb_tag_keep(tag) keep, row_number() over (partition by id, pb_tag_key(tag) order by ord) dup from cand where tag <> ''
-), ranked as (
-  select id, tag, src, keep, row_number() over (partition by id order by ord) n from dedup where dup = 1 and keep
-)
-select id, tag, src, keep, n from ranked where n <= 25
-union all
-select id, tag, src, keep, null from dedup where dup = 1 and not keep and src = 'store' and length(tag) >= 2 and length(tag) <= 255;
--- library rows in source order, then the junk the rules hid (hidden, reviewed), then the products
-select pb_tags_bump(array_agg(tag), 'facts') from pb_tag_fill where keep and src = 'facts';
-select pb_tags_bump(array_agg(tag), 'store') from pb_tag_fill where keep and src = 'store';
-select pb_tags_bump(array_agg(tag), 'store', true) from pb_tag_fill where not keep;
-update pb_products p set tags = r.tags
-from (select id, array_agg(tag order by n) tags from pb_tag_fill where keep group by id) r
-where p.id = r.id;
-drop table pb_tag_fill;

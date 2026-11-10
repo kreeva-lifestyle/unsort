@@ -2,13 +2,15 @@
 // fills the facts (name, sku, category, fabric, color, sizes, cost_price,
 // attributes). Only fields that are empty AND not locked are filled (a manual
 // "Read again" refreshes every field that is not locked). Then: cost or
-// category missing → needs_info; else ready → route (step 2). A product with
+// category missing → needs_info; else ready → route (step 2) — unless the tag
+// gate (below) finds a required attribute empty. A product with
 // sell_price (import from website: the other store's price is our selling
 // price) needs no cost: the AI's cost_price is ignored for it, because the
 // only price in its text is that selling price, not a cost.
-// After the merge the product's own tags are rebuilt from the new facts
-// (tagStore.ts nextTags: category, fabric, colour, occasion / work / pattern +
-// the store's cleaned tags) unless staff locked 'tags'.
+// Tags (tagRead.ts): the same call chooses the attribute values from the
+// owner's taxonomy; after the facts are saved, the rules + those choices are
+// written (unless staff locked 'tags') and the gate runs: a category
+// attribute with no value → needs_info ("Missing: Colour").
 // Imported attributes (IMPORT_ATTRS: brand, store_tags, seo_title…) are the
 // store's own facts: an imported product keeps them as they are — the AI's
 // attributes are added beside them, never in their place, even on "Read again".
@@ -28,7 +30,9 @@ import { readerPrompt, readerSchema, type ReadOut } from './readerPrompt.ts';
 import { routeProduct } from './route.ts';
 import { stripLess } from '../pb-telegram/group.ts';
 import { mergeReadAttrs } from './import/meta.ts';
-import { nextTags, tagCtx } from './tagStore.ts';
+import { tagAfterRead } from './tagRead.ts';
+import { refresh } from './tagStore.ts';
+import { loadTaxonomy, readerSpec } from './taxonomy.ts';
 import { MAX_ATTEMPTS, PRODUCT_COLS, STALE_MS, hasPrice, type Budget, type ProductRow } from './types.ts';
 
 /** Products the worker may read: new (not in a retry wait) or a stuck 'reading'. */
@@ -83,6 +87,8 @@ export async function readOne(p: ProductRow, o: { manual: boolean; prevStatus?: 
   let product: ProductRow;
   try {
     const s = await getSettings();
+    const tax = await loadTaxonomy(s.categories);
+    const spec = readerSpec(tax);
     const [vendor, imgs] = await Promise.all([
       p.vendor_id ? one<{ name: string }>(`pb_vendors?id=eq.${enc(p.vendor_id)}&select=name`) : Promise.resolve(null),
       sel<{ path: string }>(`pb_product_images?product_id=eq.${enc(p.id)}&kind=eq.image&select=path&order=position.asc&limit=2`),
@@ -90,21 +96,18 @@ export async function readOne(p: ProductRow, o: { manual: boolean; prevStatus?: 
     const photos = await aiPhotos(imgs.map(i => i.path));
     const ai = await askClaude<ReadOut>({
       model: s.reader.model, effort: s.reader.effort,
-      system: readerPrompt(s.categories, p.source === 'import'),
+      system: readerPrompt(s.categories, p.source === 'import', spec),
       content: [...photos.blocks, { type: 'text', text: factsText(p, vendor?.name ?? '') }],
-      schema: readerSchema(s.categories), maxTokens: 8000, timeoutMs: o.budget.hard - Date.now(),
+      schema: readerSchema(s.categories, spec), maxTokens: 8000, timeoutMs: o.budget.hard - Date.now(),
     });
     const set = merge(p, ai.data, s.categories, o.manual);
     const next = { ...p, ...set } as ProductRow;
-    // The product's own tags from the facts just read (+ its store tags); a locked 'tags' is left alone.
-    const tags = await nextTags(next, await tagCtx(s));
-    if (tags) { set.tags = tags; next.tags = tags; }
     const status = !hasPrice(next) || !String(next.category || '').trim() ? 'needs_info' : 'ready';
     const saved = await patch<ProductRow>('pb_products', `id=eq.${enc(p.id)}&status=eq.reading`,
       { ...set, status, ai_read_at: nowIso(), ai_error: null, claimed_at: null }, PRODUCT_COLS);
     if (!saved[0]) throw new HttpError(409, 'The product changed while it was being read — open it again.');
-    await logActivity({ product_id: p.id, action: 'read', details: { model: ai.model, effort: ai.effort, usd: ai.usd, status, filled: Object.keys(set), ...(photos.sent.length < imgs.length ? { photos_skipped: imgs.length - photos.sent.length } : {}) }, user_id: o.userId });
-    product = saved[0];
+    product = await tagAfterRead(saved[0], tax, spec, ai.data, o.userId);
+    await logActivity({ product_id: p.id, action: 'read', details: { model: ai.model, effort: ai.effort, usd: ai.usd, status: product.status, filled: Object.keys(set), ...(product.missing_attrs?.length ? { missing: product.missing_attrs } : {}), ...(photos.sent.length < imgs.length ? { photos_skipped: imgs.length - photos.sent.length } : {}) }, user_id: o.userId });
   } catch (e) {
     const msg = plain(e);
     await logActivity({ product_id: p.id, action: 'failed', details: { step: 'read', error: msg }, user_id: o.userId });
@@ -117,7 +120,8 @@ export async function readOne(p: ProductRow, o: { manual: boolean; prevStatus?: 
     const complete = hasPrice(p) && !!String(p.category || '').trim();
     if (giveUp && complete) { // staff already gave what websites need: ready anyway, the error stays as a note
       const r = await patch<ProductRow>('pb_products', `id=eq.${enc(p.id)}&status=eq.reading`, { status: 'ready', ai_error: msg.slice(0, 300), claimed_at: null }, PRODUCT_COLS);
-      if (r[0]) await routeAfterRead(r[0], o, p.ai_error);
+      const fin = r[0] ? (await refresh([p.id]).catch((w) => { console.error(`pb-products gate ${p.id}: ${plain(w)}`); return []; }))[0] : null; // a required attribute still missing → Needs info
+      if (r[0] && (!fin || fin.status === 'ready')) await routeAfterRead(r[0], o, p.ai_error);
       throw e;
     }
     // claimed_at stays: a 'new' product is retried only once it is 5 minutes old.
