@@ -34,7 +34,7 @@ function fakeWorld(run, store = null) {
       return ok('', 404);
     }
     const path = decodeURIComponent(u.replace('https://sb.example/rest/v1/', ''));
-    if (path.startsWith('pb_import_runs?') && path.includes('select=id&order')) return ok([{ id: run.id }]);
+    if (path.startsWith('pb_import_runs?') && path.includes('select=id,cursor&order')) return ok([{ id: run.id, cursor: run.cursor }]);
     if (path.startsWith('pb_import_runs?') && method === 'PATCH') {
       const body = JSON.parse(init.body);
       if ('status' in body && body.status === 'running') return ok([run]);

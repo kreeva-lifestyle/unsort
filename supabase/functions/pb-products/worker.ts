@@ -100,8 +100,7 @@ export async function work(userId: string | null): Promise<WorkResult> {
     const tax = queued.length ? await loadTaxonomy() : null;
     for (const c of queued) {
       if (!tax || !left(FILL_NEEDS_MS)) break;
-      await fillQueued(c, tax, userId, budget);
-      out.tagged = (out.tagged ?? 0) + 1;
+      if (await fillQueued(c, tax, userId, budget)) out.tagged = (out.tagged ?? 0) + 1; // false: another run took it
     }
   } catch (e) { failed('tags_fill', 'run', e); }
   return out;

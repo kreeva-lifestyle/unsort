@@ -12,7 +12,7 @@
 import { SB_URL } from '../pb-products/db.ts';
 import { HttpError, plain } from '../pb-products/http.ts';
 import { windowProblem } from './schedule.ts';
-import { botToken, randomHex, rpc, saveConfig, saveSecrets, scrub, sha256, tg } from './tg.ts';
+import { botToken, randomHex, rpc, saveConfig, saveSecrets, scrub, secrets, sha256, tg } from './tg.ts';
 import { resetCache } from './webhook.ts';
 import { resetKeyCache } from './crawler.ts';
 
@@ -30,6 +30,7 @@ export async function saveBotToken(b: Body) {
   });
   if (!me?.is_bot || !me.username) throw new HttpError(400, 'Telegram did not accept this bot token.');
   const secret = randomHex(32);
+  const before = await secrets();
   // Stored before setWebhook, so the first update Telegram sends is already accepted.
   await saveSecrets({ bot_token: token, webhook_secret: secret });
   resetCache();
@@ -38,6 +39,9 @@ export async function saveBotToken(b: Body) {
     await tg(token, 'setWebhook', { url: WEBHOOK_URL, secret_token: secret, allowed_updates: ['message'], drop_pending_updates: false });
   } catch (e) {
     webhook_ok = false; webhook_error = scrub(plain(e), token);
+    // The same bot saved again: Telegram still sends the earlier secret, so keep accepting that one
+    // (otherwise every update is refused until the token is saved once more).
+    if (before.bot_token === token && before.webhook_secret) { await saveSecrets({ webhook_secret: before.webhook_secret }); resetCache(); }
   }
   await saveConfig({ bot_username: me.username, webhook_ok, webhook_error });
   return { ok: true, bot_username: me.username, webhook_ok, webhook_error };
@@ -68,7 +72,8 @@ export async function testBot() {
   const last_error_message = info.last_error_message ? scrub(info.last_error_message, token) : null;
   const webhook_error = !url_ok ? 'The bot is not pointed at Playbook — save the bot token again.' : recent ? last_error_message : null;
   await saveConfig({ webhook_ok: url_ok && !webhook_error, webhook_error });
-  return { ok: true, url_ok, pending_update_count: Number(info.pending_update_count || 0), last_error_message };
+  // Only a problem of the last hour is reported: Telegram keeps its last error message for good.
+  return { ok: true, url_ok, pending_update_count: Number(info.pending_update_count || 0), last_error_message: recent ? last_error_message : null };
 }
 
 export async function respread() {

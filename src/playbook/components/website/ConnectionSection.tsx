@@ -4,6 +4,8 @@
 // A new domain is never written from here: it goes with fresh credentials to
 // save_credentials, which switches the site off, deletes the old store's
 // secrets and re-queues its listings for the new store.
+// What is typed here (domain, sign-in type, credentials) is held by the editor
+// (`creds`), so opening another section and coming back does not empty the boxes.
 import { useState } from 'react';
 import { friendlyError } from '../../../lib/friendlyError';
 import PbSwitch from '../ui/PbSwitch';
@@ -21,15 +23,19 @@ import type { Draft, SetDraft } from './WebsiteEditor';
 
 const secretInput = { ...input44, fontFamily: PB.mono };
 
-export default function ConnectionSection({ site, draft, set, onSaved, addToast }: {
-  site: PbWebsite; draft: Draft; set: SetDraft; onSaved: (w: PbWebsite) => void; addToast: AddToast;
+/** The typed, not yet saved connection fields. */
+export type Creds = { domain: string; mode: PbAuthMode; token: string; cid: string; csec: string };
+export const newCreds = (site: PbWebsite): Creds => ({ domain: site.shop_domain, mode: site.auth_mode, token: '', cid: '', csec: '' });
+/** Something is typed that closing the editor would lose. */
+export const credsTyped = (c: Creds, site: PbWebsite) => !!(c.token.trim() || c.cid.trim() || c.csec.trim()) || cleanDomain(c.domain) !== site.shop_domain;
+
+export default function ConnectionSection({ site, draft, set, creds, setCreds, onSaved, addToast }: {
+  site: PbWebsite; draft: Draft; set: SetDraft; creds: Creds; setCreds: (p: Partial<Creds>) => void; onSaved: (w: PbWebsite) => void; addToast: AddToast;
 }) {
-  const [domain, setDomain] = useState(site.shop_domain);
-  const [mode, setMode] = useState<PbAuthMode>(site.auth_mode);
-  const [token, setToken] = useState('');
-  const [cid, setCid] = useState('');
-  const [csec, setCsec] = useState('');
-  const [doing, setDoing] = useState<'' | 'save' | 'test' | 'active'>('');
+  const { domain, mode, token, cid, csec } = creds;
+  const setDomain = (v: string) => setCreds({ domain: v }), setMode = (v: PbAuthMode) => setCreds({ mode: v });
+  const setToken = (v: string) => setCreds({ token: v }), setCid = (v: string) => setCreds({ cid: v }), setCsec = (v: string) => setCreds({ csec: v });
+  const [doing, setDoing] = useState<'' | 'save' | 'test' | 'on' | 'off'>('');
   const [result, setResult] = useState<ConnectionResult | null>(null);
   const [err, setErr] = useState('');
   const { ask, modalProps } = useConfirm();
@@ -39,6 +45,8 @@ export default function ConnectionSection({ site, draft, set, onSaved, addToast 
   const run = async (kind: 'save' | 'test') => {
     if (doing) return; // Enter in a credentials field must not run it twice
     if (kind === 'test' && moving) { setErr('A new store domain needs its own credentials — fill them in and tap "Save credentials".'); return; }
+    // The test checks what is SAVED. With new credentials typed it would pass on the old ones and say "Connected".
+    if (kind === 'test' && (token.trim() || cid.trim() || csec.trim())) { setErr('Tap "Save credentials" first: saving checks the new credentials. "Test connection" only checks the saved ones.'); return; }
     if (kind === 'save') {
       const bad = domainProblem(newDomain);
       if (bad) { setErr(bad); return; }
@@ -56,7 +64,8 @@ export default function ConnectionSection({ site, draft, set, onSaved, addToast 
     try {
       const creds = mode === 'token' ? { auth_mode: mode, access_token: token.trim() } : { auth_mode: mode, client_id: cid.trim(), client_secret: csec.trim() };
       const r = kind === 'save' ? await saveCredentials(site.id, moving ? { ...creds, shop_domain: newDomain } : creds) : await testConnection(site.id);
-      ok = true; setResult(r); setToken(''); setCid(''); setCsec('');
+      ok = true; setResult(r);
+      if (kind === 'save') setCreds({ token: '', cid: '', csec: '' });
       addToast(kind === 'save' ? `Credentials saved — connected to ${r.shop_name}` : `Connected to ${r.shop_name}`, 'success');
     } catch (e) {
       const m = friendlyError(e); setErr(m); addToast(m, 'error');
@@ -65,7 +74,7 @@ export default function ConnectionSection({ site, draft, set, onSaved, addToast 
       // The edge function records the domain / connected_at / shop_name / last_error — read them back either way.
       try {
         const w = await getWebsite(site.id); onSaved(w);
-        if (ok) setDomain(w.shop_domain);
+        if (ok && kind === 'save') setDomain(w.shop_domain);
         if (ok && moving && w.shop_domain !== newDomain) addToast('The store domain was not changed — try again, or ask an admin.', 'error');
       } catch (e) { addToast(friendlyError(e), 'error'); }
     }
@@ -74,7 +83,7 @@ export default function ConnectionSection({ site, draft, set, onSaved, addToast 
   const toggleActive = async () => {
     const next = !site.active;
     if (next && !site.connected_at) { setErr('Connect this store first — save the credentials and pass "Test connection".'); return; }
-    setDoing('active'); setErr('');
+    setDoing(next ? 'on' : 'off'); setErr('');
     try {
       onSaved(await setWebsiteActive(site.id, next));
       if (!next) { addToast(`${site.name} is off — nothing new is sent`, 'success'); return; }
@@ -87,6 +96,7 @@ export default function ConnectionSection({ site, draft, set, onSaved, addToast 
   // Stock tracking also needs write_inventory — checked here too, so "all permissions are there" is never wrong.
   const missing = [...(result?.missing_scopes ?? [])];
   if (result?.scopes && draft.track_inventory && !result.scopes.includes('write_inventory') && !missing.includes('write_inventory')) missing.push('write_inventory');
+  const switching = doing === 'on' || doing === 'off' ? doing : '';
   const savedHint = !moving && site.auth_mode === 'client_credentials' && site.connected_at ? 'Saved — type to replace' : '';
   // Layout: (Store 6)(Active 6) / (Store & credentials 12); stacked at 6 columns and on phone.
   return (
@@ -101,9 +111,9 @@ export default function ConnectionSection({ site, draft, set, onSaved, addToast 
         </Cell>
         <Cell span={6}>
           <Section title="Active" hint="Off = nothing new is sent to this store (products already there stay). It can only be switched on after a successful connection."
-            right={<span style={{ display: 'inline-flex', alignItems: 'center', pointerEvents: doing === 'active' ? 'none' : 'auto', opacity: doing === 'active' ? 0.5 : 1 }} aria-busy={doing === 'active' || undefined}>
+            right={<span style={{ display: 'inline-flex', alignItems: 'center', pointerEvents: switching ? 'none' : 'auto', opacity: switching ? 0.5 : 1 }} aria-busy={!!switching || undefined}>
               <PbSwitch on={site.active} onToggle={() => void toggleActive()} label={`${site.name} active`} /></span>}>
-            <div aria-live="polite"><ActiveLine site={site} switching={doing === 'active'} /></div>
+            <div aria-live="polite"><ActiveLine site={site} switching={switching} /></div>
           </Section>
         </Cell>
         <Cell>

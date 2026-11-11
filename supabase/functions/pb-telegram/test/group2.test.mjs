@@ -5,6 +5,16 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { inlineLess, isDescription, lessOf, plan, stripLess, DESC_WAIT_MS, QUIET_MS, NO_DESC_MS, SETTLE_MS } from '../group.ts';
 
+test('a rate followed by "less 5%" is not read as the less amount', () => {
+  for (const t of ['Rate 1600 less 5%', '1600 less 5%', 'Rate 1600/- less 10%', 'Price 1299 less 5% on 10 pcs']) {
+    assert.equal(inlineLess(t), null, t);
+    assert.equal(stripLess(t), t, t);
+  }
+  assert.equal(inlineLess('RATE 1600 LESS 200'), 200);
+  assert.equal(inlineLess('Rate 1600\n200/- less'), 200);
+  assert.equal(lessOf('200 less'), 200);
+});
+
 const T0 = Date.parse('2026-11-07T06:00:00Z');
 const DESC = 'LEHENGA CHOLI COLLECTIONS\nCODE :- KA-5070\nLEHENGA :- Georgette\nSIZE :- 42\nCOLOUR :- 2\nWEIGHT :- 1.2 kg\nRATE :- 1600/-INR';
 let seq = 1000;

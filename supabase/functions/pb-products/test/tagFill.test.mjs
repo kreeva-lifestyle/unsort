@@ -1,8 +1,9 @@
 // node --test --experimental-strip-types supabase/functions/pb-products/test/
 // "Let AI decide" (tagFill.ts) against a fake database and a fake AI (fetch is replaced):
 // the pass asks ONLY for the empty required attributes, writes 'ai' rows in 'add' mode, re-runs
-// the gate, always leaves the queue and ticks the run; a locked product is skipped; an AI error
-// counts as "left empty" without losing the queue entry's tick.
+// the gate, and ticks the run; a locked product is skipped; an AI error counts as "left empty" without
+// losing the queue entry's tick. Leaving the queue comes FIRST and is the claim: a product another
+// worker run already took is neither filled nor ticked.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -17,7 +18,7 @@ const TAX = {
 };
 const PRODUCT = { id: 'p1', name: 'Lehenga choli', category: 'Lehenga', status: 'needs_info', locked: [], attributes: {}, raw_text: 'Cosmos with beads', source: 'telegram', missing_attrs: ['Colour'] };
 
-function world({ product = PRODUCT, ai = { tags: { colour: { values: ['Pink'], other: [] } } }, aiStatus = 200 } = {}) {
+function world({ product = PRODUCT, ai = { tags: { colour: { values: ['Pink'], other: [] } } }, aiStatus = 200, taken = false } = {}) {
   const calls = { ai: [], set: [], ticks: [], patches: [] };
   globalThis.fetch = async (url, init = {}) => {
     const u = decodeURIComponent(String(url)); const method = init.method || 'GET';
@@ -35,7 +36,7 @@ function world({ product = PRODUCT, ai = { tags: { colour: { values: ['Pink'], o
     if (path.startsWith('rpc/pb_product_values_set')) { const b = JSON.parse(init.body); calls.set.push(b); return ok([{ id: 'p1', status: 'ready', was: 'needs_info', missing: [] }]); }
     if (path.startsWith('rpc/pb_tag_fill_tick')) { calls.ticks.push(JSON.parse(init.body)); return ok(null); }
     if (path.startsWith('rpc/pb_tag_suggest')) return ok(1);
-    if (method === 'PATCH') { calls.patches.push([path, JSON.parse(init.body)]); return ok([]); }
+    if (method === 'PATCH') { calls.patches.push([path, JSON.parse(init.body)]); return ok(taken ? [] : [{ id: 'p1' }]); }
     if (path.startsWith('pb_activity')) return ok([]);
     throw new Error(`unexpected ${method} ${u}`);
   };
@@ -67,6 +68,29 @@ test('the AI refuses: counted as left empty, queue entry cleared, nothing writte
   assert.equal(c.set.length, 0);
   assert.deepEqual(c.ticks, [{ p_run: 'run1', p_filled: 0, p_left: 1 }]);
   assert.ok(c.patches.some(([, b]) => b.tag_fill_run === null));
+});
+
+test('a product another worker run already took: no AI call, no tick, reported as not done', async () => {
+  const c = world({ taken: true });
+  assert.equal(await fillQueued({ id: 'p1', tag_fill_run: 'run1' }, TAX, null, budget()), false);
+  assert.equal(c.ai.length, 0);
+  assert.deepEqual(c.ticks, []);
+});
+
+test('the claim comes before the AI call, and a tick with an empty reply (204) is not an error', async () => {
+  const c = world();
+  const real = globalThis.fetch;
+  const order = [];
+  globalThis.fetch = async (url, init = {}) => {
+    const u = decodeURIComponent(String(url));
+    if (u.startsWith('https://api.anthropic.com/')) order.push('ai');
+    else if (init.method === 'PATCH' && u.includes('tag_fill_run=eq.run1')) order.push('claim');
+    else if (u.includes('rpc/pb_tag_fill_tick')) { c.ticks.push(JSON.parse(init.body)); return new Response(null, { status: 204 }); }
+    return real(url, init);
+  };
+  assert.equal(await fillQueued({ id: 'p1', tag_fill_run: 'run1' }, TAX, null, budget()), true);
+  assert.deepEqual(order, ['claim', 'ai']);
+  assert.deepEqual(c.ticks, [{ p_run: 'run1', p_filled: 1, p_left: 0 }]);
 });
 
 test('a value outside the list is never written', async () => {

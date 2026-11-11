@@ -89,9 +89,11 @@ export async function refreshGate(productId: string): Promise<{ status: string; 
   return (data as { status: string; was: string; missing: string[] }[] | null)?.[0] ?? null;
 }
 
-/** Needs-info products waiting for a required tag (Products → Needs info: "Let AI decide for N products"). */
+/** Needs-info products waiting for a required tag that the AI may fill (Products → Needs info: "Let AI decide
+ *  for N products"). A product whose tags a person chose is left to that person (tags_ai_fill skips it too). */
 export async function countMissingTags(): Promise<number> {
-  const { count, error } = await supabase.from('pb_products').select('id', { count: 'exact', head: true }).eq('status', 'needs_info').neq('missing_attrs', '{}');
+  const { count, error } = await supabase.from('pb_products').select('id', { count: 'exact', head: true })
+    .eq('status', 'needs_info').neq('missing_attrs', '{}').not('locked', 'cs', '{tags}');
   if (error) throw error;
   return count ?? 0;
 }

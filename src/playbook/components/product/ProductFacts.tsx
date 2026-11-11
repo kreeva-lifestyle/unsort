@@ -8,6 +8,9 @@
 // is something to save. On phone the edited tile's Discard / Save ride in a
 // sticky bar above the tab bar and the keyboard (mobile.md §5). Edited facts
 // register as dirty (useDirty), so Back and the nav ask before leaving.
+// The page reloads the product whenever a tag is chosen, a photo is added or
+// the AI reads it again: what is typed here stays (carry), the other fields
+// follow the fresh product, and our own save lines the whole form up again.
 import { useState, type FormEvent } from 'react';
 import { friendlyError } from '../../../lib/friendlyError';
 import type { AddToast } from '../PbToasts';
@@ -35,12 +38,22 @@ const toForm = (p: ProductDetail): Form => ({
   name: p.name ?? '', sku: p.sku ?? '', vendor_id: p.vendor_id ?? '', category: p.category ?? '', fabric: p.fabric ?? '',
   color: p.color ?? '', sizes: p.sizes.join(', '), cost_price: p.cost_price == null ? '' : String(p.cost_price), raw_text: p.raw_text ?? '',
 });
+/** The form after a reload: fields the user edited keep what was typed, the rest take the fresh value. */
+const carry = (typed: Form, was: Form, now: Form): Form =>
+  Object.fromEntries((Object.keys(now) as (keyof Form)[]).map(k => [k, typed[k].trim() !== was[k].trim() ? typed[k] : now[k]])) as Form;
 
 export default function ProductFacts({ product, vendors, categories, onVendorCreated, onSaved, addToast, className, primary = true }: {
   product: ProductDetail; vendors: VendorLite[]; categories: string[]; onVendorCreated: (v: VendorLite) => void;
   onSaved: () => void; addToast: AddToast; className?: string; primary?: boolean;
 }) {
   const [f, setF] = useState<Form>(() => toForm(product));
+  const [base, setBase] = useState(product); // the product `f` is lined up with
+  const [resync, setResync] = useState(false); // our own save went through: take the reloaded product whole
+  if (base !== product) {
+    setBase(product);
+    setResync(false);
+    setF(resync ? toForm(product) : carry(f, toForm(base), toForm(product)));
+  }
   const [err, setErr] = useState('');
   const [saving, setSaving] = useState(false);
   const phone = useIsPhone();
@@ -72,17 +85,19 @@ export default function ProductFacts({ product, vendors, categories, onVendorCre
     const complete = priced(cost2 ?? null) && !!cat2;
     let lostInfo = product.status === 'ready' && !complete;
     if (lostInfo) patch.status = 'needs_info';
-    // A ready product whose routing / price inputs changed is checked against the websites again.
-    const reroute = product.status === 'ready' && !lostInfo && changed.some(k => ROUTE_KEYS.includes(k));
-    const costChanged = product.status === 'ready' && changed.includes('cost_price') && !lostInfo;
     const kept = product.pb_listings.filter(l => l.status === 'published' && l.locked.includes('price')).length;
     setSaving(true); setErr('');
     try {
       if (changed.length || lostInfo) await updateProduct(product, patch, changed);
       // The gate (price, category AND a value for every attribute of the category) decides the status.
       const g = await refreshGate(product.id);
-      const nowReady = product.status === 'needs_info' && g?.status === 'ready';
-      lostInfo = lostInfo || (product.status === 'ready' && g?.status === 'needs_info');
+      // The status this save found, not the page's copy: a page opened as New can be Ready (and listed) by now.
+      const was = lostInfo ? 'ready' : g?.was ?? product.status;
+      const nowReady = was === 'needs_info' && g?.status === 'ready';
+      lostInfo = lostInfo || (was === 'ready' && g?.status === 'needs_info');
+      // A ready product whose routing / price inputs changed is checked against the websites again.
+      const reroute = was === 'ready' && !lostInfo && changed.some(k => ROUTE_KEYS.includes(k));
+      const costChanged = was === 'ready' && changed.includes('cost_price') && !lostInfo;
       const still = g?.status === 'needs_info' && g.missing.length ? ` — still needs ${g.missing.join(', ')}` : '';
       if ((nowReady || reroute) && !lostInfo) {
         try {
@@ -93,6 +108,7 @@ export default function ProductFacts({ product, vendors, categories, onVendorCre
           if (r.warning) addToast(`${done}, but: ${r.warning}`, 'error'); else addToast(done, 'success');
         } catch (e2) { addToast(`Saved, but checking the websites failed: ${friendlyError(e2)}`, 'error'); }
       } else addToast(lostInfo ? `Saved — back to Needs info${still || ': cost price or category is missing'}` : `Saved${still}`, still ? 'info' : 'success');
+      setResync(true);
       onSaved();
     } catch (e2) { setErr(friendlyError(e2)); } finally { setSaving(false); }
   };

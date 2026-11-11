@@ -12,14 +12,15 @@ import { useIsPhone } from '../hooks/useIsPhone';
 import { PbButton, PbChip, PbChipRow, PbIcon, PbPageHeader, PbTile } from '../components/ui';
 import VendorRow from '../components/vendors/VendorRow';
 import VendorForm, { type VendorFormState as Form } from '../components/vendors/VendorForm';
-import { VendorsEmpty, VendorsError, VendorsNoMatch, VendorsSkeleton } from '../components/vendors/VendorStates';
-import { VENDOR_PAGE, listVendors, normalizeTgChannel, saveVendor, setVendorActive, type VendorRow as Vendor } from '../data/vendors';
+import { VendorsAllInactive, VendorsEmpty, VendorsError, VendorsNoMatch, VendorsSkeleton } from '../components/vendors/VendorStates';
+import { VENDOR_PAGE, countInactiveVendors, listVendors, normalizeTgChannel, saveVendor, setVendorActive, type VendorRow as Vendor } from '../data/vendors';
 
 const NEW: Form = { id: null, name: '', code: '', notes: '', tg: '' };
 
 export default function Vendors({ addToast, onBack }: { addToast: AddToast; onBack?: () => void }) {
   const [rows, setRows] = useState<Vendor[]>([]);
   const [count, setCount] = useState(0);
+  const [hidden, setHidden] = useState(0); // inactive vendors behind an empty "active only" list
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState('');
   const [q, setQ] = useState('');
@@ -44,7 +45,10 @@ export default function Vendors({ addToast, onBack }: { addToast: AddToast; onBa
       // Past the last page (last row deactivated, or the list shrank) → step back to the real last page.
       const last = Math.max(0, Math.ceil(r.count / VENDOR_PAGE) - 1);
       if (page > last) { setPage(last); return; }
-      setRows(r.rows); setCount(r.count); setLoadErr('');
+      // Nothing active and no search: are there vendors that were switched off? (else this looks like a first run)
+      const off = r.count === 0 && !q && !inactive ? await countInactiveVendors() : 0;
+      if (my !== seq.current) return;
+      setRows(r.rows); setCount(r.count); setHidden(off); setLoadErr('');
     }
     // The error shows in the list tile with Try again (no toast on top of the header).
     catch (e) { if (my === seq.current) setLoadErr(friendlyError(e)); }
@@ -117,7 +121,8 @@ export default function Vendors({ addToast, onBack }: { addToast: AddToast; onBa
   const inTile = (n: ReactElement) => (phone ? n : <PbTile as="section" aria-label="Vendor list">{n}</PbTile>);
   const body = firstLoad ? inTile(<VendorsSkeleton />)
     : loadErr && !rows.length ? <VendorsError message={loadErr} onRetry={() => void load()} busy={loading} />
-      : rows.length === 0 ? (q ? <VendorsNoMatch search={q} onClear={() => setSearch('')} /> : <VendorsEmpty onAdd={add} />)
+      : rows.length === 0 ? (q ? <VendorsNoMatch search={q} onClear={() => setSearch('')} />
+        : hidden > 0 ? <VendorsAllInactive n={hidden} onShow={() => { setInactive(true); setPage(0); }} /> : <VendorsEmpty onAdd={add} />)
         : inTile(list);
 
   return (
@@ -128,7 +133,7 @@ export default function Vendors({ addToast, onBack }: { addToast: AddToast; onBa
         phoneAction={<PbButton kind="primary" iconOnly icon="plus" aria-label="Add vendor" onClick={add} />} />
       <div style={{ display: 'flex', flexDirection: 'column', gap: phone ? 12 : 16, minWidth: 0 }}>
         {/* First run (no vendors at all): no search or filter over an empty page. */}
-        {(count > 0 || firstLoad || search || q || inactive) && (phone ? toolbar : <PbTile as="section" aria-label="Search vendors">{toolbar}</PbTile>)}
+        {(count > 0 || hidden > 0 || firstLoad || search || q || inactive) && (phone ? toolbar : <PbTile as="section" aria-label="Search vendors">{toolbar}</PbTile>)}
         {loadErr && rows.length > 0 && <VendorsError inline message={loadErr} onRetry={() => void load()} busy={loading} />}
         {body}
       </div>

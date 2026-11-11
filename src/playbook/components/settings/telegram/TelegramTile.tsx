@@ -9,6 +9,7 @@ import { useConfirm } from '../../../../components/ui/ConfirmModal';
 import type { AddToast } from '../../PbToasts';
 import { WINDOW_DEFAULT, createCrawlerKey, getLinkCode, respreadSlots, saveBotToken, saveCrawlWindow, testBot } from '../../../data/telegram';
 import { minuteLabel } from '../../../data/tgSchedule';
+import { plainError } from '../../../data/plainError';
 import { count, istDate, istRelative } from '../../../format';
 import { useTgStatus } from '../../../hooks/useTgStatus';
 import { PB, pbBody, pbLabel, pbMeta, pbNum } from '../../../pbTheme';
@@ -22,13 +23,18 @@ import TgFailedPosts from './TgFailedPosts';
 import TgSchedule from './TgSchedule';
 
 type Busy = '' | 'token' | 'test' | 'code' | 'key' | 'window' | 'spread';
+// The crawler key is shown once. It is held here, outside the component, until "I saved it — hide": the tile
+// unmounts when the Guide ("How to set it up", right above the key) or Categories & tags opens, and coming
+// back must still show the key. A page reload or signing out forgets it.
+let shownKey: string | null = null;
 
 export default function TelegramTile({ addToast, onGuide }: { addToast: AddToast; onGuide: () => void }) {
   const { status, error, loading, reload } = useTgStatus();
   const { profile } = useAuth();
   const canManage = profile?.role === 'admin' || profile?.role === 'manager';
   const [busy, setBusy] = useState<Busy>('');
-  const [newKey, setNewKey] = useState<string | null>(null);
+  const [newKey, setNewKeyState] = useState<string | null>(shownKey);
+  const setNewKey = (k: string | null) => { shownKey = k; setNewKeyState(k); };
   const { ask, modalProps } = useConfirm();
   const config = status?.config ?? null;
 
@@ -47,7 +53,7 @@ export default function TelegramTile({ addToast, onGuide }: { addToast: AddToast
   });
   const onTest = () => void run('test', async () => {
     const r = await testBot();
-    if (!r.url_ok) throw new Error(canManage ? 'The bot is not connected to Playbook — save the bot token again.' : 'The bot is not connected to Playbook — ask an admin or manager to save the bot token again.');
+    if (!r.url_ok) throw plainError(canManage ? 'The bot is not connected to Playbook — save the bot token again.' : 'The bot is not connected to Playbook — ask an admin or manager to save the bot token again.');
     return r.last_error_message ? 'Bot connected. Telegram had trouble delivering recently — it retries by itself' : 'Bot connected';
   });
   const onCode = () => void run('code', async () => { const r = await getLinkCode(); return `Link code ${r.code} — send /link ${r.code} in the group`; });

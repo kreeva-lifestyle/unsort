@@ -136,7 +136,7 @@ export async function detect(site: SiteUrl, o: { estimate: boolean }): Promise<D
   }
   // Generic: product pages with JSON-LD, found through the sitemap (or the home page itself)
   const home = await homePage(probe);
-  const g = await genericProbe(origin, robots, home?.ok ? home.text : '', o.estimate);
+  const g = await genericProbe(origin, robots, home?.ok ? home.text : '');
   const vendorName = siteName(home?.ok ? home.text : '', host);
   if (g) {
     const r = robotsRefusal(robots, 'generic');

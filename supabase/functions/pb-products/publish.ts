@@ -126,7 +126,11 @@ export async function publishOne(l: ListingRow, o: { manual: boolean; putBack?: 
   } catch (e) {
     const msg = plain(e);
     if (!(e instanceof HttpError && e.status === 409)) {
-      const r = await patch('pb_listings', mine, { status: 'failed', attempts: (l.attempts || 0) + 1, error: msg, claimed_at: null });
+      // A failed "Put back on site" goes back to Removed, not Failed: the retry of a failed listing is a plain
+      // update, which never sets the Shopify status, so it would call the listing Published while the product
+      // stays a hidden draft on the store. The person who tapped it sees the error and can tap it again.
+      const r = await patch('pb_listings', mine, o.putBack ? { status: 'skipped', claimed_at: null }
+        : { status: 'failed', attempts: (l.attempts || 0) + 1, error: msg, claimed_at: null });
       if (r.length) await logActivity({ product_id: l.product_id, website_id: l.website_id, listing_id: l.id, action: 'failed', details: { step: 'publish', error: msg, ...(sent.length ? { handles: [...new Set(sent)] } : {}) }, user_id: o.userId });
     }
     throw e instanceof HttpError ? e : new HttpError(502, msg);

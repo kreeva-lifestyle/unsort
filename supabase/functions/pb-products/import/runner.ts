@@ -66,10 +66,12 @@ const due = () => `status=in.(queued,running)&or=(claimed_at.is.null,claimed_at.
 const clean = (c: Record<string, unknown>) => { const x = { ...c }; delete x.skip; delete x.skip_ref; delete x.wait_until; return x; };
 
 export async function advanceImport(until: number, userId: string | null): Promise<{ run_id: string; found: number; added: number } | null> {
-  const cand = await sel<{ id: string }>(`pb_import_runs?${due()}&select=id&order=created_at.asc&limit=1`);
-  if (!cand[0]) return null;
+  // The oldest run that is not waiting out a "slow down" from its store: a run in a wait must not hold up the ones behind it.
+  const cands = await sel<{ id: string; cursor: Record<string, unknown> | null }>(`pb_import_runs?${due()}&select=id,cursor&order=created_at.asc&limit=10`);
+  const cand = cands.find(c => !(Number(c.cursor?.wait_until) > Date.now()));
+  if (!cand) return null;
   const stamp = nowIso();
-  const held = await patch<RunRow>('pb_import_runs', `id=eq.${enc(cand[0].id)}&${due()}`, { claimed_at: stamp, status: 'running' }, RUN_COLS);
+  const held = await patch<RunRow>('pb_import_runs', `id=eq.${enc(cand.id)}&${due()}`, { claimed_at: stamp, status: 'running' }, RUN_COLS);
   const run = held[0];
   if (!run) return null; // another tick took it
   const mine = `id=eq.${enc(run.id)}&status=eq.running&claimed_at=eq.${enc(stamp)}`;
@@ -111,7 +113,8 @@ export async function advanceImport(until: number, userId: string | null): Promi
       page = await fetchPage({ platform: cur.platform || 'unknown', origin, cursor: cur.cursor, in_stock_only: cur.in_stock_only, currency: (cur.cursor.currency as string | null) ?? null, known: ctx.known },
         robots, () => Date.now() < until - GENERIC_INGEST_MS);
     } catch (e) { return failed(e); }
-    const counts: Counts = { found: cur.found + (page.known ?? 0), added: cur.added, skipped: cur.skipped + (page.known ?? 0), out_of_stock: cur.out_of_stock, failed: cur.failed };
+    // A product page that could not be read (a timeout, a 5xx, a 403) is passed over for good: it counts as failed.
+    const counts: Counts = { found: cur.found + (page.known ?? 0), added: cur.added, skipped: cur.skipped + (page.known ?? 0), out_of_stock: cur.out_of_stock, failed: cur.failed + Number(page.pageErrors || 0) };
     const { next: i, taken } = await addProducts(page.items, resumeAt(page.items, cur.cursor), counts, ctx);
     const partial = i < page.items.length && !capped(counts);
     const stop = capped(counts);

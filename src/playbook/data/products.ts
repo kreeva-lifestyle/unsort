@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabase';
 import { logSwallowed } from '../../lib/errorLogger';
 import { PB_BUCKET, type PbListingStatus, type PbProduct, type PbProductImage, type PbProductStatus, type PbWebsite } from '../types';
 import { LISTING_COLS, logPbActivity as logActivity, type ListingFull } from './listings';
+import { plainError } from './plainError';
 export type { ListingFull } from './listings';
 
 export const PAGE_SIZE = 25;
@@ -67,7 +68,7 @@ export async function updateProduct(p: Pick<PbProduct, 'id' | 'locked' | 'status
   if (patch.status) q = q.eq('status', p.status);
   const { data, error } = await q.select('id');
   if (error) throw error;
-  if (!data?.length) throw new Error('The AI is reading this product right now, or it changed meanwhile — wait a minute, reload it and save again.');
+  if (!data?.length) throw plainError('The AI is reading this product right now, or it changed meanwhile — wait a minute, reload it and save again.');
   if (changed.length) logActivity({ product_id: p.id, action: 'edited', details: { fields: changed } });
 }
 

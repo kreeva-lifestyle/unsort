@@ -51,7 +51,8 @@ const DESC_MIN = 40;
 const LESS_MAX = 40;
 const KEYWORDS = /\b(rate|code|price|inr)\b|₹|\brs\.?\s*\d|\d\s*\/-/i;
 const AMT = String.raw`(\d[\d,]*(?:\.\d{1,2})?)(?![\d.,]*\s*%)`;
-const LESS_A = new RegExp(String.raw`${AMT}\s*(?:\/-|rs\.?|₹|inr|rupees?)?\s*(?:\/-)?\s*less\b`, 'i');
+// "200 less". Not when "less" is followed by its own number ("Rate 1600 less 5%"): there the number before it is the rate.
+const LESS_A = new RegExp(String.raw`${AMT}\s*(?:\/-|rs\.?|₹|inr|rupees?)?\s*(?:\/-)?\s*less\b(?!\s*[:\-–=]?\s*(?:rs\.?|₹|inr)?\s*\d)`, 'i');
 const LESS_B = new RegExp(String.raw`\bless\b\s*[:\-–=]?\s*(?:rs\.?|₹|inr)?\s*${AMT}`, 'i');
 const amountOf = (s: string) => { const n = Number(s.replace(/,/g, '')); return Number.isFinite(n) && n > 0 && n < 10_000_000 ? n : null; };
 /** A less phrase in one short line. */

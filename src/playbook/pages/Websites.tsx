@@ -2,7 +2,7 @@
 // mode), sized by count so every bento row is full, and the editor for each —
 // Connection, Publishing, Routing rules, Pricing, Tags, Content & AI.
 // Spec: docs/playbook/product-directory-spec.md. Look: DESIGN.md (V2).
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { friendlyError } from '../../lib/friendlyError';
 import { useBackClose } from '../../hooks/useBackClose';
 import type { AddToast } from '../components/PbToasts';
@@ -17,6 +17,12 @@ import { siteSpans, useSixCols } from '../layout';
 import { useReturnFocus } from '../hooks/useReturnFocus';
 import { WebsitesEmpty, WebsitesError, WebsitesSkeleton } from '../components/website/shell/WebsiteListStates';
 
+// Unsaved editor drafts by site id. The device Back button and a nav tap close the editor without its
+// confirm, so the draft is kept and restored on reopen. Kept outside the component: a nav tap unmounts
+// this page, and "Unsaved changes kept" must stay true when the user comes back to it.
+const drafts = new Map<string, Draft>();
+const onDraft = (id: string, d: Draft | null) => { if (d) drafts.set(id, d); else drafts.delete(id); };
+
 export default function Websites({ addToast }: { addToast: AddToast }) {
   const [sites, setSites] = useState<PbWebsite[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,13 +36,8 @@ export default function Websites({ addToast }: { addToast: AddToast }) {
   const six = useSixCols();
   useReturnFocus(openId);
 
-  // Unsaved editor drafts by site id: the device Back button closes the editor
-  // without its confirm, so the draft is kept here and restored on reopen.
-  const drafts = useRef(new Map<string, Draft>());
-  const onDraft = useCallback((id: string, d: Draft | null) => { if (d) drafts.current.set(id, d); else drafts.current.delete(id); }, []);
-
   useBackClose(!!openId, () => {
-    if (openId && drafts.current.has(openId)) addToast('Unsaved changes kept — open the website again to save or discard them', 'info');
+    if (openId && drafts.has(openId)) addToast('Unsaved changes kept — open the website again to save or discard them', 'info');
     setOpenId(null);
   });
 
@@ -70,7 +71,7 @@ export default function Websites({ addToast }: { addToast: AddToast }) {
   return (
     <>
       {open && (
-        <WebsiteEditor key={open.id} site={open} initialDraft={drafts.current.get(open.id)} onDraft={onDraft} onClose={() => setOpenId(null)} onSaved={onSaved}
+        <WebsiteEditor key={open.id} site={open} initialDraft={drafts.get(open.id)} onDraft={onDraft} onClose={() => setOpenId(null)} onSaved={onSaved}
           addToast={addToast} vendors={vendors} categories={categories} />
       )}
       <div style={{ display: open ? 'none' : 'block' }}>

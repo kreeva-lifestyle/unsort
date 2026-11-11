@@ -15,7 +15,12 @@ test('stem: plurals, -ed, -ing, -ery share one form', () => {
     assert.equal(stem(a), stem(b), `${a} vs ${b}`);
   }
   for (const w of ['red', 'silk', 'dress', 'string', 'need', 'status']) assert.equal(stem(w), w, w);
-  assert.equal(stem('wedding'), 'wed');
+  assert.equal(stem('stopping'), 'stop');
+  // Not -ing forms of another word: cut down they would match "even", "wed", "shirt", "leg"… in ordinary text.
+  for (const w of ['evening', 'wedding', 'shirting', 'lining', 'legging']) assert.equal(stem(w), w);
+  assert.equal(stem('evenings'), 'evening');
+  assert.equal(stem('leggings'), 'legging');
+  assert.equal(stem('even'), 'even');
 });
 
 test('words / stemKey', () => {

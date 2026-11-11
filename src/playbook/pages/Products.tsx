@@ -77,10 +77,16 @@ export default function Products({ addToast, start = {}, onGuide }: { addToast: 
     try {
       const r = await listProducts(filter, page);
       if (my !== seq.current) return;
+      // Past the last page (its last product was archived, or left the filter) → step back to the real last page.
+      const last = Math.max(0, Math.ceil(r.count / PAGE_SIZE) - 1);
+      if (page > last) { setPage(last); return; }
       setRows(r.rows); setCount(r.count); setLoadErr('');
     } catch (e) {
+      if (my !== seq.current) return;
+      // The server answers "range not satisfiable" for a page past the end: same cure, from the first page.
+      if (page > 0 && (e as { code?: string } | null)?.code === 'PGRST103') { setPage(0); return; }
       // The error shows in the results tile with Try again; a toast on top would only cover the header.
-      if (my === seq.current) setLoadErr(friendlyError(e));
+      setLoadErr(friendlyError(e));
     } finally { if (my === seq.current) setLoading(false); }
   }, [filter, page]);
   useEffect(() => { void load(); }, [load]);

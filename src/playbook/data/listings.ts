@@ -4,6 +4,7 @@
 import { supabase } from '../../lib/supabase';
 import { logSwallowed } from '../../lib/errorLogger';
 import type { PbListing } from '../types';
+import { plainError } from './plainError';
 
 export type ListingFull = Pick<PbListing, 'id' | 'product_id' | 'website_id' | 'status' | 'price' | 'compare_at_price' | 'title'
   | 'description_html' | 'seo_title' | 'seo_description' | 'handle' | 'tags' | 'locked' | 'error' | 'shopify_product_id'
@@ -36,7 +37,7 @@ export async function updateListing(l: Pick<ListingFull, 'id' | 'locked' | 'prod
     .eq('id', l.id).or(`status.not.in.(generating,publishing),and(status.eq.publishing,or(claimed_at.is.null,claimed_at.lt.${staleIso()}))`)
     .select(LISTING_COLS).maybeSingle();
   if (error) throw error;
-  if (!data) throw new Error('This listing is being written or published right now — wait a minute, reload it and edit again.');
+  if (!data) throw plainError('This listing is being written or published right now — wait a minute, reload it and edit again.');
   logPbActivity({ product_id: l.product_id, listing_id: l.id, website_id: l.website_id, action: 'edited', details: { fields: changed } });
   return data as unknown as ListingFull;
 }
@@ -56,11 +57,11 @@ export async function approveListing(l: Pick<ListingFull, 'id' | 'product_id' | 
   ]);
   if (site.error) throw site.error;
   if (auto.error) throw auto.error;
-  if (!site.data.active) throw new Error(`${site.data.name} is switched off — turn it on in Websites first.`);
+  if (!site.data.active) throw plainError(`${site.data.name} is switched off — turn it on in Websites first.`);
   const { data, error } = await supabase.from('pb_listings').update({ status: 'publishing', error: null })
     .eq('id', l.id).eq('status', 'review').select('id');
   if (error) throw error;
-  if (!data?.length) throw new Error('This listing is no longer waiting for review — reload and check it again.');
+  if (!data?.length) throw plainError('This listing is no longer waiting for review — reload and check it again.');
   logPbActivity({ product_id: l.product_id, listing_id: l.id, website_id: l.website_id, action: 'approved' });
   return { paused: (auto.data?.value as { paused?: boolean } | null)?.paused === true };
 }

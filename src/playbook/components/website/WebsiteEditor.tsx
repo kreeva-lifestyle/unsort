@@ -18,7 +18,7 @@ import { useIsPhone } from '../../hooks/useIsPhone';
 import { Dot } from '../product/status';
 import { PbPageHeader, PbTag, focusPageTitle } from '../ui';
 import { connection } from './WebsiteCard';
-import ConnectionSection from './ConnectionSection';
+import ConnectionSection, { credsTyped, newCreds, type Creds } from './ConnectionSection';
 import PublishingSection from './PublishingSection';
 import RoutingSection from './RoutingSection';
 import PricingSection from './PricingSection';
@@ -47,6 +47,9 @@ export default function WebsiteEditor({ site, initialDraft, onDraft, onClose, on
   onClose: () => void; onSaved: (w: PbWebsite) => void; addToast: AddToast; vendors: VendorLite[]; categories: string[];
 }) {
   const [draft, setDraftState] = useState<Draft>(() => initialDraft ?? pick(site));
+  // Typed domain / credentials live here, not in the Connection section, which unmounts when another section opens.
+  const [creds, setCredsState] = useState<Creds>(() => newCreds(site));
+  const setCreds = (p: Partial<Creds>) => setCredsState(c => ({ ...c, ...p }));
   const [tab, setTab] = useState<Tab>('connection');
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
@@ -68,7 +71,7 @@ export default function WebsiteEditor({ site, initialDraft, onDraft, onClose, on
   useEffect(() => { focusPageTitle(); }, [phoneOpen]);
 
   const close = async () => {
-    if (dirty && !(await ask({ title: 'Discard unsaved changes?', message: 'Your edits to this website have not been saved.', confirmLabel: 'Discard', danger: true }))) return;
+    if ((dirty || credsTyped(creds, site)) && !(await ask({ title: 'Discard unsaved changes?', message: 'Your edits to this website have not been saved.', confirmLabel: 'Discard', danger: true }))) return;
     onDraft(site.id, null); onClose();
   };
 
@@ -98,7 +101,7 @@ export default function WebsiteEditor({ site, initialDraft, onDraft, onClose, on
 
   const body = (
     <>
-      {tab === 'connection' && <ConnectionSection site={site} draft={draft} set={setDraft} onSaved={onSaved} addToast={addToast} />}
+      {tab === 'connection' && <ConnectionSection site={site} draft={draft} set={setDraft} creds={creds} setCreds={setCreds} onSaved={onSaved} addToast={addToast} />}
       {tab === 'publishing' && <PublishingSection draft={draft} set={setDraft} />}
       {tab === 'routing' && <RoutingSection siteId={site.id} draft={draft} set={setDraft} addToast={addToast} vendors={vendors} categories={categories} />}
       {tab === 'pricing' && <PricingSection draft={draft} set={setDraft} />}

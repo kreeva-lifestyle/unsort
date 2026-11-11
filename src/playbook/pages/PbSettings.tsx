@@ -32,6 +32,7 @@ export default function PbSettings({ addToast, onBack, onGuide }: { addToast: Ad
   const [saved, setSaved] = useState<Settings | null>(null);
   const [reader, setReader] = useState<Settings['reader']>(DEFAULT_SETTINGS.reader);
   const [busy, setBusy] = useState<Busy>('');
+  const [pausing, setPausing] = useState(false);
   const [run, setRun] = useState<WorkResult | null>(null);
   const [loadErr, setLoadErr] = useState('');
   const [retrying, setRetrying] = useState(false);
@@ -54,13 +55,15 @@ export default function PbSettings({ addToast, onBack, onGuide }: { addToast: Ad
   const retry = () => { setRetrying(true); void load().finally(() => setRetrying(false)); };
 
   const save = async <K extends keyof Settings>(key: K, value: Settings[K], ok: string) => {
-    if (busy) return; // Enter in a field must not run a save twice
-    setBusy(key);
+    // The pause switch has its own lock: it must still work while "Run now" (up to 2 min) or a save is busy.
+    const own = key === 'automation';
+    if (own ? pausing : busy) return; // Enter in a field must not run a save twice
+    if (own) setPausing(true); else setBusy(key);
     try {
       await saveSetting(key, value);
       setSaved(s => (s ? { ...s, [key]: value } : s));
       addToast(ok, 'success');
-    } catch (e) { addToast(friendlyError(e), 'error'); } finally { setBusy(''); }
+    } catch (e) { addToast(friendlyError(e), 'error'); } finally { if (own) setPausing(false); else setBusy(''); }
   };
 
   const runNow = async () => {
@@ -118,7 +121,7 @@ export default function PbSettings({ addToast, onBack, onGuide }: { addToast: Ad
     <>
       {header}
       <SettingsColumns form={form} side={
-        <AutomationTile paused={paused} saving={busy === 'automation'} running={busy === 'run'} dim={!!busy && busy !== 'run'} run={run}
+        <AutomationTile paused={paused} saving={pausing} running={busy === 'run'} dim={!!busy && busy !== 'run'} run={run}
           onRun={() => void runNow()}
           onToggle={() => void save('automation', { paused: !paused }, paused ? 'Automation running again' : 'Automation paused — nothing runs on its own')} />
       } />

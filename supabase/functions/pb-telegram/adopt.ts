@@ -2,7 +2,7 @@
 // products (straggle.ts) — a post forwarded twice is dropped, a photo / video
 // that arrived late is copied onto the product it belongs to. Returns the ids
 // handled here, which grouping must leave out.
-import { enc, logActivity, patch, sel } from '../pb-products/db.ts';
+import { enc, logActivity, patch, sel, selAll } from '../pb-products/db.ts';
 import { TRIES, type MsgRow } from './create.ts';
 import { copyMedia, onProduct, planMedia } from './media.ts';
 import { stragglers, type Used } from './straggle.ts';
@@ -16,9 +16,9 @@ export async function adopt(rows: MsgRow[], token: string, deadline: number, tri
   for (const r of rows) if (r.origin_chat_id !== null && r.origin_message_id !== null) byChat.set(r.origin_chat_id, [...(byChat.get(r.origin_chat_id) || []), r]);
   for (const [chat, list] of byChat) {
     const mids = list.map(r => r.origin_message_id as number);
-    const used = await sel<{ origin_message_id: number; media_group_id: string | null; product_id: string }>(
+    const used = await selAll<{ origin_message_id: number; media_group_id: string | null; product_id: string }>(
       `pb_tg_messages?origin_chat_id=eq.${chat}&state=eq.used&product_id=not.is.null&origin_message_id=gte.${Math.min(...mids) - WINDOW}`
-      + `&origin_message_id=lte.${Math.max(...mids) + WINDOW}&select=origin_message_id,media_group_id,product_id&order=origin_message_id.asc&limit=2000`);
+      + `&origin_message_id=lte.${Math.max(...mids) + WINDOW}&select=origin_message_id,media_group_id,product_id&order=origin_message_id.asc,id.asc`);
     if (!used.length) continue;
     const u: Used[] = used.map(x => ({ mid: x.origin_message_id, album: x.media_group_id, product_id: x.product_id }));
     const r = stragglers(list.map(m => ({ id: m.id, mid: m.origin_message_id as number, kind: m.kind, album: m.media_group_id })), u);

@@ -43,6 +43,12 @@ test('stems, aliases and word boundaries', () => {
   assert.deepEqual(r.chosen.col, ['black']); // the alias "kala"; "blackberry" is not "black"
 });
 
+test('"Evening" and "Wedding" are not found in "even" and "wed"', () => {
+  const OCCASION = { id: 'occ', name: 'Occasion', multi: true, values: [v('eve', 'Evening'), v('wedd', 'Wedding'), v('cas', 'Casual')] };
+  assert.equal(matchProduct({ text: 'Comfortable even for daily wear. We wed tradition with style.' }, [OCCASION]).chosen.occ, undefined);
+  assert.deepEqual(matchProduct({ text: 'An evening gown for weddings' }, [OCCASION]).chosen.occ, ['eve', 'wedd']);
+});
+
 test('store tags: matched ones are used, the rest are candidates (junk filtered by autoValues)', () => {
   const r = autoValues({ name: 'Wine Lehenga', attributes: { store_tags: '_altnew_KBSUIT25, _label_BUY 1 GET 1 FREE, Ideal Collection, Lehenga, SIZE_CHART, Kurtas & Suits, Organza' } }, ATTRS, { categories: ['Lehenga'] });
   assert.deepEqual(r.rows.map(x => x.value_id).sort(), ['org', 'wine']);

@@ -57,7 +57,13 @@ export default function CategorySheet({ category, attrs, links, stats, api, addT
     if (!ok) return;
     setAsk0(null);
     if (!ai) return;
-    try { const q = await api.aiFill({ category, attribute_id: a.id }); addToast(`AI is choosing a ${a.name} for ${plural(q || n, 'product')} — they move to Ready as it goes`, 'success'); onChanged(); }
+    try {
+      const q = await api.aiFill({ category, attribute_id: a.id });
+      // q can be fewer than the products lacking it (n), or none: the AI leaves products whose tags a person chose.
+      if (q) addToast(`AI is choosing a ${a.name} for ${plural(q, 'product')} — they move to Ready as it goes`, 'success');
+      else addToast(`The AI took none of the ${plural(n, 'product')}: they already wait for it, or their tags were chosen by hand. Choose ${a.name} on those yourself.`, 'info');
+      onChanged();
+    }
     catch (e) { addToast(friendlyError(e), 'error'); }
   };
   const remove = async () => {

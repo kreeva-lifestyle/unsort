@@ -33,12 +33,14 @@ export async function findSitemaps(origin: string, robots: Robots): Promise<stri
   return [...new Set(out)].slice(0, 50);
 }
 
-/** import_check for such a store: how many product URLs, and a few pages proving that JSON-LD is there. */
-export async function genericProbe(origin: string, robots: Robots, home: string, estimate: boolean): Promise<{ total: number | null; capped: boolean; sample: Found[]; sitemaps: string[] } | null> {
+/** import_check for such a store: how many product URLs, and a few pages proving that JSON-LD is there.
+ *  import_start runs the same probe at the same depth, so it never refuses a store the check just accepted
+ *  (a first sitemap with no products, or a first entry that is the shop page, is common). */
+export async function genericProbe(origin: string, robots: Robots, home: string): Promise<{ total: number | null; capped: boolean; sample: Found[]; sitemaps: string[] } | null> {
   const sitemaps = await findSitemaps(origin, robots);
   let total = 0;
   const urls: string[] = [];
-  for (const sm of sitemaps.slice(0, estimate ? 3 : 1)) {
+  for (const sm of sitemaps.slice(0, 3)) {
     const r = await siteGet(sm, { accept: XML, robots }).catch(() => null);
     if (!r?.ok) continue;
     const locs = productLocs(r.text, sm, origin, robots);
@@ -47,7 +49,7 @@ export async function genericProbe(origin: string, robots: Robots, home: string,
   }
   const capped = sitemaps.length > 3;
   const sample: Found[] = [];
-  for (const u of urls.slice(0, estimate ? 5 : 1)) {
+  for (const u of urls.slice(0, 5)) {
     const r = await siteGet(u, { robots }).catch(() => null);
     const f = r?.ok ? fromJsonLd(r.text, u) : null;
     if (f && f.name) sample.push(f);
