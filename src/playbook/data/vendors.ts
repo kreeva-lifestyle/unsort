@@ -25,6 +25,13 @@ export async function listVendors(search: string, showInactive: boolean, page: n
   return { rows, count: count ?? 0 };
 }
 
+/** How many vendors are switched off, so a list where every vendor is inactive is not shown as "No vendors yet". */
+export async function countInactiveVendors(): Promise<number> {
+  const { count, error } = await supabase.from('pb_vendors').select('id', { count: 'exact', head: true }).eq('active', false);
+  if (error) throw error;
+  return count ?? 0;
+}
+
 const logActivity = (action: string, details: Record<string, unknown>) => {
   supabase.from('pb_activity').insert({ action, details }).then(({ error }) => { if (error) logSwallowed('pb_activity insert', error); });
 };

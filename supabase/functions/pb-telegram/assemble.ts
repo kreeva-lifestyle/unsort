@@ -21,7 +21,7 @@ import { scrub, secrets } from './tg.ts';
 
 const TRY_RE = / \(attempt (\d+) of \d+\)$/;
 const tries = (r: MsgRow) => Number(TRY_RE.exec(r.note || '')?.[1] || 0);
-const PAGE = 3000;
+const PAGE = 1000; // the most rows one request returns on this project; a full page means "there may be more" (see `held`)
 const BUDGET_MS = 135_000;    // the edge runtime ends a call at 150 s
 const NO_ORIGIN_MS = 10 * 60_000;
 

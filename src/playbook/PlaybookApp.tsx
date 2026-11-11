@@ -8,7 +8,7 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties } from 're
 import { useAuth } from '../hooks/useAuth';
 import { useConfirm } from '../components/ui/ConfirmModal';
 import { setDivision } from '../lib/division';
-import { closeAllLayers, closeTopLayer, useBackClose } from '../hooks/useBackClose';
+import { closeAllLayers, closeTopLayer, layerCount, useBackClose } from '../hooks/useBackClose';
 import { DailyWorkMark, PlaybookMark } from '../components/brand/DivisionLogos';
 import PbNav, { PbTabBar, PB_PAGES, pageLabel, type PbPage } from './components/PbNav';
 import { PbToasts, usePbToasts } from './components/PbToasts';
@@ -33,6 +33,13 @@ const readPage = (): PbPage => {
   return 'dashboard';
 };
 
+/** Phone: the device-Back layer of a page that sits under More. Mounted with the page as its key, so going
+ *  straight from one such page to another (Settings → Guide) gets a fresh layer: go() closes every layer first. */
+function MoreBack({ onBack }: { onBack: () => void }) {
+  useBackClose(true, onBack);
+  return null;
+}
+
 export default function PlaybookApp() {
   const { profile, signOut } = useAuth();
   const [signingOut, setSigningOut] = useState(false);
@@ -54,15 +61,23 @@ export default function PlaybookApp() {
   useEffect(() => { const prev = prevTitle.current; return () => { document.title = prev; }; }, []);
   useEffect(() => { document.title = `${pageLabel(shown)} · Playbook · DailyOffice`; }, [shown]);
 
+  // Phone: Vendors, Settings and Guide sit under More. Their header shows
+  // "Back to More", and the device Back returns there instead of leaving Playbook.
+  const underMore = isPhone && (shown === 'vendors' || shown === 'settings' || shown === 'guide');
+  const underMoreRef = useRef(underMore);
+  underMoreRef.current = underMore;
+
   // DailyWork's global Escape is off while Playbook is open — Playbook closes its own top layer.
+  // Never the "under More" page itself (a narrow window with a keyboard): only what was opened on top of it.
   useEffect(() => {
-    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') closeTopLayer(); };
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape' && layerCount() > (underMoreRef.current ? 1 : 0)) closeTopLayer(); };
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
   }, []);
 
   const pageRef = useRef(page);
-  const go = useCallback(async (p: PbPage, s?: ProductsStart) => {
+  // `at`: the Guide section to open at (a "How to set it up" button); set here so it survives the discard question.
+  const go = useCallback(async (p: PbPage, s?: ProductsStart, at?: string) => {
     // Unsaved typing on the open page (edited product Facts): ask before leaving.
     const what = dirtyTitle();
     if (what && !(await ask(discardAsk(what)))) return;
@@ -70,21 +85,18 @@ export default function PlaybookApp() {
     // A plain nav tap opens Products clean: an old tile filter or "+ Add product" must not come back.
     if (s || p !== pageRef.current) setStart(prev => ({ key: prev.key + 1, value: s ?? {} }));
     pageRef.current = p;
-    setGuideAt(null);
+    setGuideAt(at ?? null);
     setPage(p);
     try { localStorage.setItem(PAGE_KEY, p); } catch { /* storage blocked: page just isn't remembered */ }
     scroller.current?.scrollTo({ top: 0 });
   }, [ask]);
 
-  // Phone: Vendors, Settings and Guide sit under More. Their header shows
-  // "Back to More", and the device Back returns there instead of leaving Playbook.
-  const underMore = isPhone && (shown === 'vendors' || shown === 'settings' || shown === 'guide');
-  useBackClose(underMore, () => {
+  const toMore = useCallback(() => {
     pageRef.current = 'more';
     setPage('more');
     try { localStorage.setItem(PAGE_KEY, 'more'); } catch { /* storage blocked: page just isn't remembered */ }
     scroller.current?.scrollTo({ top: 0 });
-  });
+  }, []);
   const backToMore = underMore ? closeTopLayer : undefined;
 
   // Same as DailyWork's Logout: lock when Face ID is enrolled, else sign out;
@@ -97,7 +109,12 @@ export default function PlaybookApp() {
     try { await signOut(); } catch { /* reload below shows the login either way */ }
     window.location.reload();
   };
-  const toDailyWork = () => setDivision('dailywork');
+  // Playbook unmounts on the switch, so unsaved typing (edited product Facts) gets the same question as a nav tap.
+  const toDailyWork = async () => {
+    const what = dirtyTitle();
+    if (what && !(await ask(discardAsk(what)))) return;
+    setDivision('dailywork');
+  };
 
   return (
     // #root is a fixed overflow:hidden frame, so Playbook brings its own scroller (.pb-scroll).
@@ -127,12 +144,13 @@ export default function PlaybookApp() {
         </header>
         <main id="pb-main" tabIndex={-1}>
           {shown === 'dashboard' && <PlaybookDashboard name={profile?.full_name?.split(' ')[0] || ''} addToast={addToast} go={go} />}
-          {shown === 'products' && <Products key={start.key} addToast={addToast} start={start.value} onGuide={id => { go('guide'); setGuideAt(id); }} />}
+          {shown === 'products' && <Products key={start.key} addToast={addToast} start={start.value} onGuide={id => void go('guide', undefined, id)} />}
           {shown === 'websites' && <Websites addToast={addToast} />}
           {shown === 'vendors' && <Vendors addToast={addToast} onBack={backToMore} />}
-          {shown === 'settings' && <PbSettings addToast={addToast} onBack={backToMore} onGuide={id => { go('guide'); setGuideAt(id); }} />}
+          {shown === 'settings' && <PbSettings addToast={addToast} onBack={backToMore} onGuide={id => void go('guide', undefined, id)} />}
           {shown === 'guide' && <Guide addToast={addToast} onBack={backToMore} at={guideAt} />}
           {shown === 'more' && <More go={p => go(p)} onSwitch={toDailyWork} onSignOut={out} signingOut={signingOut} />}
+          {underMore && <MoreBack key={shown} onBack={toMore} />}
         </main>
       </div>
       <PbTabBar page={shown} onGo={p => go(p)} />

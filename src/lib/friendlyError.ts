@@ -10,6 +10,9 @@ export function friendlyError(raw: unknown, fallback = 'Something went wrong. Pl
   const code = ((raw as { code?: string } | undefined)?.code ?? '').toString();
   if (msg) { console.error('[app error]', code || '(no code)', msg); noteError(code ? `${code} ${msg}` : msg); }
   if (!msg) return fallback;
+  // A sentence its thrower already wrote for the user and marked `plain` (Playbook's server replies and
+  // data layer): show it as it is, whatever its length, and never through the keyword tests below.
+  if ((raw as { plain?: boolean } | undefined)?.plain === true) return msg;
   const l = msg.toLowerCase();
 
   // Postgres constraint violations

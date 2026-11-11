@@ -16,10 +16,15 @@ export const tagKey = (s: unknown): string =>
     .replace(/[^\p{L}\p{M}\p{N}]+/gu, ' ').replace(/\s+/g, ' ').trim();
 
 const VOWEL = /[aeiou]/;
+// Words that only look like an -ing form: cut down they become another everyday word, and a value such as
+// "Evening" or "Wedding" would then be found in "even for daily wear" or "we wed tradition with style".
+const WHOLE = new Set(['evening', 'wedding', 'shirting', 'suiting', 'lining', 'morning', 'legging', 'clothing', 'bedding', 'stocking']);
 
 export function stem(w: string): string {
   let s = w;
   if (s.length <= 3 || !/^[a-z]+$/.test(s)) return s;
+  if (WHOLE.has(s)) return s;
+  if (s.endsWith('s') && WHOLE.has(s.slice(0, -1))) return s.slice(0, -1); // evenings, leggings
   if (s.endsWith('ies') && s.length > 4) s = s.slice(0, -3) + 'y';
   else if (/(ches|shes|xes|sses)$/.test(s)) s = s.slice(0, -2);
   else if (s.endsWith('s') && !/(ss|us)$/.test(s)) s = s.slice(0, -1);

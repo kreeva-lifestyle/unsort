@@ -55,8 +55,11 @@ export async function routeOne(b: Body, userId: string | null) {
 
 export async function generateListing(b: Body, userId: string | null) {
   const id = uuid(b.listing_id, 'listing_id');
-  const cur = await one<{ status: string; generated_at: string | null }>(`pb_listings?id=eq.${enc(id)}&select=status,generated_at`);
+  const cur = await one<{ status: string; generated_at: string | null; product_id: string }>(`pb_listings?id=eq.${enc(id)}&select=status,generated_at,product_id`);
   if (!cur) throw new HttpError(404, 'That listing no longer exists.');
+  // As publish_listing: the writer would set an archived product's listing aside (even one live on Shopify) and still answer ok.
+  const prod = await one<{ status: string }>(`pb_products?id=eq.${enc(cur.product_id)}&select=status`);
+  if (prod?.status === 'archived') throw new HttpError(400, 'This product is archived.');
   if (cur.status === 'skipped' && cur.generated_at) throw new HttpError(400, 'This listing was removed from the website — use "Put back on site" to bring it back first.');
   // Removed before it was ever written: there is nothing to put back, so writing it is how it returns.
   if (cur.status === 'skipped') await patch('pb_listings', `id=eq.${enc(id)}&status=eq.skipped`, { status: 'queued', error: null });

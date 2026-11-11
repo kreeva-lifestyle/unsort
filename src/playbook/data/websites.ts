@@ -6,6 +6,7 @@
 import { supabase } from '../../lib/supabase';
 import { logSwallowed } from '../../lib/errorLogger';
 import { pbCall } from './pbFunctions';
+import { plainError } from './plainError';
 import type { PbAuthMode, PbContent, PbPricing, PbRoutingRule, PbTagRules, PbWebsite } from '../types';
 
 // Same values as the column defaults in 20261105090000_pb_product_directory.sql —
@@ -72,7 +73,7 @@ export async function setWebsiteActive(id: string, active: boolean): Promise<PbW
   if (active) {
     const { data, error } = await supabase.from('pb_websites').select('connected_at').eq('id', id).single();
     if (error) throw error;
-    if (!data?.connected_at) throw new Error('Connect this store first — save the credentials and pass "Test connection".');
+    if (!data?.connected_at) throw plainError('Connect this store first — save the credentials and pass "Test connection".');
   }
   return updateWebsite(id, { active });
 }
@@ -169,6 +170,6 @@ export async function reorderRules(websiteId: string, ordered: PbRoutingRule[]) 
     .eq('id', m.id).eq('website_id', websiteId).select('id')));
   const failed = res.find(r => r.error);
   if (failed?.error) throw failed.error;
-  if (res.some(r => !r.data?.length)) throw new Error('A rule was changed or deleted somewhere else — the list has been reloaded, try again.');
+  if (res.some(r => !r.data?.length)) throw plainError('A rule was changed or deleted somewhere else — the list has been reloaded, try again.');
   logActivity(websiteId, 'rules_reordered', { rule_ids: ordered.map(r => r.id) });
 }

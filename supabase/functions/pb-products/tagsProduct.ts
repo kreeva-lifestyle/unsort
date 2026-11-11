@@ -6,7 +6,7 @@
 //                      projected gate moves; apply writes in batches of 100 (pb_product_values_bulk)
 // retagProducts(ids): the same rules for a few products (after a suggestion became a value).
 import { uuid, type Body } from './actions.ts';
-import { enc, logActivity, one, patch, rpc, sel } from './db.ts';
+import { enc, logActivity, one, patch, rpc, sel, selAll } from './db.ts';
 import { HttpError } from './http.ts';
 import { routeProduct } from './route.ts';
 import { autoValues, type ValueSet } from './tagAuto.ts';
@@ -63,9 +63,13 @@ function next(p: P, have: Pv[], tax: Taxonomy): { rows: ValueSet[]; missing: str
   return { rows, missing, before };
 }
 
+// Only products the reader has finished (Ready / Needs info): a new or reading one gets its values from the
+// reader, and rows worked out from a snapshot taken before it finished would overwrite what the reader chose.
+// The value rows are read in full (selAll): cut at 1000, a product whose rows fell off the end would look
+// untagged, and the 'auto' write would then delete its AI-chosen values.
 async function pageOf(offset: number, ids?: string[]): Promise<{ ps: P[]; pvs: Pv[] }> {
-  const ps = await sel<P>(`pb_products?select=${COLS}&status=neq.archived${ids ? `&id=in.(${ids.map(enc).join(',')})` : ''}&order=id.asc&limit=${PAGE}&offset=${offset}`);
-  const pvs = ps.length ? await sel<Pv>(`pb_product_values?product_id=in.(${ps.map(p => enc(p.id)).join(',')})&select=product_id,value_id,source,pb_attribute_values(attribute_id)&limit=20000`) : [];
+  const ps = await sel<P>(`pb_products?select=${COLS}&status=in.(ready,needs_info)${ids ? `&id=in.(${ids.map(enc).join(',')})` : ''}&order=id.asc&limit=${PAGE}&offset=${offset}`);
+  const pvs = ps.length ? await selAll<Pv>(`pb_product_values?product_id=in.(${ps.map(p => enc(p.id)).join(',')})&select=product_id,value_id,source,pb_attribute_values(attribute_id)&order=product_id.asc,value_id.asc`) : [];
   return { ps, pvs };
 }
 

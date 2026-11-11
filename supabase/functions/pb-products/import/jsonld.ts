@@ -52,7 +52,9 @@ export function offersOf(prod: Ld): Ld[] {
   const direct = own(asList(prod.offers));
   return direct.length ? direct : own(asList(prod.hasVariant).flatMap(v => (v && typeof v === 'object' ? asList((v as Ld).offers) : [])));
 }
-export const offerPrices = (offers: Ld[]) => offers.flatMap(o => [num(o.price), num(o.lowPrice), num((o.priceSpecification as Ld | undefined)?.price)]);
+/** priceSpecification is one object or a list of them (WooCommerce writes a list). */
+const specs = (o: Ld): Ld[] => asList(o.priceSpecification).filter((s): s is Ld => !!s && typeof s === 'object');
+export const offerPrices = (offers: Ld[]) => offers.flatMap(o => [num(o.price), num(o.lowPrice), ...specs(o).map(s => num(s.price))]);
 
 const ldText = (v: unknown): string => (v && typeof v === 'object' ? ldText((v as Ld).name ?? (v as Ld)['@value'] ?? (v as Ld).url) : txt(v, 500));
 
@@ -63,8 +65,10 @@ export function fromJsonLd(html: string, url: string): Found | null {
   const offers = offersOf(prod);
   const prices = offerPrices(offers);
   const avail = (o: Ld) => String(o.availability ?? '').toLowerCase();
-  const inStock = offers.length ? offers.some(o => /instock|limitedavailability|preorder|onlineonly/.test(avail(o))) : false;
-  const currency = txt(offers.map(o => o.priceCurrency).find(Boolean), 3).toUpperCase() || null;
+  // An offer that names no availability at all is on sale as far as the page says (stores often leave it out):
+  // counting it "out of stock" would end an in-stock-only import with nothing, for no stated reason.
+  const inStock = offers.some(o => (avail(o) ? /instock|limitedavailability|preorder|onlineonly/.test(avail(o)) : offerPrices([o]).some(p => p != null)));
+  const currency = txt(offers.flatMap(o => [o.priceCurrency, ...specs(o).map(s => s.priceCurrency)]).find(Boolean), 3).toUpperCase() || null;
   const colors = uniq(asList(prod.color).map(ldText));
   const sizes = uniq(asList(prod.size).map(ldText));
   const images = imgs(asList(prod.image).map(i => (i && typeof i === 'object' ? (i as Ld).url ?? (i as Ld).contentUrl : i)), url);

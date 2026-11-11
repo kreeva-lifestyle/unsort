@@ -64,8 +64,13 @@ export async function fillOne(p: ProductRow, tax: Taxonomy, o: { manual: boolean
   return { filled, left, refreshed, usd: ai.usd };
 }
 
-/** Worker step: one queued product. Always leaves the queue (an AI error counts as "left empty"). */
-export async function fillQueued(c: { id: string; tag_fill_run: string }, tax: Taxonomy, userId: string | null, budget: Budget): Promise<void> {
+/** Worker step: one queued product. It leaves the queue FIRST, and that is the claim: worker runs can
+ *  overlap (one starts every minute, each may take over two), and only the run whose patch returns the row
+ *  fills the product and ticks the run. Returns false when another run had taken it. Once taken it is
+ *  always ticked (an AI error counts as "left empty"). */
+export async function fillQueued(c: { id: string; tag_fill_run: string }, tax: Taxonomy, userId: string | null, budget: Budget): Promise<boolean> {
+  const mine = await patch('pb_products', `id=eq.${enc(c.id)}&tag_fill_run=eq.${enc(c.tag_fill_run)}`, { tag_fill_run: null });
+  if (!mine.length) return false;
   let filled = 0, left = 0;
   try {
     const p = await one<ProductRow>(`pb_products?id=eq.${enc(c.id)}&select=${PRODUCT_COLS}`);
@@ -78,9 +83,9 @@ export async function fillQueued(c: { id: string; tag_fill_run: string }, tax: T
     console.error(`pb-products tag fill ${c.id}: ${plain(e)}`);
     await logActivity({ product_id: c.id, action: 'failed', details: { step: 'tags_fill', error: plain(e) }, user_id: userId });
   } finally {
-    await patch('pb_products', `id=eq.${enc(c.id)}&tag_fill_run=eq.${enc(c.tag_fill_run)}`, { tag_fill_run: null });
     await rpc('pb_tag_fill_tick', { p_run: c.tag_fill_run, p_filled: filled, p_left: left });
   }
+  return true;
 }
 
 /** Worker step: route products a tag change made Ready (route_due, set by pb_products_refresh). */

@@ -99,7 +99,7 @@ export default function ProductPage({ id, onClose, onChanged, addToast, vendors,
   // The page's one gradient: Edit on the first listing waiting for approval, else Save facts.
   const waiting = p.pb_listings.some(l => l.status === 'review');
   const facts = (
-    <ProductFacts key={p.updated_at} product={p} vendors={vendors} categories={categories} onVendorCreated={onVendorCreated}
+    <ProductFacts key={p.id} product={p} vendors={vendors} categories={categories} onVendorCreated={onVendorCreated}
       onSaved={refresh} addToast={addToast} primary={!waiting} />
   );
   const listings = <ProductListings listings={p.pb_listings} sites={sites} onChanged={refresh} addToast={addToast} busy={busy} primary={waiting} phone={phone} />;

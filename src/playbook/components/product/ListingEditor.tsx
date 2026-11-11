@@ -2,12 +2,13 @@
 // price (each edit joins listing.locked so Regenerate keeps it), plus the
 // actions in ListingActions (Regenerate, Approve, Publish / Update, Remove):
 // the gradient one in the sheet footer, the others and Remove in the body.
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { friendlyError } from '../../../lib/friendlyError';
+import { logSwallowed } from '../../../lib/errorLogger';
 import type { AddToast } from '../PbToasts';
 import { shopifyAdminUrl } from '../../data/pbFunctions';
 import type { WebsiteLite } from '../../data/products';
-import { listingBusy, updateListing, type ListingFull } from '../../data/listings';
+import { getListing, listingBusy, updateListing, type ListingFull } from '../../data/listings';
 import { compareAtPrice } from '../../data/websites';
 import { PB, pbBtnSecondary, pbErrorBox, pbNum, pbTileReview } from '../../pbTheme';
 import PbModal from './PbModal';
@@ -36,12 +37,29 @@ export default function ListingEditor({ listing, site, onClose, onChanged, addTo
   const locked = listingBusy(l); // a run holds it: edits would be overwritten or published stale
   const reset = (next: ListingFull) => { setL(next); setF(toForm(next)); };
 
+  // The product page's copy can be minutes old (a run may have written or published it since), and
+  // "close and reopen in a minute" only works if opening reads the listing again. Fields already typed in stay.
+  const opened = useRef({ listing, onChanged });
+  useEffect(() => {
+    const { listing: first, onChanged: tell } = opened.current;
+    let live = true;
+    getListing(first.id).then(next => {
+      if (!live || next.updated_at === first.updated_at) return;
+      const was = toForm(first), now = toForm(next);
+      setL(next);
+      setF(cur => Object.fromEntries((Object.keys(now) as (keyof Form)[]).map(k => [k, cur[k].trim() !== was[k].trim() ? cur[k] : now[k]])) as Form);
+      tell(); // the tile behind the sheet is stale too
+    }).catch(e => logSwallowed('pb listing reopen', e)); // the page's copy stays; a save still re-checks on the server
+    return () => { live = false; };
+  }, []);
+
   /** Save edits (if any). Returns false when they could not be saved. */
   const save = async (): Promise<boolean> => {
     if (!changed.length) return true;
     if (locked) { setErr('This listing is being written or published right now — reload it in a minute, then edit.'); return false; }
     const price = f.price.trim() === '' ? null : Number(f.price);
-    if (price != null && (!Number.isFinite(price) || price < 0)) { setErr('Price must be a number, 0 or more'); return false; }
+    // 0 is refused everywhere on the server ("no price"), and a locked 0 would make Regenerate fail too.
+    if (price != null && (!Number.isFinite(price) || price <= 0)) { setErr('Price must be a number above 0 — or leave it empty to let the website’s pricing set it'); return false; }
     const handle = f.handle.trim().toLowerCase();
     if (handle && !/^[a-z0-9-]{1,80}$/.test(handle)) { setErr('Handle: only a–z, 0–9 and "-", up to 80 characters'); return false; }
     const patch: Partial<ListingFull> = {};

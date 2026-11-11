@@ -36,6 +36,15 @@ export function VendorsEmpty({ onAdd }: { onAdd: () => void }) {
   );
 }
 
+/** Every vendor is switched off: say so and offer the way back to them (not "No vendors yet"). */
+export function VendorsAllInactive({ n, onShow }: { n: number; onShow: () => void }) {
+  return (
+    <Shell icon="users" title="No active vendors" action={<PbButton onClick={onShow}>Show inactive</PbButton>}>
+      {n === 1 ? '1 vendor is inactive.' : `${n.toLocaleString('en-IN')} vendors are inactive.`} Show {n === 1 ? 'it' : 'them'} to edit or activate {n === 1 ? 'it' : 'one'} again.
+    </Shell>
+  );
+}
+
 export function VendorsNoMatch({ search, onClear }: { search: string; onClear: () => void }) {
   return (
     <Shell icon="search" title="No vendor matches" action={<PbButton icon="x" onClick={onClear}>Clear search</PbButton>}>

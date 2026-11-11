@@ -164,6 +164,7 @@ export async function ingest(b: IngestBody): Promise<Record<string, unknown>> {
   const rows: { product_id: string; path: string; position: number }[] = [];
   const store = source === 'import' ? (() => { try { return new URL(String(more.source_url)).host; } catch { return ''; } })() : null;
   const step = store !== null ? 1 : 3; // three at a time keeps memory in check; an import's one by one (another store's server)
+  let held = Date.now(); // when the hold (claimed_at) was last set
   try {
     for (let i = 0; i < urls.length; i += step) {
       await Promise.all(urls.slice(i, i + step).map(async (url, k) => {
@@ -175,13 +176,20 @@ export async function ingest(b: IngestBody): Promise<Record<string, unknown>> {
             method: 'POST', headers: { ...svcHeaders, 'content-type': img.type, 'x-upsert': 'true' }, body: img.bytes.buffer as ArrayBuffer,
           }, 30_000);
           if (!up.ok) throw new Error(`could not be saved (${up.status})`);
+          // Recorded at once: if this call is cut off before the last photo, the product keeps the photos it has.
+          await insert('pb_product_images', [{ product_id: id, path, position: n }]);
           rows.push({ product_id: id, path, position: n });
         } catch (e) {
           warnings.push(`Photo ${n + 1} ${e instanceof DOMException ? 'took too long to download' : plain(e).replace(/\.$/, '')}.`);
         }
       }));
+      // A slow store (a long Crawl-delay between photos) can take minutes: renew the hold once a minute, so the
+      // reader does not take the product over as "stuck" while its photos are still arriving.
+      if (Date.now() - held > 60_000) {
+        held = Date.now();
+        await patch('pb_products', `id=eq.${enc(id)}&status=eq.new`, { claimed_at: nowIso() }).catch(e => console.error(`pb-products ingest hold ${id}: ${plain(e)}`));
+      }
     }
-    if (rows.length) await insert('pb_product_images', rows.sort((a, c) => a.position - c.position));
   } finally {
     // Release the hold even when saving photos failed, so the product is still read.
     await patch('pb_products', `id=eq.${enc(id)}&status=eq.new`, { claimed_at: null });

@@ -2,7 +2,7 @@
 // status, listings per website, what needs a person, and whether automation is paused.
 // V2 bento (layout-and-components.md §4): [paused banner 12]
 // (hero 6×2)(3)(3)/(3)(3) · (products 12) · websites by count (12 | 6+6 | 4+4+4 …).
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { friendlyError } from '../lib/friendlyError';
 import type { PbPage } from './components/PbNav';
 import type { AddToast } from './components/PbToasts';
@@ -16,10 +16,11 @@ import DashProducts from './components/dashboard/DashProducts';
 import DashWebsites from './components/dashboard/DashWebsites';
 import { DashError, DashSkeleton, PausedBanner } from './components/dashboard/DashStates';
 
-export default function PlaybookDashboard({ name, go }: { name: string; addToast: AddToast; go: (p: PbPage, s?: ProductsStart) => void }) {
+export default function PlaybookDashboard({ name, addToast, go }: { name: string; addToast: AddToast; go: (p: PbPage, s?: ProductsStart) => void }) {
   const [d, setD] = useState<DashData | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadErr, setLoadErr] = useState<string | null>(null);
+  const loaded = useRef(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -27,10 +28,16 @@ export default function PlaybookDashboard({ name, go }: { name: string; addToast
       const [products, sites, settings, failed, review] = await Promise.all([productCounts(), listWebsitesLite(), getPbSettingsLite(), listingTotal('failed'), listingTotal('review')]);
       const perSite = await listingCounts(sites.map(s => s.id));
       setD({ products, sites, perSite, failed, review, paused: settings.paused });
+      loaded.current = true;
       setLoadErr(null);
-    } catch (e) { setLoadErr(friendlyError(e)); } // shown in the failed tile with Try again; no toast on top
-    finally { setLoading(false); }
-  }, []);
+    } catch (e) {
+      // First load: the failed tile with Try again is the signal (no toast on top).
+      // A failed Refresh keeps the old numbers on screen, so it must say so.
+      const m = friendlyError(e);
+      setLoadErr(m);
+      if (loaded.current) addToast(m, 'error');
+    } finally { setLoading(false); }
+  }, [addToast]);
   useEffect(() => { void load(); }, [load]);
 
   const refresh = (block?: boolean) => (

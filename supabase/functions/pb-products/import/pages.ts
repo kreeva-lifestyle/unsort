@@ -98,7 +98,8 @@ async function genericPage(run: RunSpec, robots: Robots, stillInTime: () => bool
       taken++; used++;
       const f = r.ok ? fromJsonLd(r.text, u) : null;
       if (f && f.name) items.push(f);
-      else if (!r.ok) pageErrors++;
+      // A page that is gone (a stale sitemap entry) is not the website refusing us, and not a failed product.
+      else if (!r.ok && r.status !== 404 && r.status !== 410) pageErrors++;
     } catch (e) {
       if (e instanceof RateLimited) { if (!taken) throw e; wait = e.retryAfter; break; } // this page is read again after the wait
       taken++; used++; pageErrors++;

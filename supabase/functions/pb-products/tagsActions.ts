@@ -6,7 +6,7 @@
 // category_link_save. SQL: 20261110090000_pb_tags.sql. Suggestions, product
 // values, retag and "Let AI decide": tagsQueue.ts.
 import { uuid, type Body } from './actions.ts';
-import { SB_URL, enc, insert, logActivity, one, patch, rpc, sel, svcHeaders, uniqueCi } from './db.ts';
+import { SB_URL, enc, insert, logActivity, one, patch, remove, rpc, sel, selAll, svcHeaders, uniqueCi } from './db.ts';
 import { HttpError } from './http.ts';
 import { exactIn, lookAlikes } from './tagLook.ts';
 import { displayName, tagKey } from './tagText.ts';
@@ -64,7 +64,7 @@ export async function attributeSave(b: Body, userId: string | null) {
     row = (await patch<AttrRow>('pb_attributes', `id=eq.${enc(id)}`, body, ATTR_COLS))[0];
     if (before.name !== name) { // "Missing: Colour" holds the name: re-gate the products of its categories
       const cats = (await sel<{ category: string }>(`pb_category_attributes?attribute_id=eq.${enc(id)}&select=category`)).map(c => `"${c.category.replace(/"/g, '')}"`);
-      const ids = cats.length ? (await sel<{ id: string }>(`pb_products?category=in.(${enc(cats.join(','))})&status=neq.archived&select=id&limit=20000`)).map(p => p.id) : [];
+      const ids = cats.length ? (await selAll<{ id: string }>(`pb_products?category=in.(${enc(cats.join(','))})&status=neq.archived&select=id&order=id.asc`)).map(p => p.id) : [];
       await refresh(ids);
     }
   } else {
@@ -77,6 +77,15 @@ export async function attributeSave(b: Body, userId: string | null) {
 
 export async function attributeDelete(b: Body, userId: string | null) {
   const id = uuid(b.id, 'The attribute');
+  // A suggestion filed under this attribute falls back to "no attribute" when the attribute goes. Where the
+  // same word already waits with no attribute that would be a duplicate, and the database then refuses the
+  // whole delete: take the attribute's copy out first (the other one stays in the queue).
+  const mine = await selAll<{ id: string; key: string }>(`pb_tag_suggestions?attribute_id=eq.${enc(id)}&select=id,key&order=id.asc`);
+  if (mine.length) {
+    const free = new Set((await selAll<{ key: string }>('pb_tag_suggestions?attribute_id=is.null&select=key&order=id.asc')).map(s => s.key));
+    const twins = mine.filter(s => free.has(s.key)).map(s => s.id);
+    for (let i = 0; i < twins.length; i += 100) await remove('pb_tag_suggestions', `id=in.(${twins.slice(i, i + 100).map(enc).join(',')})`);
+  }
   const regated = await rpc<number>('pb_attribute_delete', { p_id: id });
   await logActivity({ action: 'tags_edited', details: { what: 'attribute_deleted', id, regated }, user_id: userId });
   return { ok: true, regated };
@@ -132,7 +141,7 @@ export async function valueSave(b: Body, userId: string | null) {
     const last = r.tax.values.filter(v => v.attribute_id === attributeId).reduce((m, v) => Math.max(m, v.position), 0);
     row = (await insert<ValueRow>('pb_attribute_values', [{ attribute_id: attributeId, name, key, aliases, position: last + 1 }], { select: VALUE_COLS }))[0];
   }
-  if (id && before && before.name !== name) await refresh((await sel<{ product_id: string }>(`pb_product_values?value_id=eq.${enc(id)}&select=product_id&limit=20000`)).map(x => x.product_id));
+  if (id && before && before.name !== name) await refresh((await selAll<{ product_id: string }>(`pb_product_values?value_id=eq.${enc(id)}&select=product_id&order=product_id.asc`)).map(x => x.product_id));
   await logActivity({ action: 'tags_edited', details: { what: 'value', name, new: !id, forced: b.force === true && matches.length > 0 }, user_id: userId });
   return { ok: true, value: row };
 }

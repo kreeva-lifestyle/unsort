@@ -59,6 +59,15 @@ export async function webhook(req: Request): Promise<Response> {
   try {
     const cfg = await config();
     if (p.link) {
+      // A basic group numbers its messages separately for every account, so the crawler's "this group message
+      // is that channel post" notes would never match what the bot receives: reposts would land under the wrong
+      // vendor. Only a supergroup can be linked. Answered only while a code is live (as below: no code, no answer).
+      if (p.chat_type === 'group') {
+        if (cfg.link_code && cfg.link_code_expires_at && Date.parse(cfg.link_code_expires_at) > Date.now()) {
+          await say(token, p.chat_id, 'This is a basic group, which Playbook cannot use. Make it a supergroup first: open the group’s settings, set “Chat history for new members” to Visible, then send /link with the code again.');
+        }
+        return ok();
+      }
       const r = await rpc<string>('pb_tg_link_try', { p_code: p.link, p_chat: p.chat_id, p_title: p.chat_title ?? null });
       if (r === 'linked') await say(token, p.chat_id, 'Linked to Playbook ✓');
       else if (r === 'wrong') await say(token, p.chat_id, 'That code is not right or has expired — get a new one in Playbook → Settings → Telegram.');

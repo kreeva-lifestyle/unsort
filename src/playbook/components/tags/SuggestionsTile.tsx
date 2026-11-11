@@ -29,7 +29,12 @@ export default function SuggestionsTile({ attrs, api, addToast, version, onChang
   const [guard, setGuard] = useState<{ s: PbSuggestion; matches: PbLookAlike[] } | null>(null);
   const [alias, setAlias] = useState<PbSuggestion | null>(null);
   const load = useCallback(async () => {
-    try { const r = await api.listSuggestions('pending', page, attr); setRows(r.rows); setCount(r.count); setErr(''); }
+    try {
+      const r = await api.listSuggestions('pending', page, attr);
+      // The last suggestion of a later page was just handled: step back to the page that still has some.
+      if (!r.rows.length && page > 0) { setPage(Math.max(0, Math.ceil(r.count / 20) - 1)); return; }
+      setRows(r.rows); setCount(r.count); setErr('');
+    }
     catch (e) { setErr(friendlyError(e)); }
   }, [api, page, attr]);
   useEffect(() => { void load(); }, [load, version]);
@@ -42,17 +47,17 @@ export default function SuggestionsTile({ attrs, api, addToast, version, onChang
       const first = Object.entries(r.conflicts)[0];
       if (first) { const s = rows?.find(x => x.id === first[0]); if (s) setGuard({ s, matches: first[1] as PbLookAlike[] }); }
       if (r.done) { addToast(ok(r.done) + (r.retagged ? ` · ${plural(r.retagged, 'product')} tagged` : ''), 'success'); setSel(new Set()); onChanged(); }
-      return true;
+      return first ? 'asked' : true; // 'asked': the server found a look-alike and the question is now open
     } catch (e) { addToast(friendlyError(e), 'error'); return false; } finally { setBusy(''); }
   };
   const nameOf = (id: string | null) => attrs.find(a => a.id === id)?.name ?? '';
   const add = (s: PbSuggestion, force = false) => {
     const close = s.matches.filter(m => m.reason !== 'same' || m.other_attribute);
     if (!force && close.length) { setGuard({ s, matches: close }); return; }
-    void act({ ids: [s.id], action: 'add', force }, `add:${s.id}`, () => `Added “${s.phrase}” to ${nameOf(s.attribute_id)}`).then(() => setGuard(null));
+    void act({ ids: [s.id], action: 'add', force }, `add:${s.id}`, () => `Added “${s.phrase}” to ${nameOf(s.attribute_id)}`).then(r => { if (r === true) setGuard(null); });
   };
   const aliasTo = (s: PbSuggestion, t: AliasTarget) => void act({ ids: [s.id], action: 'alias', value_id: t.value_id }, `alias:${s.id}`, () => `“${s.phrase}” now means ${t.value} (${t.attribute})`)
-    .then(ok => { if (ok) { setAlias(null); setGuard(null); } });
+    .then(ok => { if (ok === true) { setAlias(null); setGuard(null); } });
 
   const ids = [...sel];
   const chosen = (rows ?? []).filter(r => sel.has(r.id));

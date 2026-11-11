@@ -50,8 +50,9 @@ export function LastConnected({ site }: { site: PbWebsite }) {
   return <div style={pbMeta}>Last connected {shortDate(site.connected_at)}{site.shop_name ? ` · ${site.shop_name}` : ''}</div>;
 }
 
-export function ActiveLine({ site, switching }: { site: PbWebsite; switching: boolean }) {
-  const label = switching ? (site.active ? 'Switching off…' : 'Switching on…')
+/** `switching`: the way the switch is going. Not read from site.active, which is already true while the matching products are still being sent. */
+export function ActiveLine({ site, switching }: { site: PbWebsite; switching: '' | 'on' | 'off' }) {
+  const label = switching ? (switching === 'off' ? 'Switching off…' : site.active ? 'On — sending the products that match…' : 'Switching on…')
     : site.active ? 'On — new and re-checked products that match are sent automatically.'
       : site.connected_at ? 'Off — nothing new is sent.' : 'Off — connect the store first.';
   return <Dot color={site.active ? PB.live : NEUTRAL} label={label} style={{ whiteSpace: 'normal', fontSize: 13, color: site.active ? PB.tx : PB.tx2 }} />;

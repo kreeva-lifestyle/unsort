@@ -58,6 +58,11 @@ export async function routeProduct(p: ProductRow, userId: string | null): Promis
     } else if (waiting(cur) || autoSkipped(cur)) {
       const done = await patch('pb_listings', `id=eq.${enc(cur.id)}&or=(${WAITING_OR},and(status.eq.skipped,shopify_product_id.is.null,error.in.(${AUTO_SKIP.map(quoted).join(',')})))`, fields);
       (done.length ? queued : kept).push(s.name);
+    } else if (cur.status === 'skipped' && cur.error === ARCHIVED && cur.shopify_product_id) {
+      // Set aside by the worker because the product was archived while this listing waited to go out, yet it is
+      // still on Shopify. The product is back: send it again, or Playbook shows "removed" for a product on sale.
+      const done = await patch('pb_listings', `id=eq.${enc(cur.id)}&status=eq.skipped&error=eq.${enc(ARCHIVED)}`, fields);
+      (done.length ? queued : kept).push(s.name);
     } else if (cur.status === 'published' && !(cur.locked || []).includes('price') && hasPrice(p)) {
       // The cost / copied selling price or the site's pricing changed: only the price moves; the written text stays.
       const calc = listingPrice(p, s.pricing || {}, d.rule?.price_override ?? null)!;

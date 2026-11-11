@@ -25,6 +25,18 @@ export async function sel<T>(path: string): Promise<T[]> {
   return await r.json() as T[];
 }
 
+/** Every row of a query. PostgREST answers at most 1000 rows per request on this project, whatever `limit`
+ *  asks for, so a bigger read is paged. `path` must carry an `order` (a stable one) and no limit / offset. */
+export async function selAll<T>(path: string, max = 100_000): Promise<T[]> {
+  const out: T[] = [];
+  for (let offset = 0; offset < max; offset += 1000) {
+    const rows = await sel<T>(`${path}&limit=1000&offset=${offset}`);
+    out.push(...rows);
+    if (rows.length < 1000) break;
+  }
+  return out;
+}
+
 export async function one<T>(path: string): Promise<T | null> {
   return (await sel<T>(path.includes('limit=') ? path : `${path}&limit=1`))[0] ?? null;
 }
@@ -38,6 +50,12 @@ export async function patch<T>(table: string, filter: string, body: Record<strin
   });
   if (!r.ok) return dbFail(r, 'refused the change');
   return await r.json() as T[];
+}
+
+/** DELETE the rows matching `filter` (always pass one). */
+export async function remove(table: string, filter: string): Promise<void> {
+  const r = await fetch(`${SB_URL}/rest/v1/${table}?${filter}`, { method: 'DELETE', headers: svcHeaders });
+  if (!r.ok) await dbFail(r, 'refused the delete');
 }
 
 /** INSERT (or upsert with `onConflict` + merge / ignore). Returns the written rows. */
@@ -87,7 +105,9 @@ export async function rpc<T>(fn: string, args: Record<string, unknown>): Promise
     if (body?.code === 'P0001' && body.message) throw new HttpError(400, String(body.message).slice(0, 200));
     return dbFail(r, 'refused the change');
   }
-  return await r.json() as T;
+  // A function that returns void answers 204 with no body (pb_tag_fill_tick): nothing to parse.
+  const text = await r.text();
+  return (text ? JSON.parse(text) : undefined) as T;
 }
 
 /** Timeline entry. Written after the change it describes; a failed log write is reported in the
