@@ -9,7 +9,7 @@
 //                    with now and one product, fill it right away: tagFill.ts)
 //   tags_fill_status → the latest run's progress
 import { uuid, type Body } from './actions.ts';
-import { SB_URL, ago, enc, insert, logActivity, nowIso, one, patch, sel, svcHeaders } from './db.ts';
+import { SB_URL, enc, insert, logActivity, nowIso, one, patch, sel, svcHeaders } from './db.ts';
 import { HttpError } from './http.ts';
 import { routeProduct } from './route.ts';
 import { fillOne } from './tagFill.ts';
@@ -104,7 +104,7 @@ export async function fillStatus() {
   const waiting = r.finished_at ? 0 : await count(`pb_products?select=id&tag_fill_run=eq.${enc(r.id)}&status=in.(ready,needs_info)`);
   // Nothing left to take, yet no tick closed the run (its last products were archived meanwhile): close it here,
   // or the progress line never ends. Not in its first minutes: a run is created before its products are marked.
-  if (!r.finished_at && !waiting && r.created_at < ago(2 * 60_000)) {
+  if (!r.finished_at && !waiting && Date.parse(r.created_at) < Date.now() - 2 * 60_000) {
     r.finished_at = nowIso();
     await patch('pb_tag_fill_runs', `id=eq.${enc(r.id)}&finished_at=is.null`, { finished_at: r.finished_at });
   }

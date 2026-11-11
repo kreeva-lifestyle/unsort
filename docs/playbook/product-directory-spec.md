@@ -122,7 +122,11 @@ Time budget per `work` call: stop starting new items after ~100 s; a read
 starts only with 45 s left, a generation with 80 s, a publish with 70 s; at
 most 6 reads, 8 generations, 10 publishes per call. The cron's
 trigger_pb_worker calls the function only when the steps' own filters would
-find work (claims older than 5 min, listings of active websites only).
+find work (claims older than 5 min, listings of active websites only; since
+20261111090000 also a product queued for "Let AI decide" or made Ready by a
+tag change: tag_fill_run, route_due). A queued "Let AI decide" product leaves
+the queue first, and that is its claim, so two overlapping runs never fill
+the same product.
 A routing failure after a read counts towards the reader's 3 tries; after
 that the product stays Ready with the note. `pb_settings.automation.paused`
 stops the cron (manual actions still work).

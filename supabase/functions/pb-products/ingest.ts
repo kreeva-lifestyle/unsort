@@ -185,7 +185,10 @@ export async function ingest(b: IngestBody): Promise<Record<string, unknown>> {
       }));
       // A slow store (a long Crawl-delay between photos) can take minutes: renew the hold once a minute, so the
       // reader does not take the product over as "stuck" while its photos are still arriving.
-      if (Date.now() - held > 60_000) { held = Date.now(); await patch('pb_products', `id=eq.${enc(id)}&status=eq.new`, { claimed_at: nowIso() }).catch(() => []); }
+      if (Date.now() - held > 60_000) {
+        held = Date.now();
+        await patch('pb_products', `id=eq.${enc(id)}&status=eq.new`, { claimed_at: nowIso() }).catch(e => console.error(`pb-products ingest hold ${id}: ${plain(e)}`));
+      }
     }
   } finally {
     // Release the hold even when saving photos failed, so the product is still read.

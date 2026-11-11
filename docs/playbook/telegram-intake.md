@@ -50,6 +50,10 @@ ignored).
    step: 5 wrong codes (from any group) void it; while no code is live the bot
    does not answer at all. Then BotFather `/setjoingroups` → **Disable**. A
    group upgraded to a supergroup (new id) is picked up automatically.
+   The group must BE a supergroup before `/link`: a basic group numbers its
+   messages per account, so the crawler's forward mapping would never match
+   the bot's message ids. `/link` in a basic group is refused with how to
+   upgrade it (chat history for new members → Visible).
 4. **Staff account keys** at my.telegram.org → API development tools →
    `api_id`, `api_hash`; the staff account joins every vendor channel and the
    admin group (privacy "Groups & Channels → My Contacts").
@@ -154,7 +158,7 @@ ignored).
      onto the product before it if that one has no text, the note, is under 2
      days old (checks are daily) and on no website (read again); otherwise text with no photos is
      a product only when it names a rate / code / price;
-   - when the batch (3000 rows) is full, the last channel's last group waits
+   - when the batch (1000 rows, the most one request returns) is full, the last channel's last group waits
      for the next run; products are made oldest first;
    - a LESS attaches to the current product until the next product's photos;
      a product with no less is kept from the reader until 10 minutes after

@@ -42,6 +42,7 @@ export const TELEGRAM: GuideSection[] = [
       h('3 · Add the bot to your admin group and link it'),
       steps(
         'In Telegram make a **private group**, e.g. `Vendor posts`, with you and the **staff account** (step 4). Keep it just for this.',
+        'Open the group, tap its name → **Edit** (pencil) → **Chat history for new members** → **Visible** → save. This turns it into a supergroup, the only kind Playbook can use. If you skip it, the bot tells you so when you send the link code.',
         'Open the group, tap its name → **Add members** → add your bot. Then tap **Edit** (pencil) → **Administrators** → **Add Admin** → pick the bot → tap ✓ to save. The bot must be an **admin** to see the forwarded posts.',
         'In Playbook, under **2 · Admin group**, tap **Get link code**. A 6-digit code appears, valid for 30 minutes.',
         'In the group send `/link 123456` (your code instead of 123456) — or tap **Copy /link …** in Playbook and paste it.',
