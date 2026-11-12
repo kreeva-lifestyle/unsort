@@ -592,9 +592,14 @@ AI's extra tags are an enum of it.
   or the FAQ (`FACT_ORDER` has no sizes bullet); a measurement that belongs to
   a size, or "free size", may be a fit fact. On Shopify each size is one value
   of the `Size` option, shown as scraped ("XS (34)"). Its SKU is the product's
-  base SKU plus the size without its measurement (`skuBase`: an imported
-  product carries its first size's own SKU, "NKB 47 PURPLE XS" →
-  "NKB 47 PURPLE-XS", "NKB 47 PURPLE-S"…). An import hands its size choices
+  base SKU, the joiner and the size without its measurement (`skuParts`: an
+  imported product carries its first size's own SKU, "NKB 47 PURPLE XS" →
+  base "NKB 47 PURPLE", joiner " " → "NKB 47 PURPLE XS", "NKB 47 PURPLE S"…,
+  the store's own code for each size: 790 of the 796 sizes on the first
+  scraped store follow that form, the other six are "…-1" to "…-6"; a SKU
+  with no size at its end is joined with "-": "RG-1042-M"). Each colour is
+  its own product and its SKU carries the colour, so every colour + size has
+  one code of its own. An import hands its size choices
   to `ingest` as a list (`importFacts`, import only), exactly as the store
   writes them, and the reader never replaces an imported product's sizes;
   before this the reader retyped them from the text and shortened "XS (34)"
