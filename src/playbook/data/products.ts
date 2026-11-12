@@ -11,26 +11,26 @@ export type { ListingFull } from './listings';
 
 export const PAGE_SIZE = 25;
 
-export type ProductRow = Pick<PbProduct, 'id' | 'name' | 'sku' | 'cost_price' | 'sell_price' | 'in_stock' | 'status' | 'category' | 'fabric' | 'color' | 'missing_attrs' | 'ai_error' | 'source' | 'source_ref' | 'created_at'> & {
+export type ProductRow = Pick<PbProduct, 'id' | 'name' | 'sku' | 'cost_price' | 'sell_price' | 'in_stock' | 'temp_out_at' | 'status' | 'category' | 'fabric' | 'color' | 'missing_attrs' | 'ai_error' | 'source' | 'source_ref' | 'created_at'> & {
   pb_vendors: { name: string } | null;
   pb_product_images: { path: string; position: number }[];
   pb_listings: { id: string; website_id: string; status: PbListingStatus }[];
 };
-/** status: '' = everything but archived · a product status · 'l:failed' / 'l:queued,generating,publishing' = has a listing in that state (one or a comma list) · 'stock:out' = out of stock.
+/** status: '' = everything but archived · a product status · 'l:failed' / 'l:queued,generating,publishing' = has a listing in that state (one or a comma list) · 'stock:out' = out of stock · 'stock:temp' = a vendor called it temporarily out (a note only).
  *  source: '' = any · 'telegram' · 'manual' (typed in) · 'import:<host>' (copied from that website, with or without "www."). */
 export type ProductFilter = { search: string; status: string; vendorId: string; websiteId: string; source: string };
 export const EMPTY_FILTER: ProductFilter = { search: '', status: '', vendorId: '', websiteId: '', source: '' };
 
-const LIST_COLS = 'id,name,sku,cost_price,sell_price,in_stock,status,category,fabric,color,missing_attrs,ai_error,source,source_ref,created_at,pb_vendors(name),pb_product_images(path,position),pb_listings(id,website_id,status)';
+const LIST_COLS = 'id,name,sku,cost_price,sell_price,in_stock,temp_out_at,status,category,fabric,color,missing_attrs,ai_error,source,source_ref,created_at,pb_vendors(name),pb_product_images(path,position),pb_listings(id,website_id,status)';
 
 export async function listProducts(f: ProductFilter, page: number): Promise<{ rows: ProductRow[]; count: number }> {
   const lStatus = f.status.startsWith('l:') ? f.status.slice(2) : '';
   // A second, inner-joined copy of the listings narrows the products without trimming the chips.
   const hit = f.websiteId || lStatus ? ',hit:pb_listings!inner(website_id,status)' : '';
   let q = supabase.from('pb_products').select(LIST_COLS + hit, { count: 'exact' });
-  const soldOut = f.status === 'stock:out';
-  if (!f.status || lStatus || soldOut) q = q.neq('status', 'archived'); else q = q.eq('status', f.status);
-  if (soldOut) q = q.eq('in_stock', false);
+  const stock = f.status.startsWith('stock:') ? f.status.slice(6) : '';
+  if (!f.status || lStatus || stock) q = q.neq('status', 'archived'); else q = q.eq('status', f.status);
+  if (stock === 'out') q = q.eq('in_stock', false); else if (stock === 'temp') q = q.not('temp_out_at', 'is', null);
   const lList = lStatus.split(',').filter(Boolean);
   if (lList.length > 1) q = q.in('hit.status', lList); else if (lStatus) q = q.eq('hit.status', lStatus);
   if (f.websiteId) q = q.eq('hit.website_id', f.websiteId);
@@ -57,7 +57,7 @@ export type ProductDetail = Omit<PbProduct, 'claimed_at' | 'created_by'> & {
   pb_product_images: Pick<PbProductImage, 'id' | 'path' | 'position' | 'kind' | 'bytes'>[];
   pb_listings: ListingFull[];
 };
-const PRODUCT_COLS = 'id,vendor_id,source,source_ref,raw_text,sku,name,category,fabric,color,sizes,in_stock,cost_price,tags,missing_attrs,attributes,status,locked,ai_read_at,ai_error,less_amount,source_url,intake_notes,sell_price,price_note,created_at,updated_at';
+const PRODUCT_COLS = 'id,vendor_id,source,source_ref,raw_text,sku,name,category,fabric,color,sizes,in_stock,temp_out_at,cost_price,tags,missing_attrs,attributes,status,locked,ai_read_at,ai_error,less_amount,source_url,intake_notes,sell_price,price_note,created_at,updated_at';
 
 export async function getProduct(id: string): Promise<ProductDetail> {
   const { data, error } = await supabase.from('pb_products')

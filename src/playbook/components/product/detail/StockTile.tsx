@@ -5,19 +5,28 @@
 // minutes. A product copied from a website gets this from that
 // store on every import, so the hint says who decides next time.
 // Two signals: "Saving…" beside the switch, then a toast.
+// A vendor's TEMPORARY stock-out notice leaves only a note here (owner,
+// 2026-11-12: "just note that product as temporary … nothing is to be done"):
+// a line with the date and "Clear note"; the product stays on sale.
 import { useState } from 'react';
 import { friendlyError } from '../../../../lib/friendlyError';
 import type { AddToast } from '../../PbToasts';
 import type { ProductDetail } from '../../../data/products';
-import { setStock } from '../../../data/stock';
+import { clearTempOut, setStock } from '../../../data/stock';
 import { PB, pbMeta, pbTileTitle } from '../../../pbTheme';
-import { PbTile } from '../../ui';
+import { PbButton, PbTile } from '../../ui';
 import PbSwitch from '../../ui/PbSwitch';
-import { Dot, NEUTRAL } from '../status';
+import { Dot, NEUTRAL, shortDate } from '../status';
 
-export default function StockTile({ p, span, addToast, onChanged }: { p: Pick<ProductDetail, 'id' | 'in_stock' | 'source' | 'source_ref'>; span?: 12; addToast: AddToast; onChanged: () => void }) {
+export default function StockTile({ p, span, addToast, onChanged }: { p: Pick<ProductDetail, 'id' | 'in_stock' | 'temp_out_at' | 'source' | 'source_ref'>; span?: 12; addToast: AddToast; onChanged: () => void }) {
   const [busy, setBusy] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const on = p.in_stock !== false;
+  const clear = async () => {
+    setClearing(true);
+    try { await clearTempOut(p.id); addToast('Note cleared', 'success'); onChanged(); }
+    catch (e) { addToast(friendlyError(e), 'error'); } finally { setClearing(false); }
+  };
   const host = p.source === 'import' ? (p.source_ref || '').split(':')[0] : '';
   const flip = async () => {
     if (busy) return;
@@ -42,6 +51,13 @@ export default function StockTile({ p, span, addToast, onChanged }: { p: Pick<Pr
         <Dot color={on ? PB.live : NEUTRAL} label={busy ? 'Saving…' : on ? 'In stock' : 'Out of stock'} />
         <PbSwitch on={on} onToggle={() => void flip()} label="In stock" />
       </span>
+      {p.temp_out_at && (
+        <div style={{ flex: '1 1 100%', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', minWidth: 0 }}>
+          <Dot color={PB.review} style={{ whiteSpace: 'normal', flex: '1 1 220px', minWidth: 0 }}
+            label={`The vendor said this is temporarily out of stock (${shortDate(p.temp_out_at)}). Nothing was changed on your websites.`} />
+          <PbButton onClick={() => void clear()} busy={clearing} busyLabel="Clearing…" dim={busy}>Clear note</PbButton>
+        </div>
+      )}
     </PbTile>
   );
 }

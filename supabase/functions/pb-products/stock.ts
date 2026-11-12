@@ -12,7 +12,7 @@ import { type Body, uuid } from './actions.ts';
 import { enc, logActivity, one, patch, sel } from './db.ts';
 import { HttpError } from './http.ts';
 
-export interface StockChange { in_stock?: boolean; sizes?: string[] }
+export interface StockChange { in_stock?: boolean; sizes?: string[]; temp_out_at?: string | null }
 
 /** Save the change and send the published listings again. Returns how many were sent, or -1 when the product is gone. */
 export async function saveStock(p: { id: string; status: string }, ch: StockChange, note: Record<string, unknown>, userId: string | null): Promise<number> {

@@ -15,8 +15,13 @@
 // A code Playbook has no product for is nothing to do. The notice itself never
 // becomes a product: it is archived when everything was handled, or stays in
 // Needs info named "Stock notice …" with one line per code under "Notes from
-// Telegram" when something is left to check. Permanent / temporary is recorded
-// on the activity row; both are "out of stock" for now.
+// Telegram" when something is left to check.
+// Permanent or temporary (owner, same day: "If temporary word mentioned then
+// ignore it. And just note that product as temporary which can be filterable;
+// nothing is to be done"): a TEMPORARY notice changes nothing on the websites;
+// the products only get the note `temp_out_at`, which the Products list can
+// filter. A PERMANENT one, and one that says neither, marks them out of stock
+// and clears that note.
 // A product is only ever taken for a notice on its FIRST read, when nobody has
 // typed anything into it and the reader found no price in it: a product that
 // is already in use is never renamed or archived by a later read.
@@ -71,10 +76,10 @@ export function pick(item: NoticeItem, cands: Cand[]): { apply: Cand[]; left: st
   return { apply: [...apply], left: missing.length ? `no product of this design in ${missing.join(', ')} (it has ${skus(set)})` : '' };
 }
 
-/** One line for the notice's "Notes from Telegram". */
-export function noticeLine(item: NoticeItem, r: { apply: Cand[]; left: string }): string {
+/** One line for the notice's "Notes from Telegram". `temporary`: the products were only noted, nothing was taken off sale. */
+export function noticeLine(item: NoticeItem, r: { apply: Cand[]; left: string }, temporary = false): string {
   const label = `${item.code}${(item.colours || []).length ? ` ${item.colours.join(', ')}` : ''}`.replace(/\s+/g, ' ').trim();
-  const done = r.apply.length ? `out of stock: ${r.apply.map(c => c.sku || c.name || 'a product').join(', ')}` : '';
+  const done = r.apply.length ? `${temporary ? 'noted as temporarily out (still on sale)' : 'out of stock'}: ${r.apply.map(c => c.sku || c.name || 'a product').join(', ')}` : '';
   return `${label} — ${[done, r.left ? `CHECK: ${r.left}` : ''].filter(Boolean).join('. ') || 'not in Playbook, nothing to do'}`.slice(0, 300);
 }
 
@@ -83,16 +88,20 @@ export function noticeLine(item: NoticeItem, r: { apply: Cand[]; left: string })
 export async function stockNotice(p: ProductRow, n: Notice | null | undefined, price: number | null, ai: { model: string; usd: number }, userId: string | null): Promise<ProductRow | null> {
   const items = (n?.items || []).filter(i => String(i?.code || '').trim()).slice(0, 40);
   if (!n || !items.length || p.source === 'import' || p.ai_read_at || (p.locked || []).length || Number(price) > 0) return null;
-  const lines: string[] = [];
+  const lines: string[] = [], temporary = n.kind === 'temporary';
   let marked = 0, left = 0;
   for (const it of items) {
     const r = pick(it, await rpc<Cand[]>('pb_stock_candidates', { p_vendor: p.vendor_id, p_code: it.code }) || []);
     for (const c of r.apply) {
-      if (!c.in_stock) continue; // already out of stock
-      if ((await saveStock({ id: c.id, status: c.status }, { in_stock: false }, { notice: p.id, kind: n.kind }, userId)) >= 0) marked++;
+      if (temporary) { // a note only: the product stays on sale, Shopify is not touched
+        if (!(await patch('pb_products', `id=eq.${enc(c.id)}`, { temp_out_at: nowIso() })).length) continue;
+        await logActivity({ product_id: c.id, action: 'stock', details: { temporary: true, notice: p.id }, user_id: userId });
+        marked++;
+      } else if (!c.in_stock) await patch('pb_products', `id=eq.${enc(c.id)}`, { temp_out_at: null }); // already out of stock: only the note goes
+      else if ((await saveStock({ id: c.id, status: c.status }, { in_stock: false, temp_out_at: null }, { notice: p.id, kind: n.kind }, userId)) >= 0) marked++;
     }
     if (r.left) left++;
-    lines.push(noticeLine(it, r));
+    lines.push(noticeLine(it, r, temporary));
   }
   const name = `Stock notice${n.kind === 'unknown' ? '' : ` (${n.kind})`}: ${items.map(i => `${i.code}${i.colours?.length ? ` ${i.colours.join(', ')}` : ''}`).join('; ')}`.replace(/\s+/g, ' ').slice(0, 200);
   const saved = await patch<ProductRow>('pb_products', `id=eq.${enc(p.id)}&status=eq.reading`,
