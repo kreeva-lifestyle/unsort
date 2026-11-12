@@ -36,7 +36,7 @@ export default function FailedBar({ websiteId, addToast, onRetried, count: given
   return (
     <PbTile variant="failed" style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
       <Dot color={PB.failed} style={{ color: PB.tx, fontSize: 13, fontWeight: 600, whiteSpace: 'normal', flex: '1 1 220px' }}
-        label={<><span style={pbNum}>{count}</span> {many ? 'listings' : 'listing'} failed{websiteId ? ' on this website' : ''}. Open one to see why, or try them all again.</>} />
+        label={<span><span style={pbNum}>{count}</span> {many ? 'listings' : 'listing'} failed{websiteId ? ' on this website' : ''}. Open one to see why, or try them all again.</span>} />
       <PbButton icon="refresh" style={{ whiteSpace: 'normal', padding: '8px 16px' }} onClick={() => void go()} busy={busy} busyLabel="Retrying…">Retry all {count}</PbButton>
     </PbTile>
   );

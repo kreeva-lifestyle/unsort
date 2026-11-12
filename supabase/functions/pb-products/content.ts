@@ -1,6 +1,7 @@
 // Pure text helpers for listings: length cuts, the title template, the URL
 // handle, the meta title's brand ending and the description HTML whitelist
 // (p, ul, li, h3, strong, em, br).
+import { brandFits } from './profile.ts';
 
 /** Cut to `max` characters, at a word boundary when one is near. */
 export function cut(s: string, max: number): string {
@@ -50,7 +51,8 @@ export function cleanHandle(raw: string, fallback: string, sku: string | null): 
   return w.slice(0, 6).join('-').slice(0, 80).replace(/-$/, '');
 }
 
-/** "… | Brand": the meta title always ends with the brand, inside `max` (the text gives way, never the brand). */
+/** "… | Brand": the meta title ends with the brand, inside `max` (the text gives way, never the brand). A brand
+ *  too long to leave the product 12 characters is left out: cut off part-way it would fail the brand check on every listing. */
 export function withBrand(title: string, brand: string, max: number): string {
   const b = String(brand || '').replace(/\s+/g, ' ').trim();
   const flat = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
@@ -58,9 +60,8 @@ export function withBrand(title: string, brand: string, max: number): string {
   if (!b) return cut(t, max);
   if (flat(t).endsWith(flat(b))) t = t.slice(0, t.toLowerCase().lastIndexOf(b.toLowerCase().split(' ')[0])); // strip the brand it already ends with
   t = t.replace(/[\s|\-–:,]+$/, '');
-  const room = max - b.length - 3;
-  if (room < 12 || !t) return cut(t ? `${t} | ${b}` : b, max);
-  return `${cut(t, room)} | ${b}`;
+  if (!brandFits(b, max)) return cut(t || b, max);
+  return t ? `${cut(t, max - b.length - 3)} | ${b}` : b;
 }
 
 const KEEP: Record<string, string> = {

@@ -113,7 +113,7 @@ export default function RuleModal({ siteId, rule, nextPosition, vendors, categor
         </Field>
         <Grid2>
           <Field label="Cost from ₹" htmlFor="pbr-min"><NumInput id="pbr-min" value={c.min_cost ?? null} max={10000000} placeholder="Any" onChange={v => putC({ min_cost: v })} /></Field>
-          <Field label="Cost up to ₹" htmlFor="pbr-max"><NumInput id="pbr-max" value={c.max_cost ?? null} max={10000000} placeholder="Any" onChange={v => putC({ max_cost: v })} /></Field>
+          <Field label="Cost up to ₹" htmlFor="pbr-max" hint="A product copied from another website has no cost, so a cost range never matches it"><NumInput id="pbr-max" value={c.max_cost ?? null} max={10000000} placeholder="Any" onChange={v => putC({ max_cost: v })} /></Field>
         </Grid2>
         <Field label="Keywords" htmlFor="pbr-kw" hint="Any of these words in the name, SKU, details or AI-read attributes">
           <ChipsInput id="pbr-kw" values={c.keywords ?? []} onChange={v => putC({ keywords: v })} placeholder="e.g. bridal" />

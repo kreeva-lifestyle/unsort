@@ -86,7 +86,9 @@ export async function setWebsiteActive(id: string, active: boolean): Promise<PbW
 /** shop_domain only when moving the site to another store: the server then switches the site off,
  *  deletes every saved secret of the old store and re-queues its listings before storing these. */
 export type Credentials = { auth_mode: PbAuthMode; access_token?: string; client_id?: string; client_secret?: string; shop_domain?: string };
-export type ConnectionResult = { ok: boolean; shop_name: string; scopes?: string[]; missing_scopes?: string[] };
+/** `problems` = why the store cannot be used although Shopify answered (wrong currency, no Online Store channel), in plain
+ *  sentences. With a missing permission or a problem the website is NOT marked connected, so it cannot be switched on. */
+export type ConnectionResult = { ok: boolean; shop_name: string; scopes?: string[]; missing_scopes?: string[]; currency?: string; problems?: string[] };
 
 export const saveCredentials = (websiteId: string, c: Credentials) =>
   pbCall<ConnectionResult>('save_credentials', { website_id: websiteId, ...c });

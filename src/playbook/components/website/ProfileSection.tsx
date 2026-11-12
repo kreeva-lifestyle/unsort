@@ -10,6 +10,7 @@ import PbSwitch from '../ui/PbSwitch';
 import { fillKeyword, type PbProfile } from '../../seoTypes';
 import { PB, pbBody, pbTextarea } from '../../pbTheme';
 import { PbTag } from '../ui';
+import { Dot } from '../product/status';
 import { Field, Grid2, Section, Seg, input44 } from './ui';
 import { Cell, SectionGrid } from './sections/SectionGrid';
 import type { Draft, SetDraft } from './WebsiteEditor';
@@ -34,13 +35,17 @@ export default function ProfileSection({ draft, set, siteName }: { draft: Draft;
   );
   const example = fillKeyword(p.keyword_pattern, SAMPLE);
   const brand = p.brand_name.trim() || siteName;
+  // Same rule as the server (profile.ts brandFits): "| Brand" must leave the product 12 of the SEO title's characters.
+  const seoMax = Number(draft.content.meta_title_max) || 60, brandMax = seoMax - 15;
 
   return (
     <SectionGrid>
       <Cell>
         <Section title="Brand and market" hint="The writer is told which store it is writing for. Two stores with different profiles get different titles, descriptions and SEO text for the same product.">
           <Grid2>
-            <Field label="Brand name" htmlFor="pbp-brand" hint={<>Every SEO title ends with it: {mono(`… | ${brand}`)}. Empty uses the website's name.</>}>
+            <Field label="Brand name" htmlFor="pbp-brand" hint={brand.length > brandMax
+              ? <Dot color={PB.review} style={{ whiteSpace: 'normal', fontSize: 12, lineHeight: 1.5, color: PB.tx }} label={`${brand.length} characters is too long for SEO titles (${seoMax}), so it is left out of them. Up to ${brandMax} characters fits.`} />
+              : <>Every SEO title ends with it: {mono(`… | ${brand}`)}. Empty uses the website's name.</>}>
               {text('brand_name', 'pbp-brand', 80, siteName)}
             </Field>
             <Field label="Market" htmlFor="pbp-market" hint="Where the shoppers are. The writer uses the words they search with.">

@@ -72,3 +72,10 @@ export async function retryFailed(b: Body, userId: string | null) {
   if (retried) await logActivity({ website_id: site, action: 'retried_failed', details: { retried, to_shopify: sent.length, to_writer: written.length }, user_id: userId });
   return { ok: true, retried };
 }
+
+/** Products the reader gave up on (Needs info, still carrying the AI's error): back in the queue to be read again. */
+export async function rereadFailed(userId: string | null) {
+  const rows = await patch<{ id: string }>('pb_products', 'status=eq.needs_info&ai_error=not.is.null', { status: 'new', ai_error: null, claimed_at: null }, 'id');
+  if (rows.length) await logActivity({ action: 'reread_failed', details: { products: rows.length }, user_id: userId });
+  return { ok: true, queued: rows.length };
+}

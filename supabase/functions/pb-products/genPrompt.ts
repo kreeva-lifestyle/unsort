@@ -21,7 +21,7 @@
 // section the writer adds anyway (genWrite.ts).
 import { expectedFacts, FACT_ORDER } from './garment.ts';
 import { HUMAN_RULES } from './humanCopy.ts';
-import { hasOrdering, type Profile } from './profile.ts';
+import { brandFits, hasOrdering, type Profile } from './profile.ts';
 import { IMPORTED_TEXT } from './readerPrompt.ts';
 import type { Faq, Problem, Version } from './seoCheck.ts';
 import { opening, plainText } from './seoText.ts';
@@ -56,6 +56,11 @@ export function limitsOf(c: Partial<ContentCfg>) {
   return { titleMax: n(c.title_max, 70), metaTitleMax: n(c.meta_title_max, 60), metaDescMax, metaDescMin: Math.max(50, metaDescMax - 15), wordsMax, wordsMin: Math.round(wordsMax * 0.65) };
 }
 
+/** The title formula of a store that typed none. Colour, fabric and type stay together, in the order of the
+ *  default search phrase (profile.ts DEFAULT_KEYWORD) and of the reader's product name: a title that put the
+ *  work between them could never hold the phrase word for word, and failed its own check (keyword_title). */
+export const DEFAULT_FORMULA = 'what the product is: colour, fabric and type together, then the main work or pattern and what comes with it (for example "Maroon Georgette Kurta Set with Zari Work and Dupatta")';
+
 export interface GenAsk { c: Partial<ContentCfg>; profile: Profile; extraMax: number; allowed: string[]; photos: number; imported: boolean }
 
 export function genSystem(a: GenAsk): string {
@@ -71,7 +76,7 @@ export function genSystem(a: GenAsk): string {
     ...line('Audience', p.audience),
     `- Voice: ${String(c.brand_voice || '').trim().slice(0, 600) || 'clear, warm and trustworthy'}`,
     ...line('Angle (what this store leads with)', p.angle),
-    `- Title formula: ${String(c.title_formula || '').trim().slice(0, 300) || 'what the product is: colour, fabric, the work or pattern, type, then what comes with it (for example "with Dupatta")'}`,
+    `- Title formula: ${String(c.title_formula || '').trim().slice(0, 300) || DEFAULT_FORMULA}`,
     ...line('Delivery time', p.delivery), ...line('Stitching options', p.stitching), ...line('Returns', p.returns),
     '',
     'HARD RULES',
@@ -90,7 +95,9 @@ export function genSystem(a: GenAsk): string {
     'OUTPUT',
     `title: per the title formula, at most ${L.titleMax} characters, the most telling details first. Plain words only: no sales words, no word in ALL CAPS, no emoji or symbols.`,
     'handle: lowercase words joined by hyphens, 3 to 6 words, no codes.',
-    `seo_title: at most ${L.metaTitleMax} characters, ending with "| ${p.brand}". When the product is for women and it still fits, add "for Women" before the brand.`,
+    brandFits(p.brand, L.metaTitleMax)
+      ? `seo_title: at most ${L.metaTitleMax} characters, ending with "| ${p.brand}". When the product is for women and it still fits, add "for Women" before the brand.`
+      : `seo_title: at most ${L.metaTitleMax} characters, without the brand name (it is too long to fit). When the product is for women and it still fits, end with "for Women".`,
     `seo_description: ${L.metaDescMin} to ${L.metaDescMax} characters: one concrete detail of this product plus one store benefit${hasOrdering(p) ? ' from the profile (delivery time, stitching or returns; never a number the profile does not give)' : ' (only if the profile gives one)'}. This is the only field that may mention them.`,
     `description_html: ${L.wordsMin} to ${L.wordsMax} words (fewer only when the facts are few), using only <p>, <ul>, <li>, <h3>, <strong>, <em> and <br> (no links, classes or styles), in this order:`,
     "  - an opening of 2 to 3 sentences. The first says plainly what the product is and what comes with it (the pieces in the set, or where the work sits): a fact the title does not already give, never the title again. The store's angle follows from the second sentence.",

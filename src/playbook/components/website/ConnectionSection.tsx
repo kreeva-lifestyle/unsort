@@ -66,7 +66,9 @@ export default function ConnectionSection({ site, draft, set, creds, setCreds, o
       const r = kind === 'save' ? await saveCredentials(site.id, moving ? { ...creds, shop_domain: newDomain } : creds) : await testConnection(site.id);
       ok = true; setResult(r);
       if (kind === 'save') setCreds({ token: '', cid: '', csec: '' });
-      addToast(kind === 'save' ? `Credentials saved — connected to ${r.shop_name}` : `Connected to ${r.shop_name}`, 'success');
+      // Shopify answering is not enough: a missing permission, another currency or no Online Store channel = not usable.
+      if (r.missing_scopes?.length || r.problems?.length) addToast(`${kind === 'save' ? 'Credentials saved. ' : ''}Reached ${r.shop_name || 'the store'}, but it cannot be used yet — see what is missing below`, 'error');
+      else addToast(kind === 'save' ? `Credentials saved — connected to ${r.shop_name}` : `Connected to ${r.shop_name}`, 'success');
     } catch (e) {
       const m = friendlyError(e); setErr(m); addToast(m, 'error');
     } finally {

@@ -10,6 +10,7 @@
 // notes are kept beside the listing (seoStore.ts).
 // Two versions of one product are never written at the same time: the later
 // listing waits a minute, so it can be told what the earlier one says.
+import { aiBusy, freeTry } from './aiRetry.ts';
 import { cleanHandle, cleanHtml, cut, fillTitle, stripTags, withBrand } from './content.ts';
 import { ago, enc, logActivity, nowIso, one, patch, sel, uniqueCi } from './db.ts';
 import { factValues, genFacts, genSchema, genSystem, limitsOf, type GenOut } from './genPrompt.ts';
@@ -148,12 +149,13 @@ export async function generateOne(l: ListingRow, o: { manual: boolean; prevStatu
   } catch (e) {
     if (waited) throw e; // put back already: nothing failed
     const msg = plain(e);
-    await logActivity({ product_id: l.product_id, website_id: l.website_id, listing_id: l.id, action: 'failed', details: { step: 'generate', error: msg }, user_id: o.userId });
+    const free = !o.manual && await freeTry(e, `listing_id=eq.${enc(l.id)}`, 'generate', 'generated'); // the AI was busy: tried again, no try used up
+    await logActivity({ product_id: l.product_id, website_id: l.website_id, listing_id: l.id, action: 'failed', details: { step: 'generate', error: msg, ...(aiBusy(e) ? { temporary: true } : {}) }, user_id: o.userId });
     if (o.manual) {
       await patch('pb_listings', `id=eq.${enc(l.id)}&status=eq.generating`, { status: o.prevStatus || 'queued', error: msg, claimed_at: null });
       throw e instanceof HttpError ? e : new HttpError(502, msg);
     }
-    const attempts = (l.attempts || 0) + 1;
+    const attempts = (l.attempts || 0) + (free ? 0 : 1);
     // Under the limit: back to 'queued' with claimed_at kept → retried after 5 minutes.
     await patch('pb_listings', `id=eq.${enc(l.id)}&status=eq.generating`,
       attempts < MAX_ATTEMPTS ? { status: 'queued', attempts, error: msg } : { status: 'failed', attempts, error: msg, claimed_at: null });

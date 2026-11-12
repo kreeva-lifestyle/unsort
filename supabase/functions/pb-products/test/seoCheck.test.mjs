@@ -4,7 +4,8 @@
 // replace the writer's self check (seoCheck.ts).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_KEYWORD, hasOrdering, keywordOf, profileOf } from '../profile.ts';
+import { brandFits, DEFAULT_KEYWORD, hasOrdering, keywordOf, profileOf } from '../profile.ts';
+import { withBrand } from '../content.ts';
 import { copiedRuns, countPhrase, dropSection, factWords, opening, sectionAfter, wordsOf } from '../seoText.ts';
 import { better, checkCopy, hardOf } from '../seoCheck.ts';
 
@@ -176,4 +177,22 @@ test('better: fewer hard problems wins, then fewer in all', () => {
   assert.ok(better([soft, soft], [hard]) < 0);
   assert.ok(better([hard], [hard, soft]) < 0);
   assert.equal(better([], []), 0);
+});
+
+// Pre-launch check, 2026-11-13 (D2, D3).
+test('a brand too long for the SEO title is left out whole, and then not asked for', () => {
+  const B47 = 'Shree Rangoli Creations and Exports Private Ltd', B62 = 'Shree Rangoli Creations and Exports Private Limited of Surat I';
+  assert.deepEqual([B47.length, B62.length], [47, 62]);
+  assert.deepEqual([brandFits('Kreeva', 60), brandFits('x'.repeat(45), 60), brandFits('x'.repeat(46), 60), brandFits(B47, 60), brandFits(B62, 60), brandFits('', 60), brandFits(B62, 0), brandFits(B62)], [true, true, false, false, false, false, true, true]);
+  assert.equal(withBrand('Maroon Georgette Kurta Set with Zari for Women', 'Kreeva', 60), 'Maroon Georgette Kurta Set with Zari for Women | Kreeva');
+  for (const b of [B47, B62]) {
+    const t = withBrand('Maroon Georgette Kurta Set with Zari Work for Women', b, 60);
+    assert.equal(t, 'Maroon Georgette Kurta Set with Zari Work for Women', 'the product text, no part of the brand');
+    // The writer added the long brand itself: it is taken off again, not cut in the middle.
+    assert.equal(withBrand(`Maroon Georgette Kurta Set | ${b}`, b, 60), 'Maroon Georgette Kurta Set');
+    const limits = { ...LIMITS, titleMax: 70, metaTitleMax: 60 };
+    assert.equal(codes({ brand: b, limits, copy: { ...GOOD, seo_title: t } }).includes('brand'), false, 'no brand check for a brand that cannot fit');
+    assert.equal(codes({ brand: b, limits, copy: { ...GOOD, seo_title: t } }).includes('keyword_fit'), false, 'the phrase alone fits');
+  }
+  assert.ok(codes({ limits: { ...LIMITS, metaTitleMax: 60 }, copy: { ...GOOD, seo_title: 'Maroon Georgette Kurta Set with Zari' } }).includes('brand'), 'a brand that fits is still asked for');
 });

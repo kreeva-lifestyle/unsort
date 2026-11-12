@@ -45,8 +45,8 @@ export const CONNECT: GuideSection[] = [
       h('Test, then switch on'),
       steps(
         'Tap **Test connection**.',
-        'Green **Connected to <store name>. All needed permissions are there.** — done.',
-        'Yellow **Missing permissions: …** — add those scopes to the app in Shopify, reinstall / approve it, then **Test connection** again.',
+        'Green **Connected to <store name>** — done: every permission is there, the store sells in rupees and it has an Online Store channel.',
+        'Yellow **Reached <store name>, but it cannot be used yet** — it lists what is missing: permissions (add those scopes to the app in Shopify, reinstall / approve it), a store that does not sell in rupees, or no Online Store channel. Fix it, then **Test connection** again. The website cannot be switched on until the test is green.',
         'Red **Last problem: …** — the details are wrong or the app was removed. Copy them again, **Save credentials**, test again.',
         'Finish Steps 2 to 6 below for this website. Then come back to **Connection** and switch **Active** on.',
       ),

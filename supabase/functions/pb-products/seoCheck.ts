@@ -21,6 +21,7 @@
 //               returns: it is about the product only (owner, 2026-11-12)
 // No I/O — tested in test/seoCheck.test.mjs.
 import { copyTells } from './humanCopy.ts';
+import { brandFits } from './profile.ts';
 import { copiedRuns, countPhrase, factWords, opening, plainText, wordsOf } from './seoText.ts';
 
 export interface Faq { q: string; a: string }
@@ -85,14 +86,14 @@ export function checkCopy(i: CheckInput): Problem[] {
     const inTitle = countPhrase(c.title, i.keyword);
     // A phrase longer than the title limit, or than the SEO title leaves beside the brand, cannot be asked for.
     const fitsTitle = !L.titleMax || i.keyword.length <= L.titleMax;
-    const fitsMeta = !L.metaTitleMax || i.keyword.length + (i.brand ? i.brand.length + 3 : 0) <= L.metaTitleMax;
+    const fitsMeta = !L.metaTitleMax || i.keyword.length + (brandFits(i.brand, L.metaTitleMax) ? i.brand.length + 3 : 0) <= L.metaTitleMax;
     if (ai.title && fitsTitle && inTitle !== 1) add('keyword_title', true, `The search phrase ${k} ${inTitle ? 'is in the title more than once' : 'is not in the title'}.`, `Use the primary keyword ${k} exactly once in the title, word for word.`);
     if (ai.desc && !countPhrase(wordsOf(desc).slice(0, 50).join(' '), i.keyword)) add('keyword_start', true, `The search phrase ${k} is not in the first 50 words of the description.`, `Use the primary keyword ${k} once, word for word, in the first 50 words of the description.`);
     if (ai.metaTitle && fitsMeta && countPhrase(c.seo_title, i.keyword) !== 1) add('keyword_meta', true, `The search phrase ${k} is not in the SEO title exactly once.`, `Use the primary keyword ${k} exactly once in seo_title, word for word.`);
     if (ai.metaTitle && !fitsMeta) add('keyword_fit', false, `The search phrase ${k} and the brand name do not fit in the SEO title together (${L.metaTitleMax} characters): shorten one of them in the store profile.`, 'Keep seo_title inside its limit; put as much of the primary keyword in it as fits.');
     if (ai.desc && countPhrase(desc, i.keyword) > 3) add('keyword_stuffed', false, `The search phrase ${k} is repeated too often in the description.`, `Use the primary keyword at most twice in the description.`);
   }
-  if (ai.metaTitle && i.brand && !wordsOf(c.seo_title).join(' ').endsWith(wordsOf(i.brand).join(' '))) add('brand', true, `The SEO title does not end with ${i.brand}.`, `End seo_title with "| ${i.brand}".`);
+  if (ai.metaTitle && brandFits(i.brand, i.limits.metaTitleMax) && !wordsOf(c.seo_title).join(' ').endsWith(wordsOf(i.brand).join(' '))) add('brand', true, `The SEO title does not end with ${i.brand}.`, `End seo_title with "| ${i.brand}".`);
 
   // A supplier that is also the store's own brand name is not a leak.
   const vendor = i.vendor.trim(), ownBrand = !!vendor && wordsOf(i.brand).join(' ').includes(wordsOf(vendor).join(' '));

@@ -567,9 +567,12 @@ AI's extra tags are an enum of it.
   (`garment.ts expectedFacts`, by category) and the writer names the absent
   ones in `missing_facts`; FAQ answers begin with the answer and use shopper
   wording; the first alt names the product and the view, later ones only what
-  the photo adds, never "image of"; default title formula = colour, fabric,
-  work or pattern, type, what comes with it; "for Women" in the SEO title
-  when it fits. `manufacturer` (an imported store's) is withheld from the
+  the photo adds, never "image of"; default title formula = colour, fabric
+  and type together, then the main work or pattern and what comes with it
+  (`genPrompt.ts DEFAULT_FORMULA`: the order of the default search phrase and
+  of the reader's product name; the earlier order put the work between fabric
+  and type, so a title that followed it failed `keyword_title`); "for Women"
+  in the SEO title when it fits. `manufacturer` (an imported store's) is withheld from the
   writer. Checks: `title` (HARD: a humanCopy tell, a word of 4+ capitals that
   is not a size, an emoji or one of `! * # @ $ ₹ ™ ® ©` in an AI title) and
   `alt_opening` (soft). Shopify: `vendor` = the store profile's brand (the
@@ -991,3 +994,42 @@ paid service, no library.
   every row says "from Telegram" / "from bahupalace.com" (`sourceText`); a
   **Source** filter (`ProductFilter.source`: `telegram`, `manual`,
   `import:<host>`).
+
+## Pre-launch fixes (owner, 2026-11-13: "Fix all")
+The 21 defects of the launch research (`reports/Playbook launch gaps and
+Telegram intake.md`, D1 to D21), fixed in batches. The 20 decisions in that
+report (Q1 to Q20) are the owner's and are not built here.
+
+### Batch 1 — connection, writer rules, AI retries
+- **D1 a store that cannot be used is not connected.** `shopify.ts
+  testConnection` sets `connected_at` (which the On switch asks for) only when
+  every `REQUIRED_SCOPES` permission is there, the store sells in INR and it
+  has an Online Store channel (`onlineStoreId`, looked up only with
+  `read_publications`; a failed lookup is not "no channel"). Otherwise
+  `connected_at = null` and `last_error` lists what is missing. The reply
+  carries `problems: string[]` (currency, channel); the app shows "Reached X,
+  but it cannot be used yet" (`ConnectionBits ResultBox`) and an error toast.
+  Not built: a test that creates and deletes a draft product on the store (it
+  writes to the owner's store; the owner's call).
+- **D2 a long brand name.** `profile.ts brandFits(brand, max)`: "| Brand"
+  must leave the product 12 of the SEO title's characters (60 → a brand of up
+  to 45). A longer brand is left out of the SEO title (`content.ts
+  withBrand`, never cut part-way), not asked of the writer (`genPrompt.ts`)
+  and not checked (`seoCheck.ts` `brand`, `keyword_fit`). The profile editor
+  says so under Brand name.
+- **D3** the default title formula, above.
+- **D4 a busy AI is not a failed try** (`aiRetry.ts`). `ai.ts` throws 503
+  (rate limit, overloaded, 5xx) or 504 (too slow, unreachable): `aiBusy`.
+  Such a failure of the writer (`generate.ts`) or the reader (`reader.ts`) is
+  logged with `temporary: true` and, up to `FREE_RETRIES` (10) times in a row
+  for that listing / product (`freeTry` reads the item's last activity,
+  `busyRun`), does not count toward `MAX_ATTEMPTS`; it is tried again 5
+  minutes later as before. Manual actions are unchanged (the person sees the
+  error). New action `reread_failed` (staff, `bulk.ts`): every product in
+  Needs info that still carries the reader's error goes back to `new`; the
+  Needs info list offers it as "Read all N again" (`UnreadBar`).
+- **D12 copied products and prices.** The Pricing screen and its preview say
+  that copied products sell at the copied price (only compare-at % is added);
+  the rule editor says a cost range never matches a copied product (it has no
+  cost).
+

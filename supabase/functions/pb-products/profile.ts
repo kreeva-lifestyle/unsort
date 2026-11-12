@@ -32,6 +32,13 @@ export function profileOf(site: { name: string; shop_name?: string | null; conte
   };
 }
 
+/** Does "| Brand" fit in an SEO title of `max` characters and still leave the product 12? A longer brand name is
+ *  left out of SEO titles (content.ts withBrand), not asked of the writer (genPrompt.ts) and not checked (seoCheck.ts). */
+export function brandFits(brand: string, max?: number): boolean {
+  const b = String(brand || '').replace(/\s+/g, ' ').trim();
+  return !!b && (!max || max - b.length - 3 >= 12);
+}
+
 /** Has the store said anything about ordering (delivery, stitching, returns)? Then the SEO description may use one as its
  *  store benefit. Nothing of it is written into a description or a question (owner, 2026-11-12). */
 export const hasOrdering = (p: Profile) => !!(p.delivery || p.stitching || p.returns);
