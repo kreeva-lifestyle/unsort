@@ -942,10 +942,19 @@ paid service, no library.
   with no product at all is nothing to do. The notice row is renamed "Stock
   notice (kind): …", gets one line per item in `intake_notes`, and becomes
   `archived` when nothing is left, else `needs_info`. Guards: first read
-  only, nothing kept by hand, no price read, not an import. Not built:
-  different handling for permanent (hide from the websites?), "back in
-  stock" notices, a notice mixed into a product's album, acting on another
-  vendor's matching code.
+  only, nothing kept by hand, no price read, not an import.
+  **Temporary is a note only (owner, same day: "If temporary word mentioned
+  then ignore it. And just note that product as temporary which can be
+  filterable; nothing is to be done")**: with `kind = temporary` the matched
+  products get `pb_products.temp_out_at` (migration
+  `20261112210000_pb_temp_stock_out.sql`, partial index) and an activity
+  row; `in_stock` and Shopify are not touched. `permanent` and `unknown`
+  mark out of stock and clear that note. List: "· Temporarily out (vendor)"
+  after the status, filter `stock:temp`; product page: a line on the Stock
+  tile with the date and "Clear note" (`data/stock.ts clearTempOut`).
+  Not built: hiding a permanently sold-out product from the websites, "back
+  in stock" notices, a notice mixed into a product's album, acting on
+  another vendor's matching code.
 - Product list: "Needs info · Already here as KB 264 WINE XS"
   (`data/duplicates.ts heldLabels`, one RPC per page for its Needs-info rows);
   every row says "from Telegram" / "from bahupalace.com" (`sourceText`); a

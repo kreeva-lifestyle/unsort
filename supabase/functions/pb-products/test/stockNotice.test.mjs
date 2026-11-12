@@ -42,7 +42,11 @@ test('"KB:-273 WINE" and "Kb-302 Temporary stock out": the colour named, or both
   const kb273 = [c('KB 273 WINE XS', ['wine'], { key: 'KB273', nk: 'KB273' }), c('KB 273 XS', ['maroon'], { key: 'KB273', nk: 'KB273' })];
   assert.deepEqual(skus(pick(it('KB 273', ['Wine']), kb273)), ['KB 273 WINE XS']);
   const kb302 = [c('KB 302 DUSTYPINK XS', ['dustypink'], { key: 'KB302', nk: 'KB302' }), c('KB 302 SEAGREEN XS', ['seagreen'], { key: 'KB302', nk: 'KB302' })];
-  assert.deepEqual(skus(pick(it('KB 302'), kb302)), ['KB 302 DUSTYPINK XS', 'KB 302 SEAGREEN XS']);
+  const both = pick(it('KB 302'), kb302);
+  assert.deepEqual(skus(both), ['KB 302 DUSTYPINK XS', 'KB 302 SEAGREEN XS']);
+  // "Temporary": the same products are found, but they are only noted and stay on sale (owner, 2026-11-12)
+  assert.equal(noticeLine(it('KB 302'), both, true), 'KB 302 — noted as temporarily out (still on sale): KB 302 DUSTYPINK XS, KB 302 SEAGREEN XS');
+  assert.equal(noticeLine(it('KB 302'), both), 'KB 302 — out of stock: KB 302 DUSTYPINK XS, KB 302 SEAGREEN XS');
 });
 
 test('nothing is guessed: another vendor, letters that differ, a number two designs share', () => {
