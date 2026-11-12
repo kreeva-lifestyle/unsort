@@ -122,6 +122,8 @@ Every row of a fixed layout adds up to 12. Write the spans down before coding, a
 | Charts | `src/components/ui/Charts.tsx` | add an optional `ink` prop | Rules are in `data-and-charts.md`. |
 | Section within a tile | `Section` in `components/website/ui.tsx` | title 17 Sora or an 11px label; separated by a `tileBd` hairline | Do not nest tiles inside it. |
 | Numbered setup step | `TgStep` + `TgValueBox` in `components/settings/telegram/TgStep.tsx` | hairline-separated block inside one tile; 32px mono number circle (`PB.ctl`), `pbName` title, dot + label status | For one-time setups done in order (Settings → Telegram). Steps are an `<ol>`; a value shown once (code, key) goes in `TgValueBox` with a Copy button. |
+| Page loaded on first open | `lazyPage()` + `PbPageSkeleton` / `PbPageLoadError` in `components/ui/PbPageLoad.tsx` | skeletons shaped like a page; `failed` tile with Reload | For pages most visits never open (Websites, Vendors, Settings, Guide). Add the loader to `LOAD` in `PlaybookApp.tsx` so it is also fetched in the background. Built on the shared `retryImport`. |
+| Product photo | `pbPhotoUrl(path, w)` + `photoFallback(path)` (`data/pbFunctions.ts`); `ProductPhoto` for list boxes | box width in CSS px; the URL asks for the whole photo at twice that | Never the original in a list or tile (`mobile.md` §10). |
 | Video in the photo area | `VideoCell` in `components/product/detail/ProductVideos.tsx` | photo cell recipe (radius 16, `PB.ctl`), `pbSheet`-style "Video · 12 MB" badge above the controls | `<video controls preload="metadata" playsInline>`; never the cover; never sent to Shopify or the AI (`kind = 'video'`). |
 
 ## 6. Status mapping (real Product Directory values to PB tokens)

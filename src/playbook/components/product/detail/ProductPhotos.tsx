@@ -6,7 +6,7 @@
 // Telegram videos follow the photos (a "Videos" row on desktop, slides after
 // the photos on phone); the cover is always a photo.
 import type { CSSProperties, ReactNode } from 'react';
-import { pbImageUrl } from '../../../data/pbFunctions';
+import { pbPhotoUrl, photoFallback } from '../../../data/pbFunctions';
 import type { ProductDetail } from '../../../data/products';
 import { PB, pbMeta, pbTileFlat, pbTileTitle } from '../../../pbTheme';
 import PbIcon from '../../ui/PbIcon';
@@ -18,10 +18,13 @@ import { usePhotoViewer } from './PhotoViewer';
 type Img = ProductDetail['pb_product_images'][number];
 type AddProps = { onAdd: () => void; busy: string | null };
 
-const photoLink = (img: Img, i: number, box: CSSProperties, open: (i: number) => void) => (
+// The cover and the phone slides are up to 400 px wide on screen; the small grid cells about 180.
+const BIG = 400, SMALL = 180;
+const photoLink = (img: Img, i: number, box: CSSProperties, open: (i: number) => void, size = BIG) => (
   <button key={img.id} type="button" onClick={() => open(i)} className="pb-tile" aria-label={`Open photo ${i + 1} full size`}
     style={{ display: 'block', flexShrink: 0, padding: 0, cursor: 'pointer', borderRadius: PB.r.photo, overflow: 'hidden', background: PB.tile, border: `1px solid ${PB.tileBd}`, ...box }}>
-    <img src={pbImageUrl(img.path)} alt={`Photo ${i + 1}`} loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+    <img src={pbPhotoUrl(img.path, size)} alt={`Photo ${i + 1}`} loading="lazy" decoding="async" onError={photoFallback(img.path)}
+      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
   </button>
 );
 
@@ -67,7 +70,7 @@ export function PhotosTile({ images, onAdd, busy }: AddProps & { images: Img[] }
         <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', minWidth: 0 }}>
           {photoLink(cover, 0, { height: 'clamp(280px, 30vw, 400px)', aspectRatio: '4 / 5', flex: 'none' }, viewer.open)}
           <div style={{ flex: 1, minWidth: 0, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(112px, 1fr))', gap: 8, alignContent: 'start' }}>
-            {rest.map((img, i) => photoLink(img, i + 1, { width: '100%', aspectRatio: '4 / 5' }, viewer.open))}
+            {rest.map((img, i) => photoLink(img, i + 1, { width: '100%', aspectRatio: '4 / 5' }, viewer.open, SMALL))}
             <AddCell onAdd={onAdd} busy={busy} style={{ width: '100%', aspectRatio: '4 / 5', minHeight: 90, padding: 4, textAlign: 'center' }} />
           </div>
         </div>

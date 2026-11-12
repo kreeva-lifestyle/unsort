@@ -18,7 +18,7 @@ Visual values (tokens, radii, blur, tab bar look) are in `src/playbook/DESIGN.md
   - Every flex or grid child that holds text gets `min-width: 0`.
   - Long SKUs, domains and handles get `overflow-wrap: anywhere`.
 - Never give a text box a fixed height. Mixed Hindi and English needs line-height 1.5 or more, and the font stack ends in `'Noto Sans Devanagari'`.
-- **Landscape phones:** 844×390 gets the 6-column layout and 667×375 the phone layout. Nothing depends on height; sheets and modals scroll inside `max-height: 90dvh`. Under `@media (max-height: 500px)` the tab bar's margin drops to 8px and its tabs to min-height 44 (DESIGN.md §7); set `--pb-bar: 66px` there too (§4).
+- **Landscape phones:** 844×390 gets the 6-column layout and 667×375 the phone layout. Nothing depends on height; sheets and modals scroll inside `max-height: 90dvh`. Under `@media (max-height: 500px)` the tab bar's margin drops to 8px and its tabs to min-height 44 (DESIGN.md §7); set `--pb-bar: 66px` there too (§4). Sheets there drop the grab handle, keep 8px above them and tighten the footer (`.pb-sheet-handle`, `.pb-sheet-foot` in `src/index.css`), so the primary button stays above the keyboard.
 
 ## 2. Safe areas and the scroll container
 - `index.html` already sets `viewport-fit=cover`, so `env(safe-area-inset-*)` works. Do not edit the meta tag. It is shared.
@@ -91,7 +91,9 @@ const sync = () => {
 };
 vv.addEventListener('resize', sync); vv.addEventListener('scroll', sync); // remove both on unmount
 ```
-- On `focusin` inside a sheet or form, wait 300ms and then call `el.scrollIntoView({ block: 'center' })`. The keyboard animation has to finish first.
+- On `focusin` inside a sheet or form, wait 300ms (the keyboard animation has to finish first), then:
+  - in a sheet, `el.scrollIntoView({ block: 'center' })`: the sheet sits on the keyboard, so the middle of its own scrolling body is visible;
+  - on a page, scroll `.pb-scroll` so the field's top is at `visualViewport.offsetTop + 0.25 × visualViewport.height`. Never centre it on the screen: the keyboard covers the bottom and the sticky save bar (§5) sits just above it, about where the middle of the screen is (measured 2026-11-12: centred fields at 360 and 390 wide all ended up behind "Save facts").
 - Never `autoFocus` a field on page load on a phone. It throws the keyboard over the page before the person has read it.
 
 ## 8. Forms on phone
@@ -137,7 +139,7 @@ vv.addEventListener('resize', sync); vv.addEventListener('scroll', sync); // rem
   - Each photo has a 44px remove button and 44px move-left/right buttons. Drag to reorder is only an extra.
   - Tapping a photo opens it in-app, never in a new tab (`PhotoViewer`, built on `PbModal`: Previous / Next buttons, 44px close, device Back).
   - Revoke object URLs on remove and on close (this is already done).
-- **Showing photos:** lists ask for sized images (Shopify CDN `&width=128`, `srcset` `&width=256 2x`), never originals. Every image gets `width`/`height`, `loading="lazy"`, `decoding="async"`, `object-fit: cover` and a `PB.tile` background while loading.
+- **Showing photos:** never the original (0.5 to 2 MB each; a page of 25 products was about 20 MB). Use `pbPhotoUrl(path, w)` from `data/pbFunctions.ts` with the box width in CSS px: it asks Supabase image resizing for the whole photo at twice that width (WebP where the browser takes it), 5 to 120 KB a photo, and the page crops it with `object-fit` as before. Pass `onError={photoFallback(path)}` so a photo still shows from the original if resizing is ever refused. The viewer uses `pbPhotoUrl(path, 720, 900)` (fitted whole). Resizing is billed per distinct photo per month (Pro: 100 free, then $5 per 1,000); the AI reader resizes the same photos already. Every image gets `width`/`height` (or a fixed box), `loading="lazy"`, `decoding="async"`, `object-fit: cover` and a `PB.tile` background while loading.
 
 ## 11. iOS Safari fixes
 - Any input under 16px zooms the page. Use 16px on every phone input, including the ones in sheets and the search field.
@@ -165,6 +167,7 @@ vv.addEventListener('resize', sync); vv.addEventListener('scroll', sync); // rem
 - **Animation:** on phone, only `transform` and `opacity` animate. Desktop hover (inside `@media (hover:hover)`) may also ease `box-shadow`, `border-color` and `filter` (DESIGN.md §8). Use `will-change` only on a sheet while it moves, and drop it on `transitionend`. Long lists get `content-visibility: auto; contain-intrinsic-size: auto 96px` on each row.
 - **No glass support:** under `@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)))`, and under `prefers-reduced-transparency`, switch to the opaque fills `PB.tileSolid`, `PB.sheetSolid` and `PB.barSolid` (DESIGN.md §2). Text must stay readable with no glass.
 - **Network:** shop Wi-Fi is weak. Data loads time out after 15s with a Retry; actions that start server work are never aborted (`states-and-feedback.md` §1). Stale data stays on screen while the page reloads.
+- **First download:** Playbook's first file holds only the shell, Dashboard and Products. Websites, Vendors, Settings (with Tags) and Guide load on first open through `lazyPage()` (`components/ui/PbPageLoad.tsx`: skeleton while loading, an error tile with Reload when offline), and are fetched in the background about 2.5 s after the first page shows, unless the phone is offline or in data-saver mode. A new page that most visits do not need goes the same way.
 
 ## 13. Test before you call it done
 - **Sizes:** 360×740 (small Android), 375×667 (iPhone SE), **390×844** (design), 393×852 (iPhone 15 Pro, root checklist), 430×932, 844×390 (landscape), 768×1024 (still phone), 1024×768 (6 columns), 1344×900 or wider (12 columns).

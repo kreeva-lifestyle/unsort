@@ -16,7 +16,7 @@ export default function ProductCard({ p, sites, onOpen }: { p: ProductRow; sites
   return (
     <PbTile as="button" flat variant={productTone(p) ?? 'default'} onClick={onOpen} data-open-id={p.id}
       style={{ padding: 8, display: 'flex', flexDirection: 'column', gap: 0, fontFamily: PB.sans, color: PB.tx, height: '100%' }}>
-      <ProductPhoto path={p.pb_product_images[0]?.path} width="100%" height="auto" style={{ aspectRatio: '5 / 4' }} />
+      <ProductPhoto path={p.pb_product_images[0]?.path} width="100%" height="auto" px={440} style={{ aspectRatio: '5 / 4' }} />
       <span style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '12px 8px 8px', minWidth: 0, flex: 1 }}>
         <span className="pb-clamp2" style={pbName}>{productTitle(p)}</span>
         {(meta || p.sku) && (
