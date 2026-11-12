@@ -24,7 +24,7 @@ test('prompt: the store profile, the ten rules and the output shape', () => {
   for (const part of ['"Kreeva"', '- Market: India', '- Audience: Women 25 to 40', '- Angle (what this store leads with): Festive wear that is easy to carry',
     '- Title formula: Colour, fabric, type, then the work', '- Delivery time: Ships in 5 to 7 days', '- Returns: 7 day returns', 'British / Indian (colour, jewellery)', 'Measurements in inches',
     '2. Never copy any run of 5 or more words', '5. PRIMARY KEYWORD', '8. No vendor or supplier names', 'ending with "| Kreeva"', '140 to 155 characters',
-    '<h3>Ordering from Kreeva</h3>', 'image_alts: exactly 4', 'only from the allowed list', 'copied from another online store']) assert.ok(sys.includes(part), part);
+    'no ordering, delivery, shipping, returns, stitching-service, price or offer text', 'No question about delivery, returns, payment or price', 'This is the only field that may mention them', 'image_alts: exactly 4', 'only from the allowed list', 'copied from another online store']) assert.ok(sys.includes(part), part);
   assert.ok(!sys.includes('Stitching options')); // not given → not mentioned
   // Owner, 2026-11-12: the photos overrule the facts for what can be seen; the fabric is never reworded.
   for (const part of ['9. Check the facts against the photos', 'write what the photos show', 'seo_title, seo_description, image_alts and faq alike',
@@ -40,7 +40,7 @@ test('prompt: the store profile, the ten rules and the output shape', () => {
   assert.ok(facts.includes('SHOPPERS OF THIS GARMENT EXPECT') && facts.includes('- the kurta length') && facts.includes('- the bottom type'));
   assert.ok(!facts.includes('Other Store Mills')); // another store's manufacturer never reaches the writer
   assert.ok(!bare.includes('Check the facts against the photos') && bare.includes('9. The fabric is the one thing a photo cannot tell')); // no photos: nothing to check against
-  assert.ok(bare.includes('no ordering section') && bare.includes('image_alts: [].') && bare.includes('extra_tags: [].') && !bare.includes('Ordering from Arya'));
+  assert.ok(!bare.includes('Ordering from') && !sys.includes('Ordering from') && bare.includes('image_alts: [].') && bare.includes('extra_tags: [].') && !bare.includes('Ordering from Arya'));
   assert.deepEqual(limitsOf({}), { titleMax: 70, metaTitleMax: 60, metaDescMax: 155, metaDescMin: 140, wordsMax: 200, wordsMin: 130 });
 });
 
@@ -119,6 +119,7 @@ test('tidyOut: safe fixes only: no long dashes, at most five questions, empty en
   const t = tidyOut(DRAFT);
   assert.equal(t.description_html, '<p>D, more</p>');
   assert.deepEqual(t.faq, [{ q: 'Q1', a: 'A1' }, { q: 'Q3', a: 'A3' }, { q: 'Q4', a: 'A4' }]);
+  assert.equal(tidyOut({ ...DRAFT, description_html: '<p>D</p><h3>How to wear it</h3><p>W</p><h3>Ordering from Kreeva</h3><p>Ships in 5 days.</p>' }).description_html, '<p>D</p><h3>How to wear it</h3><p>W</p>'); // owner, 2026-11-12
   const seven = Array.from({ length: 7 }, (_, i) => ({ q: `Q${i}`, a: `A${i}` }));
   assert.deepEqual(tidyOut({ ...DRAFT, faq: seven }).faq, seven.slice(0, 5)); // owner, 2026-11-12: two to five
   assert.deepEqual(t.missing_facts, ['wash care']);

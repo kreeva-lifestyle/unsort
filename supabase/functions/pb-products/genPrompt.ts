@@ -14,6 +14,11 @@
 // bullets keep one order, each garment has its buying facts (garment.ts), an
 // FAQ answer starts with the answer, and the first photo's alt names the
 // product while later ones say only what they add.
+// No "Ordering from…" part (owner, 2026-11-12, after the report): the
+// description and the questions are about the product only. The store's
+// delivery, stitching and returns lines stay in the profile and may give the
+// SEO description its one store benefit; a program also strips an ordering
+// section the writer adds anyway (genWrite.ts).
 import { expectedFacts, FACT_ORDER } from './garment.ts';
 import { HUMAN_RULES } from './humanCopy.ts';
 import { hasOrdering, type Profile } from './profile.ts';
@@ -86,14 +91,13 @@ export function genSystem(a: GenAsk): string {
     `title: per the title formula, at most ${L.titleMax} characters, the most telling details first. Plain words only: no sales words, no word in ALL CAPS, no emoji or symbols.`,
     'handle: lowercase words joined by hyphens, 3 to 6 words, no codes.',
     `seo_title: at most ${L.metaTitleMax} characters, ending with "| ${p.brand}". When the product is for women and it still fits, add "for Women" before the brand.`,
-    `seo_description: ${L.metaDescMin} to ${L.metaDescMax} characters: one concrete detail of this product plus one store benefit${hasOrdering(p) ? ' from the profile' : ' (only if the profile gives one)'}.`,
+    `seo_description: ${L.metaDescMin} to ${L.metaDescMax} characters: one concrete detail of this product plus one store benefit${hasOrdering(p) ? ' from the profile (delivery time, stitching or returns; never a number the profile does not give)' : ' (only if the profile gives one)'}. This is the only field that may mention them.`,
     `description_html: ${L.wordsMin} to ${L.wordsMax} words (fewer only when the facts are few), using only <p>, <ul>, <li>, <h3>, <strong>, <em> and <br> (no links, classes or styles), in this order:`,
     "  - an opening of 2 to 3 sentences. The first says plainly what the product is and what comes with it (the pieces in the set, or where the work sits): a fact the title does not already give, never the title again. The store's angle follows from the second sentence.",
     `  - a <ul> of 5 to 7 fact bullets (fewer when there are fewer facts), each "Label: fact", in this order, leaving out what the facts do not give: ${FACT_ORDER}`,
     "  - <h3>How to wear it</h3> then 2 sentences for this audience, tied to this product's own colour, fabric, work or set",
-    hasOrdering(p) ? `  - <h3>Ordering from ${p.brand}</h3> then the delivery time, stitching and returns from the profile, worded freshly. Never add a number the profile does not give.`
-      : '  - no ordering section (the profile gives no delivery, stitching or returns details)',
-    'faq: 2 to 5 questions a buyer in this market would really ask about this product, in the words a shopper types ("Is the blouse stitched?", "Is the dupatta included?"). Each answer is 1 to 2 sentences, begins with the answer itself, is taken only from the facts and the profile, and where it can gives a fact the description does not already give. Only as many as the facts can truly answer, never one to fill the count; [] when the facts cannot answer two.',
+    '  - nothing after that: no ordering, delivery, shipping, returns, stitching-service, price or offer text anywhere in the description. It is about the product only.',
+    'faq: 2 to 5 questions a buyer in this market would really ask about this product, in the words a shopper types ("Is the blouse stitched?", "Is the dupatta included?"). Each answer is 1 to 2 sentences, begins with the answer itself, is taken only from the product facts, and where it can gives a fact the description does not already give. No question about delivery, returns, payment or price. Only as many as the facts can truly answer, never one to fill the count; [] when the facts cannot answer two.',
     c.alt_text !== false && a.photos > 0 ? `image_alts: exactly ${a.photos}, one per photo in the order given, each different, describing what is visible, at most 110 characters. The first names the product (colour, fabric, garment, work) and the view; each later one says only what that photo adds (the back, a close view of the border, the dupatta draped). Plain colour names; never begin with "image of" or "photo of"; nothing about the model's looks.` : 'image_alts: [].',
     a.extraMax > 0 ? (a.allowed.length ? `extra_tags: up to ${a.extraMax} tags that fit this product, only from the allowed list; [] if none fit.`
       : `extra_tags: up to ${a.extraMax} short style / occasion tags shoppers would filter by (e.g. "Festive", "Wedding Guest"); [] if none fit.`) : 'extra_tags: [].',

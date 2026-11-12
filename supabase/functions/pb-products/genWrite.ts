@@ -10,6 +10,7 @@ import { fixAsk, type GenOut } from './genPrompt.ts';
 import { tidyCopy } from './humanCopy.ts';
 import { plain } from './http.ts';
 import { better, type Problem } from './seoCheck.ts';
+import { dropSection } from './seoText.ts';
 import type { Budget } from './types.ts';
 
 /** Time a rewrite needs left; with less the first draft stands. */
@@ -19,10 +20,13 @@ export interface Written { g: GenOut; usd: number; model: string; effort: string
 
 const list = (v: unknown, max: number, len: number) => (Array.isArray(v) ? v : []).map(x => tidyCopy(x).replace(/\s+/g, ' ').trim().slice(0, len)).filter(Boolean).slice(0, max);
 
-/** The writer's JSON with the safe fixes: no curly quotes or long dashes, at most 2 questions, short lists. */
+/** A heading for the store's terms. Owner, 2026-11-12: no "Ordering from…" part in a description; it is about the product only. */
+const TERMS_HEADING = /\b(?:ordering|shipping|delivery|returns?)\b/i;
+
+/** The writer's JSON with the safe fixes: no curly quotes or long dashes, no ordering section, at most 5 questions, short lists. */
 export function tidyOut(d: GenOut): GenOut {
   return {
-    title: tidyCopy(d.title), description_html: tidyCopy(d.description_html), seo_title: tidyCopy(d.seo_title), seo_description: tidyCopy(d.seo_description),
+    title: tidyCopy(d.title), description_html: dropSection(tidyCopy(d.description_html), TERMS_HEADING), seo_title: tidyCopy(d.seo_title), seo_description: tidyCopy(d.seo_description),
     handle: String(d.handle || ''), extra_tags: Array.isArray(d.extra_tags) ? d.extra_tags.map(String) : [],
     image_alts: Array.isArray(d.image_alts) ? d.image_alts.map(a => tidyCopy(a).slice(0, 110)) : [],
     faq: (Array.isArray(d.faq) ? d.faq : []).map(f => ({ q: tidyCopy(f?.q).trim().slice(0, 200), a: tidyCopy(f?.a).trim().slice(0, 500) })).filter(f => f.q && f.a).slice(0, 5),

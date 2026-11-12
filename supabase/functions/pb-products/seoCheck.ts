@@ -17,10 +17,11 @@
 //               (owner, 2026-11-12: the fabric is never shortened or reworded)
 // A field a person typed (kept) is theirs: only what the AI wrote is checked.
 //   claims      "No. 1", fake scarcity, invented reviews
-//   ordering    a number in "Ordering from …" that the store profile does not give
+//   ordering    (noted) the description talks about delivery, shipping or
+//               returns: it is about the product only (owner, 2026-11-12)
 // No I/O — tested in test/seoCheck.test.mjs.
 import { copyTells } from './humanCopy.ts';
-import { copiedRuns, countPhrase, factWords, opening, plainText, sectionAfter, wordsOf } from './seoText.ts';
+import { copiedRuns, countPhrase, factWords, opening, plainText, wordsOf } from './seoText.ts';
 
 export interface Faq { q: string; a: string }
 export interface Version { title: string; description_html: string; seo_title: string; seo_description: string; image_alts: string[] }
@@ -35,8 +36,6 @@ export interface CheckInput {
   vendor: string; sku: string;
   /** The product's fabric as the facts give it ('' or left out = not checked, e.g. a listing not written in English). */
   fabric?: string;
-  /** The profile's delivery + stitching + returns text ('' = no ordering block is written). */
-  ordering: string;
   limits: { metaDescMin: number; metaDescMax: number; wordsMin: number; wordsMax: number; titleMax?: number; metaTitleMax?: number };
 }
 export interface Problem { code: string; hard: boolean; say: string; fix: string }
@@ -51,6 +50,7 @@ const LINKS = [/https?:\/\/|\bwww\./i, /\b[a-z0-9-]{3,}\.(?:com|in|co|net|org|sh
 // Sizes such as XXXL, and short codes of up to three letters, are not shouting.
 const SHOUT = /(?<![\p{L}\p{N}])(?!X+L\b)\p{Lu}{4,}(?![\p{L}\p{N}])/u;
 const SYMBOLS = /[\p{Extended_Pictographic}!*#@$₹™®©★☆]/u;
+const TERMS = /\b(?:ships? (?:in|within)|shipping|deliver(?:y|ed)|returns? (?:within|policy|accepted)|easy returns?|\d+[- ]day returns?|refunds?|cash on delivery)\b/i;
 const whole = (text: string, name: string) => new RegExp(`(?<![\\p{L}\\p{N}])${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\p{L}\\p{N}])`, 'iu').test(text);
 
 export function checkCopy(i: CheckInput): Problem[] {
@@ -110,12 +110,7 @@ export function checkCopy(i: CheckInput): Problem[] {
   const fabric = String(i.fabric ?? '').replace(/\s+/g, ' ').trim();
   if (fabric && ai.desc && !countPhrase(desc, fabric)) add('fabric', true, `The description does not name the fabric as given (${q(fabric)}).`, `Name the fabric in the description word for word as PRODUCT FACTS gives it: ${q(fabric)}. Do not shorten it, reword it or change its spelling.`);
 
-  if (i.ordering && ai.desc) {
-    const block = sectionAfter(c.description_html, /ordering from/i);
-    const given = new Set(i.ordering.match(/\d+/g) ?? []);
-    const extra = [...new Set(block.match(/\d+/g) ?? [])].filter(n => !given.has(n));
-    if (extra.length) add('ordering', true, `The ordering section gives a number that is not in the store profile: ${extra.join(', ')}.`, `In "Ordering from", use only the delivery time, stitching and returns given in the store profile. Remove: ${extra.join(', ')}.`);
-  }
+  if (ai.desc && TERMS.test(desc)) add('ordering', false, 'The description talks about delivery or returns; it should be about the product only.', 'Remove every sentence about delivery, shipping, returns or refunds from the description. It is about the product only.');
 
   const L = i.limits, n = wordsOf(desc).length, m = c.seo_description.length;
   if (ai.metaDesc && (m < L.metaDescMin || m > L.metaDescMax)) add('meta_length', false, `The SEO description is ${m} characters (aim for ${L.metaDescMin} to ${L.metaDescMax}).`, `Make seo_description ${L.metaDescMin} to ${L.metaDescMax} characters (it is ${m}).`);
