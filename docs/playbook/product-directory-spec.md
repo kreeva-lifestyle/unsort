@@ -1144,3 +1144,69 @@ as long as it takes (the dashboard shows the store's problem); while the daily
 limit is used up the worker is still woken each minute when work waits (it
 reads settings and stops).
 
+
+## Bulk changes: the log and Revert (owner, 2026-11-12)
+
+Owner: "We should also have revert option. Firstly log all bulk changes we
+did for past 7 days with option to revert them. Only those which are done in
+bulk. If by mistake we made changes in bulk we should have the option to
+revert those changes. Also only allow those bulk changes which can be
+reverted in bulk easily without creating any problem."
+
+A **bulk change** is one tap that changes many products or listings.
+
+### How a bulk change is recorded
+- `pb_bulk_runs`: one row per bulk change (`kind`, `label` = the sentence the
+  log shows, `items`, `details` = the action's own counts, `status`
+  running / done / reverted / partly_reverted, who, when, `revert_result`).
+- `pb_bulk_items`: every row the change touched, as it was (`before`) and as
+  it became (`after`), with `done` once a revert has settled it.
+- The server opens a run (`bulkLog.ts startRun`) and passes its id to the
+  database calls that belong to it (`db.ts`: `patch(…, run)`,
+  `insert(…, { run })`), which sends the header `x-pb-bulk`. The trigger
+  `pb_bulk_capture` on `pb_listings` and `pb_products` writes the item in the
+  same transaction, and only for a call from the server that carries the
+  header (`pb_bulk_run()`), so a bulk change cannot go unrecorded and an
+  ordinary save costs one settings lookup. `endRun` closes the run; one that
+  touched nothing leaves the log.
+- An import's run has the import's own id; the runner asks for it on every
+  tick, and every product it adds is recorded under it (`ingest(body, run)`).
+
+### What a revert does (`pb_bulk_revert(run, apply, user, note)`)
+Row by row, and **only where the row is still as the change left it**; what
+somebody changed since is left alone and counted. `apply = false` only counts
+(the sheet shows the counts before anyone confirms). Refused in plain words:
+still running, already reverted, older than 7 days, and (re-price, re-read) a
+later bulk change of the same kind that touched the same rows: that one is
+reverted first, so prices never end up as a mix that never existed. A row a
+worker run holds right now is "busy": the run becomes `partly_reverted` and
+Revert can be tapped again for the rest.
+
+| kind | made by | revert |
+|---|---|---|
+| `import` | Import from website | the server deletes, 25 at a time with their photo files, the products it added that are on no store and that nobody typed into; products on a store or edited by hand are kept and said (`pb_bulk_import_targets`, `bulkRevert.ts`) |
+| `route_site` | Send matching products now, switching a website on | a listing not on the store is set aside with the note `REVERTED`; one that is live gets `unpublish_due` and the worker hides it on Shopify (DRAFT) within minutes (`takeOff.ts`, also while paused), then it carries the same note. Routing leaves such listings alone; "Send matching products now" takes them again (a hidden one goes back as written, with no new AI call) |
+| `reprice_site` | Update prices on Shopify | price and compare-at price back; a published listing is sent again. The website's pricing rule is not touched |
+| `retry_failed` | Retry all | the listings nothing has picked up yet go back to Failed with their old message; what was already tried again stays |
+| `reread_failed` | Read again (unread products) | the products not read again yet go back to Needs info |
+| `reread` | only from the log: the re-read of all products on 12 Nov 2026 | each field that read changed goes back where the product still holds what the read wrote and the field is not locked; the gate runs and the tag rules run again. The reader's log kept the first 200 characters of each old value, so the long notes of 105 products are not put back |
+
+The two bulk changes of the week before the log existed were written into it
+from what was on record (`20261113070000_pb_bulk_log_backfill.sql`).
+
+### Not in the log yet
+Changes to the tag lists that reach many products (merge / delete a value or
+an attribute, category links, suggestions in bulk, "Retag all", "Let AI
+decide"), a vendor's stock notice, and moving a website to another store.
+They are the next step of this work.
+
+### UI
+Settings → **Bulk changes** (`BulkTile`): the last 7 days, newest first:
+label, "136 products · 10 Nov, 9:28 AM · by …", until when it can be taken
+back, or what a revert did. **Revert** (admin / manager) opens
+`BulkRevertSheet`: it asks `bulk_preview`, says in sentences what would
+change (`bulkText.ts plan`) and has one button; the server's refusal is shown
+instead of a button. "Retry all" and "Read again" only repeat a step that
+failed, so their button is "Stop the rest". The success messages of
+"Send matching products now" and "Update prices on Shopify" say where the
+change can be taken back.

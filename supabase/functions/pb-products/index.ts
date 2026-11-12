@@ -19,7 +19,9 @@
 //   reprice_website    staff          { website_id }                      → { ok, repriced, kept, more }   (bulk.ts)
 //   retry_failed       staff          { website_id? }                     → { ok, retried }                (bulk.ts)
 //   reread_failed      staff          {}                                  → { ok, queued }                 (bulk.ts)
-//   set_stock          staff          { product_id, in_stock }            → { ok, resent }                 (stock.ts)
+//   set_stock          staff          { product_id, in_stock }            → { ok, resent, waiting }        (stock.ts)
+//   bulk_preview       staff          { run_id }                          → { ok, kind, …counts }  what a revert would do now (bulkRevert.ts)
+//   bulk_revert        admin|manager  { run_id }                          → { ok, kind, …counts }  takes a bulk change back (bulkLog.ts)
 //   delete_product     admin|manager  { product_id }                      → { ok, photos_left }   (409 while it is on Shopify or being worked on)
 //   route_website      staff          { website_id }                      → { ok, queued, matched, more }
 //   generate_listing   staff          { listing_id }                      → { ok, listing }
@@ -63,6 +65,7 @@ import { userOf, whoIs } from './auth.ts';
 import { HttpError, corsHeaders, fail, json, plain } from './http.ts';
 import { importCancel, importCheck, importList, importStart } from './import/actions.ts';
 import { repriceWebsite, rereadFailed, retryFailed } from './bulk.ts';
+import { bulkPreview, bulkRevert } from './bulkRevert.ts';
 import { deleteProduct } from './productDelete.ts';
 import { routeWebsite } from './routeSite.ts';
 import { setStock } from './stock.ts';
@@ -84,6 +87,8 @@ const ACTIONS: Record<string, { who: Who; run: (b: A.Body, c: Caller) => Promise
   retry_failed: { who: 'staff', run: (b, c) => retryFailed(b, userOf(c)) },
   reread_failed: { who: 'staff', run: (_b, c) => rereadFailed(userOf(c)) },
   set_stock: { who: 'staff', run: (b, c) => setStock(b, userOf(c)) },
+  bulk_preview: { who: 'staff', run: (b) => bulkPreview(b) },
+  bulk_revert: { who: 'admin', run: (b, c) => bulkRevert(b, userOf(c)) },
   generate_listing: { who: 'staff', run: (b, c) => A.generateListing(b, userOf(c)) },
   publish_listing: { who: 'staff', run: (b, c) => A.publishListing(b, userOf(c)) },
   unpublish_listing: { who: 'staff', run: (b, c) => A.unpublishListing(b, userOf(c)) },

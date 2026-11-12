@@ -13,6 +13,7 @@
 // A store that asks us to slow down (RateLimited) is left alone until
 // `cursor.wait_until`; that is not an error. Shopify's currency comes from its
 // /meta.json, read once per run (cursor.currency).
+import { endRun, startRun } from '../bulkLog.ts';
 import { ago, enc, logActivity, nowIso, one, patch, sel } from '../db.ts';
 import { HttpError } from '../http.ts';
 import { STALE_MS } from '../types.ts';
@@ -29,7 +30,7 @@ import { robotsRefusal, setOwnDomains } from './urlCheck.ts';
 export interface RunRow {
   id: string; url: string; host: string; platform: string | null; status: string; in_stock_only: boolean; use_their_price: boolean;
   vendor_id: string | null; cursor: Record<string, unknown>; found: number; added: number; skipped: number; out_of_stock: number; failed: number;
-  sample: unknown; error: string | null; started_at: string | null; created_by: string | null;
+  sample: unknown; error: string | null; started_at: string | null; created_by: string | null; created_at?: string;
 }
 export const RUN_COLS = 'id,url,host,platform,status,in_stock_only,use_their_price,vendor_id,cursor,found,added,skipped,out_of_stock,failed,sample,error,started_at,created_by,claimed_at,finished_at,created_at,updated_at';
 /** Generic sites: product pages are fetched only while this much of the import clock is left, for adding them. */
@@ -85,6 +86,10 @@ export async function advanceImport(until: number, userId: string | null): Promi
   const out = { run_id: run.id, found: 0, added: 0 };
   if (Number(run.cursor.wait_until) > Date.now()) { await save({ claimed_at: null }); return out; }
   if (!run.started_at) await save({ started_at: stamp });
+  // An import is a bulk change: its log entry carries the import's own id, and every product it adds is recorded
+  // under it (batch.ts → ingest), so the import can be taken back. Asked for on every tick: a run that began before
+  // the log existed gets its entry here, and an existing one is left as it is.
+  await startRun('import', `Imported products from ${run.host}`, { id: run.id, userId: run.created_by, createdAt: run.created_at });
   let cur = run;
   // A failed request: a rate limit waits (not an error); our own 400 (refused, no sitemap) fails at once; else 3 tries.
   const failed = async (e: unknown) => {
@@ -153,5 +158,8 @@ async function finish(run: RunRow, save: (b: Record<string, unknown>) => Promise
   if (saved.length) await logRun(run, 'failed', error, userId); // 0 rows: cancelled meanwhile, so nothing failed
 }
 
-const logRun = (run: RunRow, status: string, error: string | null, userId: string | null) =>
-  logActivity({ action: 'import_run', user_id: userId ?? run.created_by, details: { run_id: run.id, host: run.host, platform: run.platform, status, found: run.found, added: run.added, skipped: run.skipped, out_of_stock: run.out_of_stock, failed: run.failed, ...(error ? { error } : {}) } });
+/** The run is over: its timeline line, and its entry in the bulk-change log is closed (taken out when it added nothing). */
+const logRun = async (run: RunRow, status: string, error: string | null, userId: string | null) => {
+  await endRun(run.id, { host: run.host, added: run.added, found: run.found, skipped: run.skipped, status });
+  await logActivity({ action: 'import_run', user_id: userId ?? run.created_by, details: { run_id: run.id, host: run.host, platform: run.platform, status, found: run.found, added: run.added, skipped: run.skipped, out_of_stock: run.out_of_stock, failed: run.failed, ...(error ? { error } : {}) } });
+};

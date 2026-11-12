@@ -15,6 +15,7 @@
 // and guarded by a unique index, so two quick taps on Start make one run.
 // The run itself is advanced by the worker (runner.ts), one run per tick.
 import { type Body, uuid } from '../actions.ts';
+import { endRun } from '../bulkLog.ts';
 import { SB_URL, enc, insert, logActivity, patch, sel, svcHeaders } from '../db.ts';
 import { HttpError, plain } from '../http.ts';
 import { vendorId } from '../ingest.ts';
@@ -95,12 +96,15 @@ export async function importStart(b: Body, userId: string | null) {
 
 export async function importCancel(b: Body, userId: string | null) {
   const id = uuid(b.run_id, 'run_id');
-  const rows = await patch<{ id: string }>('pb_import_runs', `id=eq.${enc(id)}&status=in.(queued,running)`, { status: 'cancelled', finished_at: new Date().toISOString() });
+  const rows = await patch<{ id: string; host: string; added: number; found: number; skipped: number }>('pb_import_runs', `id=eq.${enc(id)}&status=in.(queued,running)`,
+    { status: 'cancelled', finished_at: new Date().toISOString() }, 'id,host,added,found,skipped');
   if (!rows.length) {
     const cur = await sel<{ status: string }>(`pb_import_runs?id=eq.${enc(id)}&select=status&limit=1`);
     if (!cur[0]) throw new HttpError(404, 'That import no longer exists.');
     throw new HttpError(400, `This import is already ${cur[0].status} — nothing to cancel.`);
   }
+  // What it added before it was stopped stays in the bulk-change log, where it can be taken back.
+  await endRun(id, { host: rows[0].host, added: rows[0].added, found: rows[0].found, skipped: rows[0].skipped, status: 'cancelled' });
   await logActivity({ action: 'import_cancelled', user_id: userId, details: { run_id: id } });
   return { ok: true };
 }

@@ -8,6 +8,10 @@ export const SB_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SB_SVC = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 export const svcHeaders: Record<string, string> = { apikey: SB_SVC, authorization: `Bearer ${SB_SVC}` };
 
+/** Marks a database call as part of one bulk change: the database then records every row the call changes, in the
+ *  same transaction (pb_bulk_capture, 20261113060000_pb_bulk_log.sql), so the change can be taken back. */
+const tagged = (run?: string | null): Record<string, string> => (run ? { 'x-pb-bulk': run } : {});
+
 export const enc = encodeURIComponent;
 /** ISO time `ms` milliseconds ago (for "claimed more than 5 minutes ago" filters). */
 export const ago = (ms: number) => new Date(Date.now() - ms).toISOString();
@@ -37,15 +41,23 @@ export async function selAll<T>(path: string, max = 100_000): Promise<T[]> {
   return out;
 }
 
+/** How many rows a query matches (HEAD + exact count). `path` is "<table>?select=id&filters". */
+export async function countRows(path: string): Promise<number> {
+  const r = await fetch(`${SB_URL}/rest/v1/${path}`, { method: 'HEAD', headers: { ...svcHeaders, prefer: 'count=exact' } });
+  if (!r.ok) throw new HttpError(502, `The database could not be read (${r.status}).`);
+  return Number((r.headers.get('content-range') || '').split('/')[1]) || 0;
+}
+
 export async function one<T>(path: string): Promise<T | null> {
   return (await sel<T>(path.includes('limit=') ? path : `${path}&limit=1`))[0] ?? null;
 }
 
-/** PATCH rows matching `filter`; returns the rows that changed (empty = nothing matched — a lost claim). */
-export async function patch<T>(table: string, filter: string, body: Record<string, unknown>, select = 'id'): Promise<T[]> {
+/** PATCH rows matching `filter`; returns the rows that changed (empty = nothing matched — a lost claim).
+ *  `run`: the bulk change this belongs to (bulkLog.ts). */
+export async function patch<T>(table: string, filter: string, body: Record<string, unknown>, select = 'id', run?: string | null): Promise<T[]> {
   const r = await fetch(`${SB_URL}/rest/v1/${table}?${filter}&select=${select}`, {
     method: 'PATCH',
-    headers: { ...svcHeaders, 'content-type': 'application/json', prefer: 'return=representation' },
+    headers: { ...svcHeaders, ...tagged(run), 'content-type': 'application/json', prefer: 'return=representation' },
     body: JSON.stringify(body),
   });
   if (!r.ok) return dbFail(r, 'refused the change');
@@ -59,12 +71,12 @@ export async function remove(table: string, filter: string): Promise<void> {
 }
 
 /** INSERT (or upsert with `onConflict` + merge / ignore). Returns the written rows. */
-export async function insert<T>(table: string, rows: Record<string, unknown>[], opts: { select?: string; onConflict?: string; mode?: 'merge' | 'ignore' } = {}): Promise<T[]> {
+export async function insert<T>(table: string, rows: Record<string, unknown>[], opts: { select?: string; onConflict?: string; mode?: 'merge' | 'ignore'; run?: string | null } = {}): Promise<T[]> {
   const q = [`select=${opts.select || 'id'}`, ...(opts.onConflict ? [`on_conflict=${opts.onConflict}`] : [])].join('&');
   const prefer = ['return=representation', ...(opts.mode === 'merge' ? ['resolution=merge-duplicates'] : opts.mode === 'ignore' ? ['resolution=ignore-duplicates'] : [])];
   const r = await fetch(`${SB_URL}/rest/v1/${table}?${q}`, {
     method: 'POST',
-    headers: { ...svcHeaders, 'content-type': 'application/json', prefer: prefer.join(',') },
+    headers: { ...svcHeaders, ...tagged(opts.run), 'content-type': 'application/json', prefer: prefer.join(',') },
     body: JSON.stringify(rows),
   });
   if (r.status === 409) throw new HttpError(409, 'That record already exists.');

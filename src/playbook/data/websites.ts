@@ -99,14 +99,16 @@ export const testConnection = (websiteId: string) =>
 export type SendResult = { queued: number; matched: number; more: boolean };
 export const sendMatchingProducts = (websiteId: string) => pbCall<SendResult>('route_website', { website_id: websiteId });
 export const sentMessage = (name: string, r: SendResult) =>
-  `${r.queued ? `${r.queued} matching product${r.queued > 1 ? 's' : ''} queued for ${name}` : `No new matching products for ${name}`}${r.more ? ' — there are more: tap "Send matching products now" again' : ''}`;
+  `${r.queued ? `${r.queued} matching product${r.queued > 1 ? 's' : ''} queued for ${name}` : `No new matching products for ${name}`}${r.more ? ' — there are more: tap "Send matching products now" again' : ''}${r.queued ? `. ${UNDO_HINT}` : ''}`;
+/** After a bulk change: where it can be taken back (components/settings/BulkTile.tsx). */
+export const UNDO_HINT = 'To take it back: Settings → Bulk changes';
 
 /** Give every written listing of this website the price from its saved pricing; the changed ones go to Shopify again. */
 export type RepriceResult = { repriced: number; kept: number; more: boolean };
 export const repriceWebsite = (websiteId: string) => pbCall<RepriceResult>('reprice_website', { website_id: websiteId });
 export const repricedMessage = (r: RepriceResult) =>
   `${r.repriced ? `${r.repriced.toLocaleString('en-IN')} listing${r.repriced > 1 ? 's' : ''} re-priced — the ones on Shopify are updated about ten a minute` : 'Every listing already has this price'}`
-  + `${r.kept ? `. ${r.kept.toLocaleString('en-IN')} keep${r.kept > 1 ? '' : 's'} a price typed by hand` : ''}${r.more ? ' — there are more: tap "Update prices on Shopify" again' : ''}`;
+  + `${r.kept ? `. ${r.kept.toLocaleString('en-IN')} keep${r.kept > 1 ? '' : 's'} a price typed by hand` : ''}${r.more ? ' — there are more: tap "Update prices on Shopify" again' : ''}${r.repriced ? `. ${UNDO_HINT}` : ''}`;
 
 // ── price preview: the SAME formula as supabase/functions/pb-products/pricing.ts ──
 const r2 = (n: number) => Math.round(n * 100) / 100;
