@@ -84,7 +84,7 @@ export const DAILY: GuideSection[] = [
       ),
       h('On the product itself'),
       table(['Button', 'What it does'],
-        ['**Read again with AI**', 'The AI reads the photos and text again and refreshes every field it filled. Kept fields stay.'],
+        ['**Read again with AI**', 'The AI reads the photos and text again and refreshes every field it filled. A detail it no longer finds is removed. Kept fields stay.'],
         ['**Check websites again**', 'Runs every website\'s rules again for this product — use it after you change a rule. Published listings also get the price from today\'s cost and pricing, sent to Shopify without rewriting the text (a **kept** price stays).'],
         ['**Save facts**', 'Saves your changes. If the cost, category, vendor, fabric, name, SKU or details changed, the websites are checked again: unpublished listings are re-priced and rewritten, published ones are re-priced and updated on Shopify (their text stays; a **kept** price stays).'],
         ['**Archive** / **Restore**', 'Archive hides the product and stops sending it anywhere. Listings already on Shopify stay — use **Remove from site** first if they should go. Restore makes the AI read it again.'],

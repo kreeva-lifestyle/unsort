@@ -61,6 +61,17 @@ test('a clean listing passes every check', () => {
   assert.deepEqual(checkCopy(input()), []);
 });
 
+test('fabric: the description must name it word for word (owner, 2026-11-12)', () => {
+  assert.deepEqual(codes({ fabric: 'Georgette' }), []);                       // "georgette" is there: case and punctuation do not matter
+  assert.deepEqual(codes({ fabric: '' }), []);                                // no fabric, or a listing not in English: not checked
+  const p = checkCopy(input({ fabric: 'Pure Soft Fox Georgette' }));          // shortened to "georgette"
+  assert.deepEqual(p.map(x => [x.code, x.hard]), [['fabric', true]]);
+  assert.ok(p[0].say.includes('"Pure Soft Fox Georgette"') && p[0].fix.includes('word for word'));
+  const named = { ...GOOD, description_html: GOOD.description_html.replace('<li>Fabric: georgette</li>', '<li>Fabric: Pure Soft Fox Georgette</li>') };
+  assert.deepEqual(codes({ copy: named, fabric: 'pure soft  fox georgette', facts: [...input().facts, 'Pure Soft Fox Georgette'] }), []);
+  assert.deepEqual(codes({ fabric: 'Pure Soft Fox Georgette', kept: ['description_html'] }), []); // a description a person typed is theirs
+});
+
 test('copying the supplier or another store is a hard problem with the phrase named', () => {
   const p = checkCopy(input({ source: 'Zari runs along the yoke of this lovely piece' }));
   assert.deepEqual(p.map(x => [x.code, x.hard]), [['copied', true]]);

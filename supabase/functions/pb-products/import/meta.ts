@@ -149,14 +149,17 @@ export function pageAmount(html: string): number | null {
 
 const IMPORTED = new Set<string>(IMPORT_ATTRS);
 
-/** The reader's attribute merge: every existing key is kept; the AI fills empty keys (any key on a
- *  manual "Read again"), except that an imported product's IMPORT_ATTRS keys are never touched. */
-export function mergeReadAttrs(current: Record<string, string> | null | undefined, ai: Record<string, unknown> | null | undefined, o: { manual: boolean; imported: boolean }): Record<string, string> {
+/** The reader's attribute merge: every existing key is kept and the AI fills the empty ones. A `fresh` read
+ *  ("Read again", or a product sent back for reading) replaces the keys the AI answers — and drops one it now
+ *  answers with nothing, so an earlier wrong answer does not stay. An imported product's IMPORT_ATTRS keys are
+ *  never touched, and a key the AI is not asked about is never dropped. */
+export function mergeReadAttrs(current: Record<string, string> | null | undefined, ai: Record<string, unknown> | null | undefined, o: { fresh: boolean; imported: boolean }): Record<string, string> {
   const attrs: Record<string, string> = { ...(current || {}) };
   for (const [k, v] of Object.entries(ai || {})) {
     if (o.imported && IMPORTED.has(k)) continue; // the store's own fact wins
     const s = String(v ?? '').trim().slice(0, 500);
-    if (s && (o.manual || !String(attrs[k] ?? '').trim())) attrs[k] = s;
+    if (s && (o.fresh || !String(attrs[k] ?? '').trim())) attrs[k] = s;
+    else if (!s && o.fresh) delete attrs[k];
   }
   return attrs;
 }

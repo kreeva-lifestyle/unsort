@@ -119,14 +119,19 @@ test('formatting: rupees en-IN, grams', () => {
   assert.equal(gramsText(0), '');
 });
 
-test('reader merge: imported keys survive a read and a manual "Read again"; others behave as before', () => {
+test('reader merge: imported keys survive a read and a fresh read; a fresh read replaces or drops the AI\'s own answers', () => {
   const cur = { brand: 'Kumari Art', seo_title: 'Store title', work: '' };
   const ai = { brand: 'AI brand', seo_title: 'AI', work: 'Zari', occasion: 'Wedding' };
-  assert.deepEqual(mergeReadAttrs(cur, ai, { manual: true, imported: true }), { brand: 'Kumari Art', seo_title: 'Store title', work: 'Zari', occasion: 'Wedding' });
-  assert.deepEqual(mergeReadAttrs(cur, ai, { manual: false, imported: true }), { brand: 'Kumari Art', seo_title: 'Store title', work: 'Zari', occasion: 'Wedding' });
-  assert.deepEqual(mergeReadAttrs({ work: 'Print' }, { work: 'Zari' }, { manual: false, imported: false }), { work: 'Print' });
-  assert.deepEqual(mergeReadAttrs({ work: 'Print' }, { work: 'Zari' }, { manual: true, imported: false }), { work: 'Zari' });
-  assert.deepEqual(mergeReadAttrs(null, null, { manual: false, imported: true }), {});
+  assert.deepEqual(mergeReadAttrs(cur, ai, { fresh: true, imported: true }), { brand: 'Kumari Art', seo_title: 'Store title', work: 'Zari', occasion: 'Wedding' });
+  assert.deepEqual(mergeReadAttrs(cur, ai, { fresh: false, imported: true }), { brand: 'Kumari Art', seo_title: 'Store title', work: 'Zari', occasion: 'Wedding' });
+  assert.deepEqual(mergeReadAttrs({ work: 'Print' }, { work: 'Zari' }, { fresh: false, imported: false }), { work: 'Print' });
+  assert.deepEqual(mergeReadAttrs({ work: 'Print' }, { work: 'Zari' }, { fresh: true, imported: false }), { work: 'Zari' });
+  assert.deepEqual(mergeReadAttrs(null, null, { fresh: false, imported: true }), {});
+  // Owner, 2026-11-12: an earlier answer the AI no longer stands behind goes on a fresh read (a sales line it once took for a pattern)…
+  const was = { brand: 'Kumari Art', pattern: 'Vintage design with rich border', notes: 'Colour may vary', weight: '700 g', price_note: 'copied' };
+  assert.deepEqual(mergeReadAttrs(was, { pattern: '', notes: 'Flair 9 metres', brand: '' }, { fresh: true, imported: true }), { brand: 'Kumari Art', notes: 'Flair 9 metres', weight: '700 g', price_note: 'copied' });
+  // …but a first read never drops anything, and a key the AI is not asked about stays.
+  assert.deepEqual(mergeReadAttrs(was, { pattern: '', notes: '' }, { fresh: false, imported: true }), was);
 });
 
 test('tag templates: {attr:brand}, {attr:product_type}, one tag per {attr:store_tags}', () => {
