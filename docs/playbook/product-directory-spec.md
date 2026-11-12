@@ -916,6 +916,36 @@ paid service, no library.
   cover part of a store). Not built: a stock check that runs by itself on a
   schedule; quantities; per-size sold-out (a size that sells out leaves the
   size list).
+- **Stock-out notices from vendors (owner, 2026-11-12, nine example
+  pictures)**. A vendor announces sold-out designs as a picture (often a
+  collage) with the codes written on it: "Permanent stock Out D no 5081",
+  "D no 5073 Offwhite / Pur / Rama", "1262", "1260 peach", "7185 All Colour
+  Only Lehenga Stock out", "D-7182 white, black, maroon", "code:-7165 both
+  colour", "KB:-273 WINE PERMANENT STOCKOUT", "Kb-302 Temporary stock out
+  All platform". It arrives as a Telegram post and would become a product.
+  The reader (`readerPrompt.ts NOTICE_LINE`, schema `stock_notice`; never
+  asked for an imported product) returns `{ kind: permanent | temporary |
+  unknown, items: [{ code, colours[], note }] }` (code without label words
+  or colour; colours in full English; `note` = a limit to a part such as
+  "Only Lehenga"). `stockNotice.ts` then, per item, asks
+  `pb_stock_candidates(p_vendor, p_code)` (migration
+  `20261112200000_pb_stock_notices.sql`; the same `pb_code_key` /
+  `pb_code_num` / `pb_colour_keys` as the "already added?" check: the
+  vendor's products with the same design number, plus the same lettered
+  code at other vendors as `same_vendor = false`) and `pick` decides: no
+  colour named → every product of the design; colours → `byColour` (exact
+  key or a `SAME` trade-name alias, else a looser match only when it points
+  at one product). Marked with `saveStock` (`in_stock = false`, published
+  listings sent again). Left for a person, with the reason: a `note`; a
+  number several letter codes share; a lettered code under other letters; a
+  named colour no product has; a code only known at another vendor. A code
+  with no product at all is nothing to do. The notice row is renamed "Stock
+  notice (kind): …", gets one line per item in `intake_notes`, and becomes
+  `archived` when nothing is left, else `needs_info`. Guards: first read
+  only, nothing kept by hand, no price read, not an import. Not built:
+  different handling for permanent (hide from the websites?), "back in
+  stock" notices, a notice mixed into a product's album, acting on another
+  vendor's matching code.
 - Product list: "Needs info · Already here as KB 264 WINE XS"
   (`data/duplicates.ts heldLabels`, one RPC per page for its Needs-info rows);
   every row says "from Telegram" / "from bahupalace.com" (`sourceText`); a

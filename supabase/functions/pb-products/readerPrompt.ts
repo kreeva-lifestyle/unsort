@@ -4,13 +4,19 @@
 // from the owner's taxonomy (tagPrompt.ts: one enum per attribute + "other"
 // phrases); with no attribute linked to any category nothing is added.
 import { uniqueCi } from './db.ts';
+import type { Notice } from './stockNotice.ts';
 import { type TagOut, type TagSpec, tagPromptLines, tagSchema } from './tagPrompt.ts';
 
 export interface ReadOut {
   name: string; sku: string; category: string; fabric: string; color: string; sizes: string[];
   cost_price: number | null; attributes: Record<string, string>;
   tags?: TagOut['tags']; tag_other?: unknown;
+  /** A vendor's "stock out" picture instead of a product (stockNotice.ts); never asked for an imported product. */
+  stock_notice?: Notice | null;
 }
+
+/** Owner, 2026-11-12 (nine examples): the notice is a picture with the codes written on it; it must never become a product. */
+const NOTICE_LINE = 'stock_notice: a vendor sometimes posts a picture that is not a product for sale but a NOTICE that designs are out of stock: "stock out", "stockout", "out of stock" or "sold out" is written across the picture (often a collage of several designs) or in the text. Only for such a post fill stock_notice, and then leave every other field empty. A post that offers a product for sale (it names a rate or describes the product) is a product, whatever else is in its pictures: stock_notice null. kind: "permanent" when it says permanent or permanently, "temporary" when it says temporary, else "unknown". items: one per design code the notice names. code = the design code as written, without any colour and without the words in front of it ("D no 5073" → "5073", "D-7182" → "7182", "code:-7165" → "7165", "KB:-273 WINE" → "KB 273", "Kb-302" → "KB 302", "1262" → "1262"). colours = the colours it names for that code, each in full plain English ("Pur" → "Purple", "Mrn" → "Maroon", "prt" → "Parrot Green", "Offwhite" → "Off White", "Rama" stays "Rama"); [] when it names none or says all colours / both colours. A code written in several places with different colours is ONE item with all of them. note = words that limit it to a part of the product ("Only Lehenga", "dupatta only", "size M only"), else "" (words such as "all platform" are not a limit). For an ordinary product post stock_notice is null.';
 
 /** The details the reader itself writes into `attributes` (a fresh read replaces or clears exactly these). */
 export const ATTRS = ['work', 'occasion', 'pattern', 'set_contents', 'wash_care', 'notes'];
@@ -42,13 +48,21 @@ export function readerPrompt(categories: string[], imported = false, spec?: TagS
     'cost_price: the vendor\'s price for ONE piece in rupees as a plain number (e.g. "₹1,250/-" → 1250, "rate 899" → 899). If several prices, take the single-piece price, not a full-set or catalogue total. null when no price is given.',
     'attributes: work (embroidery, print…: what the photos show, in the post\'s words when they fit), occasion, pattern (what is seen: floral print, stripes, bandhej, plain…), set_contents (what is in the set), wash_care, notes (only facts a shopper needs that have no field of their own: whether each piece is stitched, semi-stitched or unstitched, measurements, lining, what the dupatta or bottom is made of — for a saree its length and the blouse piece, for a lehenga the waist, length, flare and can-can, for a suit or kurta set the top length, sleeve and bottom type; only what the post says; no disclaimers such as "colour may vary", no shipping, returns or legal lines) — "" when not stated or not seen.',
     ...(spec ? tagPromptLines(spec) : []),
-    ...(imported ? [IMPORTED_TEXT] : []),
+    ...(imported ? [IMPORTED_TEXT] : [NOTICE_LINE]),
   ].join('\n');
 }
 
-export function readerSchema(categories: string[], spec?: TagSpec): Record<string, unknown> {
+export function readerSchema(categories: string[], spec?: TagSpec, imported = false): Record<string, unknown> {
   const str = { type: 'string' };
   const tags = spec ? tagSchema(spec) : null;
+  const notice = imported ? null : { stock_notice: { anyOf: [{ type: 'null' }, {
+    type: 'object',
+    properties: {
+      kind: { type: 'string', enum: ['permanent', 'temporary', 'unknown'] },
+      items: { type: 'array', items: { type: 'object', properties: { code: str, colours: { type: 'array', items: str }, note: str }, required: ['code', 'colours', 'note'], additionalProperties: false } },
+    },
+    required: ['kind', 'items'], additionalProperties: false,
+  }] } };
   return {
     type: 'object',
     properties: {
@@ -63,9 +77,9 @@ export function readerSchema(categories: string[], spec?: TagSpec): Record<strin
         required: ATTRS,
         additionalProperties: false,
       },
-      ...(tags ?? {}),
+      ...(tags ?? {}), ...(notice ?? {}),
     },
-    required: ['name', 'sku', 'category', 'fabric', 'color', 'sizes', 'cost_price', 'attributes', ...Object.keys(tags ?? {})],
+    required: ['name', 'sku', 'category', 'fabric', 'color', 'sizes', 'cost_price', 'attributes', ...Object.keys(tags ?? {}), ...Object.keys(notice ?? {})],
     additionalProperties: false,
   };
 }

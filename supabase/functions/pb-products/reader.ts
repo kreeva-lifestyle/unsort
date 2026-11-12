@@ -34,6 +34,7 @@ import { aiPhotos } from './photos.ts';
 import { readChanges } from './readChanges.ts';
 import { nameWithColour } from './readName.ts';
 import { READ_PHOTOS, readerPrompt, readerSchema, type ReadOut } from './readerPrompt.ts';
+import { stockNotice } from './stockNotice.ts';
 import { routeProduct } from './route.ts';
 import { stripLess } from '../pb-telegram/group.ts';
 import { mergeReadAttrs } from './import/meta.ts';
@@ -110,11 +111,13 @@ export async function readOne(p: ProductRow, o: { manual: boolean; prevStatus?: 
       model: s.reader.model, effort: s.reader.effort,
       system: readerPrompt(s.categories, p.source === 'import', spec),
       content: [...photos.blocks.slice(0, n), { type: 'text', text: factsText(p, vendor?.name ?? '', o.manual || again) }],
-      schema: readerSchema(s.categories, spec), maxTokens: 8000, timeoutMs: o.budget.hard - Date.now(),
+      schema: readerSchema(s.categories, spec, p.source === 'import'), maxTokens: 8000, timeoutMs: o.budget.hard - Date.now(),
     });
     // A photo the AI cannot open must not stop the read: once more with the first two (what the reader had before 2026-11-12).
     let used = photos.blocks.length;
     const ai = await ask(used).catch((e) => { if (used <= 2 || !/could not open one of the product photos/.test(plain(e))) throw e; used = 2; return ask(2); });
+    const notice = await stockNotice(p, ai.data.stock_notice, ai.data.cost_price, ai, o.userId); // a vendor's "stock out" picture, not a product
+    if (notice) return { product: notice, routed: 0 };
     const set = merge(p, ai.data, s.categories, o.manual, again);
     const changed = o.manual || again ? readChanges(p, set) : {};
     const next = { ...p, ...set } as ProductRow;
