@@ -10,7 +10,7 @@
 //   tags_fill_status → the latest run's progress
 import { uuid, type Body } from './actions.ts';
 import { SB_URL, enc, insert, logActivity, nowIso, one, patch, sel, svcHeaders } from './db.ts';
-import { HttpError } from './http.ts';
+import { HttpError, plain, usdOf } from './http.ts';
 import { routeProduct } from './route.ts';
 import { fillOne } from './tagFill.ts';
 import { exactIn, lookAlikes } from './tagLook.ts';
@@ -118,7 +118,11 @@ export async function tagsAiFill(b: Body, userId: string | null) {
     const p = await one<ProductRow>(`pb_products?id=eq.${enc(ids[0])}&select=${PRODUCT_COLS}`);
     if (!p) throw new HttpError(404, 'That product no longer exists.');
     if (!['ready', 'needs_info'].includes(p.status)) throw new HttpError(409, 'This product is still being read — try again in a minute.');
-    const r = await fillOne(p, await loadTaxonomy(), { manual: true, userId, budget: newBudget() });
+    const r = await fillOne(p, await loadTaxonomy(), { manual: true, userId, budget: newBudget() }).catch(async (e) => {
+      // An answer that was paid for and then refused or cut off: logged, so the day's AI limit counts it.
+      if (usdOf(e)) await logActivity({ product_id: p.id, action: 'failed', details: { step: 'tags_fill', error: plain(e), usd: usdOf(e) }, user_id: userId });
+      throw e;
+    });
     let routed = 0;
     if (r.refreshed?.was === 'needs_info' && r.refreshed.status === 'ready') {
       const now = await one<ProductRow>(`pb_products?id=eq.${enc(p.id)}&select=${PRODUCT_COLS}`);

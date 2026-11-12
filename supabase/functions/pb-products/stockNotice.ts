@@ -6,7 +6,8 @@
 // codes and colours here. For each code the vendor's own products with that
 // design are found (pb_stock_candidates: the same code and colour rules as the
 // "already added?" check) and marked out of stock (stock.ts saveStock, which
-// sends the listings already on Shopify again → Sold out).
+// marks the listings on sale on Shopify so their stock is sent → Sold out).
+// An archived product is found too while a listing of it is still on a store.
 // Only what is certain is marked. Left for a person, with the reason:
 //   * the number exists under several letter codes at this vendor;
 //   * a colour the notice names that no product of the design has;
@@ -104,9 +105,9 @@ export async function stockNotice(p: ProductRow, n: Notice | null | undefined, p
         await logActivity({ product_id: c.id, action: 'stock', details: { temporary: true, notice: p.id }, user_id: userId });
         marked++;
       } else if (kind === 'permanent') { // archived on Shopify and in Playbook
-        if ((await takeOffSale({ id: c.id, status: c.status }, { notice: p.id }, userId)) >= 0) marked++;
+        if ((await takeOffSale({ id: c.id }, { notice: p.id }, userId)) >= 0) marked++;
       } else if (!c.in_stock) await patch('pb_products', `id=eq.${enc(c.id)}`, { temp_out_at: null }); // already out of stock: only the note goes
-      else if ((await saveStock({ id: c.id, status: c.status }, { in_stock: false, temp_out_at: null }, { notice: p.id, kind }, userId)) >= 0) marked++;
+      else if ((await saveStock({ id: c.id }, { in_stock: false, temp_out_at: null }, { notice: p.id, kind }, userId)) >= 0) marked++;
     }
     if (r.left) left++;
     lines.push(noticeLine(it, r, kind));
@@ -114,7 +115,7 @@ export async function stockNotice(p: ProductRow, n: Notice | null | undefined, p
   const name = `Stock notice${kind === 'unknown' ? '' : ` (${kind})`}: ${items.map(i => `${i.code}${i.colours?.length ? ` ${i.colours.join(', ')}` : ''}`).join('; ')}`.replace(/\s+/g, ' ').slice(0, 200);
   const saved = await patch<ProductRow>('pb_products', `id=eq.${enc(p.id)}&status=eq.reading`,
     { name, status: left ? 'needs_info' : 'archived', intake_notes: lines.slice(0, 20), ai_read_at: nowIso(), ai_error: null, claimed_at: null }, PRODUCT_COLS);
-  if (!saved[0]) throw new HttpError(409, 'The product changed while it was being read — open it again.');
+  if (!saved[0]) throw Object.assign(new HttpError(409, 'The product changed while it was being read — open it again.'), { usd: ai.usd }); // paid for: counted with the failure
   await logActivity({ product_id: p.id, action: 'read', details: { model: ai.model, usd: ai.usd, stock_notice: { kind, items: items.length, marked, left } }, user_id: userId });
   return saved[0];
 }

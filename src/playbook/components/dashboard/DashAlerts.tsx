@@ -4,8 +4,8 @@
 // place that fixes it. Shown only while it is true:
 //   stalled   work is waiting, automation is on, and the worker has not run
 //             for 10 minutes (it runs every minute while there is work);
-//   limit     today's AI limit is used up: reading and writing wait for
-//             tomorrow or a higher limit;
+//   limit     today's AI limit is used up: writing waits for tomorrow or a
+//             higher limit (vendor posts are still read);
 //   store     a website whose last contact with Shopify failed (a rejected
 //             key, a missing permission, a frozen store);
 //   noted     published listings that carry a note (a photo Shopify could
@@ -48,7 +48,7 @@ export default function DashAlerts({ d, go }: { d: DashData; go: DashGo }) {
       )}
       {over && (
         <Banner id="pb-dash-limit" tone="review" button="Open Settings" onOpen={() => go('settings')} title="Today’s AI limit is used up">
-          The AI has cost {rupees(d.spentToday ?? 0)} today (limit {rupees(d.limit)}). Nothing more is read or written until tomorrow, or a higher limit; sending to Shopify goes on.
+          The AI has cost {rupees(d.spentToday ?? 0)} today (limit {rupees(d.limit)}). Nothing more is written until tomorrow, or a higher limit. Vendor posts are still read, and sending to Shopify goes on.
         </Banner>
       )}
       {broken.slice(0, 3).map(s => (

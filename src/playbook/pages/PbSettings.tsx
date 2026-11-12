@@ -15,7 +15,7 @@ import { dirtyTitle } from '../hooks/useDirty';
 import { discardAsk } from '../components/ui/discard';
 import type { AddToast } from '../components/PbToasts';
 import { PB_EFFORTS, PB_MODELS, type PbSettings as Settings } from '../types';
-import { DEFAULT_DAILY_LIMIT, DEFAULT_SETTINGS, getSettings, runWorker, saveSetting, type WorkResult } from '../data/settings';
+import { DEFAULT_DAILY_LIMIT, DEFAULT_SETTINGS, getSettings, runWorker, saveAutomation, saveSetting, type WorkResult } from '../data/settings';
 import { getAiCostSince } from '../data/listingSeo';
 import { USD_INR, istDayStart } from '../format';
 import { Field, Grid2 } from '../components/website/ui';
@@ -61,15 +61,24 @@ export default function PbSettings({ addToast, onBack, onGuide }: { addToast: Ad
   const retry = () => { setRetrying(true); void load().finally(() => setRetrying(false)); };
 
   const save = async <K extends keyof Settings>(key: K, value: Settings[K], ok: string) => {
-    // The pause switch has its own lock: it must still work while "Run now" (up to 2 min) or a save is busy.
-    const own = key === 'automation';
-    if (own ? pausing : busy) return; // Enter in a field must not run a save twice
-    if (own) setPausing(true); else setBusy(key);
+    if (busy) return; // Enter in a field must not run a save twice
+    setBusy(key);
     try {
       await saveSetting(key, value);
       setSaved(s => (s ? { ...s, [key]: value } : s));
       addToast(ok, 'success');
-    } catch (e) { addToast(friendlyError(e), 'error'); } finally { if (own) setPausing(false); else setBusy(''); }
+    } catch (e) { addToast(friendlyError(e), 'error'); } finally { setBusy(''); }
+  };
+  // The pause switch and the daily limit have their own lock: they must still work while "Run now" (up to 2 min) or a
+  // save is busy. Only the part that changed is saved (data/settings.ts saveAutomation).
+  const saveAuto = async (patch: Partial<Settings['automation']>, ok: string) => {
+    if (pausing) return;
+    setPausing(true);
+    try {
+      const value = await saveAutomation(patch);
+      setSaved(s => (s ? { ...s, automation: value } : s));
+      addToast(ok, 'success');
+    } catch (e) { addToast(friendlyError(e), 'error'); } finally { setPausing(false); }
   };
 
   const runNow = async () => {
@@ -130,8 +139,8 @@ export default function PbSettings({ addToast, onBack, onGuide }: { addToast: Ad
       <SettingsColumns form={form} side={
         <AutomationTile paused={paused} saving={pausing} running={busy === 'run'} dim={!!busy && busy !== 'run'} run={run}
           onRun={() => void runNow()} limit={limit} spent={spent} savingLimit={pausing}
-          onLimit={v => void save('automation', { ...saved.automation, daily_limit_inr: v }, v ? `Daily AI limit saved: ₹${v.toLocaleString('en-IN')}` : 'Daily AI limit removed')}
-          onToggle={() => void save('automation', { ...saved.automation, paused: !paused }, paused ? 'Automation running again' : 'Automation paused — nothing runs on its own')} />
+          onLimit={v => void saveAuto({ daily_limit_inr: v }, v ? `Daily AI limit saved: ₹${v.toLocaleString('en-IN')}` : 'Daily AI limit removed')}
+          onToggle={() => void saveAuto({ paused: !paused }, paused ? 'Automation running again' : 'Automation paused — nothing runs on its own')} />
       } />
     </>
   );

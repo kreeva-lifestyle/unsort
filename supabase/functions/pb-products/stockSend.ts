@@ -4,8 +4,11 @@
 // in Needs review or Failed, the website was switched off or automation was
 // paused — and every missed "sold out" is an order for goods the vendor no
 // longer has. Now:
-//   * stock.ts marks every listing of the product that is on Shopify
-//     (markStockDue: pb_listings.stock_due), whatever state it is in;
+//   * stock.ts saves the product and marks every listing of it that is on sale
+//     on Shopify in ONE database call (pb_stock_save: pb_listings.stock_due),
+//     whatever state the listing or the product is in. "On sale" = it has a
+//     Shopify product that was not hidden (Remove from site) or archived
+//     there; a listing set aside while its product was archived still counts;
 //   * sendStock sends only the stock: each size's "Continue selling when out
 //     of stock" box (ticked = in stock, unticked = sold out; nothing on a
 //     Track-stock website, where the count in Shopify decides), or, for a
@@ -34,24 +37,33 @@ const BULK = `mutation PbStock($productId: ID!, $variants: [ProductVariantsBulkI
   productVariantsBulkUpdate(productId: $productId, variants: $variants) { userErrors { field message } }
 }`;
 
-export interface Due { id: string; product_id: string; website_id: string; status: string; claimed_at: string | null; shopify_product_id: string | null; stock_tried_at: string | null }
-const DUE_COLS = 'id,product_id,website_id,status,claimed_at,shopify_product_id,stock_tried_at';
+export interface Due { id: string; product_id: string; website_id: string; status: string; claimed_at: string | null; shopify_product_id: string | null; shopify_status: string | null; stock_tried_at: string | null }
+const DUE_COLS = 'id,product_id,website_id,status,claimed_at,shopify_product_id,shopify_status,stock_tried_at';
 type Stock = { id: string; in_stock: boolean; perm_out_at: string | null };
+
+/** Not on sale on Shopify: never sent there, or hidden (Remove from site → DRAFT) or archived there. The Playbook
+ *  status alone does not say this: a listing set aside while its product was archived is still on the store. */
+export const offSale = (l: Pick<Due, 'status' | 'shopify_product_id' | 'shopify_status'>) =>
+  !l.shopify_product_id || (l.status === 'skipped' && ['DRAFT', 'ARCHIVED'].includes(l.shopify_status || ''));
+/** The same as a PostgREST filter (pb_stock_save marks by this rule too). */
+const ON_SALE = 'shopify_product_id=not.is.null&or=(status.neq.skipped,shopify_status.is.null,shopify_status.not.in.(DRAFT,ARCHIVED))';
 
 /** What each size of the Shopify product is set to: counted, and sellable at a count of zero only while in stock. */
 export const stockVariants = (ids: string[], inStock: boolean) =>
   ids.map(id => ({ id, inventoryPolicy: inStock ? 'CONTINUE' : 'DENY', inventoryItem: { tracked: true } }));
 
-/** Every listing of the product that is on Shopify now owes its store the product's stock. Returns how many. */
-export async function markStockDue(productId: string): Promise<number> {
-  return (await patch('pb_listings', `product_id=eq.${enc(productId)}&shopify_product_id=not.is.null&status=neq.skipped`, { stock_due: true, stock_tried_at: null })).length;
+/** Archive a permanently sold-out product once none of its listings is still on sale on Shopify. */
+export async function retire(productId: string): Promise<void> {
+  const left = await sel<{ id: string }>(`pb_listings?product_id=eq.${enc(productId)}&${ON_SALE}&select=id&limit=1`);
+  if (!left.length) await patch('pb_products', `id=eq.${enc(productId)}&status=in.(ready,needs_info,new)&in_stock=eq.false&perm_out_at=not.is.null`, { status: 'archived' });
 }
 
-/** Archive a permanently sold-out product once none of its listings is still on Shopify. */
-export async function retire(productId: string): Promise<void> {
-  const mine = `product_id=eq.${enc(productId)}`;
-  const left = await sel<{ id: string }>(`pb_listings?${mine}&shopify_product_id=not.is.null&status=in.(published,publishing,review,failed)&select=id&limit=1`);
-  if (!left.length) await patch('pb_products', `id=eq.${enc(productId)}&status=in.(ready,needs_info,new)&in_stock=eq.false&perm_out_at=not.is.null`, { status: 'archived' });
+/** The worker's sweep: a permanent stock-out whose archive did not happen when its last listing left Shopify (that
+ *  call failed, or the product was being read just then). Returns how many were looked at. */
+export async function retireDue(limit: number): Promise<number> {
+  const rows = await sel<{ id: string }>(`pb_products?perm_out_at=not.is.null&in_stock=eq.false&status=in.(ready,needs_info,new)&select=id&order=perm_out_at.asc&limit=${limit}`);
+  for (const r of rows) await retire(r.id);
+  return rows.length;
 }
 
 const said = (site: WebsiteRow, ue: { message: string }[]) => new HttpError(400, `${site.name}: Shopify said "${ue.map(e => e.message).join('; ').slice(0, 200)}".`);
@@ -61,7 +73,7 @@ const said = (site: WebsiteRow, ue: { message: string }[]) => new HttpError(400,
 export async function sendStock(l: Due, userId: string | null, ms = 20_000): Promise<'done' | 'wait' | 'failed'> {
   const mine = `id=eq.${enc(l.id)}&stock_due=eq.true`;
   const clear = { stock_due: false, stock_tried_at: null };
-  if (!l.shopify_product_id || l.status === 'skipped') { await patch('pb_listings', mine, clear); return 'done'; }
+  if (offSale(l)) { await patch('pb_listings', mine, clear); return 'done'; }
   // A run is publishing this listing right now, perhaps with the stock as it was: once it is done, the stock goes.
   if (l.status === 'publishing' && l.claimed_at && Date.parse(l.claimed_at) > Date.now() - STALE_MS) return 'wait';
   const [p, site] = await Promise.all([
@@ -93,9 +105,13 @@ export async function sendStock(l: Due, userId: string | null, ms = 20_000): Pro
         if (ue.length) throw said(site, ue);
       }
     }
-    // The stock may have changed while this was on its way: then it is still owed, and the next try sends the new one.
+    // The stock changed while this was on its way: it is owed again, and the next try sends the new one. Marked here,
+    // not assumed: a newer send may have finished first and cleared the mark, and this older one reached the store last.
     const now = await one<Stock>(`pb_products?id=eq.${enc(p.id)}&select=id,in_stock,perm_out_at`);
-    if (now && (now.in_stock !== p.in_stock || !!now.perm_out_at !== !!p.perm_out_at)) return 'wait';
+    if (now && (now.in_stock !== p.in_stock || !!now.perm_out_at !== !!p.perm_out_at)) {
+      await patch('pb_listings', `id=eq.${enc(l.id)}`, { stock_due: true, stock_tried_at: null });
+      return 'wait';
+    }
     if ((await patch('pb_listings', mine, clear)).length) await logActivity({ ...who, action: 'stock_sent', details: { in_stock: inStock, ...(site.track_inventory ? { counted_in_shopify: true } : {}) } });
     return 'done';
   } catch (e) {
@@ -107,31 +123,41 @@ export async function sendStock(l: Due, userId: string | null, ms = 20_000): Pro
   }
 }
 
-/** The listings whose stock is owed and due for a try (never tried, or the last try is 5 minutes old), oldest try first. */
-export const stockCandidates = (limit: number, productId = '') =>
-  sel<Due>(`pb_listings?stock_due=eq.true${productId ? `&product_id=eq.${enc(productId)}` : `&or=(stock_tried_at.is.null,stock_tried_at.lt.${ago(RETRY_MS)})`}&select=${DUE_COLS}&order=stock_tried_at.asc.nullsfirst&limit=${limit}`);
+/** The listings whose stock is owed and due for a try (never tried, or the last try is 5 minutes old), oldest try first.
+ *  `skipSites`: stores that just failed in this run. */
+export const stockCandidates = (limit: number, productId = '', skipSites: string[] = []) =>
+  sel<Due>(`pb_listings?stock_due=eq.true${productId ? `&product_id=eq.${enc(productId)}` : `&or=(stock_tried_at.is.null,stock_tried_at.lt.${ago(RETRY_MS)})`}`
+    + `${skipSites.length ? `&website_id=not.in.(${skipSites.map(enc).join(',')})` : ''}&select=${DUE_COLS}&order=stock_tried_at.asc.nullsfirst&limit=${limit}`);
 
-/** The worker's first step, for every website (on or off) and also while automation is paused. Returns how many were sent. */
+/** The worker's first step, for every website (on or off) and also while automation is paused. Returns how many were sent.
+ *  Each Shopify call gets 10 s here (a send is two calls), so one hanging store cannot take the run from the other steps;
+ *  a store that fails is tried once a run, and the listings of the other stores are fetched and sent instead. */
 export async function sendStockDue(limit: number, inTime: () => boolean, userId: string | null): Promise<number> {
   let n = 0;
-  const down = new Set<string>(); // a store that just failed: its other listings wait for the next run (one failing call a minute, not ten)
-  for (const l of await stockCandidates(limit)) {
-    if (!inTime()) break;
-    if (down.has(l.website_id)) continue;
-    const r = await sendStock(l, userId);
-    if (r === 'done') n++; else if (r === 'failed') down.add(l.website_id);
+  const down = new Set<string>();
+  for (let pass = 0; pass < 3 && n < limit && inTime(); pass++) {
+    const failedBefore = down.size;
+    for (const l of await stockCandidates(limit - n, '', [...down])) {
+      if (!inTime()) break;
+      if (down.has(l.website_id)) continue;
+      const r = await sendStock(l, userId, 10_000);
+      if (r === 'done') n++; else if (r === 'failed') down.add(l.website_id);
+    }
+    if (down.size === failedBefore) break; // no store failed in this pass: nothing was skipped
   }
   return n;
 }
 
-/** A person changed the stock: send it to the product's stores at once (what fails stays owed for the worker). Returns how many went. */
+/** A person changed the stock: send it to the product's stores at once (what fails stays owed for the worker). Returns
+ *  how many reached their store (a listing that turned out not to be on sale any more is not counted). */
 export async function sendNow(productId: string, userId: string | null): Promise<number> {
-  const done = await Promise.all((await stockCandidates(20, productId)).map(l => sendStock(l, userId, 15_000)));
-  return done.filter(r => r === 'done').length;
+  const due = await stockCandidates(20, productId);
+  const done = await Promise.all(due.map(l => sendStock(l, userId, 15_000)));
+  return done.filter((r, i) => r === 'done' && !offSale(due[i])).length;
 }
 
 /** After a full publish: the product's stock changed while the listing was being sent, so the store may show the old one. */
 export async function stockMoved(listingId: string, was: Stock): Promise<void> {
   const now = await one<Stock>(`pb_products?id=eq.${enc(was.id)}&select=id,in_stock,perm_out_at`);
-  if (now && (now.in_stock !== was.in_stock || !!now.perm_out_at !== !!was.perm_out_at)) await patch('pb_listings', `id=eq.${enc(listingId)}&shopify_product_id=not.is.null`, { stock_due: true, stock_tried_at: null });
+  if (now && (now.in_stock !== was.in_stock || !!now.perm_out_at !== !!was.perm_out_at)) await patch('pb_listings', `id=eq.${enc(listingId)}&${ON_SALE}`, { stock_due: true, stock_tried_at: null });
 }

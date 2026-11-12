@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 globalThis.Deno ??= { env: { get: () => '' } }; // db.ts reads Deno.env
-const { stockVariants, PERM_NOTE } = await import('../stockSend.ts');
+const { stockVariants, PERM_NOTE, offSale } = await import('../stockSend.ts');
 const stock = await import('../stock.ts');
 const { mediaVerdict, photoNote } = await import('../mediaCheck.ts');
 const { istDayStart, USD_INR } = await import('../brake.ts');
@@ -19,6 +19,19 @@ test('stock send: every size is counted; it can be ordered at a count of zero on
   assert.deepEqual(stockVariants([], true), []);
   assert.equal(stock.PERM_NOTE, PERM_NOTE, 'stock.ts still hands out the note and retire (publish.ts imports them)');
   assert.equal(typeof stock.retire, 'function');
+});
+
+test('on sale on Shopify: a Shopify product that was not hidden or archived there, whatever the Playbook status', () => {
+  const l = (status, shopify_product_id, shopify_status) => ({ status, shopify_product_id, shopify_status });
+  assert.equal(offSale(l('published', 'gid://1', 'ACTIVE')), false);
+  assert.equal(offSale(l('queued', 'gid://1', 'ACTIVE')), false, 'waiting to be written again, still on the store');
+  assert.equal(offSale(l('failed', 'gid://1', 'ACTIVE')), false);
+  assert.equal(offSale(l('skipped', 'gid://1', 'ACTIVE')), false, 'set aside while its product was archived: still on the store');
+  assert.equal(offSale(l('skipped', 'gid://1', null)), false, 'not known to be off: treated as on sale');
+  assert.equal(offSale(l('skipped', 'gid://1', 'DRAFT')), true, 'Remove from site');
+  assert.equal(offSale(l('skipped', 'gid://1', 'ARCHIVED')), true, 'a permanent stock-out that was already archived there');
+  assert.equal(offSale(l('published', null, null)), true, 'never sent to Shopify');
+  assert.equal(offSale(l('skipped', null, 'DRAFT')), true);
 });
 
 test('photo check: ready → ok; still processing early → wait; failed, or not ready after 30 minutes → how many', () => {

@@ -35,7 +35,7 @@ import { checkMedia } from './mediaCheck.ts';
 import { claimPublish, PUBLISH_NEEDS_MS, pubCandidates, publishOne } from './publish.ts';
 import { temporary } from './publishParts.ts';
 import { claimRead, readCandidates, readOne } from './reader.ts';
-import { sendStockDue } from './stockSend.ts';
+import { retireDue, sendStockDue } from './stockSend.ts';
 import { FILL_NEEDS_MS, fillCandidates, fillQueued, routeDue } from './tagFill.ts';
 import { loadTaxonomy } from './taxonomy.ts';
 import type { Budget } from './types.ts';
@@ -43,7 +43,7 @@ import type { Budget } from './types.ts';
 /** stock = stock changes sent to stores; paused = automation is paused (the run stopped, or sent stock only); limit = the day's AI limit is used up. */
 export interface WorkResult { read: number; routed: number; generated: number; published: number; failed: number; imported?: number; tagged?: number; stock?: number; paused?: boolean; limit?: boolean }
 
-const CAPS = { read: 6, generate: 8, publish: 10, route: 10, fill: 5, stock: 10, media: 5 };
+const CAPS = { read: 6, generate: 8, publish: 10, route: 10, fill: 5, stock: 10, media: 5, retire: 5 };
 /** The slice of each run that stock sends may use. */
 const STOCK_MS = 25_000;
 /** Time an AI step needs left before it is claimed: photo checks + a slow answer (Opus / high effort). */
@@ -80,6 +80,7 @@ export async function work(userId: string | null, manual = false): Promise<WorkR
   try { // never held back: not by a pause, not by a website that is off
     const until = Date.now() + STOCK_MS, sent = await sendStockDue(CAPS.stock, () => Date.now() < until, userId);
     if (sent) out.stock = sent;
+    await retireDue(CAPS.retire); // a permanent stock-out whose archive did not happen when its last listing left Shopify
   } catch (e) { failed('stock', 'run', e); }
   if (pausedAtStart && !manual) return { ...out, paused: true };
 
@@ -94,7 +95,9 @@ export async function work(userId: string | null, manual = false): Promise<WorkR
     if (imp) out.imported = imp.added;
   } catch (e) { failed('import', 'run', e); } // the run itself records its error; the next tick carries on
 
-  for (const c of (await capped()) ? [] : await readCandidates(CAPS.read)) {
+  // The day's limit stops what costs most: writing, tag fills and reading imported products. A vendor's Telegram post
+  // is still read (a few paise): it may be a stock notice, and a missed "sold out" is an order for goods that are gone.
+  for (const c of await readCandidates(CAPS.read, (await capped()) ? 'telegram' : '')) {
     if (!left(READ_NEEDS_MS) || await stopped()) break;
     const p = await claimRead(c.id, false);
     if (!p) continue; // another run took it
@@ -137,7 +140,7 @@ export async function work(userId: string | null, manual = false): Promise<WorkR
     const queued = left(FILL_NEEDS_MS) && !(await stopped()) && !(await capped()) ? await fillCandidates(CAPS.fill) : [];
     const tax = queued.length ? await loadTaxonomy() : null;
     for (const c of queued) {
-      if (!tax || !left(FILL_NEEDS_MS)) break;
+      if (!tax || !left(FILL_NEEDS_MS) || await stopped()) break;
       if (await fillQueued(c, tax, userId, budget)) out.tagged = (out.tagged ?? 0) + 1; // false: another run took it
     }
   } catch (e) { failed('tags_fill', 'run', e); }

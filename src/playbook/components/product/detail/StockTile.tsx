@@ -36,8 +36,10 @@ export default function StockTile({ p, owed = 0, span, addToast, onChanged }: { 
     setBusy(true);
     try {
       const r = await setStock(p.id, !on);
-      const sent = r.resent ? ` — sent to the ${r.resent === 1 ? 'website' : `${r.resent} websites`} it is on` : '';
-      addToast(`${on ? 'Marked out of stock' : 'Back in stock'}${sent}`, 'success');
+      const sites = (n: number) => (n === 1 ? '1 website' : `${n} websites`);
+      const sent = r.resent ? ` — sent to ${sites(r.resent)}` : '';
+      const wait = r.waiting ? `${sent ? ';' : ' —'} ${sites(r.waiting)} could not be reached yet, Playbook keeps trying` : '';
+      addToast(`${on ? 'Marked out of stock' : 'Back in stock'}${sent}${wait}`, 'success');
       onChanged();
     } catch (e) { addToast(friendlyError(e), 'error'); } finally { setBusy(false); }
   };

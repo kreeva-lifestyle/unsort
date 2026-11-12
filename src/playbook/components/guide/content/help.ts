@@ -67,7 +67,7 @@ export const HELP: GuideSection[] = [
       h('What happens when I pause automation?'),
       p('Nothing is read, written or published on its own until you switch it back on, and a run that was going stops. Two things carry on: a stock change (sold out, back in stock, a vendor\'s permanent stock-out) still reaches your stores, and Telegram posts are still saved and wait. Buttons on a product and **Run one round now** still work. When it is switched on again it carries on from where it stopped.'),
       h('What is the daily AI limit?'),
-      p('**Settings → Automation → Daily AI limit ₹**. Once the AI has cost that much in a day, Playbook stops reading and writing until midnight; sending to Shopify goes on, and a button you tap yourself still works. It starts at ₹500. Type another amount, or leave it empty for no limit. **Today so far** shows what the day has cost.'),
+      p('**Settings → Automation → Daily AI limit ₹**. Once the AI has cost that much in a day, Playbook stops writing listings and reading imported products until midnight. Vendor posts from Telegram are still read (a few paise each), so a stock notice is never missed; sending to Shopify goes on, and a button you tap yourself still works. It starts at ₹500. Type another amount, or leave it empty for no limit. **Today so far** shows what the day has cost.'),
       h('Two of us edited the same listing. Whose change stays?'),
       p('The last one saved. Close and reopen a listing before editing if someone else may have just changed it.'),
     ],

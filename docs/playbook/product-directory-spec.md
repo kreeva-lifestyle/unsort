@@ -1072,8 +1072,10 @@ Migration `20261113020000_pb_stock_due_media_check.sql`.
   starting items; a round started with "Run now" while already paused runs
   through. `pb_settings.automation.daily_limit_inr` (₹ per IST day; absent →
   500, 0 → none): once `pb_ai_cost_since(today)` × `USD_INR` reaches it the
-  worker skips read, generate and tag fill (`WorkResult.limit`); publishing
-  and stock go on; a button a person taps is not held back. Set in Settings →
+  worker skips generate, tag fill and the reading of imported and hand-added
+  products (`WorkResult.limit`); Telegram posts are still read (one may be a
+  stock notice), publishing and stock go on; a button a person taps is not
+  held back. Set in Settings →
   Automation beside "Today so far". `ai.ts` attaches `usd` to failures raised
   after the model answered (`http.ts usdOf`); the reader, the writer (also a
   failed rewrite) and the tag filler log it on their `failed` row, and
@@ -1106,4 +1108,39 @@ Migration `20261113020000_pb_stock_due_media_check.sql`.
   Not changed: the functions are still one-line loaders pinned to a commit of
   this public repository; deploying real files from GitHub Actions needs a
   Supabase access token only the owner can create.
+
+### Independent review of batches 2 and 3 (2026-11-13)
+Fixed before the batches went live (`20261113040000_pb_stock_save.sql`):
+- **One definition of "on sale on Shopify"** (`stockSend.ts offSale` /
+  `ON_SALE`, the same rule in `pb_stock_save`): the listing has a Shopify
+  product that was not hidden (DRAFT) or archived there. Its Playbook status
+  does not decide it: a listing set aside while its product was archived is
+  still on the store. Stock is marked, sent and counted by this rule, so a
+  permanent stock-out cannot leave a product on sale; `retire` uses it too,
+  and the worker sweeps for a permanent stock-out whose archive did not
+  happen (`retireDue`).
+- **Archived products**: a stock change, by the switch or a vendor's notice
+  (`pb_stock_candidates`), also reaches an archived product's listings that
+  are still on a store.
+- **Saved and marked together**: `pb_stock_save(product, change)` updates the
+  product and marks its listings in one transaction.
+- **An older send cannot win**: a send that finds the stock changed while it
+  was on its way marks the listing owed again.
+- **A store that is down does not hold up the others**: the stock step gives
+  each Shopify call 10 s, tries a failing store once a run and fetches the
+  other stores' listings instead; the photo check does the same.
+- **The daily limit never hides a stock notice**: once it is used up, Telegram
+  posts are still read. While automation is PAUSED they wait (the pause text
+  says so).
+- **No listing is written for a permanent stock-out** (`generate.ts`).
+- **Cost counted**: a write thrown away because the product changed, a read
+  that could not be saved, and a refused manual tag fill log their `usd`.
+- **Stock toast**: `set_stock` returns `resent` (reached at once) and
+  `waiting` (not reached yet). **Settings**: the pause and the daily limit
+  save only their own part of `automation` (`saveAutomation`), so a page
+  opened before a pause cannot undo it.
+Accepted as they are: stock owed to a dead store is tried every 5 minutes for
+as long as it takes (the dashboard shows the store's problem); while the daily
+limit is used up the worker is still woken each minute when work waits (it
+reads settings and stops).
 

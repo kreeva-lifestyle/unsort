@@ -23,7 +23,8 @@ import { checkCopy, hardOf, type Version } from './seoCheck.ts';
 import { seoGet, seoPut } from './seoStore.ts';
 import { buildTags, vendorCode } from './tags.ts';
 import { siteValueTags } from './tagStore.ts';
-import { ARCHIVED, LISTING_COLS, MAX_ATTEMPTS, NEEDS_INFO, PRODUCT_COLS, STALE_MS, WEBSITE_COLS, hasPrice, type Budget, type ListingRow, type ProductRow, type WebsiteRow } from './types.ts';
+import { PERM_NOTE } from './stockSend.ts';
+import { ARCHIVED, LISTING_COLS, MAX_ATTEMPTS, NEEDS_INFO, PRODUCT_COLS, STALE_MS, WEBSITE_COLS, hasPrice, permOut, type Budget, type ListingRow, type ProductRow, type WebsiteRow } from './types.ts';
 
 const MAX_PHOTOS = 8; // photos sent to the writer (alt text for the rest is derived from the title)
 /** Product fields the price, content or tags are made from: if any changes while the AI writes, the result is stale. */
@@ -58,8 +59,10 @@ export async function generateOne(l: ListingRow, o: { manual: boolean; prevStatu
       sel<Sibling>(`pb_listings?product_id=eq.${enc(l.product_id)}&id=neq.${enc(l.id)}&select=id,status,claimed_at,generated_at,title,description_html,seo_title,seo_description,image_alts`),
     ]);
     if (!p || !site) throw new HttpError(404, 'The product or website for this listing no longer exists.');
-    if (p.status === 'archived') {
-      const r = await patch<ListingRow>('pb_listings', `id=eq.${enc(l.id)}&status=eq.generating`, { status: 'skipped', error: ARCHIVED, claimed_at: null }, LISTING_COLS);
+    // Archived, or the vendor called it a permanent stock-out: nothing is written (no AI call). A listing that is on
+    // Shopify stays there until the stock send archives it (stockSend.ts, which does not go by this status).
+    if (p.status === 'archived' || permOut(p)) {
+      const r = await patch<ListingRow>('pb_listings', `id=eq.${enc(l.id)}&status=eq.generating`, { status: 'skipped', error: p.status === 'archived' ? ARCHIVED : PERM_NOTE, claimed_at: null }, LISTING_COLS);
       return r[0] ?? l;
     }
     if (p.status === 'needs_info') throw new HttpError(400, NEEDS_INFO);
@@ -137,6 +140,9 @@ export async function generateOne(l: ListingRow, o: { manual: boolean; prevStatu
     const now = await one<ProductRow>(`pb_products?id=eq.${enc(p.id)}&select=${PRODUCT_COLS}`);
     if (!now || factsOf(now) !== factsOf(p)) {
       const r = await patch<ListingRow>('pb_listings', `id=eq.${enc(l.id)}&status=eq.generating`, { status: 'queued', error: null, claimed_at: null }, LISTING_COLS);
+      // The text is thrown away but was paid for: logged, so the day's AI limit counts it.
+      await logActivity({ product_id: l.product_id, website_id: l.website_id, listing_id: l.id, action: 'failed', user_id: o.userId,
+        details: { step: 'generate', error: 'The product changed while this was being written, so it is written again from the new details.', temporary: true, usd: w.usd } });
       if (o.manual) throw new HttpError(409, 'The product changed while this listing was being written — it is queued to be written again from the new details.');
       return r[0] ?? l;
     }

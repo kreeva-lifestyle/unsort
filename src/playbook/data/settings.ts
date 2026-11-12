@@ -33,6 +33,14 @@ export async function saveSetting<K extends keyof PbSettings>(key: K, value: PbS
     .then(({ error: e }) => { if (e) logSwallowed('pb_activity insert', e); });
 }
 
+/** Change one part of the automation setting (the pause, or the daily limit). What is stored is read again first, so a
+ *  page opened before someone else paused cannot switch the automation back on by saving a limit. Returns what is stored now. */
+export async function saveAutomation(patch: Partial<PbSettings['automation']>): Promise<PbSettings['automation']> {
+  const value = { ...(await getSettings()).automation, ...patch };
+  await saveSetting('automation', value);
+  return value;
+}
+
 /** stock = stock changes sent to stores · paused = the run stopped because automation was paused · limit = today's AI limit is used up. */
 export type WorkResult = { ok: boolean; read: number; routed: number; generated: number; published: number; failed: number; stock?: number; paused?: boolean; limit?: boolean };
 export const runWorker = () => pbCall<WorkResult>('work');
