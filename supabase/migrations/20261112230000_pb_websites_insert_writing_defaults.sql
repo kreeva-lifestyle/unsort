@@ -1,0 +1,12 @@
+-- Why: "Add website" stopped working on 2026-11-12. Since that day the app sends a new
+-- store's writing defaults with the insert (createWebsite in src/playbook/data/websites.ts:
+-- content = descriptions of 130 to 200 words, tag_rules = at most 8 tags; the owner's
+-- per-store template), but INSERT on pb_websites was granted for (name, shop_domain) only
+-- (20261105090000_pb_product_directory.sql). Postgres therefore refused the insert with
+-- "permission denied for table pb_websites" and no website could be added.
+--
+-- content and tag_rules are already updatable by the same role (same migration), so this
+-- gives staff nothing they could not already do one step later. Every other column still
+-- starts from its default (inactive, not connected, routing 'none'), and the connection
+-- fields stay with the edge function (save_credentials / test_connection).
+grant insert (content, tag_rules) on public.pb_websites to authenticated;
