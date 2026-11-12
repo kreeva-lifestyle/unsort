@@ -11,16 +11,7 @@ export type PbTagCase = 'as_is' | 'lower' | 'title';
 export type PbModel = 'claude-haiku-5-5' | 'claude-sonnet-5-5' | 'claude-opus-5-5';
 export type PbEffort = '' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 
-export interface PbVendor {
-  id: string; name: string; code: string | null; notes: string | null; active: boolean;
-  /** Telegram channel (20261107090000_pb_telegram_intake.sql): Bot API id (-100…), username (lowercase, no @), title. */
-  tg_channel_id: number | null; tg_username: string | null; tg_title: string | null;
-  /** Daily check (set by the database, never by the app): IST minute of day 0–1439, when it was given
-   *  (first check = its next occurrence after that), when the last check finished, and whether the
-   *  crawler has noted the channel's newest post yet (old posts are never copied). */
-  tg_slot_minute: number | null; tg_slot_set_at: string | null; tg_checked_at: string | null; tg_cursor_ready: boolean;
-  created_by: string | null; created_at: string; updated_at: string;
-}
+export type { PbVendor } from './vendorTypes';
 
 export interface PbProduct {
   id: string; vendor_id: string | null; source: 'manual' | 'telegram' | 'import'; source_ref: string | null;

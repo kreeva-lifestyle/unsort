@@ -55,7 +55,19 @@ export function normalizeTgChannel(raw: string): { value: string | null } | { er
   return { value: s };
 }
 
-export type VendorInput = { name: string; code: string | null; notes: string | null; tg_username: string | null };
+/** "kb, nkb" → ["KB", "NKB"]: the letters a vendor's design codes start with. Split on anything that is not a
+ *  letter or a number, upper-cased, duplicates dropped, order kept (the database cleans the same way: pb_short_names). */
+export function parseShortNames(raw: string): { value: string[] } | { error: string } {
+  const list = [...new Set(raw.toUpperCase().split(/[^A-Z0-9]+/).filter(Boolean))];
+  if (raw.trim() && !list.length) return { error: 'A short name is made of English letters or numbers, e.g. KB.' };
+  const long = list.find(c => c.length > 10);
+  if (long) return { error: `${long.slice(0, 14)}${long.length > 14 ? '…' : ''} is too long: a short name has up to 10 letters or numbers. Separate several with a comma, e.g. KB, NKB.` };
+  if (list.length > 8) return { error: 'A vendor can have up to 8 short names.' };
+  return { value: list };
+}
+
+/** `codes` = the short names; the database rebuilds the `code` text the list shows from it. */
+export type VendorInput = { name: string; codes: string[]; notes: string | null; tg_username: string | null };
 
 export async function saveVendor(id: string | null, v: VendorInput) {
   const { data, error } = id

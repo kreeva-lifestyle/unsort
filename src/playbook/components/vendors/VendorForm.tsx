@@ -1,18 +1,23 @@
-// Add / edit a vendor: a short sheet (4 fields) through PbModal. Desktop
+// Add / edit a vendor: a short sheet (4 fields; "Short names" takes several,
+// KB, NKB) through PbModal. Desktop
 // footer: Cancel then Save; phone: one full-width Save (Cancel is the ×,
 // swipe down or Back), in the PbModal footer. Typing makes the form dirty:
 // scrim tap / swipe-down are off and ×, Back or Escape ask "Discard …?" first
 // (PbModal). Enter submits. The page owns the save and the state.
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { PB, pbErrorBox, pbInput, pbNum, pbTextarea } from '../../pbTheme';
 import { useIsPhone } from '../../hooks/useIsPhone';
 import PbModal from '../product/PbModal';
 import { Field } from '../website/ui';
 import PbButton from '../ui/PbButton';
+import { parseShortNames } from '../../data/vendors';
 import TgHint, { type SavedTg } from './VendorTgHint';
 
-/** tg = the Telegram channel as typed (@name, name or a t.me link). */
+/** code = the short names as typed ("kb, nkb"); tg = the Telegram channel as typed (@name, name or a t.me link). */
 export type VendorFormState = { id: string | null; name: string; code: string; notes: string; tg: string };
+
+/** Leaving the field shows the short names the way they will be saved ("kb nkb" → "KB, NKB"); text that cannot be saved stays as typed, for Save to explain. */
+const tidy = (typed: string) => { const r = parseShortNames(typed); return 'value' in r ? r.value.join(', ') : typed; };
 
 /** Editing an existing vendor: Deactivate / Activate at the end of the sheet body (away from Save, off the list rows). */
 export type VendorToggle = { active: boolean; name: string; busy: boolean; dim: boolean; onToggle: () => void };
@@ -26,6 +31,9 @@ export default function VendorForm({ form, setForm, saving, err, onSave, onClose
   const initial = useRef<string | null>(null);
   if (!form) initial.current = null;
   else if (initial.current == null) initial.current = JSON.stringify(form);
+  // A refused Save: on a short phone the message sits below the fold, so bring it into view.
+  const errBox = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (err) errBox.current?.scrollIntoView({ block: 'nearest' }); }, [err]);
   return (
     <PbModal open={!!form} title={form?.id ? 'Edit vendor' : 'Add vendor'} onClose={onClose}
       dirty={!!form && JSON.stringify(form) !== initial.current} discardTitle={form?.id ? 'Discard changes to this vendor?' : 'Discard this vendor?'}
@@ -41,9 +49,10 @@ export default function VendorForm({ form, setForm, saving, err, onSave, onClose
             <input id="pbv-name" autoFocus value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} maxLength={120}
               autoCapitalize="words" enterKeyHint="next" aria-invalid={!!err && !form.name.trim()} className="pb-input" style={pbInput} />
           </Field>
-          <Field label="Short code" htmlFor="pbv-code" hint="Optional — usable in tags as {vendor_code}, e.g. RG">
-            <input id="pbv-code" value={form.code} onChange={e => setForm({ ...form, code: e.target.value })} maxLength={20}
-              autoCapitalize="characters" autoCorrect="off" spellCheck={false} enterKeyHint="next" aria-describedby="pbv-code-hint"
+          <Field label="Short names" htmlFor="pbv-code" hint="Optional. The letters this vendor's design codes start with. More than one? Put a comma between them: KB, NKB">
+            <input id="pbv-code" value={form.code} onChange={e => setForm({ ...form, code: e.target.value })} onBlur={() => setForm({ ...form, code: tidy(form.code) })}
+              maxLength={100} placeholder="KB, NKB" autoCapitalize="characters" autoCorrect="off" spellCheck={false} enterKeyHint="next" aria-describedby="pbv-code-hint"
+              aria-invalid={!!err && 'error' in parseShortNames(form.code)}
               className="pb-input" style={{ ...pbInput, ...pbNum }} />
           </Field>
           <Field label="Telegram channel" htmlFor="pbv-tg"
@@ -56,7 +65,7 @@ export default function VendorForm({ form, setForm, saving, err, onSave, onClose
             <textarea id="pbv-notes" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} maxLength={1000} rows={3}
               autoCapitalize="sentences" className="pb-input" style={{ ...pbTextarea, minHeight: 96 }} />
           </Field>
-          {err && <div role="alert" style={{ ...pbErrorBox, overflowWrap: 'anywhere' }}>{err}</div>}
+          {err && <div ref={errBox} role="alert" style={{ ...pbErrorBox, overflowWrap: 'anywhere' }}>{err}</div>}
           {toggle && (
             <div style={{ borderTop: `1px solid ${PB.tileBd}`, marginTop: err ? 16 : 0, paddingTop: 16, display: 'flex' }}>
               <PbButton kind={toggle.active ? 'danger' : 'secondary'} onClick={toggle.onToggle} busy={toggle.busy} busyLabel="Saving…" dim={toggle.dim || saving}

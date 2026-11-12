@@ -20,7 +20,7 @@ import { compareAt, listingPrice } from './pricing.ts';
 import { cleanKeyword, keywordOf, profileOf } from './profile.ts';
 import { checkCopy, hardOf, type Version } from './seoCheck.ts';
 import { seoGet, seoPut } from './seoStore.ts';
-import { buildTags } from './tags.ts';
+import { buildTags, vendorCode } from './tags.ts';
 import { siteValueTags } from './tagStore.ts';
 import { ARCHIVED, LISTING_COLS, MAX_ATTEMPTS, NEEDS_INFO, PRODUCT_COLS, STALE_MS, WEBSITE_COLS, hasPrice, type Budget, type ListingRow, type ProductRow, type WebsiteRow } from './types.ts';
 
@@ -71,7 +71,7 @@ export async function generateOne(l: ListingRow, o: { manual: boolean; prevStatu
       return r[0] ?? l;
     }
     const [vendor, imgs, rule, seoRows] = await Promise.all([
-      p.vendor_id ? one<{ name: string; code: string | null }>(`pb_vendors?id=eq.${enc(p.vendor_id)}&select=name,code`) : Promise.resolve(null),
+      p.vendor_id ? one<{ name: string; codes: string[] | null }>(`pb_vendors?id=eq.${enc(p.vendor_id)}&select=name,codes`) : Promise.resolve(null),
       sel<{ path: string }>(`pb_product_images?product_id=eq.${enc(p.id)}&kind=eq.image&select=path&order=position.asc&limit=20`),
       l.rule_id ? one<{ price_override: { markup_pct?: number; add_flat?: number } | null }>(`pb_routing_rules?id=eq.${enc(l.rule_id)}&select=price_override`) : Promise.resolve(null),
       seoGet([l.id]),
@@ -124,7 +124,7 @@ export async function generateOne(l: ListingRow, o: { manual: boolean; prevStatu
     if (handle !== l.handle && await one(`pb_listings?website_id=eq.${enc(l.website_id)}&handle=eq.${enc(handle)}&id=neq.${enc(l.id)}&select=id`)) handle = `${handle.slice(0, 74)}-${l.id.slice(0, 4)}`;
     const set: Record<string, unknown> = {
       price, compare_at_price: compare, title: g.title, description_html: g.description_html, seo_title: g.seo_title, seo_description: g.seo_description, handle,
-      tags: locked.has('tags') ? l.tags : buildTags(tr, { ...vars, vendor_code: vendor?.code || '', sizes: p.sizes || [], attributes: p.attributes || {}, tags: valueTags }, extra),
+      tags: locked.has('tags') ? l.tags : buildTags(tr, { ...vars, vendor_code: vendorCode(vendor?.codes, p.sku), sizes: p.sizes || [], attributes: p.attributes || {}, tags: valueTags }, extra),
       product_type: p.category || null,
       image_alts: c.alt_text === false ? [] : imgs.map((_, i) => cut(String(g.image_alts?.[photos.sent.indexOf(i)] || '') || `${g.title} - view ${i + 1}`, 110)),
       ai_model: w.model, ai_effort: w.effort || null, ai_cost_usd: w.usd, generated_at: nowIso(),

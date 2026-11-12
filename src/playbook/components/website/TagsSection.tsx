@@ -15,7 +15,7 @@ import type { Draft, SetDraft } from './WebsiteEditor';
 
 const PLACEHOLDERS: [string, string][] = [
   ['{tags}', 'the product’s chosen values (Colour, Work… — Settings → Tags), one tag each'], ['{category}', 'Saree, Kurta Set…'], ['{fabric}', 'Silk, Cotton…'], ['{color}', 'Red, Navy…'], ['{vendor}', 'vendor name'],
-  ['{vendor_code}', 'vendor short code'], ['{size}', 'one tag per size'], ['{sku}', 'product code'], ['{attr:occasion}', 'any AI-read detail: work, occasion, pattern…'],
+  ['{vendor_code}', 'vendor short name'], ['{size}', 'one tag per size'], ['{sku}', 'product code'], ['{attr:occasion}', 'any AI-read detail: work, occasion, pattern…'],
   ['{attr:brand}', 'brand, product type… copied by Import from website'], ['{attr:store_tags}', 'one tag per tag on the other store'],
 ];
 const SAMPLE: TagFacts = {

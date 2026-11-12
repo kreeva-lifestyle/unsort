@@ -13,7 +13,7 @@ import { PbButton, PbChip, PbChipRow, PbIcon, PbPageHeader, PbTile } from '../co
 import VendorRow from '../components/vendors/VendorRow';
 import VendorForm, { type VendorFormState as Form } from '../components/vendors/VendorForm';
 import { VendorsAllInactive, VendorsEmpty, VendorsError, VendorsNoMatch, VendorsSkeleton } from '../components/vendors/VendorStates';
-import { VENDOR_PAGE, countInactiveVendors, listVendors, normalizeTgChannel, saveVendor, setVendorActive, type VendorRow as Vendor } from '../data/vendors';
+import { VENDOR_PAGE, countInactiveVendors, listVendors, normalizeTgChannel, parseShortNames, saveVendor, setVendorActive, type VendorRow as Vendor } from '../data/vendors';
 
 const NEW: Form = { id: null, name: '', code: '', notes: '', tg: '' };
 
@@ -61,11 +61,13 @@ export default function Vendors({ addToast, onBack }: { addToast: AddToast; onBa
     if (!form) return;
     const name = form.name.trim().replace(/\s+/g, ' ');
     if (!name) { setErr('Type the vendor name'); return; }
+    const codes = parseShortNames(form.code);
+    if ('error' in codes) { setErr(codes.error); return; }
     const tg = normalizeTgChannel(form.tg);
     if ('error' in tg) { setErr(tg.error); return; }
     setSaving(true); setErr('');
     try {
-      await saveVendor(form.id, { name, code: form.code.trim() || null, notes: form.notes.trim() || null, tg_username: tg.value });
+      await saveVendor(form.id, { name, codes: codes.value, notes: form.notes.trim() || null, tg_username: tg.value });
       addToast(form.id ? 'Vendor saved' : `${name} added`, 'success');
       close(); void load();
     } catch (e) { const m = friendlyError(e); setErr(m); addToast(m, 'error'); setSaving(false); }
@@ -91,7 +93,7 @@ export default function Vendors({ addToast, onBack }: { addToast: AddToast; onBa
         <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: PB.tx3, display: 'inline-flex', pointerEvents: 'none' }}>
           <PbIcon name="search" size={16} />
         </span>
-        <input type="search" className="pb-input" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search name, code or channel"
+        <input type="search" className="pb-input" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search name, short name, channel"
           aria-label="Search vendors" enterKeyHint="search" autoCorrect="off" spellCheck={false}
           style={{ ...pbInput, paddingLeft: 40, paddingRight: search ? 48 : 14 }} />
         {search && (

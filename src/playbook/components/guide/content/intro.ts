@@ -24,7 +24,7 @@ export const INTRO: GuideSection[] = [
         ['**Dashboard**', 'What needs a person today, products by status, and each website\'s numbers (in progress, needs review, published, failed). Tap any tile to see those products.'],
         ['**Products**', 'Every product. Add new ones, search and filter, open one to see its facts and its listing on each website.'],
         ['**Websites**', 'Your Shopify stores. Each has six tabs: **Connection**, **Publishing**, **Routing rules**, **Pricing**, **Tags**, **Content & AI**.'],
-        ['**Vendors**', 'The people you buy from — name, a short code and their Telegram channel.'],
+        ['**Vendors**', 'The people you buy from — name, short names and their Telegram channel.'],
         ['**Settings**', 'The AI that reads products, the category list, **Telegram** (bot, admin group, crawler), and the switch that pauses all automation (plus **Run now**).'],
         ['**Guide**', 'This guide, with **Download PDF**.'],
       ),
@@ -58,7 +58,7 @@ export const INTRO: GuideSection[] = [
       steps(
         'Open **Vendors → + Add vendor**.',
         '**Name**: the vendor as you know them, e.g. `Rangoli Creations`.',
-        '**Short code** (optional): two or three letters, e.g. `RG`. Tags can use it as `{vendor_code}`.',
+        '**Short names** (optional): the letters this vendor\'s design codes start with, e.g. `RG`. More than one? Put a comma between them: `KB, NKB`. Tags can use it as `{vendor_code}`: each product gets the short name its own code starts with.',
         'Tap **Save vendor**. Repeat for each vendor.',
       ),
       tip('Stopped buying from someone? Tap **Deactivate** instead of deleting. Their old products stay; they just stop showing up as a choice for new ones.'),

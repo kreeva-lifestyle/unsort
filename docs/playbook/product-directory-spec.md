@@ -574,7 +574,16 @@ AI's extra tags are an enum of it.
   is not a size, an emoji or one of `! * # @ $ ₹ ™ ® ©` in an AI title) and
   `alt_opening` (soft). Shopify: `vendor` = the store profile's brand (the
   supplier is never sent; the default tag template is `Vendor_{vendor_code}`,
-  dropped when the vendor has no code); `category` = Shopify's standard
+  dropped when the vendor has no short name. A vendor can have several short
+  names, owner 2026-11-13 "code might start with KB or NKB":
+  `pb_vendors.codes text[]`, typed in the vendor sheet as `KB, NKB`; `code` is
+  the same list joined for display and search, rebuilt by the trigger
+  `pb_vendors_codes_sync`, which also takes the text an older app copy still
+  writes into `code` (`20261113010000_pb_vendor_short_names.sql`).
+  `{vendor_code}` = the short name the product's own code starts with, else
+  the first (`tags.ts vendorCode`). Matching does not read the short names:
+  `pb_code_key` keeps a code's own letters, so KB 25 and NKB 25 stay two
+  designs); `category` = Shopify's standard
   taxonomy id from `garment.ts shopCategory` (ids read live 2026-11-12; sent
   on a create only); alt texts of unchanged photos go out inside
   `productSet` (`files: [{id, alt}]`, see "Shopify sync check" below; the
