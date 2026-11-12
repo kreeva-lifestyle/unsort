@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { expectedFacts, FACT_ORDER, garmentKind, shopCategory } from '../garment.ts';
 globalThis.Deno ??= { env: { get: () => '' } }; // productInput.ts → db.ts reads Deno.env
-const { altUpdates, buildProductInput } = await import('../productInput.ts');
+const { altUpdates, buildProductInput, skuBase } = await import('../productInput.ts');
 
 const gid = (id) => `gid://shopify/TaxonomyCategory/${id}`;
 
@@ -36,8 +36,8 @@ test('buying facts: each garment has its own, and a fixed bullet order', () => {
   assert.ok(expectedFacts('Saree').some(f => f.includes('blouse piece')) && expectedFacts('Saree').includes('the saree length'));
   assert.ok(expectedFacts('Lehenga').some(f => f.includes('can-can')) && expectedFacts('Lehenga').some(f => f.includes('stitched, semi-stitched or unstitched')));
   assert.ok(expectedFacts('Kurta Set').includes('the bottom type'));
-  assert.deepEqual(expectedFacts('Kids Wear'), ['what is in the set', 'the sizes', 'the fabric', 'care']);
-  assert.ok(FACT_ORDER.startsWith('what is in the set') && FACT_ORDER.endsWith('care'));
+  assert.deepEqual(expectedFacts('Kids Wear'), ['what is in the set', 'the fabric', 'measurements', 'care']);
+  assert.ok(FACT_ORDER.startsWith('what is in the set') && FACT_ORDER.endsWith('care') && !/\bsizes\b/.test(FACT_ORDER)); // sizes are the size choices, not a bullet
 });
 
 const L = { id: 'l1', title: 'Maroon Georgette Kurta Set', description_html: '<p>x</p>', handle: 'maroon-kurta-set', tags: ['Kurta Set'], price: 999, compare_at_price: null, seo_title: '', seo_description: '', product_type: null, image_alts: ['Front view', 'Back view'], locked: [] };
@@ -57,6 +57,19 @@ test('Shopify product: the store brand is the vendor; the category goes out with
   assert.equal(update.vendor, 'Kreeva');
   assert.ok(!('category' in ask({ p: { ...P, category: 'Kids Wear' } })));
   assert.ok(!('category' in ask({ noCategory: true }))); // the store refused it: the product still goes out
+});
+
+test('sizes on Shopify: one choice per size, each with the base SKU plus its own size', () => {
+  assert.equal(skuBase('NKB 47 PURPLE XS', ['XS', 'S', 'M']), 'NKB 47 PURPLE');          // a copied product carries its first size's SKU
+  assert.equal(skuBase('KB 313 YELLOW XS', ['XS (34)', 'S (36)']), 'KB 313 YELLOW');     // the size with its measurement
+  assert.equal(skuBase('KB-280-M', ['M', 'L']), 'KB-280');
+  assert.equal(skuBase('RG-1', ['M', 'L']), 'RG-1');                                      // no size at the end: untouched
+  assert.equal(skuBase('KB 302 XL', ['S', 'M']), 'KB 302 XL');                            // not one of this product's sizes: untouched
+  assert.equal(skuBase('XS', ['XS']), 'XS');
+  const made = ask({ p: { ...P, sku: 'NKB 47 PURPLE XS', sizes: ['XS (34)', 'S (36)', 'Free Size'] } });
+  assert.deepEqual(made.variants.map(v => v.inventoryItem.sku), ['NKB 47 PURPLE-XS', 'NKB 47 PURPLE-S', 'NKB 47 PURPLE-FreeSize']);
+  assert.deepEqual(made.productOptions[0].values.map(v => v.name), ['XS (34)', 'S (36)', 'Free Size']); // the shopper still sees the measurement
+  assert.equal(made.productOptions[0].name, 'Size');
 });
 
 test('photo descriptions: only the changed ones, and only while the store has the same photos', () => {

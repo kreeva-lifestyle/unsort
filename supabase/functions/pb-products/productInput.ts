@@ -43,6 +43,17 @@ export const UNPUBLISH = `mutation PbUnpublish($product: ProductUpdateInput!) {
 /** Stock tracking is on, but Playbook sends no quantities: new variants start at 0 and stop selling at 0. */
 export const STOCK_WARNING = 'Stock tracking is on for this website: the product starts with 0 in stock and cannot be bought until you set the quantities in Shopify.';
 
+/** A size label without its measurement: "XS (34)" → "XS". */
+const sizeCore = (s: string) => s.replace(/\(.*?\)/g, ' ').replace(/\s+/g, ' ').trim();
+
+/** The product's SKU without a size at its end ("NKB 47 PURPLE XS" → "NKB 47 PURPLE"). A product copied from
+ *  another store carries its first size's own SKU; each size on Shopify then gets the base plus its own size. */
+export function skuBase(sku: string, sizes: string[]): string {
+  const s = String(sku || '').trim(), cores = sizes.map(x => sizeCore(x).toLowerCase()).filter(Boolean);
+  const m = /^(.*[^\s\-_/])[\s\-_/]+([^\s\-_/]+)$/.exec(s);
+  return m && cores.includes(m[2].toLowerCase()) ? m[1] : s;
+}
+
 const money = (n: number | null) => (n === null || n === undefined || !(Number(n) > 0) ? null : Number(n).toFixed(2));
 
 /** The photos whose alt text on the store differs from the listing's: only when the store still has exactly
@@ -59,7 +70,7 @@ export function buildProductInput(a: { l: ListingRow; p: ProductRow; site: Websi
   const price = money(l.price);
   const compareAtPrice = l.compare_at_price !== null && Number(l.compare_at_price) > Number(l.price) ? money(l.compare_at_price) : null;
   const sizes = [...new Set((p.sizes || []).map(s => String(s).trim()).filter(Boolean))];
-  const sku = String(p.sku || '').trim();
+  const sku = skuBase(String(p.sku || ''), sizes);
   const optName = sizes.length ? 'Size' : 'Title';
   const values = sizes.length ? sizes : ['Default Title'];
   const oldOpt = existing?.options.find(o => o.name.trim().toLowerCase() === optName.toLowerCase());
@@ -71,7 +82,7 @@ export function buildProductInput(a: { l: ListingRow; p: ProductRow; site: Websi
       optionValues: [{ optionName: optName, name }],
       position: i + 1,
       price, compareAtPrice,
-      inventoryItem: { ...(id ? {} : { tracked }), ...(sku ? { sku: sizes.length ? `${sku}-${name.replace(/\s+/g, '')}` : sku } : {}) },
+      inventoryItem: { ...(id ? {} : { tracked }), ...(sku ? { sku: sizes.length ? `${sku}-${(sizeCore(name) || name).replace(/\s+/g, '')}` : sku } : {}) },
     };
   };
   const handleMoves = !!existing && !!l.handle && l.handle !== existing.handle;

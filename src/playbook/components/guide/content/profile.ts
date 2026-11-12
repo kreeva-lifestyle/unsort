@@ -25,7 +25,7 @@ export const PROFILE: GuideSection[] = [
         'A **title** with the search phrase in it once, in plain words: colour, fabric, the work or pattern, the garment, then what comes with it ("with Dupatta").',
         'A **web address** of 3 to 6 plain words, with no design codes.',
         'An **SEO title** that ends with the brand name, and an **SEO description** of about 140 to 155 characters.',
-        'A **description** whose first sentence says what the product is and what comes with it; the store\'s angle follows. Then 5 to 7 fact bullets in one order (what is in the set and whether it is stitched, fabric and lining, measurements, work, pattern, sizes, care) and "How to wear it". Nothing about delivery, returns or prices.',
+        'A **description** whose first sentence says what the product is and what comes with it; the store\'s angle follows. Then 5 to 7 fact bullets in one order (what is in the set and whether it is stitched, fabric and lining, measurements and fit, work, pattern, care) and "How to wear it". Nothing about delivery, returns or prices.',
         '**Two to five questions and answers** in a shopper\'s own words ("Is the dupatta included?"). Each answer starts with the answer and comes only from the product\'s facts.',
         'A different **description for each photo** (alt text): the first names the product and the view, the later ones say only what that photo adds. Tags come from your own lists.',
       ),
