@@ -16,6 +16,7 @@
 //                                                                          → { ok, product_id, duplicate?, images?, warnings? }
 //   read_product       staff          { product_id }                      → { ok, product, routed, warning? }
 //   route_product      staff          { product_id }                      → { ok, routed, repriced, listings, warning? }
+//   delete_product     admin|manager  { product_id }                      → { ok, photos_left }   (409 while it is on Shopify or being worked on)
 //   route_website      staff          { website_id }                      → { ok, queued, matched, more }
 //   generate_listing   staff          { listing_id }                      → { ok, listing }
 //   publish_listing    staff          { listing_id }                      → { ok, listing }
@@ -57,6 +58,7 @@ import * as A from './actions.ts';
 import { userOf, whoIs } from './auth.ts';
 import { HttpError, corsHeaders, fail, json, plain } from './http.ts';
 import { importCancel, importCheck, importList, importStart } from './import/actions.ts';
+import { deleteProduct } from './productDelete.ts';
 import { routeWebsite } from './routeSite.ts';
 import { previewPrice, saveCredentials, testSite } from './siteActions.ts';
 import * as T from './tagsActions.ts';
@@ -70,6 +72,7 @@ const ACTIONS: Record<string, { who: Who; run: (b: A.Body, c: Caller) => Promise
   ingest: { who: 'secret', run: (b) => A.doIngest(b) },
   read_product: { who: 'staff', run: (b, c) => A.readProduct(b, userOf(c)) },
   route_product: { who: 'staff', run: (b, c) => A.routeOne(b, userOf(c)) },
+  delete_product: { who: 'admin', run: (b, c) => deleteProduct(b, userOf(c)) },
   route_website: { who: 'staff', run: (b, c) => routeWebsite(b, userOf(c)) },
   generate_listing: { who: 'staff', run: (b, c) => A.generateListing(b, userOf(c)) },
   publish_listing: { who: 'staff', run: (b, c) => A.publishListing(b, userOf(c)) },

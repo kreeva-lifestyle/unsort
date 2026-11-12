@@ -1,17 +1,19 @@
 // "From the website": the details Import from website copied from the other
-// store into `attributes` (brand, manufacturer, product type, store tags, SKU,
-// barcode, weight, material, colour, was-price, currency, page title and
-// description). Text only — nothing here is edited or sent anywhere; the AI
+// store into `attributes` (when it was uploaded there and on sale since, brand,
+// manufacturer, product type, store tags, SKU, barcode, weight, material,
+// colour, was-price, currency, page title and description). Text only — nothing here is edited or sent anywhere; the AI
 // reader keeps these keys, and tag templates can use them ({attr:brand}).
 // Imported products only: on any other product these keys are the AI's. The
 // link to the original page is the one in the header (SourceLine), not here.
 // "What the AI read" leaves these keys out so nothing shows twice.
 import type { ProductDetail } from '../../../data/products';
+import { istDate } from '../../../format';
 import { PB, pbLabel, pbMeta, pbNum, pbTileTitle } from '../../../pbTheme';
 import PbTile, { type PbSpan } from '../../ui/PbTile';
 
-/** Key → label, in the order shown. `mono` = a code or figure people compare. */
-const META: { key: string; label: string; mono?: boolean; wide?: boolean }[] = [
+/** Key → label, in the order shown. `mono` = a code or figure people compare; `date` = a date the store keeps. */
+const META: { key: string; label: string; mono?: boolean; wide?: boolean; date?: boolean }[] = [
+  { key: 'source_created_at', label: 'Uploaded on their site', date: true }, { key: 'source_published_at', label: 'On sale there since', date: true },
   { key: 'brand', label: 'Brand' }, { key: 'manufacturer', label: 'Manufacturer', wide: true },
   { key: 'product_type', label: 'Product type' }, { key: 'material', label: 'Material' }, { key: 'colour', label: 'Colour' },
   { key: 'store_tags', label: 'Store tags (raw)', wide: true },
@@ -29,8 +31,11 @@ const text = (v: unknown) => (v == null ? '' : String(v).trim());
 export function webMeta(p: Pick<ProductDetail, 'attributes' | 'source'>) {
   if (p.source !== 'import') return [];
   const a = (p.attributes ?? {}) as Record<string, unknown>;
-  return META.map(m => ({ ...m, value: text(a[m.key]) }))
-    .filter(r => r.value && !(r.key === 'currency' && r.value === 'INR'))
+  // "On sale there since" is said only when it is more than a day apart (a product uploaded as a draft, or shown again later).
+  const up = Date.parse(text(a.source_created_at)), sale = Date.parse(text(a.source_published_at));
+  const sameDay = Number.isFinite(up) && Number.isFinite(sale) && Math.abs(sale - up) < 86_400_000;
+  return META.map(m => ({ ...m, value: m.date && text(a[m.key]) ? istDate(text(a[m.key])) : text(a[m.key]) }))
+    .filter(r => r.value && !(r.key === 'currency' && r.value === 'INR') && !(r.key === 'source_published_at' && sameDay))
     .map(r => ({ ...r, wide: r.wide || r.value.length > 40 }));
 }
 

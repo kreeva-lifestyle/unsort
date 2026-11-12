@@ -94,9 +94,9 @@ export function genSystem(a: GenAsk): string {
   ].join('\n');
 }
 
-/** Imported keys the writer is not given: prices, the other store's address and its own SEO
- *  wording (seo_title / seo_description are written fresh for each website, never copied). */
-const NOT_FOR_WRITER = new Set(['compare_at_price', 'currency', 'source_page_url', 'seo_title', 'seo_description', 'barcode', 'sku', 'brand', 'store_tags']);
+/** Imported keys the writer is not given: prices, the other store's address, its own SEO wording
+ *  (seo_title / seo_description are written fresh for each website, never copied) and its upload dates. */
+const NOT_FOR_WRITER = new Set(['compare_at_price', 'currency', 'source_page_url', 'seo_title', 'seo_description', 'barcode', 'sku', 'brand', 'store_tags', 'source_created_at', 'source_published_at']);
 
 /** The product's fact values (also what the copy check lets two stores share word for word). */
 export function factValues(p: ProductRow, tags: string[] = []): string[] {

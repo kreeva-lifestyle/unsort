@@ -11,7 +11,8 @@ import PbConfirm from '../components/ui/PbConfirm';
 import type { AddToast } from '../components/PbToasts';
 import { pbCall } from '../data/pbFunctions';
 import { getAiCost } from '../data/listingSeo';
-import { dupName, getDupMatches, type DupMatch } from '../data/duplicates';
+import { dupName, getDupMatches, sourceText, type DupMatch } from '../data/duplicates';
+import { useAuth } from '../../hooks/useAuth';
 import DupTile from '../components/product/detail/DupTile';
 import { refreshGate } from '../data/tags';
 import { logSwallowed } from '../../lib/errorLogger';
@@ -35,10 +36,12 @@ type Props = {
   id: string; onClose: () => void; onChanged: () => void; addToast: AddToast;
   /** Open another product from here (a match in "Already added?"); asks first when the facts hold unsaved typing. */
   onOpenOther: (id: string) => void;
+  /** The product was deleted for good: close this page (nothing is left to save) and reload the list. */
+  onDeleted: () => void;
   vendors: VendorLite[]; onVendorCreated: (v: VendorLite) => void; sites: WebsiteLite[]; categories: string[];
 };
 
-export default function ProductPage({ id, onClose, onChanged, onOpenOther, addToast, vendors, onVendorCreated, sites, categories }: Props) {
+export default function ProductPage({ id, onClose, onChanged, onOpenOther, onDeleted, addToast, vendors, onVendorCreated, sites, categories }: Props) {
   const [p, setP] = useState<ProductDetail | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [loadErr, setLoadErr] = useState('');
@@ -88,6 +91,23 @@ export default function ProductPage({ id, onClose, onChanged, onOpenOther, addTo
     void act('photos', async () => { await addPhotos(p.id, files, next); await refreshGate(p.id); }, files.length === 1 ? 'Photo added' : `${files.length} photos added`);
   };
 
+  // Delete for good: admin / manager only (the server checks again). One pop-up says what goes and what that means.
+  const { profile } = useAuth();
+  const canDelete = profile?.role === 'admin' || profile?.role === 'manager';
+  const remove = async () => {
+    if (!p || busy) return;
+    const from = sourceText(p.source, p.source_ref);
+    const again = p.source === 'import' ? ` A later import from ${from || 'that website'} will add it again as a new product.` : '';
+    if (!await ask({ title: 'Delete this product for good?', message: `Its facts, photos, tags, listings and history are removed from Playbook and cannot be brought back. Archive it instead if you may need it again.${again}`, confirmLabel: 'Delete', danger: true })) return;
+    setBusy('delete');
+    try {
+      const r = await pbCall<{ photos_left?: number }>('delete_product', { product_id: p.id });
+      if (r.photos_left) addToast(`Deleted, but ${r.photos_left} photo file${r.photos_left === 1 ? '' : 's'} could not be removed from storage. Nothing points to ${r.photos_left === 1 ? 'it' : 'them'} any more`, 'error');
+      else addToast('Deleted', 'success');
+      onDeleted();
+    } catch (e) { addToast(friendlyError(e), 'error'); setBusy(null); }
+  };
+
   const archive = async () => {
     if (!p) return;
     if (await ask({ title: 'Archive this product?', message: 'It leaves the list and is not routed any more. Listings already on Shopify stay as they are — remove them per website first if needed.', confirmLabel: 'Archive', danger: true })) {
@@ -107,7 +127,7 @@ export default function ProductPage({ id, onClose, onChanged, onOpenOther, addTo
     onRead: () => act('read', () => pbCall('read_product', { product_id: p.id }), 'Read again by the AI'),
     onRoute: () => act('route', () => pbCall('route_product', { product_id: p.id }), 'Checked against every website’s rules'),
     onRestore: () => act('restore', () => setProductStatus(p.id, 'new'), 'Restored — the AI will read it again'),
-    onArchive: archive,
+    onArchive: archive, onDelete: canDelete ? remove : undefined,
   };
   const addPhoto = () => fileInput.current?.click();
   // The page's one gradient: Edit on the first listing waiting for approval, else Save facts.

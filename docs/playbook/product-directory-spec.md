@@ -149,6 +149,7 @@ is_active). Service role for all DB writes. CORS like listing-ai.
 | `import_list` | staff | – | `{ ok, runs[≤20] }` newest first (all columns of pb_import_runs) |
 | `read_product` | staff | `{ product_id }` | re-run step 1 now for one product (ignores locked fields) → `{ ok, product, routed, warning? }` |
 | `route_product` | staff | `{ product_id }` | step 2 now → `{ ok, routed, repriced, listings, warning? }` |
+| `delete_product` | admin/manager | `{ product_id }` | delete for good (`productDelete.ts`): refused (409) while a listing is on Shopify and not Removed, while the AI reads it, or while a listing is being written / sent; then DELETE the product row (photo rows, listings, chosen tags, timeline, copy answers and photo prints cascade in the same statement) and remove its files from the bucket; one `pb_activity` line `deleted` stays (name, code, source, who). Shopify is never touched → `{ ok, photos_left }` |
 | `route_website` | staff | `{ website_id }` | step 2 for every Ready product on one active website (new listings + auto-skipped ones back) → `{ ok, queued, matched, more }` |
 | `generate_listing` | staff | `{ listing_id }` | step 3 now (keeps locked) → `{ ok, listing }` |
 | `publish_listing` | staff | `{ listing_id }` | step 4 now (from review/failed/published = update) → `{ ok, listing }` |
@@ -317,6 +318,7 @@ never guessed, and brand is never copied into manufacturer:
 | `seo_title` / `seo_description` | product page `<title>` (else `og:title`) / `meta[name=description]` (else `og:description`) | same, from the permalink | same page |
 | `material` / `colour` | options named Material or Fabric / Colour (all values) | attributes of those names | `material` / `color` |
 | `source_page_url` | the product page | the permalink | the page |
+| `source_created_at` / `source_published_at` (owner, 2026-11-12) | `created_at` / `published_at` as ISO UTC (`storeDate`: nothing for an unreadable date, one before 2000 or in the future) | — (the Store API gives no date) | — |
 
 The product page (Shopify / Woo) is fetched ONCE per new product
 (`import/enrich.ts`): same site (www. or not) and robots.txt-allowed only, a
@@ -332,7 +334,10 @@ category and fabric. **The reader never drops or replaces an imported key**
 (`mergeReadAttrs`: on an imported product the IMPORT_ATTRS keys are skipped
 even on "Read again"; the AI's own keys — work, occasion… — are added beside
 them). The writer is not given `compare_at_price`, `currency`,
-`source_page_url`, `barcode` or the store's SEO wording (it writes its own).
+`source_page_url`, `barcode`, the two source dates or the store's SEO wording
+(it writes its own). The dates show on the product page as "Uploaded on their
+site" and, when a different day, "On sale there since" (`WebMetaTile.tsx`);
+they are what a later "New arrival" rule will read.
 Tag templates can use them: `{attr:brand}`, `{attr:product_type}`,
 `{attr:manufacturer}`…; `{attr:store_tags}` gives ONE tag per store tag
 (with `{size}` too: one per tag × size); an empty key drops the template.

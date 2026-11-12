@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fromJsonLd, fromShopify, fromWoo, withPage } from '../import/normalize.ts';
-import { IMPORT_ATTRS, gramsText, mergeReadAttrs, money, pageMeta } from '../import/meta.ts';
+import { IMPORT_ATTRS, gramsText, mergeReadAttrs, money, pageMeta, storeDate } from '../import/meta.ts';
 import { ingestBody } from '../import/body.ts';
 import { buildTags } from '../tags.ts';
 
@@ -13,6 +13,20 @@ const read = (f) => readFileSync(new URL(f, here), 'utf8');
 const shopify = JSON.parse(read('shopify.products.json')).products;
 const woo = JSON.parse(read('woo.products.json'));
 const origin = 'https://kumari.example';
+
+test('Shopify: the dates the store keeps (uploaded / on sale since) are recorded, and only real ones', () => {
+  const f = fromShopify({ ...shopify[0], created_at: '2026-08-06T10:15:00+05:30', published_at: '2026-10-07T18:30:00+05:30' }, origin);
+  assert.equal(f.meta.source_created_at, '2026-08-06T04:45:00.000Z');
+  assert.equal(f.meta.source_published_at, '2026-10-07T13:00:00.000Z');
+  assert.ok(Object.keys(f.meta).every(k => IMPORT_ATTRS.includes(k)));
+  const none = fromShopify({ ...shopify[0], created_at: null, published_at: 'not a date' }, origin);
+  assert.equal('source_created_at' in none.meta, false); assert.equal('source_published_at' in none.meta, false);
+  const now = Date.UTC(2026, 10, 12);
+  assert.equal(storeDate('2026-11-12T05:00:00Z', now), '2026-11-12T05:00:00.000Z'); // today, a few hours ahead of the clock
+  assert.equal(storeDate('2031-01-01T00:00:00Z', now), '');                          // a date in the future is not a fact
+  assert.equal(storeDate('1970-01-01T00:00:00Z', now), '');
+  assert.equal(storeDate('', now), ''); assert.equal(storeDate(undefined, now), ''); assert.equal(storeDate({}, now), '');
+});
 
 test('Shopify: vendor, type, tags, first barcode, grams, compare-at, url; nothing invented', () => {
   const f = fromShopify(shopify[0], origin);
