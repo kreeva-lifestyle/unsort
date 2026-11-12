@@ -13,12 +13,26 @@ Types: `src/playbook/types.ts` (jsonb shapes documented there).
 ## Pipeline (worker, every minute when there is work)
 1. **Read** — products `new` (or `reading` claimed > 5 min ago): claim
    (`status='reading', claimed_at=now()`), send `raw_text` + name/sku + up to
-   2 photos (public URLs, image `url` source) to Claude with the
+   4 photos (`READ_PHOTOS`; public URLs, image `url` source) to Claude with the
    `pb_settings.reader` model/effort, JSON-schema output:
    `{ name, sku, category (one of pb_settings.categories or ''), fabric,
    color, sizes[], cost_price (number|null), attributes{work, occasion,
    pattern, set_contents, wash_care, notes…} }`. Fill only fields that are
-   empty AND not in `locked`. Then `needs_info` if `cost_price` or `category`
+   empty AND not in `locked`. **Photos first (owner, 2026-11-12):** the reader
+   compares the post's title and description with the photos; for what can be
+   seen (colour, pattern, work, set pieces) the photos win, for the rest the
+   text wins. Colour is a plain name from a preferred list (`COLOURS`: a trade
+   name such as "Rama" → Teal Blue); the fabric is kept exactly as the post
+   writes it (spelling mistakes apart); a sales line is never turned into a
+   fact. **A fresh read:** "Read again" (every unlocked field), or a product
+   read before that is put back to `new` with `ai_read_at` still set (the
+   worker then re-judges only name, fabric, colour and the reader's own
+   `attributes` keys; sku, category, sizes and cost are filled only when
+   empty). On a fresh read the AI's earlier name and colour are not shown to
+   it as "already known" unless locked (the fabric always is: it stays, apart
+   from a spelling mistake), a reader key it now answers
+   with nothing is dropped, and the activity row records
+   `changed: { field: [was, now] }` (`readChanges.ts`). Then `needs_info` if `cost_price` or `category`
    is missing (and, since 2026-11-12, fabric, colour or a photo: the gate, see
    "One store, one voice"), else `ready` and route (step 2). On AI error: back to `new`
    with `ai_error`, `claimed_at` left so it retries after 5 min; after 3
@@ -527,6 +541,12 @@ AI's extra tags are an enum of it.
   opening in the store's angle, 5–7 fact bullets, `<h3>How to wear it</h3>`,
   `<h3>Ordering from <brand></h3>` only when the profile gives delivery,
   stitching or returns. Allowed HTML: p, ul, li, h3, strong, em, br.
+- **Photos and fabric (owner, 2026-11-12)**: hard rule 9 (only when photos
+  are sent): the facts are checked against the photos, and for what can be
+  seen the photos win in the title, description, SEO fields, alt texts and
+  FAQ. Hard rule 10: a fabric is written word for word as PRODUCT FACTS gives
+  it, and left out of a short field rather than shortened. Spelling is
+  corrected once, by the reader, not by the writer.
 - **A program finishes the draft**: pattern title (`title_template`), the SEO
   title always ends `| <brand>` inside `meta_title_max` (`withBrand`), cuts,
   kept (locked) fields; handle = 3–6 clean words with the design code taken
@@ -540,7 +560,9 @@ AI's extra tags are an enum of it.
   keyword not exactly once in the AI title, missing from the first 50 words,
   or not exactly once in the SEO title; SEO title not ending with the brand;
   supplier name, design code, link, email, phone; "No. 1", scarcity, review
-  claims; a number in "Ordering from" that the profile does not give.
+  claims; a number in "Ordering from" that the profile does not give; the
+  description does not name the product's fabric word for word (`fabric`,
+  English listings only; owner, 2026-11-12).
   SOFT (noted only): SEO description outside min–max, description over
   115% of the limit, repeated alt texts, keyword more than 3 times, the
   humanCopy tells.

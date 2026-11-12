@@ -13,7 +13,7 @@ export const INTRO: GuideSection[] = [
       h('How one product travels'),
       steps(
         '**Lands** — a product comes in. It comes straight from the vendor\'s Telegram channel (see **Connect Telegram**), or you add it in **Products → + Add product**. Status: **New**.',
-        '**Read** — the AI looks at the photos and the vendor\'s post and fills in name, category, fabric, colour, sizes, cost price and other details (work, occasion, wash care…). Status: **Reading**, then **Ready** — or **Needs info** when the cost price or the category is missing.',
+        '**Read** — the AI looks at the first 4 photos and the vendor\'s post and fills in name, category, fabric, colour, sizes, cost price and other details (work, pattern, wash care…). The photos decide what can be seen: when the post says orange and the photos show pink, the colour is Pink, and a trade name such as "Rama" becomes Teal Blue. The fabric is kept as the post writes it; only a spelling mistake is corrected. Status: **Reading**, then **Ready** — or **Needs info** when the cost price or the category is missing.',
         '**Sorted** — each website\'s **Routing rules** decide whether the product goes there. Every "yes" becomes a *listing*: one product on one website.',
         '**Priced and written** — for each listing the price is worked out from the cost with that website\'s formula, and that website\'s AI writer writes the title, description, SEO text, tags and photo descriptions.',
         '**Published** — the listing is sent to Shopify: live, as a draft, or held until someone approves it — whatever that website\'s **Publishing mode** says.',

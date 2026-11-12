@@ -1,7 +1,12 @@
-// Step 1 — Read: Claude reads a product's post text + up to 2 photos and
+// Step 1 — Read: Claude reads a product's post text + up to 4 photos and
 // fills the facts (name, sku, category, fabric, color, sizes, cost_price,
 // attributes). Only fields that are empty AND not locked are filled (a manual
-// "Read again" refreshes every field that is not locked). Then: cost or
+// "Read again" refreshes every field that is not locked). A product that was
+// read before and is sent back to 'new' (owner, 2026-11-12) gets a fresh read
+// of what the AI describes — name, fabric, colour and its own attributes —
+// while its code, category, sizes and price are only filled when empty; what
+// a person typed (locked) is kept either way, and what changed is written to
+// the activity row (readChanges.ts). Then: cost or
 // category missing → needs_info; else ready → route (step 2) — unless the tag
 // gate (below) finds a required attribute empty. A product with
 // sell_price (import from website: the other store's price is our selling
@@ -26,7 +31,8 @@ import { askClaude } from './ai.ts';
 import { ago, enc, getSettings, logActivity, nowIso, one, patch, sel } from './db.ts';
 import { HttpError, plain } from './http.ts';
 import { aiPhotos } from './photos.ts';
-import { readerPrompt, readerSchema, type ReadOut } from './readerPrompt.ts';
+import { readChanges } from './readChanges.ts';
+import { READ_PHOTOS, readerPrompt, readerSchema, type ReadOut } from './readerPrompt.ts';
 import { routeProduct } from './route.ts';
 import { stripLess } from '../pb-telegram/group.ts';
 import { mergeReadAttrs } from './import/meta.ts';
@@ -57,9 +63,12 @@ export async function claimRead(id: string, manual: boolean): Promise<ProductRow
 
 const empty = (v: unknown) => v === null || v === undefined || (typeof v === 'string' && !v.trim()) || (Array.isArray(v) && !v.length);
 
-function merge(p: ProductRow, out: ReadOut, categories: string[], manual: boolean): Record<string, unknown> {
+/** What a re-read by the worker may replace: the AI's own description of the product, never its code, category, sizes or price. */
+const DESCRIBES = new Set<keyof ProductRow>(['name', 'fabric', 'color']);
+
+function merge(p: ProductRow, out: ReadOut, categories: string[], manual: boolean, again: boolean): Record<string, unknown> {
   const locked = new Set(p.locked || []);
-  const can = (f: keyof ProductRow) => !locked.has(f) && (manual || empty(p[f]));
+  const can = (f: keyof ProductRow) => !locked.has(f) && (manual || empty(p[f]) || (again && DESCRIBES.has(f)));
   const set: Record<string, unknown> = {};
   const str = (f: 'name' | 'sku' | 'fabric' | 'color', v: unknown, max: number) => {
     const s = String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
@@ -75,7 +84,7 @@ function merge(p: ProductRow, out: ReadOut, categories: string[], manual: boolea
   const cost = Number(out.cost_price) - (Number(p.less_amount) > 0 ? Number(p.less_amount) : 0);
   const sells = p.sell_price !== null && p.sell_price !== undefined; // imported: the price in the text is the SELLING price
   if (!sells && out.cost_price !== null && Number.isFinite(cost) && cost > 0 && cost < 10_000_000 && can('cost_price')) set.cost_price = Math.round(cost * 100) / 100;
-  if (!locked.has('attributes')) set.attributes = mergeReadAttrs(p.attributes, out.attributes, { manual, imported: p.source === 'import' });
+  if (!locked.has('attributes')) set.attributes = mergeReadAttrs(p.attributes, out.attributes, { fresh: manual || again, imported: p.source === 'import' });
   return set;
 }
 
@@ -85,29 +94,31 @@ const TRY_RE = / \(attempt (\d+) of \d+\)$/;
  *  and a warning when the read worked but routing did not. */
 export async function readOne(p: ProductRow, o: { manual: boolean; prevStatus?: string; userId: string | null; budget: Budget }): Promise<{ product: ProductRow; routed: number; warning?: string }> {
   let product: ProductRow;
+  const again = !o.manual && !!p.ai_read_at; // read before and sent back: the AI's own answers are judged afresh
   try {
     const s = await getSettings();
     const tax = await loadTaxonomy(s.categories);
     const spec = readerSpec(tax);
     const [vendor, imgs] = await Promise.all([
       p.vendor_id ? one<{ name: string }>(`pb_vendors?id=eq.${enc(p.vendor_id)}&select=name`) : Promise.resolve(null),
-      sel<{ path: string }>(`pb_product_images?product_id=eq.${enc(p.id)}&kind=eq.image&select=path&order=position.asc&limit=2`),
+      sel<{ path: string }>(`pb_product_images?product_id=eq.${enc(p.id)}&kind=eq.image&select=path&order=position.asc&limit=${READ_PHOTOS}`),
     ]);
     const photos = await aiPhotos(imgs.map(i => i.path));
     const ai = await askClaude<ReadOut>({
       model: s.reader.model, effort: s.reader.effort,
       system: readerPrompt(s.categories, p.source === 'import', spec),
-      content: [...photos.blocks, { type: 'text', text: factsText(p, vendor?.name ?? '') }],
+      content: [...photos.blocks, { type: 'text', text: factsText(p, vendor?.name ?? '', o.manual || again) }],
       schema: readerSchema(s.categories, spec), maxTokens: 8000, timeoutMs: o.budget.hard - Date.now(),
     });
-    const set = merge(p, ai.data, s.categories, o.manual);
+    const set = merge(p, ai.data, s.categories, o.manual, again);
+    const changed = o.manual || again ? readChanges(p, set) : {};
     const next = { ...p, ...set } as ProductRow;
     const status = !hasPrice(next) || !String(next.category || '').trim() ? 'needs_info' : 'ready'; // the gate (tagAfterRead → pb_products_refresh) then also asks for fabric, colour, a photo and the tags
     const saved = await patch<ProductRow>('pb_products', `id=eq.${enc(p.id)}&status=eq.reading`,
       { ...set, status, ai_read_at: nowIso(), ai_error: null, claimed_at: null }, PRODUCT_COLS);
     if (!saved[0]) throw new HttpError(409, 'The product changed while it was being read — open it again.');
     product = await tagAfterRead(saved[0], tax, spec, ai.data, o.userId);
-    await logActivity({ product_id: p.id, action: 'read', details: { model: ai.model, effort: ai.effort, usd: ai.usd, status: product.status, filled: Object.keys(set), ...(product.missing_attrs?.length ? { missing: product.missing_attrs } : {}), ...(photos.sent.length < imgs.length ? { photos_skipped: imgs.length - photos.sent.length } : {}) }, user_id: o.userId });
+    await logActivity({ product_id: p.id, action: 'read', details: { model: ai.model, effort: ai.effort, usd: ai.usd, status: product.status, filled: Object.keys(set), ...(product.missing_attrs?.length ? { missing: product.missing_attrs } : {}), ...(photos.sent.length < imgs.length ? { photos_skipped: imgs.length - photos.sent.length } : {}), ...(Object.keys(changed).length ? { changed } : {}) }, user_id: o.userId });
   } catch (e) {
     const msg = plain(e);
     await logActivity({ product_id: p.id, action: 'failed', details: { step: 'read', error: msg }, user_id: o.userId });
@@ -156,11 +167,15 @@ async function routeAfterRead(product: ProductRow, o: { manual: boolean; userId:
   }
 }
 
-function factsText(p: ProductRow, vendor: string): string {
+/** `fresh` (a re-read): the AI's earlier name and colour are left out, so it judges them again from the post and
+ *  the photos instead of repeating itself; the ones a person typed (locked) stay as known. The fabric always
+ *  stays: it is never reworded, only its spelling corrected (readerPrompt.ts). */
+function factsText(p: ProductRow, vendor: string, fresh = false): string {
   const less = Number(p.less_amount) > 0; // the reader must return the RATE: the stored cost is already rate − less
+  const keep = (f: string) => !fresh || (p.locked || []).includes(f);
   const known = [
-    p.name && `Name: ${p.name}`, p.sku && `SKU: ${p.sku}`, vendor && `Vendor: ${vendor}`,
-    p.category && `Category: ${p.category}`, p.fabric && `Fabric: ${p.fabric}`, p.color && `Color: ${p.color}`,
+    p.name && keep('name') && `Name: ${p.name}`, p.sku && `SKU: ${p.sku}`, vendor && `Vendor: ${vendor}`,
+    p.category && `Category: ${p.category}`, p.fabric && `Fabric: ${p.fabric}`, p.color && keep('color') && `Color: ${p.color}`,
     p.sizes?.length && `Sizes: ${p.sizes.join(', ')}`, !less && p.cost_price !== null && p.cost_price !== undefined && `Cost price: ${p.cost_price}`,
   ].filter(Boolean).join('\n');
   // Every less phrase ("Less: 200", "200 Less", "RATE 1600 LESS 200" → "RATE 1600") is hidden, so it is never taken off twice.

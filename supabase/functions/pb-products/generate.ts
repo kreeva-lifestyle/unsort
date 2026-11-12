@@ -107,7 +107,7 @@ export async function generateOne(l: ListingRow, o: { manual: boolean; prevStatu
         seo_description: locked.has('seo_description') && l.seo_description !== null ? l.seo_description : cut(g.seo_description || stripTags(description_html), L.metaDescMax),
         faq: seo?.faq_locked ? seo.faq : g.faq };
       return { g: done, problems: checkCopy({ copy: done, keyword, brand: profile.brand, aiTitle, kept: [...locked], source: p.raw_text || '', others, facts,
-        vendor: vendor?.name || '', sku: p.sku || '', ordering: hasOrdering(profile) ? `${profile.delivery} ${profile.stitching} ${profile.returns}` : '', limits: L }) };
+        vendor: vendor?.name || '', sku: p.sku || '', fabric: /^\s*english\b/i.test(String(c.language || 'English')) ? p.fabric || '' : '', ordering: hasOrdering(profile) ? `${profile.delivery} ${profile.stitching} ${profile.returns}` : '', limits: L }) };
     };
     const w = await writeCopy({
       model: c.model, effort: c.effort, photos: photos.blocks, schema: genSchema(extraMax > 0 ? allowed : []), check, budget: o.budget,

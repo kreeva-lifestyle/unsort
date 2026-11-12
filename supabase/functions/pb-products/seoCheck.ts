@@ -11,6 +11,8 @@
 //               words and in the meta title; not stuffed
 //   brand       the meta title ends with the brand name
 //   names       supplier name, design code, links, phone numbers
+//   fabric      the description names the product's fabric word for word
+//               (owner, 2026-11-12: the fabric is never shortened or reworded)
 // A field a person typed (kept) is theirs: only what the AI wrote is checked.
 //   claims      "No. 1", fake scarcity, invented reviews
 //   ordering    a number in "Ordering from …" that the store profile does not give
@@ -29,6 +31,8 @@ export interface CheckInput {
   kept?: string[];
   source: string; others: Version[]; facts: unknown[];
   vendor: string; sku: string;
+  /** The product's fabric as the facts give it ('' or left out = not checked, e.g. a listing not written in English). */
+  fabric?: string;
   /** The profile's delivery + stitching + returns text ('' = no ordering block is written). */
   ordering: string;
   limits: { metaDescMin: number; metaDescMax: number; wordsMin: number; wordsMax: number; titleMax?: number; metaTitleMax?: number };
@@ -93,6 +97,9 @@ export function checkCopy(i: CheckInput): Problem[] {
   if (named.length) add('names', true, `Mentions ${named.join(' and ')}.`, `Remove ${named.join(' and ')} everywhere.`);
   const claim = CLAIMS.exec(written)?.[0];
   if (claim) add('claims', true, `Makes a claim the facts do not support: ${q(claim)}.`, `Remove ${q(claim)} and any other ranking, scarcity or review claim.`);
+
+  const fabric = String(i.fabric ?? '').replace(/\s+/g, ' ').trim();
+  if (fabric && ai.desc && !countPhrase(desc, fabric)) add('fabric', true, `The description does not name the fabric as given (${q(fabric)}).`, `Name the fabric in the description word for word as PRODUCT FACTS gives it: ${q(fabric)}. Do not shorten it, reword it or change its spelling.`);
 
   if (i.ordering && ai.desc) {
     const block = sectionAfter(c.description_html, /ordering from/i);

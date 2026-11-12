@@ -1,6 +1,8 @@
 // The writer's instructions and JSON schema (step 3, one call per listing),
 // built from the owner's per-store template (2026-11-12): a STORE PROFILE,
-// eight hard rules, and an output with a fixed shape. The writer is given the
+// ten hard rules, and an output with a fixed shape. Rules 9 and 10 (owner,
+// same day): the photos overrule the facts for what can be seen, and the
+// fabric is written word for word as the facts give it. The writer is given the
 // product facts, the supplier's text (facts reference only), the versions
 // already written for the other stores (never to be copied) and the primary
 // keyword. Its own "self check" is replaced by a program (seoCheck.ts); the
@@ -70,6 +72,8 @@ export function genSystem(a: GenAsk): string {
     '6. No "best", "No. 1", fake scarcity, invented reviews, or claims the facts do not support.',
     "7. Use the store's spelling and units, and the search terms shoppers in its market use.",
     '8. No vendor or supplier names, vendor or design codes, links, phone numbers, prices or discounts. No emojis or ALL CAPS.',
+    ...(a.photos > 0 ? ['9. Check the facts against the photos before you write. For what can be seen (colour, pattern, the kind of work, neckline, sleeves, length, the pieces in the set) the photos are right: when PRODUCT FACTS or SOURCE TEXT say something the photos do not show, write what the photos show. This holds for the title, the description, seo_title, seo_description, image_alts and faq alike.'] : []),
+    `${a.photos > 0 ? '10' : '9'}. The fabric is the one thing a photo cannot tell. Wherever a fabric is named, write it word for word as PRODUCT FACTS gives it: nothing added, dropped, shortened or swapped. Name the product's fabric that way in the description; in a short field where the whole name does not fit, leave the fabric out instead of shortening it.`,
     ...(a.imported ? [IMPORTED_TEXT] : []),
     '',
     'OUTPUT',
