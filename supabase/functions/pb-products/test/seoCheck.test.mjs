@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DEFAULT_KEYWORD, hasOrdering, keywordOf, profileOf } from '../profile.ts';
-import { copiedRuns, countPhrase, factWords, opening, sectionAfter, wordsOf } from '../seoText.ts';
+import { copiedRuns, countPhrase, dropSection, factWords, opening, sectionAfter, wordsOf } from '../seoText.ts';
 import { better, checkCopy, hardOf } from '../seoCheck.ts';
 
 const PRODUCT = { name: 'Zari Kurta Set', category: 'Kurta Set', fabric: 'Georgette', color: 'Maroon', attributes: { work: 'Zari', occasion: 'Festive', set_contents: 'Kurta, Pant and Dupatta' } };
@@ -13,13 +13,13 @@ const LIMITS = { metaDescMin: 140, metaDescMax: 155, wordsMin: 130, wordsMax: 20
 const META = 'Maroon georgette kurta set with zari work on the yoke and a matching dupatta. Ships in 5 to 7 days from Surat with easy 7 day returns on every order.';
 const GOOD = {
   title: 'Maroon Georgette Kurta Set with Zari Work',
-  description_html: '<p>Zari runs along the yoke of this maroon georgette kurta set, and the dupatta carries the same border.</p><ul><li>Fabric: georgette</li><li>Set: kurta, pant and dupatta</li></ul><h3>How to wear it</h3><p>Pair it with gold jhumkas for a puja.</p><h3>Ordering from Kreeva</h3><p>It ships in 5 to 7 days and can be returned within 7 days.</p>',
+  description_html: '<p>Zari runs along the yoke of this maroon georgette kurta set, and the dupatta carries the same border.</p><ul><li>Fabric: georgette</li><li>Set: kurta, pant and dupatta</li></ul><h3>How to wear it</h3><p>Pair it with gold jhumkas for a puja.</p>',
   seo_title: 'Maroon Georgette Kurta Set with Zari | Kreeva', seo_description: META,
   image_alts: ['Front view of the maroon kurta', 'Close view of the zari yoke'], faq: [{ q: 'Is the dupatta included?', a: 'Yes, the set has a kurta, pant and dupatta.' }],
 };
 const input = (o = {}) => ({
   copy: GOOD, keyword: 'Maroon Georgette Kurta Set', brand: 'Kreeva', aiTitle: true, source: '', others: [], facts: Object.values(PRODUCT).flatMap(v => (typeof v === 'string' ? [v] : Object.values(v))),
-  vendor: 'Rangoli Fashions', sku: 'RG-1042', ordering: 'Ships in 5 to 7 days. Returns within 7 days.', limits: LIMITS, ...o,
+  vendor: 'Rangoli Fashions', sku: 'RG-1042', limits: LIMITS, ...o,
 });
 const codes = (o) => checkCopy(input(o)).map(p => p.code);
 
@@ -43,7 +43,13 @@ test('words, phrases, the opening and a section', () => {
   assert.equal(countPhrase('A maroon georgette kurta set. Maroon Georgette Kurta-Set again', 'maroon georgette kurta set'), 2);
   assert.equal(countPhrase('maroon georgette embroidered kurta set', 'maroon georgette kurta set'), 0);
   assert.equal(opening('<p>Zari runs along the yoke. Second.</p><ul><li>x</li></ul>'), 'Zari runs along the yoke');
-  assert.equal(sectionAfter(GOOD.description_html, /ordering from/i), 'It ships in 5 to 7 days and can be returned within 7 days. .');
+  const ORDER = '<h3>Ordering from Kreeva</h3><p>It ships in 5 to 7 days and can be returned within 7 days.</p>';
+  assert.equal(sectionAfter(GOOD.description_html + ORDER, /ordering from/i), 'It ships in 5 to 7 days and can be returned within 7 days. .');
+  // dropSection: the heading and everything up to the next heading go; the rest is untouched
+  assert.equal(dropSection(GOOD.description_html + ORDER, /ordering/i), GOOD.description_html);
+  assert.equal(dropSection(`<p>a</p>${ORDER}<h3>How to wear it</h3><p>b</p>`, /ordering/i), '<p>a</p><h3>How to wear it</h3><p>b</p>');
+  assert.equal(dropSection(GOOD.description_html, /ordering/i), GOOD.description_html);
+  assert.equal(dropSection('', /ordering/i), '');
   assert.equal(sectionAfter('<p>none</p>', /ordering from/i), '');
 });
 
@@ -111,7 +117,7 @@ test('keyword: once in the title, in the first 50 words and in the SEO title', (
   assert.deepEqual(codes({ copy: { ...GOOD, title: 'Zari Kurta Set in Maroon' }, aiTitle: false }), []);
   assert.deepEqual(codes({ copy: { ...GOOD, seo_title: 'Zari Kurta Set | Kreeva' } }), ['keyword_meta']);
   const late = `<p>${'Plain words here. '.repeat(20)}A maroon georgette kurta set.</p>`;
-  assert.deepEqual(codes({ copy: { ...GOOD, description_html: late }, ordering: '' }), ['keyword_start']);
+  assert.deepEqual(codes({ copy: { ...GOOD, description_html: late } }), ['keyword_start']);
   assert.deepEqual(codes({ keyword: '' }), []);
 });
 
@@ -149,12 +155,14 @@ test('a phrase that cannot fit is not demanded: long brand, short SEO title', ()
   assert.deepEqual(codes({ limits, copy: { ...GOOD, seo_title: 'Zari Kurta Set | Kreeva' } }), ['keyword_meta']);
 });
 
-test('ordering: only the numbers the store profile gives', () => {
-  const bad = GOOD.description_html.replace('5 to 7 days', '2 days');
-  const p = checkCopy(input({ copy: { ...GOOD, description_html: bad } }));
-  assert.deepEqual(p.map(x => x.code), ['ordering']);
-  assert.match(p[0].say, /: 2\./);
-  assert.deepEqual(codes({ copy: { ...GOOD, description_html: bad }, ordering: '' }), []); // no profile text → no ordering check
+test('ordering: a description is about the product only (owner, 2026-11-12)', () => {
+  for (const extra of ['<p>It ships in 5 to 7 days.</p>', '<p>Free shipping across India.</p>', '<p>Easy returns on every order.</p>', '<p>Cash on delivery is available.</p>']) {
+    const p = checkCopy(input({ copy: { ...GOOD, description_html: GOOD.description_html + extra } }));
+    assert.deepEqual(p.map(x => [x.code, x.hard]), [['ordering', false]], extra); // noted and sent back once, never a stop
+  }
+  assert.deepEqual(codes({ copy: { ...GOOD, description_html: GOOD.description_html + '<p>The dupatta returns to the front in a drape.</p>' } }), []);
+  assert.deepEqual(codes({ copy: { ...GOOD, description_html: GOOD.description_html + '<p>It ships in 5 days.</p>' }, kept: ['description_html'] }), []); // a description a person typed is theirs
+  assert.deepEqual(codes(), []); // the SEO description may still give the store's delivery and returns
 });
 
 test('soft notes never block: lengths, repeated alts, sales copy', () => {

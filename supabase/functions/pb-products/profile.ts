@@ -32,7 +32,8 @@ export function profileOf(site: { name: string; shop_name?: string | null; conte
   };
 }
 
-/** Has the store said anything about ordering (the "Ordering from <brand>" block is written only then). */
+/** Has the store said anything about ordering (delivery, stitching, returns)? Then the SEO description may use one as its
+ *  store benefit. Nothing of it is written into a description or a question (owner, 2026-11-12). */
 export const hasOrdering = (p: Profile) => !!(p.delivery || p.stitching || p.returns);
 
 /** "{color} {fabric} {category}" → "Maroon Georgette Kurta Set"; '' when nothing fills it. */

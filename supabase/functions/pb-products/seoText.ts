@@ -59,6 +59,14 @@ export function copiedRuns(mine: unknown, theirs: unknown[], facts: Set<string>,
 export const factWords = (values: unknown[]): Set<string> => new Set(values.flatMap(v => wordsOf(v)));
 
 /** Text between a heading that matches `re` and the next heading (or the end). '' when there is no such heading. */
+/** The html without the section whose heading matches `re`: the heading and everything up to the next heading. */
+export function dropSection(html: unknown, re: RegExp): string {
+  return String(html ?? '').split(/(?=<h[1-6][^>]*>)/i).filter((part) => {
+    const head = /^<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]\s*>/i.exec(part);
+    return !(head && re.test(plainText(head[1])));
+  }).join('');
+}
+
 export function sectionAfter(html: unknown, re: RegExp): string {
   const parts = String(html ?? '').split(/<h[1-6][^>]*>/i);
   for (const part of parts.slice(1)) {

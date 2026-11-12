@@ -98,7 +98,7 @@ export default function ProfileSection({ draft, set, siteName }: { draft: Draft;
       </Cell>
 
       <Cell>
-        <Section title="Ordering details" hint={`The writer puts these in an "Ordering from ${brand}" part of the description, in its own words, and never adds a number you did not type. Leave all three empty and that part is left out.`}>
+        <Section title="Ordering details" hint="The writer may use one of these as the store benefit in the SEO description, and never adds a number you did not type. They are not written into descriptions or questions, which are about the product only.">
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', columnGap: 16 }}>
             <Field label="Delivery time" htmlFor="pbp-del" hint="How long an order takes.">{text('delivery', 'pbp-del', 300, 'e.g. Ships in 5 to 7 days')}</Field>
             <Field label="Stitching" htmlFor="pbp-st" hint="What you offer, if anything.">{text('stitching', 'pbp-st', 300, 'e.g. Stitched to measure')}</Field>

@@ -576,6 +576,17 @@ AI's extra tags are an enum of it.
   (needs their colour / fabric matching list), a hold on "pure" / origin
   claim words, dropping the Ordering block, Western spellings per market,
   country of origin, up to five FAQ questions (needs the listing editor).
+- **No ordering part (owner, 2026-11-12, after the report: "2 is what you
+  should correct")**. The writer no longer writes `<h3>Ordering from
+  <brand></h3>`; the description and the FAQ are about the product only (no
+  delivery, shipping, returns, stitching-service, price or offer text, and no
+  question about them). The profile's delivery / stitching / returns lines
+  stay and may give the SEO description its one store benefit, the only
+  field that may mention them. `tidyOut` strips a section whose heading says
+  ordering, shipping, delivery or returns (`seoText.ts dropSection`); the
+  `ordering` check is now SOFT: a description that talks about delivery,
+  shipping, returns, refunds or cash on delivery. This replaces the older
+  "Ordering from" lines in this section and the HARD numbers check.
 - **A program finishes the draft**: pattern title (`title_template`), the SEO
   title always ends `| <brand>` inside `meta_title_max` (`withBrand`), cuts,
   kept (locked) fields; handle = 3–6 clean words with the design code taken
