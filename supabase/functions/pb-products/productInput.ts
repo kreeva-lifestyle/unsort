@@ -28,12 +28,15 @@
 // the SKU is); India is set on a new variant only, so another country chosen
 // in Shopify stays.
 // Stock (owner, 2026-11-12: "If stock out/in-stock on playbook that same
-// happens in shopify stores"): on a store that does not count stock (Track
-// stock off) Playbook's own in stock / out of stock decides, on every send and
-// for every size. Out of stock = the size is counted with nothing to sell
-// (tracked, DENY at 0) → the store shows "Sold out"; in stock = not counted,
-// always orderable. On a store that counts stock its own numbers decide, as
-// before (a new size starts tracked at 0).
+// happens in shopify stores", then: "'Continue selling when out of stock' must
+// be on if the product is in-stock and vice versa if out of stock"): on a
+// store where Playbook decides (Track stock off) every size has Track quantity
+// ON, on every send, and Shopify's "Continue selling when out of stock" box
+// follows Playbook: ticked (CONTINUE) while the product is in stock, so it
+// sells at a count of 0; unticked (DENY) when it is out of stock, so at 0 the
+// store shows "Sold out". No count is sent. On a store that counts stock
+// itself (Track stock on) its own numbers decide, as before (a new size
+// starts tracked at 0 with the box unticked).
 import { cleanHtml } from './content.ts';
 import { uniqueCi } from './db.ts';
 import { shopCategory } from './garment.ts';
@@ -130,7 +133,7 @@ export function buildProductInput(a: { l: ListingRow; p: ProductRow; site: Websi
   const variant = (name: string, i: number) => {
     const id = variantIds[i];
     const code = sku ? (sizes.length ? `${sku}${join}${(sizeCore(name) || name).replace(/\s+/g, '')}` : sku) : '';
-    const stock = tracked ? (id ? null : { policy: 'DENY', tracked: true }) : { policy: inStock ? 'CONTINUE' : 'DENY', tracked: !inStock };
+    const stock = tracked ? (id ? null : { policy: 'DENY', tracked: true }) : { policy: inStock ? 'CONTINUE' : 'DENY', tracked: true };
     return {
       ...(id ? { id } : {}), ...(stock ? { inventoryPolicy: stock.policy } : {}),
       optionValues: [{ optionName: optName, name }],

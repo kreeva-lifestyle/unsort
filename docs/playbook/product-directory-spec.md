@@ -896,10 +896,16 @@ paid service, no library.
   run is publishing one right now, activity `stock`. Not "kept": the next
   import sets it again. Shopify
   (`productInput.ts`): on a website with Track stock OFF every variant gets,
-  on every send, `inventoryPolicy: CONTINUE` + `inventoryItem.tracked: false`
-  when in stock and `DENY` + `tracked: true` when out of stock (counted with
-  nothing to sell → the theme shows Sold out); with Track stock ON Shopify's
-  own numbers decide as before. The `published` row records `in_stock`, and
+  on every send, `inventoryItem.tracked: true` and `inventoryPolicy:
+  CONTINUE` when in stock, `DENY` when out of stock (owner, same day:
+  "'Continue selling when out of stock' must be on if the product is
+  in-stock and vice versa"; the first version sent `tracked: false` for an
+  in-stock product). No quantity is sent: the count stays at 0 and goes
+  negative with orders, so DENY means Sold out; a count typed in Shopify by
+  hand would keep an out-of-stock product selling until it is used up. A
+  theme that prints a stock line may call an in-stock product "backordered"
+  (count 0 + continue); the cure would be a fixed count. With Track stock ON
+  Shopify's own numbers decide as before. The `published` row records `in_stock`, and
   routing sends a published listing again when it differs (`route.ts
   behind`). `write_inventory` is now a required scope on every website.
   List: "· Out of stock" after the status label, filter "Out of stock"
