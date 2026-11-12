@@ -8,6 +8,7 @@
 // import run shows as a tile above the toolbar while it runs or just finished.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import MissingTagsBar from '../components/product/list/MissingTagsBar';
+import FailedBar from '../components/product/list/FailedBar';
 import { friendlyError } from '../../lib/friendlyError';
 import { logSwallowed } from '../../lib/errorLogger';
 import { heldLabels, listSources } from '../data/duplicates';
@@ -143,6 +144,7 @@ export default function Products({ addToast, start = {}, onGuide }: { addToast: 
           <PbRow icon="globe" title="Import from website" meta="Copy another store’s in-stock products" onClick={() => openImport()} />
         </div>
         {filter.status === 'needs_info' && <MissingTagsBar addToast={addToast} onQueued={() => void load()} />}
+        {filter.status === 'l:failed' && <FailedBar websiteId={filter.websiteId} addToast={addToast} onRetried={() => void load()} />}
         <div className="pb-bento pb-bento--auto">
           <ProductFilters search={search} onSearch={setSearch} filter={filter} onFilter={setFilter} vendors={vendors} websites={sites} sources={sources} onClear={clearAll} />
           <ProductResults rows={rows} sites={sites} held={held} loading={loading} loadErr={loadErr} filtered={filtered} search={filter.search}

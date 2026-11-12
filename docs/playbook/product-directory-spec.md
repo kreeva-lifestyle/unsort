@@ -862,6 +862,24 @@ paid service, no library.
   Playbook's title, description and price replace hand edits made in Shopify;
   colours of one design are not linked on the store; barcode, HSN, country
   of origin, category attributes and per-size photos are not sent.
+- **Bulk actions, barcode, country of origin (owner, 2026-11-12: "Implement
+  bulk action … Country of origin by default India. Barcode value same as
+  product code. HSN code will set later")**. `bulk.ts`:
+  `reprice_website { website_id }` gives every WRITTEN listing of a website
+  the price from the saved pricing / the rule's own price (`newPrice`): a
+  published one whose price moved becomes `publishing` (also on a "Review
+  first" website: the tap is the approval), a waiting one (review, failed,
+  unclaimed publishing) only has its price corrected, a kept price stays;
+  pages of 200, 8 at once, `more: true` after ~100 s. Button: website →
+  Pricing → "Update prices on Shopify" (dimmed while the form is unsaved).
+  `retry_failed { website_id? }`: failed + written → `publishing`, failed +
+  never written → `queued`, attempts 0. Bar: Products with the Failed filter
+  (`FailedBar`, follows the website filter). Both only mark rows; the worker
+  sends them (10 publishes a run). Shopify variants: `barcodes: [{ value }]`
+  = the variant's own SKU on every send (`barcode` on an API version before
+  2026-10); `inventoryItem.countryCodeOfOrigin: 'IN'` on a new variant only.
+  Hand edits are made in Playbook only (owner), so Playbook's title,
+  description and price replacing Shopify's is intended.
 - Product list: "Needs info · Already here as KB 264 WINE XS"
   (`data/duplicates.ts heldLabels`, one RPC per page for its Needs-info rows);
   every row says "from Telegram" / "from bahupalace.com" (`sourceText`); a

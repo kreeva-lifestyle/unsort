@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase';
 import { logSwallowed } from '../../lib/errorLogger';
 import type { PbListing } from '../types';
 import { plainError } from './plainError';
+import { pbCall } from './pbFunctions';
 
 export type ListingFull = Pick<PbListing, 'id' | 'product_id' | 'website_id' | 'status' | 'price' | 'compare_at_price' | 'title'
   | 'description_html' | 'seo_title' | 'seo_description' | 'handle' | 'tags' | 'locked' | 'error' | 'shopify_product_id'
@@ -65,3 +66,14 @@ export async function approveListing(l: Pick<ListingFull, 'id' | 'product_id' | 
   logPbActivity({ product_id: l.product_id, listing_id: l.id, website_id: l.website_id, action: 'approved' });
   return { paused: (auto.data?.value as { paused?: boolean } | null)?.paused === true };
 }
+
+/** Failed listings of products that are not archived, on one website or on all (head-only count). */
+export async function failedCount(websiteId = ''): Promise<number> {
+  let q = supabase.from('pb_listings').select('id,pb_products!inner(status)', { count: 'exact', head: true }).eq('status', 'failed').neq('pb_products.status', 'archived');
+  if (websiteId) q = q.eq('website_id', websiteId);
+  const { count, error } = await q;
+  if (error) throw error;
+  return count ?? 0;
+}
+/** Every failed listing (of one website, or all) gets its tries again; the automation sends them. */
+export const retryFailed = (websiteId = '') => pbCall<{ retried: number }>('retry_failed', websiteId ? { website_id: websiteId } : {});

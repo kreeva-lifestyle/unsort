@@ -83,6 +83,11 @@ test('sizes on Shopify: one choice per size, each with the base SKU plus its own
   assert.deepEqual(ask({ p: { ...P, sku: 'NKB 75 PINK-1', sizes: ['XS (34)', 'S (36)'] } }).variants.map(v => v.inventoryItem.sku), ['NKB 75 PINK-1-XS', 'NKB 75 PINK-1-S']);
   assert.equal(ask({ p: { ...P, sku: 'RG-9', sizes: [] } }).variants[0].inventoryItem.sku, 'RG-9'); // no sizes: the code as it is
   assert.deepEqual(made.productOptions[0].values.map(v => v.name), ['XS (34)', 'S (36)', 'Free Size']); // the shopper still sees the measurement
+  // owner, 2026-11-12: the barcode is the code itself (each size its own); India is the country of origin of a new size
+  assert.deepEqual(made.variants.map(v => v.barcodes), [[{ value: 'NKB 47 PURPLE XS' }], [{ value: 'NKB 47 PURPLE S' }], [{ value: 'NKB 47 PURPLE FreeSize' }]]);
+  assert.ok(made.variants.every(v => v.inventoryItem.countryCodeOfOrigin === 'IN'));
+  assert.equal(ask({ site: { ...SITE, api_version: '2026-04' } }).variants[0].barcode, 'RG-1-M');   // an older API version: the single field
+  assert.ok(!('barcodes' in ask({ p: { ...P, sku: '' } }).variants[0]));                            // no code, no barcode
   assert.equal(made.productOptions[0].name, 'Size');
 });
 
@@ -95,7 +100,7 @@ test('an update keeps the sizes the store has: same variant for a relabelled siz
   assert.deepEqual(made.variants.map(v => v.id), ['var-s', 'var-m', undefined]);          // "L" twice (another case) is one size
   assert.deepEqual(made.productOptions[0].values, [{ id: 'v-s', name: 'S (36)' }, { id: 'v-m', name: 'M (38)' }, { name: 'L (40)' }]);
   assert.equal(made.productOptions[0].id, 'o1');
-  assert.deepEqual(made.variants[2].inventoryItem, { tracked: false, measurement: { weight: { value: 700, unit: 'GRAMS' } }, cost: '640.00', sku: 'RG-1-L' });
+  assert.deepEqual(made.variants[2].inventoryItem, { tracked: false, countryCodeOfOrigin: 'IN', measurement: { weight: { value: 700, unit: 'GRAMS' } }, cost: '640.00', sku: 'RG-1-L' });
   assert.deepEqual(made.variants[0].inventoryItem, { sku: 'RG-1-S' });                    // what Shopify has for an existing size stays
   assert.ok(!('inventoryPolicy' in made.variants[0]) && made.variants[2].inventoryPolicy === 'CONTINUE');
   // two store sizes with the same core: no guessing, matched by the exact label only
