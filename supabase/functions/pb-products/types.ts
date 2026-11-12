@@ -96,7 +96,8 @@ export interface SecretsRow {
 export interface Settings {
   reader: { model: string; effort: string };
   categories: string[];
-  automation: { paused: boolean };
+  /** daily_limit_inr: the AI's spend per day (IST) in rupees after which the worker stops reading and writing; 0 = no limit. */
+  automation: { paused: boolean; daily_limit_inr: number };
 }
 
 

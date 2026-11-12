@@ -119,6 +119,8 @@ export interface PbListing {
   ai_model: string | null; ai_effort: string | null; ai_cost_usd: number | null; generated_at: string | null;
   shopify_product_id: string | null; shopify_status: string | null; published_at: string | null;
   attempts: number; claimed_at: string | null; error: string | null; created_at: string; updated_at: string;
+  /** The product's stock is still to be sent to this listing's Shopify product (server: stockSend.ts). */
+  stock_due: boolean;
 }
 
 export interface PbActivity {
@@ -129,7 +131,8 @@ export interface PbActivity {
 export type PbSettings = {
   reader: { model: PbModel; effort: PbEffort };
   categories: string[];
-  automation: { paused: boolean };
+  /** daily_limit_inr: ₹ of AI per day (IST) after which reading and writing stop; null = never set (the server uses 500), 0 = no limit. */
+  automation: { paused: boolean; daily_limit_inr: number | null };
 };
 
 export const PB_MODELS: { id: PbModel; label: string; note: string }[] = [

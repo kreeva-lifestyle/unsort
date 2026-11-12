@@ -16,7 +16,7 @@ export type ProductRow = Pick<PbProduct, 'id' | 'name' | 'sku' | 'cost_price' | 
   pb_product_images: { path: string; position: number }[];
   pb_listings: { id: string; website_id: string; status: PbListingStatus }[];
 };
-/** status: '' = everything but archived · a product status · 'l:failed' / 'l:queued,generating,publishing' = has a listing in that state (one or a comma list) · 'stock:out' = out of stock · 'stock:temp' = a vendor called it temporarily out (a note only).
+/** status: '' = everything but archived · a product status · 'l:failed' / 'l:queued,generating,publishing' = has a listing in that state (one or a comma list) · 'l:warn' = has a published listing that carries a note · 'stock:out' = out of stock · 'stock:temp' = a vendor called it temporarily out (a note only).
  *  source: '' = any · 'telegram' · 'manual' (typed in) · 'import:<host>' (copied from that website, with or without "www."). */
 export type ProductFilter = { search: string; status: string; vendorId: string; websiteId: string; source: string };
 export const EMPTY_FILTER: ProductFilter = { search: '', status: '', vendorId: '', websiteId: '', source: '' };
@@ -26,13 +26,14 @@ const LIST_COLS = 'id,name,sku,cost_price,sell_price,in_stock,temp_out_at,perm_o
 export async function listProducts(f: ProductFilter, page: number): Promise<{ rows: ProductRow[]; count: number }> {
   const lStatus = f.status.startsWith('l:') ? f.status.slice(2) : '';
   // A second, inner-joined copy of the listings narrows the products without trimming the chips.
-  const hit = f.websiteId || lStatus ? ',hit:pb_listings!inner(website_id,status)' : '';
+  const hit = f.websiteId || lStatus ? ',hit:pb_listings!inner(website_id,status,error)' : '';
   let q = supabase.from('pb_products').select(LIST_COLS + hit, { count: 'exact' });
   const stock = f.status.startsWith('stock:') ? f.status.slice(6) : '';
   if (!f.status || lStatus || stock) q = q.neq('status', 'archived'); else q = q.eq('status', f.status);
   if (stock === 'out') q = q.eq('in_stock', false); else if (stock === 'temp') q = q.not('temp_out_at', 'is', null);
   const lList = lStatus.split(',').filter(Boolean);
-  if (lList.length > 1) q = q.in('hit.status', lList); else if (lStatus) q = q.eq('hit.status', lStatus);
+  if (lStatus === 'warn') q = q.eq('hit.status', 'published').not('hit.error', 'is', null); // published, but with a note (a photo Shopify could not take, a field it refused…)
+  else if (lList.length > 1) q = q.in('hit.status', lList); else if (lStatus) q = q.eq('hit.status', lStatus);
   if (f.websiteId) q = q.eq('hit.website_id', f.websiteId);
   if (f.vendorId) q = q.eq('vendor_id', f.vendorId);
   if (f.source === 'telegram' || f.source === 'manual') q = q.eq('source', f.source);
@@ -151,9 +152,9 @@ export async function createProduct(id: string, p: NewProduct, files: File[]): P
 }
 
 // ── small lookups ──
-export type WebsiteLite = Pick<PbWebsite, 'id' | 'name' | 'shop_domain' | 'active' | 'publish_mode' | 'content' | 'pricing'>;
+export type WebsiteLite = Pick<PbWebsite, 'id' | 'name' | 'shop_domain' | 'active' | 'publish_mode' | 'content' | 'pricing' | 'last_error'>;
 export async function listWebsitesLite(): Promise<WebsiteLite[]> {
-  const { data, error } = await supabase.from('pb_websites').select('id,name,shop_domain,active,publish_mode,content,pricing').order('name').limit(200);
+  const { data, error } = await supabase.from('pb_websites').select('id,name,shop_domain,active,publish_mode,content,pricing,last_error').order('name').limit(200);
   if (error) throw error;
   return (data ?? []) as WebsiteLite[];
 }

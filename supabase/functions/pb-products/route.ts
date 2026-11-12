@@ -8,9 +8,10 @@
 //   was archived) and not on Shopify → queued again;
 //   a published listing whose price is not kept by hand → re-priced from the
 //   current cost / pricing / rule and sent to Shopify again (no new AI call);
-//   a published listing sent with other sizes, another SKU or another stock
-//   state (in stock / out of stock) than the product has now (the `published` activity row records what was sent) → sent again
-//   as it is, so the Shopify variants follow; found here, not passed in, so
+//   a published listing sent with other sizes or another SKU than the product
+//   has now (the `published` activity row records what was sent) → sent again
+//   as it is, so the Shopify variants follow (a change of stock is not sent
+//   this way: it has its own send, stockSend.ts); found here, not passed in, so
 //   every way of routing (save, re-read, tags, the worker's route_due) gets it;
 //   one being written / published right now goes out with what it was given,
 //   and the product is flagged (route_due) so the worker checks it again once
@@ -38,7 +39,7 @@ type Site = { id: string; name: string; routing_default: string; publish_mode: s
 export type RouteResult = { routed: number; repriced: number; resent: number; busy: boolean; listings: ListingRow[]; warning?: string };
 
 /** The sizes and SKU each listing was last sent with (newest `published` row per listing; none → not known). */
-type Sent = { sizes?: string[]; sku?: string; in_stock?: boolean };
+type Sent = { sizes?: string[]; sku?: string };
 async function lastSent(productId: string): Promise<Map<string, Sent>> {
   const rows = await sel<{ listing_id: string | null; details: Sent | null }>(`pb_activity?product_id=eq.${enc(productId)}&action=eq.published&select=listing_id,details&order=created_at.desc&limit=40`);
   const out = new Map<string, Sent>();
@@ -56,8 +57,7 @@ export async function routeProduct(p: ProductRow, userId: string | null): Promis
   const sent = existing.some(l => l.status === 'published') ? await lastSent(p.id) : new Map<string, Sent>();
   const behind = (l: ListingRow) => {
     const s = sent.get(l.id);
-    return !!s && Array.isArray(s.sizes) && (s.sizes.join('|') !== (p.sizes || []).join('|') || String(s.sku ?? '') !== String(p.sku ?? '')
-      || (typeof s.in_stock === 'boolean' && s.in_stock !== (p.in_stock !== false)));
+    return !!s && Array.isArray(s.sizes) && (s.sizes.join('|') !== (p.sizes || []).join('|') || String(s.sku ?? '') !== String(p.sku ?? ''));
   };
   const queued: string[] = [], kept: string[] = [], removed: string[] = [], stillLive: string[] = [], repriced: string[] = [], resent: string[] = [], busy: string[] = [];
   for (const s of sites) {

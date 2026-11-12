@@ -30,7 +30,7 @@
 import { askClaude } from './ai.ts';
 import { aiBusy, freeTry } from './aiRetry.ts';
 import { ago, enc, getSettings, logActivity, nowIso, one, patch, sel } from './db.ts';
-import { HttpError, plain } from './http.ts';
+import { HttpError, plain, usdOf } from './http.ts';
 import { aiPhotos } from './photos.ts';
 import { readChanges } from './readChanges.ts';
 import { nameWithColour } from './readName.ts';
@@ -50,8 +50,9 @@ const due = () => {
   return `or=(and(status.eq.new,or(claimed_at.is.null,claimed_at.lt.${t})),and(status.eq.reading,claimed_at.lt.${t}))`;
 };
 
-export const readCandidates = (limit: number) =>
-  sel<{ id: string }>(`pb_products?${due()}&select=id&order=created_at.asc&limit=${limit}`);
+/** `only`: read just the products of one source (the worker, once the day's AI limit is used up: Telegram posts). */
+export const readCandidates = (limit: number, only = '') =>
+  sel<{ id: string }>(`pb_products?${due()}${only ? `&source=eq.${enc(only)}` : ''}&select=id&order=created_at.asc&limit=${limit}`);
 
 /** Atomic-ish claim: only one caller gets the row back. A manual read waits for a
  *  product being read, and for a 'new' one that ingest still holds (photos arriving:
@@ -125,14 +126,14 @@ export async function readOne(p: ProductRow, o: { manual: boolean; prevStatus?: 
     const status = !hasPrice(next) || !String(next.category || '').trim() ? 'needs_info' : 'ready'; // the gate (tagAfterRead → pb_products_refresh) then also asks for fabric, colour, a photo and the tags
     const saved = await patch<ProductRow>('pb_products', `id=eq.${enc(p.id)}&status=eq.reading`,
       { ...set, status, ai_read_at: nowIso(), ai_error: null, claimed_at: null }, PRODUCT_COLS);
-    if (!saved[0]) throw new HttpError(409, 'The product changed while it was being read — open it again.');
+    if (!saved[0]) throw Object.assign(new HttpError(409, 'The product changed while it was being read — open it again.'), { usd: ai.usd }); // paid for: counted with the failure
     product = await tagAfterRead(saved[0], tax, spec, ai.data, o.userId);
     await backInStock(product, o.userId); // posted again: a design the vendor had called temporarily out is back
     await logActivity({ product_id: p.id, action: 'read', details: { model: ai.model, effort: ai.effort, usd: ai.usd, status: product.status, filled: Object.keys(set), ...(product.missing_attrs?.length ? { missing: product.missing_attrs } : {}), ...(used < imgs.length ? { photos_skipped: imgs.length - used } : {}), ...(Object.keys(changed).length ? { changed } : {}) }, user_id: o.userId });
   } catch (e) {
     const msg = plain(e);
     const free = !o.manual && await freeTry(e, `product_id=eq.${enc(p.id)}&listing_id=is.null`, 'read', 'read'); // the AI was busy: read again, no try used up (aiRetry.ts)
-    await logActivity({ product_id: p.id, action: 'failed', details: { step: 'read', error: msg, ...(aiBusy(e) ? { temporary: true } : {}) }, user_id: o.userId });
+    await logActivity({ product_id: p.id, action: 'failed', details: { step: 'read', error: msg, ...(aiBusy(e) ? { temporary: true } : {}), ...(usdOf(e) ? { usd: usdOf(e) } : {}) }, user_id: o.userId });
     if (o.manual) {
       await patch('pb_products', `id=eq.${enc(p.id)}&status=eq.reading`, { status: o.prevStatus || 'new', ai_error: msg, claimed_at: null });
       throw e instanceof HttpError ? e : new HttpError(502, msg);

@@ -10,11 +10,14 @@ import { useBackClose } from '../../hooks/useBackClose';
 import { useAuth } from '../../hooks/useAuth';
 import { useConfirm } from '../../components/ui/ConfirmModal';
 import { friendlyError } from '../../lib/friendlyError';
+import { logSwallowed } from '../../lib/errorLogger';
 import { dirtyTitle } from '../hooks/useDirty';
 import { discardAsk } from '../components/ui/discard';
 import type { AddToast } from '../components/PbToasts';
 import { PB_EFFORTS, PB_MODELS, type PbSettings as Settings } from '../types';
-import { DEFAULT_SETTINGS, getSettings, runWorker, saveSetting, type WorkResult } from '../data/settings';
+import { DEFAULT_DAILY_LIMIT, DEFAULT_SETTINGS, getSettings, runWorker, saveAutomation, saveSetting, type WorkResult } from '../data/settings';
+import { getAiCostSince } from '../data/listingSeo';
+import { USD_INR, istDayStart } from '../format';
 import { Field, Grid2 } from '../components/website/ui';
 import { pbInput, pbMeta } from '../pbTheme';
 import { PbButton, PbConfirm, PbPageHeader, PbSection, PbTile } from '../components/ui';
@@ -34,6 +37,7 @@ export default function PbSettings({ addToast, onBack, onGuide }: { addToast: Ad
   const [busy, setBusy] = useState<Busy>('');
   const [pausing, setPausing] = useState(false);
   const [run, setRun] = useState<WorkResult | null>(null);
+  const [spent, setSpent] = useState<number | null>(null); // ₹ of AI today (IST), beside the daily limit
   const [loadErr, setLoadErr] = useState('');
   const [retrying, setRetrying] = useState(false);
   const [tagsOpen, setTagsOpen] = useState(false);
@@ -52,18 +56,29 @@ export default function PbSettings({ addToast, onBack, onGuide }: { addToast: Ad
     .then(s => { setSaved(s); setReader(s.reader); setLoadErr(''); })
     .catch(e => setLoadErr(friendlyError(e))), []); // the error tile (with Try again) is the one signal
   useEffect(() => { void load(); }, [load]);
+  const loadSpent = useCallback(() => getAiCostSince(istDayStart()).then(c => setSpent(Math.round(c.usd * USD_INR * 100) / 100)).catch(e => logSwallowed('AI cost today', e)), []);
+  useEffect(() => { void loadSpent(); }, [loadSpent]);
   const retry = () => { setRetrying(true); void load().finally(() => setRetrying(false)); };
 
   const save = async <K extends keyof Settings>(key: K, value: Settings[K], ok: string) => {
-    // The pause switch has its own lock: it must still work while "Run now" (up to 2 min) or a save is busy.
-    const own = key === 'automation';
-    if (own ? pausing : busy) return; // Enter in a field must not run a save twice
-    if (own) setPausing(true); else setBusy(key);
+    if (busy) return; // Enter in a field must not run a save twice
+    setBusy(key);
     try {
       await saveSetting(key, value);
       setSaved(s => (s ? { ...s, [key]: value } : s));
       addToast(ok, 'success');
-    } catch (e) { addToast(friendlyError(e), 'error'); } finally { if (own) setPausing(false); else setBusy(''); }
+    } catch (e) { addToast(friendlyError(e), 'error'); } finally { setBusy(''); }
+  };
+  // The pause switch and the daily limit have their own lock: they must still work while "Run now" (up to 2 min) or a
+  // save is busy. Only the part that changed is saved (data/settings.ts saveAutomation).
+  const saveAuto = async (patch: Partial<Settings['automation']>, ok: string) => {
+    if (pausing) return;
+    setPausing(true);
+    try {
+      const value = await saveAutomation(patch);
+      setSaved(s => (s ? { ...s, automation: value } : s));
+      addToast(ok, 'success');
+    } catch (e) { addToast(friendlyError(e), 'error'); } finally { setPausing(false); }
   };
 
   const runNow = async () => {
@@ -71,7 +86,7 @@ export default function PbSettings({ addToast, onBack, onGuide }: { addToast: Ad
     setBusy('run'); setRun(null);
     try {
       const r = await runWorker();
-      setRun(r);
+      setRun(r); void loadSpent();
       addToast(`Done — read ${r.read}, routed ${r.routed}, written ${r.generated}, published ${r.published}${r.failed ? `, failed ${r.failed}` : ''}`, r.failed ? 'info' : 'success');
     } catch (e) { addToast(friendlyError(e), 'error'); } finally { setBusy(''); }
   };
@@ -81,6 +96,7 @@ export default function PbSettings({ addToast, onBack, onGuide }: { addToast: Ad
   if (tagsOpen) return <><Tags addToast={addToast} onBack={closeTags} canEdit={canEdit} /><PbConfirm {...modalProps} /></>;
   if (!saved) return <>{header}{loadErr ? <SettingsError message={loadErr} onRetry={retry} busy={retrying} /> : <SettingsSkeleton />}</>;
   const paused = saved.automation.paused;
+  const limit = saved.automation.daily_limit_inr ?? DEFAULT_DAILY_LIMIT; // never saved → what the server uses
   const readerDirty = !same(reader, saved.reader);
   const note = PB_MODELS.find(m => m.id === reader.model)?.note;
   const unchanged = <span style={{ ...pbMeta, alignSelf: 'center' }}>No changes to save</span>;
@@ -122,8 +138,9 @@ export default function PbSettings({ addToast, onBack, onGuide }: { addToast: Ad
       {header}
       <SettingsColumns form={form} side={
         <AutomationTile paused={paused} saving={pausing} running={busy === 'run'} dim={!!busy && busy !== 'run'} run={run}
-          onRun={() => void runNow()}
-          onToggle={() => void save('automation', { paused: !paused }, paused ? 'Automation running again' : 'Automation paused — nothing runs on its own')} />
+          onRun={() => void runNow()} limit={limit} spent={spent} savingLimit={pausing}
+          onLimit={v => void saveAuto({ daily_limit_inr: v }, v ? `Daily AI limit saved: ₹${v.toLocaleString('en-IN')}` : 'Daily AI limit removed')}
+          onToggle={() => void saveAuto({ paused: !paused }, paused ? 'Automation running again' : 'Automation paused — nothing runs on its own')} />
       } />
     </>
   );

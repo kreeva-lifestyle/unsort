@@ -12,7 +12,7 @@
 // product page, by the worker's route_due step otherwise).
 import { askClaude } from './ai.ts';
 import { enc, getSettings, logActivity, one, patch, rpc, sel } from './db.ts';
-import { plain } from './http.ts';
+import { plain, usdOf } from './http.ts';
 import { aiPhotos } from './photos.ts';
 import { IMPORTED_TEXT } from './readerPrompt.ts';
 import { routeProduct } from './route.ts';
@@ -81,7 +81,7 @@ export async function fillQueued(c: { id: string; tag_fill_run: string }, tax: T
   } catch (e) {
     left = 1;
     console.error(`pb-products tag fill ${c.id}: ${plain(e)}`);
-    await logActivity({ product_id: c.id, action: 'failed', details: { step: 'tags_fill', error: plain(e) }, user_id: userId });
+    await logActivity({ product_id: c.id, action: 'failed', details: { step: 'tags_fill', error: plain(e), ...(usdOf(e) ? { usd: usdOf(e) } : {}) }, user_id: userId });
   } finally {
     await rpc('pb_tag_fill_tick', { p_run: c.tag_fill_run, p_filled: filled, p_left: left });
   }

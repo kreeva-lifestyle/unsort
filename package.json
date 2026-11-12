@@ -7,6 +7,8 @@
     "dev": "vite",
     "lint": "eslint src/",
     "build": "eslint src/ && tsc && vite build",
+    "check:server": "tsc --noEmit -p supabase/functions/_check/tsconfig.json",
+    "test:server": "node --test --experimental-strip-types supabase/functions/pb-products/test/*.test.mjs supabase/functions/pb-telegram/test/*.test.mjs supabase/functions/pb-photo-prints/test/*.test.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

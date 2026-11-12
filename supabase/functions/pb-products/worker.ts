@@ -19,19 +19,33 @@
 // Tags (tagFill.ts) go LAST, with whatever time is left: products a tag
 // change made Ready are routed (route_due, at most 10), then up to 5 queued
 // "Let AI decide" products get their values-only pass.
+// Pre-launch check, 2026-11-13:
+//   * stock owed to a store goes FIRST (stockSend.ts, up to 25 s), for every
+//     website, and it is ALL a paused cron run does;
+//   * the two brakes (brake.ts): once paused, a run stops starting items;
+//     once the day's AI limit is used up, reading, writing and tag filling
+//     are skipped (sending to Shopify goes on);
+//   * the photos of freshly published listings are looked at (mediaCheck.ts).
+import { overLimit, pauseWatch } from './brake.ts';
+import { getSettings } from './db.ts';
 import { claimGenerate, genCandidates, generateOne } from './generate.ts';
 import { advanceImport } from './import/runner.ts';
 import { plain } from './http.ts';
+import { checkMedia } from './mediaCheck.ts';
 import { claimPublish, PUBLISH_NEEDS_MS, pubCandidates, publishOne } from './publish.ts';
 import { temporary } from './publishParts.ts';
 import { claimRead, readCandidates, readOne } from './reader.ts';
+import { retireDue, sendStockDue } from './stockSend.ts';
 import { FILL_NEEDS_MS, fillCandidates, fillQueued, routeDue } from './tagFill.ts';
 import { loadTaxonomy } from './taxonomy.ts';
 import type { Budget } from './types.ts';
 
-export interface WorkResult { read: number; routed: number; generated: number; published: number; failed: number; imported?: number; tagged?: number }
+/** stock = stock changes sent to stores; paused = automation is paused (the run stopped, or sent stock only); limit = the day's AI limit is used up. */
+export interface WorkResult { read: number; routed: number; generated: number; published: number; failed: number; imported?: number; tagged?: number; stock?: number; paused?: boolean; limit?: boolean }
 
-const CAPS = { read: 6, generate: 8, publish: 10, route: 10, fill: 5 };
+const CAPS = { read: 6, generate: 8, publish: 10, route: 10, fill: 5, stock: 10, media: 5, retire: 5 };
+/** The slice of each run that stock sends may use. */
+const STOCK_MS = 25_000;
 /** Time an AI step needs left before it is claimed: photo checks + a slow answer (Opus / high effort). */
 const READ_NEEDS_MS = 45_000;
 const GEN_NEEDS_MS = 80_000;
@@ -50,7 +64,8 @@ export function newBudget(): Budget {
   return { soft: t0 + 100_000, hard: t0 + 140_000 };
 }
 
-export async function work(userId: string | null): Promise<WorkResult> {
+/** `manual`: a person tapped "Run now" (the cron's call is not manual). */
+export async function work(userId: string | null, manual = false): Promise<WorkResult> {
   const budget = newBudget();
   const out: WorkResult = { read: 0, routed: 0, generated: 0, published: 0, failed: 0 };
   const inTime = () => Date.now() < budget.soft;
@@ -59,14 +74,31 @@ export async function work(userId: string | null): Promise<WorkResult> {
     out.failed++;
     console.error(`pb-products ${step} ${id}: ${plain(e)}`);
   };
+  const auto = await getSettings().then(s => s.automation).catch((e) => { failed('settings', 'run', e); return null; });
+  const pausedAtStart = auto?.paused === true;
+
+  try { // never held back: not by a pause, not by a website that is off
+    const until = Date.now() + STOCK_MS, sent = await sendStockDue(CAPS.stock, () => Date.now() < until, userId);
+    if (sent) out.stock = sent;
+    await retireDue(CAPS.retire); // a permanent stock-out whose archive did not happen when its last listing left Shopify
+  } catch (e) { failed('stock', 'run', e); }
+  if (pausedAtStart && !manual) return { ...out, paused: true };
+
+  // Paused while this run is going → it stops starting items. A round a person started while paused runs through.
+  const watch = pauseWatch();
+  const stopped = async () => { if (manual && pausedAtStart) return false; if (await watch()) out.paused = true; return !!out.paused; };
+  // The day's AI limit: asked before each AI step, so one run cannot overshoot by more than that step.
+  const capped = async () => { if (!out.limit && auto && await overLimit(auto.daily_limit_inr)) out.limit = true; return !!out.limit; };
 
   try {
-    const imp = (await importWaits()) ? null : await advanceImport(Date.now() + IMPORT_MS, userId);
+    const imp = (await stopped()) || (await importWaits()) ? null : await advanceImport(Date.now() + IMPORT_MS, userId);
     if (imp) out.imported = imp.added;
   } catch (e) { failed('import', 'run', e); } // the run itself records its error; the next tick carries on
 
-  for (const c of await readCandidates(CAPS.read)) {
-    if (!left(READ_NEEDS_MS)) break;
+  // The day's limit stops what costs most: writing, tag fills and reading imported products. A vendor's Telegram post
+  // is still read (a few paise): it may be a stock notice, and a missed "sold out" is an order for goods that are gone.
+  for (const c of await readCandidates(CAPS.read, (await capped()) ? 'telegram' : '')) {
+    if (!left(READ_NEEDS_MS) || await stopped()) break;
     const p = await claimRead(c.id, false);
     if (!p) continue; // another run took it
     try {
@@ -76,8 +108,8 @@ export async function work(userId: string | null): Promise<WorkResult> {
     } catch (e) { failed('read', c.id, e); }
   }
 
-  for (const c of left(GEN_NEEDS_MS) ? await genCandidates(CAPS.generate) : []) {
-    if (!left(GEN_NEEDS_MS)) break;
+  for (const c of left(GEN_NEEDS_MS) && !(await capped()) ? await genCandidates(CAPS.generate) : []) {
+    if (!left(GEN_NEEDS_MS) || await stopped()) break;
     const l = await claimGenerate(c.id, false);
     if (!l) continue;
     try { await generateOne(l, { manual: false, userId, budget }); out.generated++; } catch (e) { failed('generate', c.id, e); }
@@ -88,7 +120,7 @@ export async function work(userId: string | null): Promise<WorkResult> {
   const busyStores = new Set<string>(); // a store that asked for a pause: its other listings wait for the next run, the other stores go on
   let sentNow = 0;
   for (const c of pubTime() ? await pubCandidates(CAPS.publish * 3) : []) {
-    if (!pubTime() || sentNow >= CAPS.publish) break;
+    if (!pubTime() || sentNow >= CAPS.publish || await stopped()) break;
     if (busyStores.has(c.website_id)) continue;
     const l = await claimPublish(c.id, false);
     if (!l) continue;
@@ -102,12 +134,13 @@ export async function work(userId: string | null): Promise<WorkResult> {
     }
   }
 
-  try { if (inTime()) out.routed += await routeDue(CAPS.route, userId, inTime); } catch (e) { failed('route_due', 'run', e); }
+  try { if (inTime() && !(await stopped())) await checkMedia(CAPS.media, inTime); } catch (e) { failed('media', 'run', e); }
+  try { if (inTime() && !(await stopped())) out.routed += await routeDue(CAPS.route, userId, inTime); } catch (e) { failed('route_due', 'run', e); }
   try {
-    const queued = left(FILL_NEEDS_MS) ? await fillCandidates(CAPS.fill) : [];
+    const queued = left(FILL_NEEDS_MS) && !(await stopped()) && !(await capped()) ? await fillCandidates(CAPS.fill) : [];
     const tax = queued.length ? await loadTaxonomy() : null;
     for (const c of queued) {
-      if (!tax || !left(FILL_NEEDS_MS)) break;
+      if (!tax || !left(FILL_NEEDS_MS) || await stopped()) break;
       if (await fillQueued(c, tax, userId, budget)) out.tagged = (out.tagged ?? 0) + 1; // false: another run took it
     }
   } catch (e) { failed('tags_fill', 'run', e); }

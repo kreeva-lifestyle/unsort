@@ -5,8 +5,13 @@ export class HttpError extends Error {
   status: number; // a plain field (not a parameter property), so node --test can strip the types
   /** Extra fields for the JSON reply (e.g. the look-alikes of a 409). */
   extra?: Record<string, unknown>;
+  /** What the AI call behind this failure cost, when the model had answered (ai.ts): logged with the failure, so it is counted. */
+  usd?: number;
   constructor(status: number, message: string, extra?: Record<string, unknown>) { super(message); this.status = status; this.extra = extra; }
 }
+
+/** The AI cost a failure carries (0 when none). */
+export const usdOf = (e: unknown) => (e instanceof HttpError && typeof e.usd === 'number' && e.usd > 0 ? e.usd : 0);
 
 /** A short, readable message for anything thrown (never a stack trace). */
 export function plain(e: unknown): string {

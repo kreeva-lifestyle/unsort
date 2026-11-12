@@ -904,10 +904,12 @@ paid service, no library.
   the **Stock** switch on the product page (`StockTile` → `set_stock`). The
   import-driven refresh this first shipped with was removed the same day
   (see "Stock-out notices"). Both save through `stock.ts saveStock`: the product row,
-  then every `published` listing of it → `publishing` (sent again as it is:
-  no AI call, no new approval on a "Review first" website; waiting listings
-  are left alone and read the product when they go out), `route_due` when a
-  run is publishing one right now, activity `stock`. Shopify
+  then every listing of it that is on Shopify is marked `stock_due` and gets
+  the stock in its own small send (`stockSend.ts`, see "Pre-launch fixes,
+  batch 2": until 2026-11-13 the `published` listings were moved to
+  `publishing` and sent again in full, which missed four cases), activity
+  `stock`. Listings not on Shopify yet are left alone and read the product
+  when they go out. Shopify
   (`productInput.ts`): on a website with Track stock OFF every variant gets,
   on every send, `inventoryItem.tracked: true` and `inventoryPolicy:
   CONTINUE` when in stock, `DENY` when out of stock (owner, same day:
@@ -942,8 +944,8 @@ paid service, no library.
   code at other vendors as `same_vendor = false`) and `pick` decides: no
   colour named → every product of the design; colours → `byColour` (exact
   key or a `SAME` trade-name alias, else a looser match only when it points
-  at one product). Marked with `saveStock` (`in_stock = false`, published
-  listings sent again). Left for a person, with the reason: a `note`; a
+  at one product). Marked with `saveStock` (`in_stock = false`, the stock
+  sent to every store that has the product). Left for a person, with the reason: a `note`; a
   number several letter codes share; a lettered code under other letters; a
   named colour no product has; a code only known at another vendor. A code
   with no product at all is nothing to do. The notice row is renamed "Stock
@@ -1032,4 +1034,113 @@ report (Q1 to Q20) are the owner's and are not built here.
   that copied products sell at the copied price (only compare-at % is added);
   the rule editor says a cost range never matches a copied product (it has no
   cost).
+
+### Batch 2 — what "Published" means, sold-out changes, pause
+Migration `20261113020000_pb_stock_due_media_check.sql`.
+- **D6 stock has its own send** (`stockSend.ts`). `pb_listings.stock_due` =
+  this listing's Shopify product does not yet show the product's stock;
+  `stock_tried_at` = when the last try failed. `markStockDue(product)` marks
+  every listing on Shopify that is not `skipped`, whatever its status.
+  `sendStock`: for a permanent stock-out `productUpdate` status ARCHIVED, the
+  listing → `skipped` + `PERM_NOTE`, then `retire`; otherwise (Track stock
+  off) `productVariantsBulkUpdate` with `inventoryPolicy` CONTINUE / DENY and
+  `inventoryItem.tracked: true` on every variant (Track stock on: nothing to
+  send); the mark is cleared only if the product's stock is still what was
+  sent; activity `stock_sent`. A listing a run is publishing right now waits
+  for it. A failure sets `stock_tried_at` (next try 5 minutes later, for as
+  long as it takes; only the first failure in a row is logged, step `stock`).
+  The Stock switch sends at once (`sendNow`); a vendor's notice is sent by
+  the worker's first step (`sendStockDue`, up to 10 listings, 25 s), for
+  every website (on or off) and also while automation is paused
+  (`trigger_pb_worker()` wakes for it; a paused cron run does only this).
+  `route.ts behind()` no longer re-sends a listing for a stock difference;
+  `publish.ts` marks a listing (`stockMoved`) when the product's stock
+  changed while it was being published. The Stock tile says how many stores
+  are still owed (`ProductPage` → `StockTile owed`).
+- **D5 Published is true.** A product saved on Shopify that cannot be put on
+  the Online Store channel fails the listing (`channel_due`, retried) instead
+  of being saved as Published with a warning. `media_checked_at`: cleared by
+  a publish that uploaded photos; `mediaCheck.ts checkMedia` (worker, 5 per
+  run, from 3 minutes after the publish) reads the product's media status:
+  all ready → settled; still processing → next run, for 30 minutes; failed
+  (or not ready after 30 minutes) → `photoNote` appended to the listing's
+  `error`, activity `media_failed`; a store that cannot be asked is given up
+  after a day. Products filter `l:warn` = "Published with a note" (a
+  published listing whose `error` is set).
+- **D7 pause, limit, cost** (`brake.ts`). A run asks again whether
+  automation is paused before each item (at most every 10 s) and stops
+  starting items; a round started with "Run now" while already paused runs
+  through. `pb_settings.automation.daily_limit_inr` (₹ per IST day; absent →
+  500, 0 → none): once `pb_ai_cost_since(today)` × `USD_INR` reaches it the
+  worker skips generate, tag fill and the reading of imported and hand-added
+  products (`WorkResult.limit`); Telegram posts are still read (one may be a
+  stock notice), publishing and stock go on; a button a person taps is not
+  held back. Set in Settings →
+  Automation beside "Today so far". `ai.ts` attaches `usd` to failures raised
+  after the model answered (`http.ts usdOf`); the reader, the writer (also a
+  failed rewrite) and the tag filler log it on their `failed` row, and
+  `pb_ai_costs` / `pb_ai_cost_since` count `failed` rows.
+
+### Batch 3 — seeing problems, delete rights, server checks
+- **D8 the app says when something is wrong** (where a message goes when
+  nobody is looking is the owner's decision Q3, not built). The worker
+  records each run: `pb_settings` key `worker` = `{ at, …counts }`
+  (`actions.ts doWork`). `shopify.ts gql` writes `pb_websites.last_error`
+  when Shopify refuses the store (401, 402, 403, 404, 423, ACCESS_DENIED), so
+  the website card and the dashboard say "connection problem" until a test
+  passes. Dashboard (`DashAlerts`, `dashShared.stalled`): "Automation last
+  ran X, and N items are waiting" when automation is on, work waits on
+  products or on listings of switched-on websites, and the last run is over
+  10 minutes old; "Today's AI limit is used up"; one banner per website with
+  a `last_error`; "N published listings carry a note" (→ filter `l:warn`).
+  The header says "automation last ran X"; the Needs review tile says since
+  when the oldest listing waits; the numbers reload quietly every minute
+  while the page is in view (`hooks/useAutoRefresh`).
+- **D9 only the server deletes products, listings and websites**
+  (`20261113030000_pb_server_only_delete.sql`): a RESTRICTIVE delete policy
+  `using (false)` on `pb_products`, `pb_listings`, `pb_websites`. The app
+  never deleted them directly; "Delete product" goes through the edge
+  function (service role, admins only).
+- **D11 server checks and deploy notes.** `supabase/functions/_check/`
+  (tsconfig + two stubs), `npm run check:server`, `npm run test:server`; the
+  deploy workflow runs both before the build (Node 22). How the functions go
+  live, what that depends on and how to roll back: `docs/playbook/DEPLOY.md`.
+  Not changed: the functions are still one-line loaders pinned to a commit of
+  this public repository; deploying real files from GitHub Actions needs a
+  Supabase access token only the owner can create.
+
+### Independent review of batches 2 and 3 (2026-11-13)
+Fixed before the batches went live (`20261113040000_pb_stock_save.sql`):
+- **One definition of "on sale on Shopify"** (`stockSend.ts offSale` /
+  `ON_SALE`, the same rule in `pb_stock_save`): the listing has a Shopify
+  product that was not hidden (DRAFT) or archived there. Its Playbook status
+  does not decide it: a listing set aside while its product was archived is
+  still on the store. Stock is marked, sent and counted by this rule, so a
+  permanent stock-out cannot leave a product on sale; `retire` uses it too,
+  and the worker sweeps for a permanent stock-out whose archive did not
+  happen (`retireDue`).
+- **Archived products**: a stock change, by the switch or a vendor's notice
+  (`pb_stock_candidates`), also reaches an archived product's listings that
+  are still on a store.
+- **Saved and marked together**: `pb_stock_save(product, change)` updates the
+  product and marks its listings in one transaction.
+- **An older send cannot win**: a send that finds the stock changed while it
+  was on its way marks the listing owed again.
+- **A store that is down does not hold up the others**: the stock step gives
+  each Shopify call 10 s, tries a failing store once a run and fetches the
+  other stores' listings instead; the photo check does the same.
+- **The daily limit never hides a stock notice**: once it is used up, Telegram
+  posts are still read. While automation is PAUSED they wait (the pause text
+  says so).
+- **No listing is written for a permanent stock-out** (`generate.ts`).
+- **Cost counted**: a write thrown away because the product changed, a read
+  that could not be saved, and a refused manual tag fill log their `usd`.
+- **Stock toast**: `set_stock` returns `resent` (reached at once) and
+  `waiting` (not reached yet). **Settings**: the pause and the daily limit
+  save only their own part of `automation` (`saveAutomation`), so a page
+  opened before a pause cannot undo it.
+Accepted as they are: stock owed to a dead store is tried every 5 minutes for
+as long as it takes (the dashboard shows the store's problem); while the daily
+limit is used up the worker is still woken each minute when work waits (it
+reads settings and stops).
 

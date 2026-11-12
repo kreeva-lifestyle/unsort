@@ -12,9 +12,11 @@
 //   * a product someone deleted in Shopify is not made again by the worker
 //     (the listing is set aside with a note; "Put back on site" lists it again);
 //   * Shopify being busy does not use up the listing's three attempts, and a
-//     listing is not called published while the channel step still has to pass;
+//     listing is not called published while the channel step still has to pass
+//     (pre-launch check, 2026-11-13: nor when that step is refused — saved on
+//     Shopify but shown nowhere is Failed, with the reason, not Published);
 //   * a store that does not sell in rupees gets nothing (shopify.ts CURRENCY).
-import { ago, enc, logActivity, nowIso, one, patch, sel } from './db.ts';
+import { enc, logActivity, nowIso, one, patch, sel } from './db.ts';
 import { makeHandle } from './content.ts';
 import { faqHtml, fieldInputs } from './fields.ts';
 import { HttpError, plain } from './http.ts';
@@ -25,27 +27,14 @@ import { busyStreak, filesFor, FREE_RETRIES, type Gallery, knownPhotos, leaveGal
 import { seoGet } from './seoStore.ts';
 import { CURRENCY, gql, shopCurrency, wrongCurrency } from './shopify.ts';
 import { adoptable, type Existing, existingProduct } from './shopifyProduct.ts';
-import { PERM_NOTE, retire } from './stock.ts';
-import { ARCHIVED, LISTING_COLS, MAX_ATTEMPTS, NEEDS_INFO, PRODUCT_COLS, RETRY_MS, STALE_MS, WEBSITE_COLS, permOut, type Budget, type ListingRow, type ProductRow, type WebsiteRow } from './types.ts';
+import { PERM_NOTE, retire, stockMoved } from './stockSend.ts';
+import { ARCHIVED, LISTING_COLS, NEEDS_INFO, PRODUCT_COLS, WEBSITE_COLS, permOut, type Budget, type ListingRow, type ProductRow, type WebsiteRow } from './types.ts';
 
 /** Time a publish needs left before it starts: lookups + a slow productSet + the Online Store step. */
 export const PUBLISH_NEEDS_MS = 60_000;
 const SET_MS = 90_000;
 
-const due = () => {
-  const t = ago(STALE_MS);
-  return `or=(and(status.eq.publishing,or(claimed_at.is.null,claimed_at.lt.${t})),and(status.eq.failed,attempts.lt.${MAX_ATTEMPTS},updated_at.lt.${ago(RETRY_MS)}))`;
-};
-export const pubCandidates = (limit: number) =>
-  sel<{ id: string; website_id: string }>(`pb_listings?${due()}&select=id,website_id,pb_websites!inner(active)&pb_websites.active=eq.true&order=updated_at.asc&limit=${limit}`);
-
-export async function claimPublish(id: string, manual: boolean): Promise<ListingRow | null> {
-  const t = ago(STALE_MS);
-  const filter = manual
-    ? `generated_at=not.is.null&or=(status.in.(review,failed,published,skipped),and(status.eq.publishing,or(claimed_at.is.null,claimed_at.lt.${t})))`
-    : due();
-  return (await patch<ListingRow>('pb_listings', `id=eq.${enc(id)}&${filter}`, { status: 'publishing', claimed_at: nowIso() }, LISTING_COLS))[0] ?? null;
-}
+export { claimPublish, pubCandidates } from './publishQueue.ts';
 
 interface SetReply { productSet: { product: { id: string; status: string; handle: string; media?: { nodes: { id: string }[] } } | null; userErrors: { field: string[] | null; message: string; code: string | null }[] } }
 interface Sent { photos?: string[]; media?: string[]; tags?: string[]; channel?: boolean }
@@ -165,10 +154,9 @@ export async function publishOne(l: ListingRow, o: { manual: boolean; putBack?: 
     if (noFiles) warnings.push('Saved on Shopify, but the store did not take the change to its photos: check the photos there.');
     const fw = await sendFields(site, profile.custom_fields ? fieldInputs(prod.id, p, faq) : [], ms(30_000));
     if (fw) warnings.push(fw);
-    let shown = true;
-    if (owed) {
+    if (owed) { // not shown to shoppers = not published: the listing fails here (owed stays → channel_due) and is tried again
       const cw = await toOnlineStore(site, prod.id, ms(30_000));
-      if (cw) { warnings.push(cw); shown = false; }
+      if (cw) throw new HttpError(400, cw);
       owed = false;
     }
     const warning = warnings.join(' ') || null;
@@ -177,9 +165,9 @@ export async function publishOne(l: ListingRow, o: { manual: boolean; putBack?: 
     const photos = noFiles ? { photos: was?.photos ?? [], ...(was?.media ? { media: was.media } : {}) } : { photos: paths, ...(media ? { media } : {}) };
     const saved = await patch<ListingRow>('pb_listings', mine, gone
       ? { status: 'skipped', shopify_status: prod.status, attempts: 0, error: PERM_NOTE, claimed_at: null } // archived on Shopify: off the website
-      : { status: 'published', shopify_status: prod.status, published_at: nowIso(), attempts: 0, error: warning, claimed_at: null }, LISTING_COLS);
-    await logActivity({ product_id: l.product_id, website_id: l.website_id, listing_id: l.id, action: 'published', details: { shopify_product_id: prod.id, status: prod.status, update: !!existing, ...(adopted ? { adopted: true } : {}), ...photos, tags: l.tags || [], sizes: p.sizes || [], sku: p.sku || '', in_stock: p.in_stock !== false, ...(shown ? {} : { channel: false }), ...(warning ? { warning } : {}) }, user_id: o.userId });
-    if (gone) await retire(l.product_id);
+      : { status: 'published', shopify_status: prod.status, published_at: nowIso(), attempts: 0, error: warning, claimed_at: null, ...(gallery.fresh.length ? { media_checked_at: null } : {}) }, LISTING_COLS);
+    await logActivity({ product_id: l.product_id, website_id: l.website_id, listing_id: l.id, action: 'published', details: { shopify_product_id: prod.id, status: prod.status, update: !!existing, ...(adopted ? { adopted: true } : {}), ...photos, tags: l.tags || [], sizes: p.sizes || [], sku: p.sku || '', in_stock: p.in_stock !== false, ...(warning ? { warning } : {}) }, user_id: o.userId });
+    if (gone) await retire(l.product_id); else await stockMoved(l.id, p); // the stock changed while this was sent → its own send follows
     if (!saved[0]) throw new HttpError(409, 'Published on Shopify, but the listing changed meanwhile — open it again.');
     return saved[0];
   } catch (e) {

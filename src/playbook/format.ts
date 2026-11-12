@@ -58,5 +58,8 @@ export function istMonthStart(now = new Date()): string {
   return `${y}-${m}-01T00:00:00+05:30`;
 }
 
+/** The first moment of today in India, as an ISO time (the daily AI limit counts an IST day). */
+export const istDayStart = (now = new Date()) => `${dayKey.format(now)}T00:00:00+05:30`;
+
 /** "November" — the current IST month, for "AI cost in November". */
 export const istMonthName = (now = new Date()) => now.toLocaleDateString('en-IN', { timeZone: TZ, month: 'long' });
