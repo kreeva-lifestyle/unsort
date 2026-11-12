@@ -19,7 +19,8 @@ Types: `src/playbook/types.ts` (jsonb shapes documented there).
    color, sizes[], cost_price (number|null), attributes{work, occasion,
    pattern, set_contents, wash_care, notes…} }`. Fill only fields that are
    empty AND not in `locked`. Then `needs_info` if `cost_price` or `category`
-   is missing, else `ready` and route (step 2). On AI error: back to `new`
+   is missing (and, since 2026-11-12, fabric, colour or a photo: the gate, see
+   "One store, one voice"), else `ready` and route (step 2). On AI error: back to `new`
    with `ai_error`, `claimed_at` left so it retries after 5 min; after 3
    errors → `needs_info` with the error.
 2. **Route** — for each website with `active=true`: rules of that site,
@@ -55,7 +56,9 @@ Types: `src/playbook/types.ts` (jsonb shapes documented there).
      then `max(p, min_price)`. `compare_at_pct > 0` → compare_at =
      round(p × (1 + pct/100)) with the same rounding; else null. Locked
      `price` is kept.
-   - **Content**: one Claude call per listing with the site's
+   - **Content** (rewritten 2026-11-12: the prompt, output and checks are now
+     in "One store, one voice" below; what follows is the part that still
+     holds): one Claude call per listing with the site's
      `content.model` / `content.effort`, JSON-schema output
      `{ title, description_html, seo_title, seo_description, handle,
      extra_tags[], image_alts[] }`; prompt = product facts (never invent
@@ -485,3 +488,115 @@ flagged (`other_attribute`: "Silk" under Work is a Fabric value).
 Tests: `test/tagText`, `tagClean`, `tagLook`, `tagMatch` (+ tagAuto),
 `tagGate`, `tagPrompt`, `tagFill` (queue with a fake database and AI),
 `tags`, `runner` (ingest tagging).
+## One store, one voice (owner, 2026-11-12)
+
+The owner's words: "different content, alt, title, description, meta desc, meta
+title … for each store"; "if a few necessary details are not there … do not
+auto generate until everything is ok"; "in the product grid it should show
+which website it is pushed"; "AI costing for each listing in Indian rupees
+combined of all websites"; "set dollar rate at 95, no setting needed".
+Migration: `20261112090000_pb_store_writer.sql`.
+
+### Store profile — `pb_websites.content.profile` (+ `content.title_formula`)
+`{ brand_name, market, spelling: 'british'|'american', units: 'inches'|'cm',
+audience, angle, keyword_pattern, delivery, stitching, returns,
+faq_in_description, custom_fields }`. Older rows lack it; `profile.ts`
+(server) and `seoTypes.ts` (client) fill the gaps: brand = the website's name,
+british, inches, keyword `{color} {fabric} {category}`, both switches on. A
+NEW website starts with `description_words` 200 and `tag_rules.max_tags` 8
+(`data/websites.ts NEW_SITE`). `tag_rules.ai_allowed[]`: when not empty, the
+AI's extra tags are an enum of it.
+
+### The writer (generate.ts → genPrompt.ts → genWrite.ts)
+- **Inputs**: STORE PROFILE, PRODUCT FACTS (no SKU, supplier, the other
+  store's SEO text or tags), SOURCE TEXT (`raw_text`, facts reference only),
+  VERSIONS ON OUR OTHER STORES (title, SEO, opening line, description and alt
+  texts of every sibling listing in review / publishing / published /
+  failed-after-writing), PRIMARY KEYWORD, IMAGE COUNT, the photos (≤ 8).
+- **Primary keyword**: the site's `keyword_pattern` filled from the product
+  (`{color} {fabric} {category} {work} {occasion} {name}`), or the phrase
+  typed for that listing (kept: `keyword_locked`).
+- **Output**: `{ title, handle, seo_title, seo_description, description_html,
+  faq[{q,a}] (≤ 2), image_alts[] (≤ 110 chars), extra_tags[], missing_facts[] }`.
+  Description: `wordsMin`–`wordsMax` words (`description_words`, min = 65%):
+  opening in the store's angle, 5–7 fact bullets, `<h3>How to wear it</h3>`,
+  `<h3>Ordering from <brand></h3>` only when the profile gives delivery,
+  stitching or returns. Allowed HTML: p, ul, li, h3, strong, em, br.
+- **A program finishes the draft**: pattern title (`title_template`), the SEO
+  title always ends `| <brand>` inside `meta_title_max` (`withBrand`), cuts,
+  kept (locked) fields; handle = 3–6 clean words with the design code taken
+  out (`cleanHandle`), a 4-character suffix only when another listing on the
+  same website has it (the store itself is checked at publish).
+- **Program checks** (`seoCheck.ts`, in place of the writer's self check).
+  HARD: a run of 5+ words shared with the source text or another version (a
+  run counts only with ≥ 3 words that are neither the product's fact words,
+  numbers nor joining words, so "comes with Kurta, Pant and Dupatta" may
+  repeat); same title / SEO title / first four words as another version;
+  keyword not exactly once in the AI title, missing from the first 50 words,
+  or not exactly once in the SEO title; SEO title not ending with the brand;
+  supplier name, design code, link, email, phone; "No. 1", scarcity, review
+  claims; a number in "Ordering from" that the profile does not give.
+  SOFT (noted only): SEO description outside min–max, description over
+  115% of the limit, repeated alt texts, keyword more than 3 times, the
+  humanCopy tells.
+- **One rewrite**: any problem → one more call with the draft and the list
+  of fixes (text only, no photos; needs 45 s left). The better draft is kept
+  (fewer hard problems, then fewer in all); both calls are paid for
+  (`ai_cost_usd`, activity `generated` `details.usd`, `rewrote`, `problems`).
+- **Next status**: a HARD problem → `review` with
+  `error = 'Check before it goes out: …'` whatever the publish mode;
+  otherwise as before (review → `review`, live / draft → `publishing`).
+- **One at a time per product**: a listing whose sibling (lower id) is being
+  written right now goes back to `queued` (manual: 409), so the later one can
+  be told what the earlier one says.
+
+### Beside the listing — `private.pb_listing_seo`
+`listing_id (pk, fk cascade), keyword, keyword_locked, faq jsonb, faq_locked,
+missing text[], notes text[], rewrites, updated_at`. The `private` schema is
+not served by the API; `pb_listing_seo_get(p_ids uuid[])` and
+`pb_listing_seo_put(p_listing uuid, p_set jsonb)` (SECURITY DEFINER, only the
+keys present change) let in the service role and signed-in staff and raise
+for anyone else. The writer stores keyword, faq (unless `faq_locked`), missing
+facts and every check sentence after each generation; staff edits from the
+listing editor set the `_locked` flag (an emptied value hands it back).
+
+### On Shopify
+- `faq_in_description`: `<h3>Questions</h3>` + one `<p><strong>q</strong><br>a</p>`
+  per question is appended to `descriptionHtml` at publish (never stored in
+  `description_html`).
+- `custom_fields`: after `productSet`, `metafieldsSet` writes
+  `custom.fabric`, `custom.work`, `custom.colour`, `custom.occasion`,
+  `custom.set_contents` (single_line_text_field, from the product's facts by
+  program, empty ones not sent) and `custom.faq` (rich_text_field: question in
+  bold, answer below). `metafieldsSet` touches only those keys. A refusal is a
+  warning on the listing; the product is still published.
+
+### The Ready gate — necessary details
+`pb_products_refresh` (and `tagGate.ts`): Ready needs a price (cost or copied
+selling price), a category, a fabric, a colour, at least one photo
+(`pb_product_images.kind = 'image'`) and a value for every attribute of the
+category. `missing_attrs` stays the required TAG attributes only; the app
+names the other gaps from the product itself (`seoTypes.ts missingDetails`):
+"Needs info · Missing: Cost price, Fabric, Photo, Colour". Adding a photo on
+the product page re-applies the gate.
+
+### AI cost
+`pb_ai_costs(p_ids uuid[])` → per product `read_usd, tag_usd, write_usd,
+writes` and `pb_ai_cost_since(p_since)` → `usd, products, writes`, both from
+`pb_activity.details.usd` of `read`, `tags_filled`, `generated` (SECURITY
+INVOKER; partial index `pb_activity_ai_cost_idx`). The app shows rupees at a
+fixed ₹95 per dollar (`format.ts USD_INR`, `aiRupees`): on each website tile
+and in the listing editor (that listing's last writing), on the product page
+(everything for the product) and on the dashboard (this IST month).
+
+### UI
+- Websites → **Store profile** (`ProfileSection.tsx`), a seventh section; it
+  and Content & AI share the `content` key, so the "Unsaved" mark compares each
+  section's own part (`sections.ts sectionPart`).
+- Listing editor: the review reason in a review-tinted box, "Also worth a
+  look" (the soft notes) and the facts the writer missed
+  (`detail/ListingSeo.tsx`), **Search phrase** and the two **Questions**
+  (saved with the editor's Save through `useListingSeo`).
+- Product list: the phone row names the websites ("Live on Kreeva, Arya",
+  the most urgent group first, the live one always); the desktop card already
+  had one dot + name per website.

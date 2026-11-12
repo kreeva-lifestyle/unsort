@@ -24,7 +24,7 @@ export default function ProductResults({ rows, sites, loading, loadErr, filtered
       {loadErr && !loading && <LoadError inline message={loadErr} onRetry={onRetry} />}
       {phone ? (
         <div className="pb-span-12" aria-busy={loading || undefined} style={{ display: 'flex', flexDirection: 'column', gap: 8, ...dim }}>
-          {rows.map(p => <ProductRowItem key={p.id} p={p} onOpen={() => onOpen(p.id)} />)}
+          {rows.map(p => <ProductRowItem key={p.id} p={p} sites={sites} onOpen={() => onOpen(p.id)} />)}
         </div>
       ) : rows.map(p => (
         <div key={p.id} className="pb-span-4" style={{ ...dim, minWidth: 0 }}>

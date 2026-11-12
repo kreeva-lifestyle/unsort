@@ -1,10 +1,12 @@
 // One website's listing on the product page (V2 bento tile, no blur): name,
-// status dot + label, mono price (and was-price), the AI title, the error,
-// then Edit (opens the listing editor, where Approve / Publish live, so the
-// full text is seen before it goes out) and the Shopify link.
+// status dot + label, mono price (and was-price), the AI title, the error or
+// the reason it waits for review, what the AI cost for this website, then
+// Edit (opens the listing editor, where Approve / Publish live, so the full
+// text is seen before it goes out) and the Shopify link.
 // Tinted when it needs action: review → review tile, failed → failed tile.
 import type { CSSProperties } from 'react';
 import { shopifyAdminUrl } from '../../../data/pbFunctions';
+import { aiRupees } from '../../../format';
 import type { ListingFull, WebsiteLite } from '../../../data/products';
 import { PB, pbBtnSecondary, pbMeta, pbName, pbNum } from '../../../pbTheme';
 import PbButton from '../../ui/PbButton';
@@ -46,7 +48,8 @@ export default function ListingTile({ l, site, span, busy, primary, onEdit, stre
       </div>
       <div style={{ ...pbMeta, ...clamp(2), color: l.title ? PB.tx : PB.tx2 }}>{l.title || 'Not written yet'}</div>
       {/* The error is the thing to act on, so it is never clamped (a title= tooltip never shows on a phone). */}
-      {l.error && <div style={{ fontSize: 13, lineHeight: 1.5, color: PB.failed, overflowWrap: 'anywhere' }}>{l.error}</div>}
+      {l.error && <div style={{ fontSize: 13, lineHeight: 1.5, color: l.status === 'review' ? PB.tx : PB.failed, overflowWrap: 'anywhere' }}>{l.error}</div>}
+      {l.ai_cost_usd != null && <div style={pbMeta}>AI cost for this website <span style={{ ...pbNum, color: PB.tx }}>{aiRupees(l.ai_cost_usd)}</span></div>}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 'auto', paddingTop: 4 }}>
         <PbButton kind={primary ? 'primary' : 'secondary'} icon="edit" {...btn(`edit:${l.id}`)} onClick={onEdit} aria-label={`Edit the listing on ${name}`}>Edit</PbButton>
         {admin && (

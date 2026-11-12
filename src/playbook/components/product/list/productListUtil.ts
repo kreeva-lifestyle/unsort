@@ -5,6 +5,7 @@ import type { ProductRow, WebsiteLite } from '../../../data/products';
 import type { PbListingStatus } from '../../../types';
 import { PB } from '../../../pbTheme';
 import { LISTING_STATUS, PRODUCT_STATUS, type StatusTint } from '../status';
+import { missingAll, missingDetails } from '../../../seoTypes';
 
 export const IN_PROGRESS = 'l:queued,generating,publishing';
 
@@ -40,12 +41,18 @@ const GROUPS: { label: string; color: string; of: PbListingStatus[] }[] = [
   { label: 'Live on', color: PB.live, of: ['published'] },
 ];
 
-/** "Live on 2 websites", "Failed on 1 website"… (removed listings are left out). */
-export function listingSummary(p: ProductRow): { label: string; color: string; n: number }[] {
+/** "Live on Kreeva, Arya", "Failed on Kreeva +2"… most urgent first (removed listings are left out).
+ *  `nameOf` names a website (owner, 2026-11-12: the list shows WHICH websites a product is on); up to
+ *  two names, then "+N". Without it: "Live on 2 websites". */
+export function listingSummary(p: ProductRow, nameOf?: (id: string) => string): { label: string; color: string; n: number }[] {
   const out: { label: string; color: string; n: number }[] = [];
   for (const g of GROUPS) {
-    const n = p.pb_listings.filter(l => g.of.includes(l.status)).length;
-    if (n) out.push({ label: `${g.label} ${n} website${n === 1 ? '' : 's'}`, color: g.color, n });
+    const hit = p.pb_listings.filter(l => g.of.includes(l.status));
+    const n = hit.length;
+    if (!n) continue;
+    const names = nameOf ? hit.map(l => nameOf(l.website_id)) : [];
+    const where = nameOf ? `${names.slice(0, 2).join(', ')}${n > 2 ? ` +${n - 2}` : ''}` : `${n} website${n === 1 ? '' : 's'}`;
+    out.push({ label: `${g.label} ${where}`, color: g.color, n });
   }
   return out;
 }
@@ -53,6 +60,12 @@ export function listingSummary(p: ProductRow): { label: string; color: string; n
 /** Name to show; never blank. */
 export const productTitle = (p: ProductRow) => p.name || p.sku || 'Untitled product';
 
-/** The status label, with the missing required attributes on a Needs-info product: "Needs info · Missing: Colour". */
-export const statusLabel = (p: Pick<ProductRow, 'status' | 'missing_attrs'>) =>
-  p.status === 'needs_info' && p.missing_attrs?.length ? `${PRODUCT_STATUS.needs_info.label} · Missing: ${p.missing_attrs.join(', ')}` : PRODUCT_STATUS[p.status].label;
+/** Everything a Needs-info product lacks: the necessary details (price, category, fabric, colour, a photo), then its required tags. */
+export const missingOf = (p: Pick<ProductRow, 'cost_price' | 'sell_price' | 'category' | 'fabric' | 'color' | 'missing_attrs' | 'pb_product_images'>) =>
+  missingAll(missingDetails(p, p.pb_product_images.length), p.missing_attrs);
+
+/** The status label, with what is missing on a Needs-info product: "Needs info · Missing: Fabric, Colour". */
+export const statusLabel = (p: Pick<ProductRow, 'status' | 'cost_price' | 'sell_price' | 'category' | 'fabric' | 'color' | 'missing_attrs' | 'pb_product_images'>) => {
+  const miss = p.status === 'needs_info' ? missingOf(p) : [];
+  return miss.length ? `${PRODUCT_STATUS.needs_info.label} · Missing: ${miss.join(', ')}` : PRODUCT_STATUS[p.status].label;
+};

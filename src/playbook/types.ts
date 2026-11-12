@@ -69,7 +69,7 @@ export interface PbTagRules {
   /** Let the AI add style/occasion tags too (at most ai_extra_max). */
   ai_extra: boolean;
   ai_extra_max: number; max_tags?: number; // max_tags: cap per product on this site, applied last (default 30; older rows lack it)
-  tag_style?: 'plain' | 'prefixed'; // {tags}: "Black" (default) or "Colour_Black"
+  tag_style?: 'plain' | 'prefixed'; ai_allowed?: string[]; // {tags}: "Black" (default) or "Colour_Black" · ai_allowed: the only extra tags the AI may add ([] = any)
 }
 
 export interface PbContent {
@@ -80,8 +80,8 @@ export interface PbContent {
   title_template: string;
   title_max: number; description_words: number; meta_title_max: number; meta_desc_max: number;
   extra_instructions: string;
-  /** Write image alt text for SEO. */
-  alt_text: boolean;
+  /** alt_text: write image alt text · title_formula: how the AI builds its title, in words · profile: what makes this store's listings its own (seoTypes.ts). */
+  alt_text: boolean; title_formula: string; profile: import('./seoTypes').PbProfile;
 }
 
 export interface PbWebsite {

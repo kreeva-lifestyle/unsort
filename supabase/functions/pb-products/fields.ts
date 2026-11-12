@@ -2,7 +2,7 @@
 // product, and the FAQ as HTML for stores that show it in the description.
 //   custom.fabric / work / colour / occasion / set_contents   single line text,
 //     filled by a program from the product's facts (never by the AI)
-//   custom.faq   rich text: each question as a heading, its answer below
+//   custom.faq   rich text: each question in bold, its answer below
 // They go out with metafieldsSet AFTER productSet (publish.ts): metafieldsSet
 // writes only the keys it is given, so other apps' and the merchant's fields
 // are never touched (productSet would delete every field not in its input).
@@ -28,11 +28,14 @@ export function detailFields(p: Pick<ProductRow, 'fabric' | 'color' | 'attribute
   return Object.fromEntries(Object.entries(all).filter(([, v]) => v));
 }
 
-const text = (value: string) => ({ type: 'text', value });
-/** Shopify rich text: a level-3 heading per question, its answer as a paragraph. */
+/** Shopify rich text: each question as a bold paragraph, its answer as the next paragraph (the two node
+ *  kinds every version of the rich text format takes). */
 export const faqRichText = (faq: Faq[]) => JSON.stringify({
   type: 'root',
-  children: faq.flatMap(f => [{ type: 'heading', level: 3, children: [text(f.q)] }, { type: 'paragraph', children: [text(f.a)] }]),
+  children: faq.flatMap(f => [
+    { type: 'paragraph', children: [{ type: 'text', value: f.q, bold: true }] },
+    { type: 'paragraph', children: [{ type: 'text', value: f.a }] },
+  ]),
 });
 
 /** The two questions at the end of the description (stores that do not show the custom field). */

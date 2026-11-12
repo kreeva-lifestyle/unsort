@@ -85,11 +85,16 @@ export default function TagsSection({ draft, set }: { draft: Draft; set: SetDraf
             <PbSwitch on={r.ai_extra} onToggle={() => put({ ai_extra: !r.ai_extra })} label="AI extra tags" />
           </span>}>
           {r.ai_extra && (
-            <div style={{ maxWidth: 200 }}>
-              <Field label="At most" htmlFor="pbt-max">
-                <NumInput id="pbt-max" value={r.ai_extra_max} max={20} onChange={v => put({ ai_extra_max: Math.round(v ?? 0) })} />
+            <>
+              <div style={{ maxWidth: 200 }}>
+                <Field label="At most" htmlFor="pbt-max">
+                  <NumInput id="pbt-max" value={r.ai_extra_max} max={20} onChange={v => put({ ai_extra_max: Math.round(v ?? 0) })} />
+                </Field>
+              </div>
+              <Field label="Only from these tags" htmlFor="pbt-allowed" hint="The AI picks its extra tags from this list and adds nothing else. Leave it empty to let it choose any short tag.">
+                <ChipsInput id="pbt-allowed" values={r.ai_allowed ?? []} onChange={v => put({ ai_allowed: v.slice(0, 100) })} placeholder="e.g. Festive, Wedding Guest" maxLen={60} />
               </Field>
-            </div>
+            </>
           )}
         </Section>
       </Cell>

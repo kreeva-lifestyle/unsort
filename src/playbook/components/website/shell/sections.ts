@@ -1,6 +1,8 @@
-// The six editor sections: label, icon, the draft keys each one edits (so the
-// nav can mark a section with unsaved edits) and a one-line summary for the
-// phone section rows. Pure data; the sections themselves render their tiles.
+// The seven editor sections: label, icon, the draft keys each one edits (so the
+// nav can mark a section with unsaved edits; `part` narrows that to its own
+// half when two sections share a key, as Store profile and Content & AI share
+// `content`) and a one-line summary for the phone section rows. Pure data; the
+// sections themselves render their tiles.
 import type { PbWebsite } from '../../../types';
 import { rupees } from '../../product/status';
 
@@ -16,8 +18,15 @@ export const SECTIONS = [
   { id: 'routing', label: 'Routing rules', icon: 'flow', keys: ['routing_default'] },
   { id: 'pricing', label: 'Pricing', icon: 'receipt', keys: ['pricing'] },
   { id: 'tags', label: 'Tags', icon: 'tag', keys: ['tag_rules'] },
-  { id: 'content', label: 'Content & AI', icon: 'sparkles', keys: ['content'] },
-] as const satisfies readonly { id: string; label: string; icon: string; keys: readonly (keyof Draft)[] }[];
+  { id: 'profile', label: 'Store profile', icon: 'globe', keys: ['content'], part: (d: Draft) => d.content.profile },
+  { id: 'content', label: 'Content & AI', icon: 'sparkles', keys: ['content'], part: (d: Draft) => ({ ...d.content, profile: null }) },
+] as const satisfies readonly { id: string; label: string; icon: string; keys: readonly (keyof Draft)[]; part?: (d: Draft) => unknown }[];
+
+/** What a section edits, for the "Unsaved" mark: its own part of a shared key, else its keys. */
+export const sectionPart = (id: SectionId, d: Draft): unknown => {
+  const s = SECTIONS.find(x => x.id === id)!;
+  return 'part' in s ? s.part(d) : s.keys.map(k => d[k]);
+};
 
 export type SectionId = typeof SECTIONS[number]['id'];
 
@@ -32,6 +41,7 @@ export function sectionMeta(id: SectionId, d: Draft, connLabel: string): string 
     case 'routing': return d.routing_default === 'all' ? 'No rule matches: list everything' : 'No rule matches: do not list it';
     case 'pricing': return `Cost + ${d.pricing.markup_pct}% + ${rupees(d.pricing.add_flat)}`;
     case 'tags': return `${plural(d.tag_rules.templates.length, 'template', 'templates')} · ${plural(d.tag_rules.static.length, 'fixed tag', 'fixed tags')}`;
+    case 'profile': return [d.content.profile.brand_name.trim(), d.content.profile.market.trim(), clip(d.content.profile.angle.trim(), 40)].filter(Boolean).join(' · ') || 'Brand, audience, search phrase';
     case 'content': return [d.content.language, clip(d.content.brand_voice.trim())].filter(Boolean).join(' · ') || 'Voice, title, length';
   }
 }

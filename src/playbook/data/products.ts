@@ -11,7 +11,7 @@ export type { ListingFull } from './listings';
 
 export const PAGE_SIZE = 25;
 
-export type ProductRow = Pick<PbProduct, 'id' | 'name' | 'sku' | 'cost_price' | 'sell_price' | 'status' | 'category' | 'missing_attrs' | 'ai_error' | 'created_at'> & {
+export type ProductRow = Pick<PbProduct, 'id' | 'name' | 'sku' | 'cost_price' | 'sell_price' | 'status' | 'category' | 'fabric' | 'color' | 'missing_attrs' | 'ai_error' | 'created_at'> & {
   pb_vendors: { name: string } | null;
   pb_product_images: { path: string; position: number }[];
   pb_listings: { id: string; website_id: string; status: PbListingStatus }[];
@@ -20,7 +20,7 @@ export type ProductRow = Pick<PbProduct, 'id' | 'name' | 'sku' | 'cost_price' | 
 export type ProductFilter = { search: string; status: string; vendorId: string; websiteId: string };
 export const EMPTY_FILTER: ProductFilter = { search: '', status: '', vendorId: '', websiteId: '' };
 
-const LIST_COLS = 'id,name,sku,cost_price,sell_price,status,category,missing_attrs,ai_error,created_at,pb_vendors(name),pb_product_images(path,position),pb_listings(id,website_id,status)';
+const LIST_COLS = 'id,name,sku,cost_price,sell_price,status,category,fabric,color,missing_attrs,ai_error,created_at,pb_vendors(name),pb_product_images(path,position),pb_listings(id,website_id,status)';
 
 export async function listProducts(f: ProductFilter, page: number): Promise<{ rows: ProductRow[]; count: number }> {
   const lStatus = f.status.startsWith('l:') ? f.status.slice(2) : '';

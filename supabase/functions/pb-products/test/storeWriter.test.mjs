@@ -77,7 +77,7 @@ test('custom fields: five details from the facts and the FAQ as rich text; empty
     'custom.occasion:single_line_text_field', 'custom.set_contents:single_line_text_field', 'custom.faq:rich_text_field']);
   assert.ok(f.every(x => x.ownerId === 'gid://shopify/Product/1'));
   assert.deepEqual(JSON.parse(faqRichText(FAQ)), { type: 'root', children: [
-    { type: 'heading', level: 3, children: [{ type: 'text', value: 'Is the dupatta included?' }] }, { type: 'paragraph', children: [{ type: 'text', value: 'Yes <it> is.' }] }] });
+    { type: 'paragraph', children: [{ type: 'text', value: 'Is the dupatta included?', bold: true }] }, { type: 'paragraph', children: [{ type: 'text', value: 'Yes <it> is.' }] }] });
   assert.equal(fieldInputs('x', { fabric: null, color: null, attributes: {} }, []).length, 0);
   assert.equal(faqHtml(FAQ), '<h3>Questions</h3><p><strong>Is the dupatta included?</strong><br>Yes &lt;it&gt; is.</p>');
   assert.equal(faqHtml([]), '');

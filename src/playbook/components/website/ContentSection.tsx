@@ -25,7 +25,7 @@ export default function ContentSection({ draft, set }: { draft: Draft; set: SetD
   return (
     <SectionGrid>
       <Cell>
-        <Section title="AI model" hint="One AI call writes each listing (title, description, SEO, tags, alt text). Pick per store — a premium store may deserve a better writer.">
+        <Section title="AI model" hint="The AI writes each listing for this store alone (title, description, SEO, FAQ, tags, alt text), checks it, and rewrites it once if a check fails. Pick per store: a premium store may deserve a better writer.">
           <Field label="Model">
             <Seg label="AI model" value={c.model} onChange={v => put({ model: v })} options={PB_MODELS.map(m => ({ id: m.id, label: m.label, hint: m.note }))} />
           </Field>
@@ -64,6 +64,10 @@ export default function ContentSection({ draft, set }: { draft: Draft; set: SetD
             hint={<>Use {mono('{ai_title}')} to let the AI write it, or build one from: {mono(TITLE_PH)} — e.g. {mono('{color} {fabric} {category}')}. Cut to the title limit.</>}>
             <input id="pbx-title" value={c.title_template} onChange={e => put({ title_template: e.target.value })} maxLength={200}
               spellCheck={false} aria-describedby="pbx-title-hint" className="pb-input" style={{ ...input44, fontFamily: PB.mono }} />
+          </Field>
+          <Field label="Title style for the AI" htmlFor="pbx-formula" hint={<>How the AI should build its part of the title ({mono('{ai_title}')}), in your words. The search phrase from the store profile is always in it.</>}>
+            <input id="pbx-formula" value={c.title_formula} onChange={e => put({ title_formula: e.target.value })} maxLength={300}
+              placeholder="e.g. Colour, fabric, type, then the work" aria-describedby="pbx-formula-hint" className="pb-input" style={input44} />
           </Field>
         </Section>
       </Cell>

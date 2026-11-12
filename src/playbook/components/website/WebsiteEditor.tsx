@@ -1,5 +1,5 @@
-// One website's settings, in six sections. Name, publishing, routing default,
-// pricing, tags and content are a draft saved together by "Save changes" (only
+// One website's settings, in seven sections. Name, publishing, routing default,
+// pricing, tags, store profile and content are a draft saved together by "Save changes" (only
 // the changed keys are sent). The store domain + credentials, the Active switch
 // and routing rules save on their own (separate writes with their own buttons).
 // The draft is reported up to Websites so the device Back button keeps it.
@@ -24,10 +24,11 @@ import RoutingSection from './RoutingSection';
 import PricingSection from './PricingSection';
 import TagsSection from './TagsSection';
 import ContentSection from './ContentSection';
+import ProfileSection from './ProfileSection';
 import EditorHero from './shell/EditorHero';
 import SaveBar from './shell/SaveBar';
 import { SectionRows, SectionSideList } from './shell/SectionNav';
-import { SECTIONS, sectionMeta, type SectionId } from './shell/sections';
+import { SECTIONS, sectionMeta, sectionPart, type SectionId } from './shell/sections';
 
 export type Draft = Pick<PbWebsite, 'name' | 'publish_mode' | 'routing_default' | 'track_inventory' | 'pricing' | 'tag_rules' | 'content'>;
 export type SetDraft = (p: Partial<Draft>) => void;
@@ -95,7 +96,7 @@ export default function WebsiteEditor({ site, initialDraft, onDraft, onClose, on
   };
 
   const saved = pick(site);
-  const edited = (id: Tab) => SECTIONS.find(s => s.id === id)!.keys.some(k => stable(draft[k]) !== stable(saved[k]));
+  const edited = (id: Tab) => stable(sectionPart(id, draft)) !== stable(sectionPart(id, saved));
   const discard = () => { setDraftState(pick(site)); setErr(''); };
   const sectionLabel = SECTIONS.find(s => s.id === tab)!.label;
 
@@ -106,6 +107,7 @@ export default function WebsiteEditor({ site, initialDraft, onDraft, onClose, on
       {tab === 'routing' && <RoutingSection siteId={site.id} draft={draft} set={setDraft} addToast={addToast} vendors={vendors} categories={categories} />}
       {tab === 'pricing' && <PricingSection draft={draft} set={setDraft} />}
       {tab === 'tags' && <TagsSection draft={draft} set={setDraft} />}
+      {tab === 'profile' && <ProfileSection draft={draft} set={setDraft} siteName={site.name} />}
       {tab === 'content' && <ContentSection draft={draft} set={setDraft} />}
     </>
   );

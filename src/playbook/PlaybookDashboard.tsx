@@ -4,11 +4,14 @@
 // (hero 6×2)(3)(3)/(3)(3) · (products 12) · websites by count (12 | 6+6 | 4+4+4 …).
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { friendlyError } from '../lib/friendlyError';
+import { logSwallowed } from '../lib/errorLogger';
 import type { PbPage } from './components/PbNav';
 import type { AddToast } from './components/PbToasts';
 import type { ProductsStart } from './pages/Products';
 import { getPbSettingsLite, listWebsitesLite } from './data/products';
 import { listingCounts, listingTotal, productCounts } from './data/dashboard';
+import { getAiCostSince } from './data/listingSeo';
+import { istMonthStart } from './format';
 import { PbButton, PbPageHeader } from './components/ui';
 import type { DashData } from './components/dashboard/dashShared';
 import DashTop from './components/dashboard/DashTop';
@@ -25,9 +28,11 @@ export default function PlaybookDashboard({ name, addToast, go }: { name: string
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [products, sites, settings, failed, review] = await Promise.all([productCounts(), listWebsitesLite(), getPbSettingsLite(), listingTotal('failed'), listingTotal('review')]);
+      // The AI cost is a side figure: if it cannot be read, the rest of the dashboard still shows.
+      const cost = getAiCostSince(istMonthStart()).catch(e => { logSwallowed('pb ai cost', e); return null; });
+      const [products, sites, settings, failed, review, ai] = await Promise.all([productCounts(), listWebsitesLite(), getPbSettingsLite(), listingTotal('failed'), listingTotal('review'), cost]);
       const perSite = await listingCounts(sites.map(s => s.id));
-      setD({ products, sites, perSite, failed, review, paused: settings.paused });
+      setD({ products, sites, perSite, failed, review, paused: settings.paused, ai });
       loaded.current = true;
       setLoadErr(null);
     } catch (e) {

@@ -2,12 +2,14 @@
 // colours, 2px gaps) and one dot · label · count button per status, each
 // opening the Products list on that status (data-and-charts.md §1: "thin
 // segmented bar plus dot · count · label chips"). The bar is decoration;
-// every number is also text on its button.
+// every number is also text on its button. The header also says what the AI
+// cost this month, in rupees (reading, tags and writing together).
 import { PB, pbBtnSecondary, pbMeta, pbNum, pbTileTitle } from '../../pbTheme';
 import { PRODUCT_STATUSES } from '../../data/dashboard';
 import { Dot, PRODUCT_STATUS } from '../product/status';
 import { PbTile } from '../ui';
 import { count, type DashData, type DashGo } from './dashShared';
+import { aiRupees, istMonthName } from '../../format';
 
 export default function DashProducts({ d, go }: { d: DashData; go: DashGo }) {
   const total = PRODUCT_STATUSES.reduce((s, k) => s + d.products[k], 0);
@@ -15,7 +17,12 @@ export default function DashProducts({ d, go }: { d: DashData; go: DashGo }) {
     <PbTile flat as="section" span={12} aria-labelledby="pb-dash-products" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', minWidth: 0 }}>
         <h2 id="pb-dash-products" style={pbTileTitle}>Products</h2>
-        <span style={pbMeta}><span style={pbNum}>{count(total)}</span> {total === 1 ? 'product' : 'products'} in all</span>
+        <span style={{ ...pbMeta, display: 'flex', flexWrap: 'wrap', columnGap: 16, rowGap: 4, minWidth: 0 }}>
+          <span><span style={pbNum}>{count(total)}</span> {total === 1 ? 'product' : 'products'} in all</span>
+          {d.ai && d.ai.usd > 0 && (
+            <span>AI cost in {istMonthName()} <span style={{ ...pbNum, color: PB.tx }}>{aiRupees(d.ai.usd)}</span> for <span style={pbNum}>{count(d.ai.products)}</span> {d.ai.products === 1 ? 'product' : 'products'}</span>
+          )}
+        </span>
       </div>
       <div aria-hidden="true" style={{ display: 'flex', gap: 2, height: 8, borderRadius: PB.r.chartBar, overflow: 'hidden', background: total ? 'transparent' : PB.skelBar }}>
         {total > 0 && PRODUCT_STATUSES.filter(s => d.products[s] > 0).map(s => (

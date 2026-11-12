@@ -8,15 +8,19 @@ import { logSwallowed } from '../../lib/errorLogger';
 import { pbCall } from './pbFunctions';
 import { plainError } from './plainError';
 import type { PbAuthMode, PbContent, PbPricing, PbRoutingRule, PbTagRules, PbWebsite } from '../types';
+import { DEFAULT_PROFILE } from '../seoTypes';
 
 // Same values as the column defaults in 20261105090000_pb_product_directory.sql —
 // only used to fill a key missing from an older jsonb value.
 export const DEFAULT_PRICING: PbPricing = { markup_pct: 100, add_flat: 0, rounding: 'end_99', compare_at_pct: 0, min_price: null };
-export const DEFAULT_TAGS: PbTagRules = { templates: ['{category}', '{fabric}', '{color}', 'Vendor_{vendor}', '{tags}'], static: [], case: 'as_is', ai_extra: true, ai_extra_max: 5, max_tags: 30, tag_style: 'plain' };
+export const DEFAULT_TAGS: PbTagRules = { templates: ['{category}', '{fabric}', '{color}', 'Vendor_{vendor}', '{tags}'], static: [], case: 'as_is', ai_extra: true, ai_extra_max: 5, max_tags: 30, tag_style: 'plain', ai_allowed: [] };
 export const DEFAULT_CONTENT: PbContent = {
   model: 'claude-haiku-5-5', effort: '', language: 'English', brand_voice: '', title_template: '{ai_title}',
   title_max: 70, description_words: 120, meta_title_max: 60, meta_desc_max: 155, extra_instructions: '', alt_text: true,
+  title_formula: '', profile: DEFAULT_PROFILE,
 };
+/** A NEW website starts on the owner's per-store template (2026-11-12): descriptions of 130 to 200 words, at most 8 tags. */
+const NEW_SITE = { content: { ...DEFAULT_CONTENT, description_words: 200 }, tag_rules: { ...DEFAULT_TAGS, max_tags: 8 } };
 
 const COLS = 'id,name,shop_domain,auth_mode,api_version,active,publish_mode,routing_default,track_inventory,pricing,tag_rules,content,connected_at,shop_name,last_error,created_at,updated_at';
 
@@ -24,7 +28,7 @@ const norm = (w: PbWebsite): PbWebsite => ({
   ...w,
   pricing: { ...DEFAULT_PRICING, ...(w.pricing || {}) },
   tag_rules: { ...DEFAULT_TAGS, ...(w.tag_rules || {}) },
-  content: { ...DEFAULT_CONTENT, ...(w.content || {}) },
+  content: { ...DEFAULT_CONTENT, ...(w.content || {}), profile: { ...DEFAULT_PROFILE, ...(w.content?.profile || {}) } },
 });
 
 const logActivity = (website_id: string, action: string, details: Record<string, unknown> = {}) => {
@@ -48,9 +52,9 @@ export const cleanDomain = (s: string) => s.trim().toLowerCase().replace(/^https
 export const domainProblem = (d: string) =>
   !d ? 'Enter the store domain' : !/^[a-z0-9][a-z0-9-]*\.myshopify\.com$/.test(d) ? 'Use the store\'s myshopify.com address, e.g. my-store.myshopify.com' : null;
 
-/** New site: only name + domain — every other setting comes from the column defaults (inactive, safe routing 'none'). */
+/** New site: name + domain, the per-store writing defaults (NEW_SITE) — every other setting comes from the column defaults (inactive, safe routing 'none'). */
 export async function createWebsite(name: string, shopDomain: string): Promise<PbWebsite> {
-  const { data, error } = await supabase.from('pb_websites').insert({ name, shop_domain: shopDomain }).select(COLS).single();
+  const { data, error } = await supabase.from('pb_websites').insert({ name, shop_domain: shopDomain, ...NEW_SITE }).select(COLS).single();
   if (error) throw error;
   logActivity((data as PbWebsite).id, 'website_created', { name });
   return norm(data as PbWebsite);

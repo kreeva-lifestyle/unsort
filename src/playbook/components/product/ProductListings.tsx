@@ -1,5 +1,6 @@
 // Where this product is listed: one bento tile per website (status, price,
-// title, error, Shopify link). Edit opens the listing editor.
+// title, error, AI cost, Shopify link), under what the AI cost for the product
+// in all. Edit opens the listing editor.
 // Spans keep every row full at 12 and 6 columns: pairs of 6, an odd last one 12.
 import { useState } from 'react';
 import type { AddToast } from '../PbToasts';
@@ -8,12 +9,16 @@ import { PB, pbBody, pbMeta, pbNum, pbTileTitle } from '../../pbTheme';
 import PbTile, { type PbSpan } from '../ui/PbTile';
 import ListingEditor from './ListingEditor';
 import ListingTile from './detail/ListingTile';
+import AiCostLine from './detail/AiCostLine';
+import type { PbAiCost } from '../../seoTypes';
 
 const spanOf = (i: number, n: number): PbSpan => (n === 1 || (n % 2 === 1 && i === n - 1) ? 12 : 6);
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
-export default function ProductListings({ listings, sites, onChanged, addToast, busy = null, primary = false, phone = false }: {
+export default function ProductListings({ listings, sites, onChanged, addToast, busy = null, primary = false, phone = false, cost = null }: {
   listings: ListingFull[]; sites: WebsiteLite[]; onChanged: () => void; addToast: AddToast;
+  /** What the AI cost for this product so far (reading, tags and every website's writing). */
+  cost?: PbAiCost | null;
   /** The page's one busy key (dims the tile buttons while a page action runs). */
   busy?: string | null;
   /** The first waiting listing's Edit is the page's gradient button. */
@@ -42,6 +47,7 @@ export default function ProductListings({ listings, sites, onChanged, addToast, 
           </span>
         )}
       </div>
+      <AiCostLine cost={cost} />
       <div className="pb-bento pb-bento--auto">
         {listings.length === 0 && (
           <PbTile span={12} style={{ ...pbBody, color: PB.tx2 }}>
