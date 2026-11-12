@@ -8,8 +8,8 @@ import { plainError } from './plainError';
 
 export type ListingFull = Pick<PbListing, 'id' | 'product_id' | 'website_id' | 'status' | 'price' | 'compare_at_price' | 'title'
   | 'description_html' | 'seo_title' | 'seo_description' | 'handle' | 'tags' | 'locked' | 'error' | 'shopify_product_id'
-  | 'shopify_status' | 'published_at' | 'generated_at' | 'ai_model' | 'attempts' | 'claimed_at' | 'updated_at'>;
-export const LISTING_COLS = 'id,product_id,website_id,status,price,compare_at_price,title,description_html,seo_title,seo_description,handle,tags,locked,error,shopify_product_id,shopify_status,published_at,generated_at,ai_model,attempts,claimed_at,updated_at';
+  | 'shopify_status' | 'published_at' | 'generated_at' | 'ai_model' | 'ai_cost_usd' | 'attempts' | 'claimed_at' | 'updated_at'>;
+export const LISTING_COLS = 'id,product_id,website_id,status,price,compare_at_price,title,description_html,seo_title,seo_description,handle,tags,locked,error,shopify_product_id,shopify_status,published_at,generated_at,ai_model,ai_cost_usd,attempts,claimed_at,updated_at';
 
 /** A claim older than this is a crashed run (same as STALE_MS in the pb-products edge function). */
 const STALE_MS = 5 * 60_000;

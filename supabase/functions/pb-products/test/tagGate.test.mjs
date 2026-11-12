@@ -2,10 +2,10 @@
 // The ready gate with required attributes (tagGate.ts; SQL twin pb_products_refresh).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { gateMoves, gateStatus, missingAttrs, missingNote } from '../tagGate.ts';
+import { gateMoves, gateStatus, missingAttrs, missingDetails, missingNote } from '../tagGate.ts';
 
 const LINKED = [{ id: 'col', name: 'Colour' }, { id: 'work', name: 'Work' }];
-const P = (o = {}) => ({ status: 'ready', cost_price: 900, sell_price: null, category: 'Lehenga', ai_read_at: '2026-11-10T00:00:00Z', ai_error: null, ...o });
+const P = (o = {}) => ({ status: 'ready', cost_price: 900, sell_price: null, category: 'Lehenga', fabric: 'Georgette', color: 'Maroon', has_photo: true, ai_read_at: '2026-11-10T00:00:00Z', ai_error: null, ...o });
 
 test('all filled → ready', () => {
   assert.deepEqual(missingAttrs(LINKED, ['col', 'work']), []);
@@ -35,6 +35,13 @@ test('price and category still count; new / reading / archived never move; an un
   assert.equal(gateStatus(P({ category: '' }), []), 'needs_info');
   for (const s of ['new', 'reading', 'archived']) assert.equal(gateStatus(P({ status: s }), ['Work']), s);
   assert.equal(gateStatus(P({ status: 'needs_info', ai_read_at: null }), []), 'needs_info');
+});
+
+test('necessary details: no fabric, colour or photo holds the product (owner, 2026-11-12)', () => {
+  assert.deepEqual(missingDetails(P()), []);
+  assert.deepEqual(missingDetails(P({ fabric: ' ', color: null, has_photo: false })), ['Fabric', 'Colour', 'Photo']);
+  for (const o of [{ fabric: '' }, { color: null }, { has_photo: false }]) assert.equal(gateStatus(P(o), []), 'needs_info');
+  assert.equal(gateStatus(P({ status: 'needs_info' }), []), 'ready');
 });
 
 test('gateMoves counts the dry-run projection', () => {

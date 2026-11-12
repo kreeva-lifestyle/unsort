@@ -10,6 +10,10 @@ import { useConfirm } from '../../components/ui/ConfirmModal';
 import PbConfirm from '../components/ui/PbConfirm';
 import type { AddToast } from '../components/PbToasts';
 import { pbCall } from '../data/pbFunctions';
+import { getAiCost } from '../data/listingSeo';
+import { refreshGate } from '../data/tags';
+import { logSwallowed } from '../../lib/errorLogger';
+import type { PbAiCost } from '../seoTypes';
 import { addPhotos, checkPhoto, getProduct, setProductStatus, type ProductDetail, type VendorLite, type WebsiteLite } from '../data/products';
 import ProductFacts from '../components/product/ProductFacts';
 import ProductListings from '../components/product/ProductListings';
@@ -19,6 +23,7 @@ import { PhonePhotoHero, PhotosTile } from '../components/product/detail/Product
 import WebMetaTile from '../components/product/detail/WebMetaTile';
 import { AiReadTile, PhoneNameCard, ProductHero, WebsitesStat } from '../components/product/detail/ProductSummary';
 import ProductStates from '../components/product/detail/ProductStates';
+import { statusHint } from '../components/product/detail/needs';
 import { IntakeNotesTile, SourceLine } from '../components/product/detail/TelegramBits';
 import { PbPageHeader, focusPageTitle } from '../components/ui';
 import { pbMeta } from '../pbTheme';
@@ -40,9 +45,11 @@ export default function ProductPage({ id, onClose, onChanged, addToast, vendors,
   useEffect(() => { top.current?.scrollIntoView({ block: 'start' }); }, [id]);
   const { ask, modalProps } = useConfirm();
 
+  const [cost, setCost] = useState<PbAiCost | null>(null);
   const load = useCallback(async () => {
     try { setP(await getProduct(id)); setLoadErr(''); }
     catch (e) { const m = friendlyError(e); setLoadErr(m); addToast(m, 'error'); }
+    getAiCost(id).then(setCost).catch(e => logSwallowed('pb ai cost', e)); // a figure beside the listings: the page does not wait for it
   }, [id, addToast]);
   useEffect(() => { void load(); }, [load]);
   const refresh = () => { void load(); onChanged(); };
@@ -71,7 +78,8 @@ export default function ProductPage({ id, onClose, onChanged, addToast, vendors,
     if (bad.length) { addToast(bad.join(' · '), 'error'); return; }
     if (!files.length || !p) return;
     const next = p.pb_product_images.reduce((m, i) => Math.max(m, i.position + 1), 0);
-    void act('photos', () => addPhotos(p.id, files, next), files.length === 1 ? 'Photo added' : `${files.length} photos added`);
+    // A product held only for its photo becomes Ready here (the gate), and the automation sends it to the websites.
+    void act('photos', async () => { await addPhotos(p.id, files, next); await refreshGate(p.id); }, files.length === 1 ? 'Photo added' : `${files.length} photos added`);
   };
 
   const archive = async () => {
@@ -102,7 +110,7 @@ export default function ProductPage({ id, onClose, onChanged, addToast, vendors,
     <ProductFacts key={p.id} product={p} vendors={vendors} categories={categories} onVendorCreated={onVendorCreated}
       onSaved={refresh} addToast={addToast} primary={!waiting} />
   );
-  const listings = <ProductListings listings={p.pb_listings} sites={sites} onChanged={refresh} addToast={addToast} busy={busy} primary={waiting} phone={phone} />;
+  const listings = <ProductListings listings={p.pb_listings} sites={sites} onChanged={refresh} addToast={addToast} busy={busy} primary={waiting} phone={phone} cost={cost} />;
 
   return (
     <div ref={top} style={{ scrollMarginTop: 140, display: 'flex', flexDirection: 'column', gap: phone ? 12 : 24, minWidth: 0 }}>
@@ -121,7 +129,7 @@ export default function ProductPage({ id, onClose, onChanged, addToast, vendors,
         <div>
           <PbPageHeader title={name} back={{ label: 'Products', onBack: onClose }}
             sub={<span style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span style={{ display: 'inline-flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}><Dot color={st.color} label={st.label} /><span style={pbMeta}>{st.hint}</span></span>
+              <span style={{ display: 'inline-flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}><Dot color={st.color} label={st.label} /><span style={pbMeta}>{statusHint(p)}</span></span>
               <SourceLine p={p} />
             </span>}
             actions={<ProductActions {...actionProps} />} />

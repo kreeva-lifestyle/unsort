@@ -17,7 +17,8 @@ import { PRODUCT_COLS, type ProductRow } from './types.ts';
 
 const PAGE = 200;
 const COLS = 'id,name,sku,category,raw_text,fabric,color,attributes,locked,status,cost_price,sell_price,ai_read_at,ai_error';
-type P = Pick<ProductRow, 'id' | 'name' | 'sku' | 'category' | 'raw_text' | 'fabric' | 'color' | 'attributes' | 'locked' | 'status' | 'cost_price' | 'sell_price' | 'ai_read_at' | 'ai_error'>;
+type P = Pick<ProductRow, 'id' | 'name' | 'sku' | 'category' | 'raw_text' | 'fabric' | 'color' | 'attributes' | 'locked' | 'status' | 'cost_price' | 'sell_price' | 'ai_read_at' | 'ai_error'>
+  & { pb_product_images?: { id: string }[] }; // one photo at most: the gate only asks whether there is one
 interface Pv { product_id: string; value_id: string; source: string; pb_attribute_values: { attribute_id: string } | null }
 
 export async function productValuesSet(b: Body, userId: string | null) {
@@ -68,7 +69,7 @@ function next(p: P, have: Pv[], tax: Taxonomy): { rows: ValueSet[]; missing: str
 // The value rows are read in full (selAll): cut at 1000, a product whose rows fell off the end would look
 // untagged, and the 'auto' write would then delete its AI-chosen values.
 async function pageOf(offset: number, ids?: string[]): Promise<{ ps: P[]; pvs: Pv[] }> {
-  const ps = await sel<P>(`pb_products?select=${COLS}&status=in.(ready,needs_info)${ids ? `&id=in.(${ids.map(enc).join(',')})` : ''}&order=id.asc&limit=${PAGE}&offset=${offset}`);
+  const ps = await sel<P>(`pb_products?select=${COLS},pb_product_images(id)&pb_product_images.kind=eq.image&pb_product_images.limit=1&status=in.(ready,needs_info)${ids ? `&id=in.(${ids.map(enc).join(',')})` : ''}&order=id.asc&limit=${PAGE}&offset=${offset}`);
   const pvs = ps.length ? await selAll<Pv>(`pb_product_values?product_id=in.(${ps.map(p => enc(p.id)).join(',')})&select=product_id,value_id,source,pb_attribute_values(attribute_id)&order=product_id.asc,value_id.asc`) : [];
   return { ps, pvs };
 }
@@ -88,7 +89,7 @@ export async function retag(b: Body, userId: string | null) {
       const have = pvs.filter(v => v.product_id === p.id);
       const n = next(p, have, tax);
       if (!n) continue;
-      moves.push({ before: p.status, after: gateStatus(p, n.missing) });
+      moves.push({ before: p.status, after: gateStatus({ ...p, has_photo: !!p.pb_product_images?.length }, n.missing) });
       if (!n.rows.length && !n.before.size) continue;
       const was = new Set([...n.before].map(x => x.split(':')[0])), now = new Set(n.rows.map(r => r.value_id));
       changes.push({ product_id: p.id, rows: n.rows, name: p.name || p.sku || 'Untitled',

@@ -102,7 +102,7 @@ export async function readOne(p: ProductRow, o: { manual: boolean; prevStatus?: 
     });
     const set = merge(p, ai.data, s.categories, o.manual);
     const next = { ...p, ...set } as ProductRow;
-    const status = !hasPrice(next) || !String(next.category || '').trim() ? 'needs_info' : 'ready';
+    const status = !hasPrice(next) || !String(next.category || '').trim() ? 'needs_info' : 'ready'; // the gate (tagAfterRead → pb_products_refresh) then also asks for fabric, colour, a photo and the tags
     const saved = await patch<ProductRow>('pb_products', `id=eq.${enc(p.id)}&status=eq.reading`,
       { ...set, status, ai_read_at: nowIso(), ai_error: null, claimed_at: null }, PRODUCT_COLS);
     if (!saved[0]) throw new HttpError(409, 'The product changed while it was being read — open it again.');

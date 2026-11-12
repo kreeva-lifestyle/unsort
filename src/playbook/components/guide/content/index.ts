@@ -5,6 +5,7 @@ import { INTRO } from './intro';
 import { CONNECT } from './connect';
 import { RULES } from './rules';
 import { WRITING } from './writing';
+import { PROFILE } from './profile';
 import { TELEGRAM } from './telegram';
 import { IMPORT_WEB } from './importWeb';
 import { TAGS } from './tags';
@@ -19,4 +20,4 @@ export const GUIDE_META = {
   pdf: '/playbook/product-directory-guide.pdf',
 };
 
-export const GUIDE_SECTIONS: GuideSection[] = [...INTRO, ...CONNECT, ...RULES, ...WRITING, ...TELEGRAM, ...IMPORT_WEB, ...TAGS, ...DAILY, ...HELP];
+export const GUIDE_SECTIONS: GuideSection[] = [...INTRO, ...CONNECT, ...RULES, ...WRITING, ...PROFILE, ...TELEGRAM, ...IMPORT_WEB, ...TAGS, ...DAILY, ...HELP];

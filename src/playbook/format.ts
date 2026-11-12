@@ -39,3 +39,24 @@ export const megabytes = (bytes: number | null | undefined) => {
   const mb = bytes / (1024 * 1024);
   return `${mb < 100 ? mb.toFixed(1) : Math.round(mb)} MB`;
 };
+
+/** Rupees for one US dollar, fixed by the owner (2026-11-12: "Set dollar rate at 95, no setting needed"). */
+export const USD_INR = 95;
+
+/** What the AI cost, in rupees: "₹0.42" · "₹12.50" · "under ₹0.01" · "—" when nothing was recorded. */
+export function aiRupees(usd: number | null | undefined): string {
+  if (usd == null || !Number.isFinite(Number(usd))) return '—';
+  const r = Number(usd) * USD_INR;
+  if (r <= 0) return '₹0';
+  if (r < 0.01) return 'under ₹0.01';
+  return `₹${r.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+/** The first moment of the current month in India, as an ISO time ("this month" is an IST month). */
+export function istMonthStart(now = new Date()): string {
+  const [y, m] = dayKey.format(now).split('-');
+  return `${y}-${m}-01T00:00:00+05:30`;
+}
+
+/** "November" — the current IST month, for "AI cost in November". */
+export const istMonthName = (now = new Date()) => now.toLocaleDateString('en-IN', { timeZone: TZ, month: 'long' });

@@ -29,6 +29,8 @@ import { SellPriceLine } from './detail/SellPriceLine';
 import VendorSelect from './VendorSelect';
 import ProductValues from './ProductValues';
 import { refreshGate } from '../../data/tags';
+import { missingAll, missingDetails } from '../../seoTypes';
+import { photoCount } from './detail/needs';
 import { numKey, splitList } from './status';
 
 type Form = { name: string; sku: string; vendor_id: string; category: string; fabric: string; color: string; sizes: string; cost_price: string; raw_text: string };
@@ -61,10 +63,9 @@ export default function ProductFacts({ product, vendors, categories, onVendorCre
   const changed = (Object.keys(f) as (keyof Form)[]).filter(k => f[k].trim() !== orig[k].trim());
   const set = (k: keyof Form) => (v: string) => setF(x => ({ ...x, [k]: v }));
   const reading = product.status === 'reading'; // the AI reader would overwrite what is typed now
-  // A product imported from a website sells at its copied price, so it needs no cost to be Ready.
-  const priced = (cost: number | null) => cost != null || product.sell_price != null;
-  // Needs info although price and category are filled (e.g. the AI reader gave up): saving makes it Ready.
-  const promote = product.status === 'needs_info' && priced(product.cost_price) && !!product.category;
+  const photos = photoCount(product);
+  // Needs info although nothing necessary is missing here (e.g. the AI reader gave up): saving lets the gate make it Ready.
+  const promote = product.status === 'needs_info' && !missingDetails(product, photos).length;
   const off = saving || (!changed.length && !promote) || reading;
   useDirty(changed.length > 0 && !saving, 'Discard changes to this product?');
 
@@ -80,16 +81,14 @@ export default function ProductFacts({ product, vendors, categories, onVendorCre
       else patch[k] = f[k].trim() || null;
     }
     // A cleared field is in `patch` as null — it must count as missing, not as "unchanged".
-    const cost2 = 'cost_price' in patch ? patch.cost_price : product.cost_price;
-    const cat2 = 'category' in patch ? patch.category : product.category;
-    const complete = priced(cost2 ?? null) && !!cat2;
-    let lostInfo = product.status === 'ready' && !complete;
+    const lacks = missingDetails({ ...product, ...patch }, photos);
+    let lostInfo = product.status === 'ready' && lacks.length > 0;
     if (lostInfo) patch.status = 'needs_info';
     const kept = product.pb_listings.filter(l => l.status === 'published' && l.locked.includes('price')).length;
     setSaving(true); setErr('');
     try {
       if (changed.length || lostInfo) await updateProduct(product, patch, changed);
-      // The gate (price, category AND a value for every attribute of the category) decides the status.
+      // The gate (price, category, fabric, colour, a photo AND a value for every attribute of the category) decides the status.
       const g = await refreshGate(product.id);
       // The status this save found, not the page's copy: a page opened as New can be Ready (and listed) by now.
       const was = lostInfo ? 'ready' : g?.was ?? product.status;
@@ -98,7 +97,8 @@ export default function ProductFacts({ product, vendors, categories, onVendorCre
       // A ready product whose routing / price inputs changed is checked against the websites again.
       const reroute = was === 'ready' && !lostInfo && changed.some(k => ROUTE_KEYS.includes(k));
       const costChanged = was === 'ready' && changed.includes('cost_price') && !lostInfo;
-      const still = g?.status === 'needs_info' && g.missing.length ? ` — still needs ${g.missing.join(', ')}` : '';
+      const miss = missingAll(lacks, g?.missing);
+      const still = (lostInfo || g?.status === 'needs_info') && miss.length ? ` — still needs ${miss.join(', ')}` : '';
       if ((nowReady || reroute) && !lostInfo) {
         try {
           const r = await pbCall<{ warning?: string; repriced?: number }>('route_product', { product_id: product.id });
@@ -107,7 +107,7 @@ export default function ProductFacts({ product, vendors, categories, onVendorCre
               + (costChanged && kept ? `. ${kept} listing${kept > 1 ? 's have' : ' has'} a price typed by hand and keep${kept > 1 ? '' : 's'} it` : '');
           if (r.warning) addToast(`${done}, but: ${r.warning}`, 'error'); else addToast(done, 'success');
         } catch (e2) { addToast(`Saved, but checking the websites failed: ${friendlyError(e2)}`, 'error'); }
-      } else addToast(lostInfo ? `Saved — back to Needs info${still || ': cost price or category is missing'}` : `Saved${still}`, still ? 'info' : 'success');
+      } else addToast(lostInfo ? `Saved — back to Needs info${still || ': a necessary detail is missing'}` : `Saved${still}`, still ? 'info' : 'success');
       setResync(true);
       onSaved();
     } catch (e2) { setErr(friendlyError(e2)); } finally { setSaving(false); }

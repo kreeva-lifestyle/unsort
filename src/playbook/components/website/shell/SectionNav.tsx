@@ -1,4 +1,4 @@
-// How the editor's six sections are reached. Desktop: a side list in one
+// How the editor's seven sections are reached. Desktop: a side list in one
 // glass tile, the chosen section frosted with the amber inset bar (pbActiveSide).
 // Phone: one glass row per section with a summary; each opens full screen.
 // A section holding unsaved edits says so with a dot + "Unsaved".

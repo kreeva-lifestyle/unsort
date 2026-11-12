@@ -1,11 +1,11 @@
 // Hand-edited listing descriptions go live on a storefront, so they keep only
-// what the spec allows: p, ul, li, strong, em, br — no attributes. b / i become
-// strong / em; script-like elements are dropped with their content; any other
-// tag is unwrapped (its text stays).
+// what the spec allows: p, ul, li, h3, strong, em, br — no attributes. b / i become
+// strong / em and every heading an h3; script-like elements are dropped with
+// their content; any other tag is unwrapped (its text stays).
 import { escHtml } from '../../../lib/escape';
 
-const KEEP = new Set(['p', 'ul', 'li', 'strong', 'em', 'br']);
-const RENAME: Record<string, string> = { b: 'strong', i: 'em', ol: 'ul' };
+const KEEP = new Set(['p', 'ul', 'li', 'h3', 'strong', 'em', 'br']);
+const RENAME: Record<string, string> = { b: 'strong', i: 'em', ol: 'ul', h1: 'h3', h2: 'h3', h4: 'h3', h5: 'h3', h6: 'h3' };
 const DROP = new Set(['script', 'style', 'iframe', 'object', 'embed', 'noscript', 'template', 'svg', 'math', 'head', 'title', 'link', 'meta', 'form', 'input', 'button', 'select', 'textarea']);
 
 function walk(n: Node): string {

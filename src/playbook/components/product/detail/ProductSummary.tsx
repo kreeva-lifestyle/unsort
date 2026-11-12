@@ -7,6 +7,7 @@ import PbStatTile from '../../ui/PbStatTile';
 import PbTile from '../../ui/PbTile';
 import { Dot, LISTING_STATUS, PRODUCT_STATUS, rupees, shortDate } from '../status';
 import { SourceLine } from './TelegramBits';
+import { statusHint } from './needs';
 import { WEB_META_KEYS } from './WebMetaTile';
 
 type P = { p: ProductDetail; vendors: VendorLite[] };
@@ -17,7 +18,7 @@ export function ProductHero({ p, vendors }: P) {
   const st = PRODUCT_STATUS[p.status];
   const vendor = vendorName({ p, vendors });
   return (
-    <PbTile variant="hero" as="section" span={4} aria-label={`Status: ${st.label}. ${st.hint}`}
+    <PbTile variant="hero" as="section" span={4} aria-label={`Status: ${st.label}. ${statusHint(p)}`}
       style={{ display: 'flex', flexDirection: 'column', gap: 8, justifyContent: 'space-between' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'baseline', flexWrap: 'wrap' }}>
         <span style={{ fontSize: 15, fontWeight: 700 }}>{st.label}</span>
@@ -27,7 +28,7 @@ export function ProductHero({ p, vendors }: P) {
           </span>
         )}
       </div>
-      <span style={{ fontSize: 13, lineHeight: 1.5 }}>{st.hint}</span>
+      <span style={{ fontSize: 13, lineHeight: 1.5, overflowWrap: 'anywhere' }}>{statusHint(p)}</span>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         {/* An imported product leads with its copied selling price (the pricing rules are skipped for it). */}
         <span style={{ fontSize: 12, fontWeight: 600 }}>{p.sell_price != null ? 'Selling price · every website' : 'Cost price'}</span>
@@ -64,7 +65,7 @@ export function PhoneNameCard({ p, vendors }: P) {
         {p.sku && <> · <span style={{ ...pbNum, display: 'inline-block' }}>{p.sku}</span></>}
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <Dot color={st.color} label={st.label} /><span style={pbMeta}>{st.hint}</span>
+        <Dot color={st.color} label={st.label} /><span style={{ ...pbMeta, ...(p.status === 'needs_info' ? { color: PB.tx } : null), overflowWrap: 'anywhere', minWidth: 0 }}>{statusHint(p)}</span>
       </div>
       <SourceLine p={p} />
     </PbTile>

@@ -28,13 +28,30 @@ export interface TagRules {
   max_tags?: number;
   /** {tags} as plain value names (default) or `${prefix}_${name}` ('prefixed'). */
   tag_style?: 'plain' | 'prefixed';
+  /** The only extra tags the AI may add (empty = any short style / occasion tag). */
+  ai_allowed?: string[];
 }
 export const MAX_SITE_TAGS = 30;
+
+/** What makes one store's listings its own (profile.ts fills the gaps). Every key is optional in older rows. */
+export interface StoreProfile {
+  brand_name: string; market: string; spelling: string; units: string; audience: string; angle: string;
+  /** The search phrase each listing is written for: {color} {fabric} {category} {work} {occasion} {name}. */
+  keyword_pattern: string;
+  delivery: string; stitching: string; returns: string;
+  /** Also put the two questions at the end of the description (they always go to the custom field). */
+  faq_in_description: boolean;
+  /** Send fabric / work / colour / occasion / set contents and the FAQ to Shopify as custom fields. */
+  custom_fields: boolean;
+}
 
 export interface ContentCfg {
   model: string; effort: string; language: string; brand_voice: string; title_template: string;
   title_max: number; description_words: number; meta_title_max: number; meta_desc_max: number;
   extra_instructions: string; alt_text: boolean;
+  /** How the AI should build its title, in words ("Colour, fabric, type, then the work"). */
+  title_formula?: string;
+  profile?: Partial<StoreProfile>;
 }
 
 export interface WebsiteRow {
@@ -96,8 +113,8 @@ export const RETRY_MS = 10 * 60_000;
 export const MAX_ATTEMPTS = 3;
 /** Listing error written when its product was archived; routing undoes this skip once the product is ready again. */
 export const ARCHIVED = 'The product was archived.';
-/** A listing is not written or published while its product lacks the cost price (or a copied selling price) or category. */
-export const NEEDS_INFO = 'The product needs its cost price, category and a value for every attribute of its category before it can go to websites — fill them on the product page.';
+/** A listing is not written or published while its product lacks a necessary detail (the gate: pb_products_refresh / tagGate.ts). */
+export const NEEDS_INFO = 'The product needs its cost price, category, fabric, colour, a photo and a value for every attribute of its category before it can go to websites — fill them on the product page.';
 /** Ready for websites: a category plus EITHER a cost price (priced by the website's rules) OR a selling price copied from another store. */
 export const hasPrice = (p: { cost_price: number | null; sell_price?: number | null }) =>
   (p.cost_price !== null && p.cost_price !== undefined) || (p.sell_price !== null && p.sell_price !== undefined);

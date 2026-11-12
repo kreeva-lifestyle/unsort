@@ -12,6 +12,8 @@ export type DashData = {
   failed: number;
   review: number;
   paused: boolean;
+  /** What the AI cost since the 1st of this month (IST); null when the figure could not be read. */
+  ai: { usd: number; products: number; writes: number } | null;
 };
 
 export type DashGo = (p: PbPage, s?: ProductsStart) => void;

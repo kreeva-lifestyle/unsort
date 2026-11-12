@@ -1,0 +1,48 @@
+// Guide: the store profile — one voice per store (owner, 2026-11-12), what
+// every listing gets, the checks before it goes out, and what the AI cost.
+import { type GuideSection, h, list, p, table, tip, warn } from '../types';
+
+export const PROFILE: GuideSection[] = [
+  {
+    id: 'profile',
+    short: 'Store profile',
+    title: 'Store profile — one voice per store',
+    lead: 'Websites → your website → Store profile. Fill it once for each store. The AI reads it before every listing, so two stores get a different title, description, SEO text, questions and photo descriptions for the same product. The facts (fabric, colour, work, sizes) stay the same everywhere.',
+    blocks: [
+      table(['Setting', 'What it does'],
+        ['**Brand name**', 'Every SEO title ends with it, e.g. "… | Kreeva". Empty uses the website\'s name.'],
+        ['**Market**', 'Where the shoppers are (India, USA, UK…). The writer uses the words they search with.'],
+        ['**Spelling** and **Measurements**', '**British / Indian** (colour, jewellery) or **American** (color, jewelry); **Inches** or **Centimetres**.'],
+        ['**Audience**', 'Who shops here, in a line.'],
+        ['**Angle**', 'What this store leads with. The description opens with it. Give each store a different one.'],
+        ['**Search phrase**', 'The phrase each listing is written for, built from the product: `{color} {fabric} {category}` gives "Maroon Georgette Kurta Set". Also usable: `{work}`, `{occasion}`, `{name}`.'],
+        ['**Questions in the description**', 'On: the two questions and answers sit at the end of the description, so every theme shows them.'],
+        ['**Custom fields**', 'On: fabric, work, colour, occasion, what is in the set and the questions also go to Shopify as custom fields (`custom.fabric`, `custom.faq`…) for themes and filters that read them. Other apps\' fields are never touched.'],
+        ['**Ordering details**', '**Delivery time**, **Stitching** and **Returns**. The writer puts them in an "Ordering from …" part of the description, in its own words. Leave all three empty and that part is left out.'],
+      ),
+      h('What every listing gets'),
+      list(
+        'A **title** with the search phrase in it once.',
+        'A **web address** of 3 to 6 plain words, with no design codes.',
+        'An **SEO title** that ends with the brand name, and an **SEO description** of about 140 to 155 characters.',
+        'A **description**: an opening in the store\'s angle, 5 to 7 fact bullets, "How to wear it", and "Ordering from …" when you gave ordering details.',
+        '**Two questions and answers** a shopper would really ask, answered only from the facts and your profile.',
+        'A different **description for each photo** (alt text), and tags from your own lists.',
+      ),
+      h('Checked before it goes out'),
+      p('After the AI writes a listing, a program checks it. If something is wrong the AI rewrites it once. If it is still wrong, the listing waits in **Needs review** with the reason, even on a **Live** website, and you decide.'),
+      table(['The check', 'What it catches'],
+        ['Copied wording', 'Five or more words in a row taken from the supplier\'s text or from another store\'s version. Facts such as "Kurta, Pant and Dupatta" may repeat.'],
+        ['Same as another store', 'The same title, SEO title or opening line as the listing on another store.'],
+        ['Search phrase', 'Missing from the title, from the first 50 words or from the SEO title.'],
+        ['Names and claims', 'The supplier\'s name, a design code, a link or phone number; "No. 1", "only 3 left", invented reviews.'],
+        ['Ordering details', 'A number of days that is not in your store profile.'],
+      ),
+      p('Open the listing to see the reason and the smaller notes ("Also worth a look"). You can fix the text by hand, tap **Regenerate**, or **Approve** it as it is. The editor also shows the **Search phrase** (change it, save, then **Regenerate**) and the two **Questions**.'),
+      warn('Nothing is written for a product until its necessary details are there: cost price, category, fabric, colour, at least one photo and its required tags. Until then it stays in **Needs info** and says what is missing.'),
+      h('What the AI cost'),
+      p('Each website\'s listing shows **AI cost** in rupees. The product page adds everything up for that product: reading it, choosing tags and writing for every website, rewrites included. The Dashboard shows the total for the month. Dollars are turned into rupees at ₹95.'),
+      tip('The first store written for a product has nothing to differ from. Each later store is told what the earlier ones say and must open differently, so the order does not matter to you.'),
+    ],
+  },
+];
