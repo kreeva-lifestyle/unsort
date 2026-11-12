@@ -36,12 +36,13 @@ export const storeSizes = (v: unknown): string[] =>
 
 /** The facts only a website import may hand to ingest(): the store's SKU, its size choices as written, and its
  *  extra facts as short plain texts (keys a-z0-9_). Anything else that sends them is refused. */
-export function importFacts(b: { source?: unknown; sku?: unknown; sizes?: unknown; attributes?: unknown }): Record<string, unknown> {
+export function importFacts(b: { source?: unknown; sku?: unknown; sizes?: unknown; attributes?: unknown; in_stock?: unknown }): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   const sizes = storeSizes(b.sizes), sku = String(b.sku ?? '').replace(/\s+/g, ' ').trim();
-  const given = b.attributes !== undefined && b.attributes !== null;
-  if (!given && !sku && !sizes.length) return out;
-  if (b.source !== 'import') throw new HttpError(400, "attributes, sku and sizes are taken only from a website import (source 'import').");
+  const given = b.attributes !== undefined && b.attributes !== null, soldOut = b.in_stock === false;
+  if (!given && !sku && !sizes.length && !soldOut) return out;
+  if (b.source !== 'import') throw new HttpError(400, "attributes, sku, sizes and stock are taken only from a website import (source 'import').");
+  if (soldOut) out.in_stock = false; // sold out at its store when it was copied (in stock is the column's default)
   if (sku) out.sku = sku.slice(0, 80);
   if (sizes.length) out.sizes = sizes; // kept as written ("XS (34)"): the reader never retypes them
   if (given) {
@@ -76,5 +77,6 @@ export function ingestBody(f: Found, run: { host: string; use_their_price: boole
     // The store's facts (brand, type, tags, barcode, weight, SEO…) → attributes; the SKU → the sku column.
     // The size choices go in as they are, so the reader does not retype them (it shortened "XS (34)" to "XS" on 109 of 136).
     ...(Object.keys(m).length ? { attributes: m } : {}), ...(f.sku ? { sku: f.sku } : {}), ...(f.sizes.length ? { sizes: storeSizes(f.sizes) } : {}),
+    ...(f.in_stock ? {} : { in_stock: false }),
   };
 }

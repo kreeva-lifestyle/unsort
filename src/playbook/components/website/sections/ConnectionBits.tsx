@@ -10,8 +10,9 @@ import type { PbWebsite } from '../../../types';
 const box = { borderRadius: PB.r.input, padding: '12px 16px', fontSize: 13, lineHeight: 1.5, color: PB.tx, overflowWrap: 'anywhere' as const, display: 'flex', flexDirection: 'column' as const, gap: 8 };
 const wrapDot = { whiteSpace: 'normal' as const, fontSize: 13, color: PB.tx, fontWeight: 600 };
 
-export function Scopes({ inventory }: { inventory: boolean }) {
-  const scopes = ['write_products', 'read_products', 'write_publications', 'read_publications', ...(inventory ? ['write_inventory'] : [])];
+export function Scopes() {
+  // write_inventory: a size is switched between counted (sold out) and not counted (in stock), on every store.
+  const scopes = ['write_products', 'read_products', 'write_publications', 'read_publications', 'write_inventory'];
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
       <span style={pbMeta}>The app needs these permissions. Only an admin or manager can save credentials.</span>

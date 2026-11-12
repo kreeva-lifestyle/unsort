@@ -26,6 +26,8 @@ export interface PbProduct {
   id: string; vendor_id: string | null; source: 'manual' | 'telegram' | 'import'; source_ref: string | null;
   raw_text: string | null; sku: string | null; name: string | null; category: string | null;
   fabric: string | null; color: string | null; sizes: string[]; cost_price: number | null;
+  /** false = out of stock: Shopify shows it as Sold out. Set by the importer from the source store, and by staff on the product page. */
+  in_stock: boolean;
   /** tags: its chosen values' names (cache; pb_product_values, tagTypes.ts) · missing_attrs: required attributes still empty → Needs info. */
   tags: string[]; missing_attrs: string[];
   /** Anything else the AI read: work, occasion, pattern, set_contents, wash_care, notes… (string values). */

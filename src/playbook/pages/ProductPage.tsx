@@ -28,6 +28,7 @@ import { AiReadTile, PhoneNameCard, ProductHero, WebsitesStat } from '../compone
 import ProductStates from '../components/product/detail/ProductStates';
 import { statusHint } from '../components/product/detail/needs';
 import { IntakeNotesTile, SourceLine } from '../components/product/detail/TelegramBits';
+import StockTile from '../components/product/detail/StockTile';
 import { PbPageHeader, focusPageTitle } from '../components/ui';
 import { pbMeta } from '../pbTheme';
 import { useIsPhone } from '../hooks/useIsPhone';
@@ -149,6 +150,7 @@ export default function ProductPage({ id, onClose, onChanged, onOpenOther, onDel
           <PhoneNameCard p={p} vendors={vendors} copyOf={copyOf} />
           {dupTile()}
           <IntakeNotesTile p={p} addToast={addToast} onChanged={refresh} />
+          <StockTile p={p} addToast={addToast} onChanged={refresh} />
           {listings}
           {facts}
           <WebMetaTile p={p} />
@@ -169,6 +171,7 @@ export default function ProductPage({ id, onClose, onChanged, onOpenOther, onDel
             <WebsitesStat p={p} />
             {dupTile(12)}
             <IntakeNotesTile p={p} span={12} addToast={addToast} onChanged={refresh} />
+            <StockTile p={p} span={12} addToast={addToast} onChanged={refresh} />
             {/* Facts 8 + AI 4 on their own 12-column grid: its lines match the outer grid at 12 and 6 columns, so the row stays full. */}
             <div className="pb-span-12" style={{ display: 'grid', gridTemplateColumns: 'repeat(12, minmax(0, 1fr))', gap: 16 }}>
               <div style={{ gridColumn: 'span 8', display: 'grid', minWidth: 0 }}>{facts}</div>

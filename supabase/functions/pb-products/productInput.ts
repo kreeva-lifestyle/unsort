@@ -3,9 +3,8 @@
 // "Title / Default Title" variant. Photos are sent only on create or when
 // they changed (productSet replaces the media list when `files` is given).
 // On update the store's own option / variant ids are passed back, so the
-// variants are updated in place (ids, stock and carts survive); stock policy
-// and tracking are set only on variants Playbook creates (tracked → DENY: no
-// sale below 0; not tracked → CONTINUE). The playbook.listing_id metafield,
+// variants are updated in place (ids, stock and carts survive); how stock
+// policy and tracking are set is under "Stock" below. The playbook.listing_id metafield,
 // which lets a lost create be found again, is written on create only: on an
 // update productSet would delete every metafield not in the input (apps',
 // the merchant's). `status` is sent only when asked (create / Put back), so an
@@ -28,6 +27,13 @@
 // as product code." Every size's barcode is its own code (sent each time, as
 // the SKU is); India is set on a new variant only, so another country chosen
 // in Shopify stays.
+// Stock (owner, 2026-11-12: "If stock out/in-stock on playbook that same
+// happens in shopify stores"): on a store that does not count stock (Track
+// stock off) Playbook's own in stock / out of stock decides, on every send and
+// for every size. Out of stock = the size is counted with nothing to sell
+// (tracked, DENY at 0) → the store shows "Sold out"; in stock = not counted,
+// always orderable. On a store that counts stock its own numbers decide, as
+// before (a new size starts tracked at 0).
 import { cleanHtml } from './content.ts';
 import { uniqueCi } from './db.ts';
 import { shopCategory } from './garment.ts';
@@ -91,7 +97,7 @@ export function weightOf(text: unknown): { value: number; unit: 'GRAMS' | 'KILOG
  *  `files` = publishParts.ts filesFor, null when the photos need no change. */
 export function buildProductInput(a: { l: ListingRow; p: ProductRow; site: WebsiteRow; vendor: string; files: Record<string, unknown>[] | null; live: boolean; sendStatus: boolean; existing: Existing | null; tail?: string; noCategory?: boolean }): Record<string, unknown> {
   const { l, p, site, existing } = a;
-  const tracked = !!site.track_inventory;
+  const tracked = !!site.track_inventory, inStock = p.in_stock !== false;
   const price = money(l.price);
   const compareAtPrice = l.compare_at_price !== null && Number(l.compare_at_price) > Number(l.price) ? money(l.compare_at_price) : null;
   const sizes = uniqueCi((p.sizes || []).map(s => String(s).replace(/\s+/g, ' ').trim()).filter(Boolean)); // "S" and "s" are one size
@@ -124,14 +130,15 @@ export function buildProductInput(a: { l: ListingRow; p: ProductRow; site: Websi
   const variant = (name: string, i: number) => {
     const id = variantIds[i];
     const code = sku ? (sizes.length ? `${sku}${join}${(sizeCore(name) || name).replace(/\s+/g, '')}` : sku) : '';
+    const stock = tracked ? (id ? null : { policy: 'DENY', tracked: true }) : { policy: inStock ? 'CONTINUE' : 'DENY', tracked: !inStock };
     return {
-      ...(id ? { id } : { inventoryPolicy: tracked ? 'DENY' : 'CONTINUE' }), // an existing variant keeps the stock policy set in Shopify
+      ...(id ? { id } : {}), ...(stock ? { inventoryPolicy: stock.policy } : {}),
       optionValues: [{ optionName: optName, name }],
       position: i + 1,
       price, compareAtPrice,
       ...(code ? (newBarcodes ? { barcodes: [{ value: code }] } : { barcode: code }) : {}),
       // A new variant also gets its weight (for shipping rates), its cost and India as its country of origin; an existing one keeps what Shopify has.
-      inventoryItem: { ...(id ? {} : { tracked, countryCodeOfOrigin: 'IN', ...(weight ? { measurement: { weight } } : {}), ...(cost ? { cost } : {}) }),
+      inventoryItem: { ...(stock ? { tracked: stock.tracked } : {}), ...(id ? {} : { countryCodeOfOrigin: 'IN', ...(weight ? { measurement: { weight } } : {}), ...(cost ? { cost } : {}) }),
         ...(code ? { sku: code } : {}) },
     };
   };
