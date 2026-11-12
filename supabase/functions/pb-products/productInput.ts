@@ -46,13 +46,16 @@ export const STOCK_WARNING = 'Stock tracking is on for this website: the product
 /** A size label without its measurement: "XS (34)" → "XS". */
 const sizeCore = (s: string) => s.replace(/\(.*?\)/g, ' ').replace(/\s+/g, ' ').trim();
 
-/** The product's SKU without a size at its end ("NKB 47 PURPLE XS" → "NKB 47 PURPLE"). A product copied from
- *  another store carries its first size's own SKU; each size on Shopify then gets the base plus its own size. */
-export function skuBase(sku: string, sizes: string[]): string {
+/** The product's SKU without a size at its end, and what joined the two ("NKB 47 PURPLE XS" → "NKB 47 PURPLE" and
+ *  " "). A product copied from another store carries its first size's own SKU; each size on Shopify gets the base,
+ *  the same joiner and its own size, which gives back the store's own code for every size ("NKB 47 PURPLE S").
+ *  A SKU with no size at its end is the base, joined with "-" ("RG-1042" → "RG-1042-M"). */
+export function skuParts(sku: string, sizes: string[]): { base: string; join: string } {
   const s = String(sku || '').trim(), cores = sizes.map(x => sizeCore(x).toLowerCase()).filter(Boolean);
-  const m = /^(.*[^\s\-_/])[\s\-_/]+([^\s\-_/]+)$/.exec(s);
-  return m && cores.includes(m[2].toLowerCase()) ? m[1] : s;
+  const m = /^(.*[^\s\-_/])([\s\-_/]+)([^\s\-_/]+)$/.exec(s);
+  return m && cores.includes(m[3].toLowerCase()) ? { base: m[1], join: m[2] } : { base: s, join: '-' };
 }
+export const skuBase = (sku: string, sizes: string[]) => skuParts(sku, sizes).base;
 
 const money = (n: number | null) => (n === null || n === undefined || !(Number(n) > 0) ? null : Number(n).toFixed(2));
 
@@ -70,7 +73,7 @@ export function buildProductInput(a: { l: ListingRow; p: ProductRow; site: Websi
   const price = money(l.price);
   const compareAtPrice = l.compare_at_price !== null && Number(l.compare_at_price) > Number(l.price) ? money(l.compare_at_price) : null;
   const sizes = [...new Set((p.sizes || []).map(s => String(s).trim()).filter(Boolean))];
-  const sku = skuBase(String(p.sku || ''), sizes);
+  const { base: sku, join } = skuParts(String(p.sku || ''), sizes);
   const optName = sizes.length ? 'Size' : 'Title';
   const values = sizes.length ? sizes : ['Default Title'];
   const oldOpt = existing?.options.find(o => o.name.trim().toLowerCase() === optName.toLowerCase());
@@ -82,7 +85,7 @@ export function buildProductInput(a: { l: ListingRow; p: ProductRow; site: Websi
       optionValues: [{ optionName: optName, name }],
       position: i + 1,
       price, compareAtPrice,
-      inventoryItem: { ...(id ? {} : { tracked }), ...(sku ? { sku: sizes.length ? `${sku}-${(sizeCore(name) || name).replace(/\s+/g, '')}` : sku } : {}) },
+      inventoryItem: { ...(id ? {} : { tracked }), ...(sku ? { sku: sizes.length ? `${sku}${join}${(sizeCore(name) || name).replace(/\s+/g, '')}` : sku } : {}) },
     };
   };
   const handleMoves = !!existing && !!l.handle && l.handle !== existing.handle;

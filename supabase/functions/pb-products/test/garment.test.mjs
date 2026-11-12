@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { expectedFacts, FACT_ORDER, garmentKind, shopCategory } from '../garment.ts';
 globalThis.Deno ??= { env: { get: () => '' } }; // productInput.ts → db.ts reads Deno.env
-const { altUpdates, buildProductInput, skuBase } = await import('../productInput.ts');
+const { altUpdates, buildProductInput, skuBase, skuParts } = await import('../productInput.ts');
 
 const gid = (id) => `gid://shopify/TaxonomyCategory/${id}`;
 
@@ -67,7 +67,13 @@ test('sizes on Shopify: one choice per size, each with the base SKU plus its own
   assert.equal(skuBase('KB 302 XL', ['S', 'M']), 'KB 302 XL');                            // not one of this product's sizes: untouched
   assert.equal(skuBase('XS', ['XS']), 'XS');
   const made = ask({ p: { ...P, sku: 'NKB 47 PURPLE XS', sizes: ['XS (34)', 'S (36)', 'Free Size'] } });
-  assert.deepEqual(made.variants.map(v => v.inventoryItem.sku), ['NKB 47 PURPLE-XS', 'NKB 47 PURPLE-S', 'NKB 47 PURPLE-FreeSize']);
+  // every size gets the store's own code back: the same base, the same joiner, its own size
+  assert.deepEqual(made.variants.map(v => v.inventoryItem.sku), ['NKB 47 PURPLE XS', 'NKB 47 PURPLE S', 'NKB 47 PURPLE FreeSize']);
+  assert.deepEqual(skuParts('KB-280-M', ['M', 'L']), { base: 'KB-280', join: '-' });
+  assert.deepEqual(skuParts('RG-1042', ['M', 'L']), { base: 'RG-1042', join: '-' });
+  assert.deepEqual(ask({ p: { ...P, sku: 'RG-1042', sizes: ['M', 'L'] } }).variants.map(v => v.inventoryItem.sku), ['RG-1042-M', 'RG-1042-L']); // a code with no size: joined with a hyphen
+  assert.deepEqual(ask({ p: { ...P, sku: 'NKB 75 PINK-1', sizes: ['XS (34)', 'S (36)'] } }).variants.map(v => v.inventoryItem.sku), ['NKB 75 PINK-1-XS', 'NKB 75 PINK-1-S']);
+  assert.equal(ask({ p: { ...P, sku: 'RG-9', sizes: [] } }).variants[0].inventoryItem.sku, 'RG-9'); // no sizes: the code as it is
   assert.deepEqual(made.productOptions[0].values.map(v => v.name), ['XS (34)', 'S (36)', 'Free Size']); // the shopper still sees the measurement
   assert.equal(made.productOptions[0].name, 'Size');
 });
