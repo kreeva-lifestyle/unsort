@@ -52,7 +52,8 @@ export const cleanDomain = (s: string) => s.trim().toLowerCase().replace(/^https
 export const domainProblem = (d: string) =>
   !d ? 'Enter the store domain' : !/^[a-z0-9][a-z0-9-]*\.myshopify\.com$/.test(d) ? 'Use the store\'s myshopify.com address, e.g. my-store.myshopify.com' : null;
 
-/** New site: name + domain, the per-store writing defaults (NEW_SITE) — every other setting comes from the column defaults (inactive, safe routing 'none'). */
+/** New site: name + domain, the per-store writing defaults (NEW_SITE) — every other setting comes from the column defaults (inactive, safe routing 'none').
+ *  INSERT on pb_websites is granted column by column (name, shop_domain, content, tag_rules): a further column here needs its own grant, or the insert is refused. */
 export async function createWebsite(name: string, shopDomain: string): Promise<PbWebsite> {
   const { data, error } = await supabase.from('pb_websites').insert({ name, shop_domain: shopDomain, ...NEW_SITE }).select(COLS).single();
   if (error) throw error;

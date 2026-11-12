@@ -530,7 +530,12 @@ faq_in_description, custom_fields }`. Older rows lack it; `profile.ts`
 (server) and `seoTypes.ts` (client) fill the gaps: brand = the website's name,
 british, inches, keyword `{color} {fabric} {category}`, both switches on. A
 NEW website starts with `description_words` 200 and `tag_rules.max_tags` 8
-(`data/websites.ts NEW_SITE`). `tag_rules.ai_allowed[]`: when not empty, the
+(`data/websites.ts NEW_SITE`). INSERT on `pb_websites` is granted column by
+column, so those two travel with the insert only since
+`20261112230000_pb_websites_insert_writing_defaults.sql` (`name, shop_domain,
+content, tag_rules`; for one day the insert was refused and no website could
+be added). A further column sent by `createWebsite` needs its own grant.
+`tag_rules.ai_allowed[]`: when not empty, the
 AI's extra tags are an enum of it.
 
 ### The writer (generate.ts → genPrompt.ts → genWrite.ts)
