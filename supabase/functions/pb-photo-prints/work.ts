@@ -1,15 +1,15 @@
 // One call = ONE waiting photo: claim it, download it, work out its print,
 // hand the answer back (pb_photo_put pairs it with the photos already
 // printed). One photo a call on purpose: an edge function gets 2 seconds of
-// CPU per request and decoding a large JPEG takes most of a second, so each
-// photo has the whole allowance to itself; pg_cron sends several calls a
-// minute while photos are waiting (trigger_pb_photo_prints).
+// CPU per request, so each photo has the whole allowance to itself; pg_cron
+// sends several calls a minute while photos are waiting
+// (trigger_pb_photo_prints).
 // A photo that cannot be printed is answered with the reason and never asked
 // again; one whose download fails, or whose call is cut off, stays claimed
 // and is handed out again 10 minutes later (three times at most).
-import { jpegSize, printOf } from './print.ts';
+import { JpegError, readDc } from './jpegDc.ts';
+import { gridOf, printOf, turned } from './print.ts';
 
-export type Decode = (bytes: Uint8Array) => { data: Uint8Array | Uint8ClampedArray; width: number; height: number };
 export interface Claimed { image_id: string; product_id: string; path: string; bytes: number | null }
 export interface Answer { image: string; print: string | null; detail: number | null; width: number | null; height: number | null; note: string | null }
 export interface Deps {
@@ -17,31 +17,29 @@ export interface Deps {
   put: (a: Answer) => Promise<number>;
   /** The photo's bytes; null when the file is too large to read. A failed download throws. */
   download: (path: string) => Promise<Uint8Array | null>;
-  decode: Decode;
   now: () => number;
 }
 
-export const MAX_BYTES = 12_000_000; // the bucket takes 15 MB; a file this big would not decode in time
-export const MAX_PIXELS = 6_000_000; // about 2000 × 3000: the largest photo that decodes inside the CPU limit
+export const MAX_BYTES = 15_000_000; // what the bucket takes
+export const MIN_BLOCKS = 32;        // a photo under 256 px a side has too little in it to compare
 export const MIN_DETAIL = 5;         // below this the picture is blank, or nearly: its print says nothing
 
-export interface Result { state: 'idle' | 'done' | 'skipped'; image?: string; paired?: number; note?: string; pixels?: number; read_ms?: number }
+export interface Result { state: 'idle' | 'done' | 'skipped'; image?: string; paired?: number; note?: string; pixels?: number; bytes?: number; read_ms?: number }
 
 /** The print of one downloaded photo, or why it has none. */
-export function readPhoto(path: string, bytes: Uint8Array, decode: Decode, now: () => number): Omit<Answer, 'image'> & { ms: number } {
-  const none = (note: string, w: number | null = null, h: number | null = null) => ({ print: null, detail: null, width: w, height: h, note, ms: 0 });
-  const size = jpegSize(bytes);
-  if (!size) return none(/\.(png|webp)$/i.test(path) ? 'Only JPEG photos are checked.' : 'The file is not a JPEG photo.');
-  if (size.w * size.h > MAX_PIXELS) return none('The photo is too large to check.', size.w, size.h);
+export function readPhoto(path: string, bytes: Uint8Array, now: () => number): Omit<Answer, 'image'> & { ms: number } {
   const t = now();
+  const none = (note: string, w: number | null = null, h: number | null = null, detail: number | null = null) =>
+    ({ print: null, detail, width: w, height: h, note, ms: Math.round(now() - t) });
   try {
-    const d = decode(bytes);
-    const p = printOf(d.data, d.width, d.height);
-    const ms = Math.round(now() - t);
-    if (p.detail < MIN_DETAIL) return { print: null, detail: p.detail, width: d.width, height: d.height, note: 'The picture is too plain to tell apart.', ms };
-    return { print: p.hex, detail: p.detail, width: d.width, height: d.height, note: null, ms };
+    const d = readDc(bytes);
+    if (d.bw < MIN_BLOCKS || d.bh < MIN_BLOCKS) return none('The photo is too small to check.', d.width, d.height);
+    const p = printOf(turned(gridOf(d.luma, d.bw, d.bh, d.width, d.height, d.unitX, d.unitY), d.orientation));
+    if (p.detail < MIN_DETAIL) return none('The picture is too plain to tell apart.', d.width, d.height, p.detail);
+    return { print: p.hex, detail: p.detail, width: d.width, height: d.height, note: null, ms: Math.round(now() - t) };
   } catch (e) {
-    return { ...none(`The photo could not be opened (${String(e instanceof Error ? e.message : e).slice(0, 80)}).`, size.w, size.h), ms: Math.round(now() - t) };
+    if (e instanceof JpegError) return none(/\.(png|webp)$/i.test(path) && /not a JPEG/.test(e.message) ? 'Only JPEG photos are checked.' : e.message);
+    return none(`The photo could not be read (${String(e instanceof Error ? e.message : e).slice(0, 80)}).`);
   }
 }
 
@@ -55,10 +53,10 @@ export async function runOne(d: Deps): Promise<Result> {
     await d.put({ image: img.image_id, print: null, detail: null, width: null, height: null, note });
     return { state: 'skipped', image: img.image_id, note };
   }
-  const r = readPhoto(img.path, bytes, d.decode, d.now);
+  const r = readPhoto(img.path, bytes, d.now);
   const paired = await d.put({ image: img.image_id, print: r.print, detail: r.detail, width: r.width, height: r.height, note: r.note });
   return {
     state: r.print ? 'done' : 'skipped', image: img.image_id, paired, ...(r.note ? { note: r.note } : {}),
-    ...(r.width && r.height ? { pixels: r.width * r.height } : {}), read_ms: r.ms,
+    ...(r.width && r.height ? { pixels: r.width * r.height } : {}), bytes: bytes.length, read_ms: r.ms,
   };
 }

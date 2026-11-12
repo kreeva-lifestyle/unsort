@@ -2,7 +2,7 @@
 // database functions (service role) and the photo's public address.
 import { publicUrl, rpc } from '../pb-products/db.ts';
 import { HttpError, fetchT } from '../pb-products/http.ts';
-import { type Claimed, type Decode, type Deps, MAX_BYTES } from './work.ts';
+import { type Claimed, type Deps, MAX_BYTES } from './work.ts';
 
 const DOWNLOAD_MS = 20_000;
 
@@ -15,10 +15,9 @@ async function download(path: string): Promise<Uint8Array | null> {
   return new Uint8Array(await r.arrayBuffer());
 }
 
-export const liveDeps = (decode: Decode): Deps => ({
+export const liveDeps = (): Deps => ({
   claim: async () => (await rpc<Claimed[]>('pb_photo_claim', { p_n: 1 }))?.[0] ?? null,
   put: async (a) => Number(await rpc<number>('pb_photo_put', { p_image: a.image, p_print: a.print, p_detail: a.detail, p_width: a.width, p_height: a.height, p_note: a.note })) || 0,
   download,
-  decode,
   now: () => performance.now(),
 });

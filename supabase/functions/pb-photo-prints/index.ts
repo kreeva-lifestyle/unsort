@@ -6,16 +6,16 @@
 // have nothing to press here: the result shows on a product as "Could this be
 // already added? · Same photo" (pb_dup_matches).
 //
-//   POST {}  →  { ok, state: 'idle' | 'done' | 'skipped', image?, paired?, note?, pixels?, read_ms? }
+//   POST {}  →  { ok, state: 'idle' | 'done' | 'skipped', image?, paired?, note?, pixels?, bytes?, read_ms? }
 //
-// Its own function, apart from pb-products, on purpose: decoding a photo is
+// Its own function, apart from pb-products, on purpose: reading a photo is
 // the one CPU-heavy thing Playbook does on the server, and a call that runs
 // out of CPU here costs one photo (tried again later), never a listing that
 // was being written or published.
-// No AI, no paid service: a JPEG decoder and arithmetic (print.ts).
+// No AI, no paid service and no library: the photo's block averages are read
+// straight from the JPEG (jpegDc.ts) and turned into a print (print.ts).
 import { whoIs } from '../pb-products/auth.ts';
 import { HttpError, corsHeaders, fail, json, plain } from '../pb-products/http.ts';
-import { decodeJpeg } from './decode.ts';
 import { liveDeps } from './live.ts';
 import { runOne } from './work.ts';
 
@@ -26,7 +26,7 @@ Deno.serve(async (req) => {
     const caller = await whoIs(req);
     if (!caller) return fail(req, 401, 'Sign in to DailyOffice again — Playbook is for active staff only.');
     if (caller.kind !== 'secret') return fail(req, 403, 'Only the automation can use this.');
-    return json(req, { ok: true, ...(await runOne(liveDeps(decodeJpeg))) });
+    return json(req, { ok: true, ...(await runOne(liveDeps())) });
   } catch (e) {
     const status = e instanceof HttpError ? e.status : 500;
     if (status >= 500) console.error('pb-photo-prints:', e instanceof Error ? e.stack || e.message : e);

@@ -1,8 +1,9 @@
 // A photo's print: 256 bits that describe where it is light and dark, so the
 // same photo saved again (another size, another JPEG quality, a slightly
 // different brightness) gives almost the same bits, and another photo does
-// not. Pure arithmetic on decoded pixels, no dependencies:
-//   1. the photo is averaged down to a 64 × 64 grid of brightness;
+// not. Pure arithmetic, no dependencies:
+//   1. the photo is averaged down to a 64 × 64 grid of brightness — from the
+//      block averages a JPEG already stores (jpegDc.ts), so nothing is decoded;
 //   2. a cosine transform keeps the 16 × 16 slowest patterns (the flat
 //      average is left out), so fine detail and compression noise drop away;
 //   3. each of the 256 values becomes one bit: above or below their median.
@@ -15,25 +16,60 @@
 
 const GRID = 64, KEEP = 16;
 
-/** The photo as a GRID × GRID table of average brightness (0–255), row by row. */
-export function lumaGrid(rgba: Uint8Array | Uint8ClampedArray, w: number, h: number): Float64Array {
-  const sum = new Float64Array(GRID * GRID), cnt = new Uint32Array(GRID * GRID);
-  const col = new Uint16Array(w);
-  for (let x = 0; x < w; x++) col[x] = Math.min(GRID - 1, Math.floor((x * GRID) / w));
-  for (let y = 0; y < h; y++) {
-    const row = Math.min(GRID - 1, Math.floor((y * GRID) / h)) * GRID;
-    let i = y * w * 4;
-    for (let x = 0; x < w; x++, i += 4) {
-      const c = row + col[x];
-      sum[c] += 0.299 * rgba[i] + 0.587 * rgba[i + 1] + 0.114 * rgba[i + 2];
-      cnt[c]++;
+/** For each of the GRID cells along one side: the samples it covers and how much of each (weights add up to 1). */
+function spans(samples: number, unit: number, size: number): { from: number; w: number[] }[] {
+  const out: { from: number; w: number[] }[] = [];
+  for (let c = 0; c < GRID; c++) {
+    const lo = (c * size) / GRID, hi = ((c + 1) * size) / GRID;
+    const s0 = Math.min(samples - 1, Math.floor(lo / unit)), s1 = Math.min(samples - 1, Math.max(s0, Math.ceil(hi / unit) - 1));
+    const w: number[] = [];
+    let sum = 0;
+    for (let s = s0; s <= s1; s++) { const v = Math.max(0, Math.min(hi, Math.min((s + 1) * unit, size)) - Math.max(lo, s * unit)); w.push(v); sum += v; }
+    out.push({ from: s0, w: sum > 0 ? w.map(v => v / sum) : w.map((_, i) => (i ? 0 : 1)) });
+  }
+  return out;
+}
+
+/** The GRID × GRID brightness table of a picture given as samples, each `unitX` × `unitY` pixels of a
+ *  `width` × `height` photo (a JPEG's block averages: 8 × 8; plain pixels: 1 × 1). Area-weighted. */
+export function gridOf(luma: ArrayLike<number>, sw: number, sh: number, width: number, height: number, unitX = 1, unitY = 1): Float64Array {
+  const xs = spans(sw, unitX, width), ys = spans(sh, unitY, height);
+  const rows = new Float64Array(sh * GRID);
+  for (let y = 0; y < sh; y++) for (let c = 0; c < GRID; c++) {
+    const { from, w } = xs[c];
+    let s = 0;
+    for (let i = 0; i < w.length; i++) s += luma[y * sw + from + i] * w[i];
+    rows[y * GRID + c] = s;
+  }
+  const grid = new Float64Array(GRID * GRID);
+  for (let r = 0; r < GRID; r++) {
+    const { from, w } = ys[r];
+    for (let c = 0; c < GRID; c++) {
+      let s = 0;
+      for (let i = 0; i < w.length; i++) s += rows[(from + i) * GRID + c] * w[i];
+      grid[r * GRID + c] = s;
     }
   }
-  // A photo narrower or shorter than the grid leaves cells empty: they take their neighbour's value.
-  for (let c = 0; c < sum.length; c++) sum[c] = cnt[c] ? sum[c] / cnt[c] : NaN;
-  for (let c = 0; c < sum.length; c++) if (Number.isNaN(sum[c])) sum[c] = c % GRID ? sum[c - 1] : (c >= GRID ? sum[c - GRID] : 0);
-  for (let c = 0; c < sum.length; c++) if (Number.isNaN(sum[c])) sum[c] = 0;
-  return sum;
+  return grid;
+}
+
+/** Brightness of RGBA pixels (4 bytes a pixel), one value a pixel. */
+export function lumaOf(rgba: ArrayLike<number>, w: number, h: number): Float32Array {
+  const out = new Float32Array(w * h);
+  for (let i = 0, p = 0; i < out.length; i++, p += 4) out[i] = 0.299 * rgba[p] + 0.587 * rgba[p + 1] + 0.114 * rgba[p + 2];
+  return out;
+}
+
+/** The grid as the photo is meant to be seen: EXIF orientation 1–8 undone (a phone stores a turned photo sideways). */
+export function turned(grid: Float64Array, orientation: number): Float64Array {
+  if (!(orientation >= 2 && orientation <= 8)) return grid;
+  const out = new Float64Array(GRID * GRID), L = GRID - 1;
+  for (let r = 0; r < GRID; r++) for (let c = 0; c < GRID; c++) {
+    const [sr, sc] = orientation === 2 ? [r, L - c] : orientation === 3 ? [L - r, L - c] : orientation === 4 ? [L - r, c]
+      : orientation === 5 ? [c, r] : orientation === 6 ? [L - c, r] : orientation === 7 ? [L - c, L - r] : [c, L - r];
+    out[r * GRID + c] = grid[sr * GRID + sc];
+  }
+  return out;
 }
 
 const COS = (() => { // COS[u][x] = cos((2x + 1) u π / 2·GRID) for u = 1 … KEEP
@@ -57,10 +93,9 @@ export function detailOf(grid: Float64Array): number {
   return Math.min(100, Math.round((d / (2 * GRID * (GRID - 1))) * 5)); // product photos: 50–80 · a size chart: about 20 · a blank: 0
 }
 
-/** The print of decoded pixels (RGBA, 4 bytes a pixel): 64 hex characters, and how much detail the photo has. */
-export function printOf(rgba: Uint8Array | Uint8ClampedArray, w: number, h: number): { hex: string; detail: number } {
-  if (!(w > 0 && h > 0) || rgba.length < w * h * 4) throw new Error('The photo has no pixels to read.');
-  const grid = lumaGrid(rgba, w, h);
+/** The print of a brightness grid: 64 hex characters, and how much detail the picture has. */
+export function printOf(grid: Float64Array): { hex: string; detail: number } {
+  if (grid.length !== GRID * GRID) throw new Error('The photo has no pixels to read.');
   const rows = new Float64Array(GRID * KEEP); // each grid row, transformed along x
   for (let y = 0; y < GRID; y++) for (let u = 0; u < KEEP; u++) {
     let s = 0;
@@ -91,23 +126,4 @@ export function bitsApart(a: string, b: string): number {
     while (x) { n += x & 1; x >>= 1; }
   }
   return n;
-}
-
-/** Width and height from a JPEG's own header, without decoding it (null when it is not a JPEG we can size). */
-export function jpegSize(b: Uint8Array): { w: number; h: number; progressive: boolean } | null {
-  if (b.length < 4 || b[0] !== 0xff || b[1] !== 0xd8) return null;
-  let i = 2;
-  while (i + 9 < b.length) {
-    if (b[i] !== 0xff) return null;
-    const m = b[i + 1];
-    if (m === 0xff) { i++; continue; }                    // fill bytes
-    if (m === 0xd8 || (m >= 0xd0 && m <= 0xd7) || m === 0x01) { i += 2; continue; }
-    const len = (b[i + 2] << 8) | b[i + 3];
-    if (m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc) {
-      return { h: (b[i + 5] << 8) | b[i + 6], w: (b[i + 7] << 8) | b[i + 8], progressive: m === 0xc2 };
-    }
-    if (len < 2) return null;
-    i += 2 + len;
-  }
-  return null;
 }

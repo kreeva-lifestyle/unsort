@@ -8,8 +8,11 @@
 -- How:
 --   * The edge function pb-photo-prints reads each product photo once and
 --     works out its print: 256 bits of where the picture is light and dark
---     (supabase/functions/pb-photo-prints/print.ts). The same photo re-saved or
---     resized differs in a handful of bits; another photo in about half of them.
+--     (supabase/functions/pb-photo-prints/print.ts), from the block averages
+--     the JPEG already stores (jpegDc.ts) — the photos kept here are 15 to 19
+--     megapixel originals, too large to decode inside an edge function. The
+--     same photo re-saved or resized differs in a handful of bits; another
+--     photo in about half of them.
 --   * private.pb_photo_prints keeps one row per photo (also the queue: a photo
 --     with no row is waiting). private.pb_photo_pairs keeps, per two products,
 --     their closest two photos when those are near enough to be the same.
@@ -71,6 +74,9 @@ begin
   if coalesce(nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role', '') <> 'service_role' then
     raise exception 'Only the automation can do this.' using errcode = '42501';
   end if;
+  -- One claim at a time: several workers start in the same second, and without this two of them could
+  -- pick the same waiting photo (each chose it before the other's claim was saved).
+  perform pg_advisory_xact_lock(hashtext('pb_photo_claim'));
   return query
   with pick as (
     select i.id, i.product_id, i.path, i.bytes
