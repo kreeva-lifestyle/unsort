@@ -100,8 +100,8 @@ test('an update keeps the sizes the store has: same variant for a relabelled siz
   assert.deepEqual(made.variants.map(v => v.id), ['var-s', 'var-m', undefined]);          // "L" twice (another case) is one size
   assert.deepEqual(made.productOptions[0].values, [{ id: 'v-s', name: 'S (36)' }, { id: 'v-m', name: 'M (38)' }, { name: 'L (40)' }]);
   assert.equal(made.productOptions[0].id, 'o1');
-  assert.deepEqual(made.variants[2].inventoryItem, { tracked: false, countryCodeOfOrigin: 'IN', measurement: { weight: { value: 700, unit: 'GRAMS' } }, cost: '640.00', sku: 'RG-1-L' });
-  assert.deepEqual(made.variants[0].inventoryItem, { tracked: false, sku: 'RG-1-S' });    // weight, cost and country stay as Shopify has them
+  assert.deepEqual(made.variants[2].inventoryItem, { tracked: true, countryCodeOfOrigin: 'IN', measurement: { weight: { value: 700, unit: 'GRAMS' } }, cost: '640.00', sku: 'RG-1-L' });
+  assert.deepEqual(made.variants[0].inventoryItem, { tracked: true, sku: 'RG-1-S' });    // weight, cost and country stay as Shopify has them
   assert.ok(made.variants.every(v => v.inventoryPolicy === 'CONTINUE'));
   // two store sizes with the same core: no guessing, matched by the exact label only
   const twice = { ...existing, variants: [{ id: 'a', key: 'size=s (36)' }, { id: 'b', key: 'size=s (38)' }] };
@@ -114,13 +114,14 @@ test('an update keeps the sizes the store has: same variant for a relabelled siz
   for (const w of ['', 'heavy', '0 g', null]) assert.equal(weightOf(w), null);
 });
 
-test('stock: on a store that does not count stock, Playbook says which sizes can be bought', () => {
+test('stock: where Playbook decides, "Continue selling when out of stock" is on for an in-stock product and off for one out of stock', () => {
   const existing = { ...STORE, options: [{ id: 'o1', name: 'Size', values: [{ id: 'v-m', name: 'M' }] }], variants: [{ id: 'var-m', key: 'size=m' }] };
   const out = ask({ existing, p: { ...P, in_stock: false }, sendStatus: false, files: null });
-  // out of stock: every size, the one already on the store too, is counted with nothing to sell → "Sold out"
+  // out of stock: every size, the one already on the store too, stops selling at 0 → "Sold out"
   assert.deepEqual(out.variants.map(v => [v.inventoryPolicy, v.inventoryItem.tracked]), [['DENY', true], ['DENY', true]]);
   const back = ask({ existing, p: { ...P, in_stock: true }, sendStatus: false, files: null });
-  assert.deepEqual(back.variants.map(v => [v.inventoryPolicy, v.inventoryItem.tracked]), [['CONTINUE', false], ['CONTINUE', false]]);
+  assert.deepEqual(back.variants.map(v => [v.inventoryPolicy, v.inventoryItem.tracked]), [['CONTINUE', true], ['CONTINUE', true]]); // quantity stays tracked; it keeps selling at 0
+  assert.ok(back.variants.every(v => !('inventoryQuantities' in v)));                     // no count is ever sent
   // a store that counts stock keeps its own numbers: only a new size is set up (tracked, starts at 0)
   const counted = ask({ existing, site: { ...SITE, track_inventory: true }, p: { ...P, in_stock: false }, sendStatus: false, files: null });
   assert.ok(!('inventoryPolicy' in counted.variants[0]) && !('tracked' in counted.variants[0].inventoryItem));
