@@ -37,3 +37,15 @@ test('foreign currency or no / zero price: never copied', () => {
   assert.equal('sell_price' in zero, false); assert.equal('price_note' in zero, false);
   assert.match(istDate(new Date('2026-11-08T20:30:00Z')), /^9 Nov 2026$/); // IST is +5:30
 });
+
+test('the same site under its other address: www and bare host are one store', async () => {
+  const { hostTwin, refTwin, refList } = await import('../import/body.ts');
+  assert.equal(hostTwin('www.bahu.example'), 'bahu.example');
+  assert.equal(hostTwin('bahu.example'), 'www.bahu.example');
+  assert.equal(refTwin('www.bahu.example:7001'), 'bahu.example:7001');
+  assert.equal(refTwin('bahu.example:/products/kb-302'), 'www.bahu.example:/products/kb-302');
+  assert.equal(refTwin('no-host-part'), '');
+  assert.equal(refList('import', 'www.bahu.example:7001'), '"www.bahu.example:7001","bahu.example:7001"');
+  assert.equal(refList('telegram', '-100123:45'), '"-100123:45"'); // only an imported product has a second address
+  assert.equal(refList('manual', 'a"b\\c'), '"a\\"b\\\\c"');
+});

@@ -600,3 +600,66 @@ and in the listing editor (that listing's last writing), on the product page
 - Product list: the phone row names the websites ("Live on Kreeva, Arya",
   the most urgent group first, the live one always); the desktop card already
   had one dot + name per website.
+
+## Already added? (owner, 2026-11-12)
+"If we scrape from multiple websites of the products which come from Telegram,
+how will we judge whether it was uploaded earlier?" — answered in three steps,
+cheapest first. Records are **linked, never merged**; a look-alike search with
+the AI was considered and dropped by the owner.
+Migration `20261112150000_pb_duplicates.sql`.
+
+### 1. The same post or page again
+`pb_products.source` + `source_ref` (`telegram`: chat + message; `import`:
+`<host>:<id on that site>`). `ingest.ts findDup` returns the product that
+already has that reference; the importer's `known()` skips it before fetching
+("already here"). Both treat a host and its `www.` twin as one
+(`import/body.ts hostTwin`, `refTwin`). A repeat import never updates the
+price or stock of what it skips.
+
+### 2. Design code + colour
+- `pb_code_key(sku)`: letters{1,6} + digits{2,6} (+ one attached letter) at
+  the start of the SKU, spaces / dashes / case ignored, leading zeros dropped:
+  `KB 302`, `kb-302`, `KB 302 XS BLUE` → `KB302`. A bare number (`302`,
+  `D.No 302`) → `#302`. No SKU or no code → null (never matched).
+- `pb_code_num(sku)`: the number alone, for "same number, other letters".
+- `pb_colour_keys(sku, color)`: the words after the code minus size words
+  (`KB 264 ROYAL BLUE XS` → `{royalblue}`), else the product's colour split
+  on `, / |`.
+- `private.pb_dup_scan(p_ids)` pairs a product with every other non-archived
+  product that has the same key, or (same vendor) the same number:
+
+  | Pair | kind | how |
+  |---|---|---|
+  | same vendor, same key (not bare), colours overlap or one side has none | `held` on the later product, `original` on the earlier | `code` |
+  | same vendor, same key, both have colours and none in common | `colour` | `code` |
+  | same key, another or no vendor | `maybe` | `other_vendor` |
+  | same vendor, the same bare number (`302` / `D.No 302`) | `maybe` | `code` |
+  | same vendor, same number, other letters (`KB 25` / `NKB 25`) | `maybe` | `near_code` |
+
+  A person's answer (`private.pb_dup_verdicts`, one row per pair, `a < b`)
+  wins: `different` and `colour` release the pair, `same` keeps it held.
+- `pb_dup_matches(p_ids)` (staff / service role) is what the app reads;
+  `pb_dup_verdict_set(a, b, verdict)` saves one pair's answer;
+  `pb_dup_answer(p_id, p_others[], verdict)` is the tap on the product page
+  — every pair's answer plus what follows (archive, or the gate re-applied)
+  in one transaction, SECURITY INVOKER;
+  `pb_dup_held(p_id)` gives the gate the earliest product this one is held
+  for (SECURITY DEFINER with no role check: the gate runs for whoever saves
+  a product, and it gives away one id).
+- **The Ready gate** (`pb_products_refresh`): a product that would be Ready
+  stays `needs_info` while `pb_dup_held(id)` is not null. Only `ready` /
+  `needs_info` products are asked (never one that is new, being read or
+  archived), and only the LATER product of a pair is ever held. Indexes: `pb_products_code_key_idx`,
+  `pb_products_code_num_idx` (both skip archived rows).
+
+### UI
+- Product page: `detail/DupTile.tsx` — "This looks already added" (held,
+  review-tinted) / "Could this be already added?" (suggestions) / "Same
+  design" (other colours, a later copy). Answers, each one `pb_dup_answer` call: **It is a copy** (verdict
+  `same` + archive this product), **Another colour**, **Different product**
+  (verdict + gate re-applied, so a held product goes on to the websites).
+- Product list: "Needs info · Already here as KB 264 WINE XS"
+  (`data/duplicates.ts heldLabels`, one RPC per page for its Needs-info rows);
+  every row says "from Telegram" / "from bahupalace.com" (`sourceText`); a
+  **Source** filter (`ProductFilter.source`: `telegram`, `manual`,
+  `import:<host>`).

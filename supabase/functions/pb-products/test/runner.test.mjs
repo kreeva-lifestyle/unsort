@@ -51,7 +51,13 @@ function fakeWorld(run, store = null) {
     if (path.startsWith('rpc/pb_product_values_set')) { calls.values.push(JSON.parse(init.body)); return ok([{ id: 'p', status: 'new', was: 'new', missing: [] }]); }
     if (path.startsWith('rpc/pb_tag_suggest')) { calls.suggest.push(...JSON.parse(init.body).p_rows); return ok(1); }
     if (path.startsWith('pb_websites?')) return ok([{ shop_domain: 'aryadesigns.myshopify.com' }]);
-    if (path.startsWith('pb_products?source=eq.import&source_ref=in.')) { calls.known.push(path); return ok([{ source_ref: 'kumari.example:801' }]); }
+    // Two questions share this shape: the page's "which of these were imported before" (select=source_ref, asked for
+    // the site's address and its www twin) and ingest's own check of one product (select=id).
+    if (path.startsWith('pb_products?source=eq.import&source_ref=in.') && path.includes('select=source_ref')) {
+      calls.known.push(path);
+      return ok(path.includes('"kumari.example:801"') ? [{ source_ref: 'kumari.example:801' }] : []);
+    }
+    if (path.startsWith('pb_products?source=eq.import&source_ref=in.')) return ok([]);
     if (path.startsWith('pb_products?source=eq.import&source_ref=eq.')) return ok([]);
     if (path.startsWith('pb_vendors?') && method === 'POST') return ok([{ id: 'v1' }]);
     if (path.startsWith('pb_products?') && method === 'POST') { const row = JSON.parse(init.body)[0]; calls.inserts.push(row); return ok([{ id: `p${calls.inserts.length}` }]); }
@@ -71,7 +77,8 @@ test('out of time mid-page: known product skipped without its page, cursor.skip 
   let out = await advanceImport(Date.now() + 10_500, null); // only the first batch of 3 fits before the 10 s reserve
   assert.deepEqual(out, { run_id: 'r1', found: 4, added: 3 });
   assert.deepEqual(calls.site, ['/robots.txt', '/meta.json', '/products.json?limit=50&page=1', '/products/saree-2', '/products/saree-3', '/products/saree-4']); // no page for 801
-  assert.equal(calls.known.length, 1); // one lookup for the whole page
+  assert.equal(calls.known.length, 2); // the whole page in one lookup per address of the site (kumari.example, www.kumari.example)
+  assert.match(calls.known[1], /source_ref=in\.\("www\.kumari\.example:801",/);
   assert.match(calls.known[0], /source_ref=in\.\("kumari\.example:801","kumari\.example:802",.*"kumari\.example:807"\)/);
   const save1 = calls.saves.at(-1);
   assert.deepEqual(save1.cursor, { currency: 'INR', skip: 4, skip_ref: '804', errors: 0 });

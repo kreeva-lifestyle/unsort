@@ -1,8 +1,9 @@
 // The Products toolbar tile (12 wide): search (name / SKU / details), status
 // chips for the statuses staff act on, and picker chips for the other
-// statuses, the vendor and the website. Same filter values as before
+// statuses, the vendor, the website and the source (Telegram, typed in, or the
+// website a product was copied from). Same filter values as before
 // (data/products.ts `ProductFilter`); only the controls changed.
-// Desktop: [search ……… vendor · website] / [status chips · more statuses · Clear].
+// Desktop: [search ……… vendor · website · source] / [status chips · more statuses · Clear].
 // Phone: search, then one sideways-scrolling chip row (mobile.md §9).
 import type { ProductFilter, VendorLite, WebsiteLite } from '../../data/products';
 import { PB, pbInput } from '../../pbTheme';
@@ -13,14 +14,16 @@ import PbTile from '../ui/PbTile';
 import SelectChip from './list/SelectChip';
 import { MORE_STATUSES, STATUS_CHIPS } from './list/productListUtil';
 
-export default function ProductFilters({ search, onSearch, filter, onFilter, vendors, websites, onClear }: {
+export default function ProductFilters({ search, onSearch, filter, onFilter, vendors, websites, sources, onClear }: {
   search: string; onSearch: (s: string) => void; filter: ProductFilter; onFilter: (f: Partial<ProductFilter>) => void;
   vendors: VendorLite[]; websites: WebsiteLite[];
+  /** Where products came from: Telegram, typed in, and each website they were copied from. */
+  sources: { v: string; label: string }[];
   /** Resets search + every filter; shown as "Clear" while any is on. */
   onClear?: () => void;
 }) {
   const phone = useIsPhone();
-  const any = !!(search || filter.status || filter.vendorId || filter.websiteId);
+  const any = !!(search || filter.status || filter.vendorId || filter.websiteId || filter.source);
   const more = MORE_STATUSES.find(o => o.v === filter.status);
   const vendor = vendors.find(v => v.id === filter.vendorId);
   const site = websites.find(w => w.id === filter.websiteId);
@@ -59,6 +62,10 @@ export default function ProductFilters({ search, onSearch, filter, onFilter, ven
       options={[{ v: '', label: 'All websites' }, ...websites.map(w => ({ v: w.id, label: w.name }))]}
       onChange={v => onFilter({ websiteId: v })} />
   );
+  const sourceChip = (
+    <SelectChip label="Source" value={filter.source} text={sources.find(o => o.v === filter.source)?.label ?? 'All sources'} active={!!filter.source}
+      options={[{ v: '', label: 'All sources' }, ...sources]} onChange={v => onFilter({ source: v })} />
+  );
   const clear = any && onClear && (
     <PbChip onClick={onClear} icon="x" aria-label="Clear search and filters">Clear</PbChip>
   );
@@ -67,14 +74,14 @@ export default function ProductFilters({ search, onSearch, filter, onFilter, ven
   if (phone) return (
     <section aria-label="Search and filters" className="pb-span-12" style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
       {searchBox}
-      <PbChipRow label="Filter products">{statusChips}{moreChip}{vendorChip}{siteChip}{clear}</PbChipRow>
+      <PbChipRow label="Filter products">{statusChips}{moreChip}{vendorChip}{siteChip}{sourceChip}{clear}</PbChipRow>
     </section>
   );
   return (
     <PbTile span={12} as="section" aria-label="Search and filters" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', minWidth: 0 }}>
         {searchBox}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', minWidth: 0 }}>{vendorChip}{siteChip}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', minWidth: 0 }}>{vendorChip}{siteChip}{sourceChip}</div>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', minWidth: 0 }}>
         <div style={{ minWidth: 0, maxWidth: '100%' }}><PbChipRow label="Filter by status">{statusChips}</PbChipRow></div>

@@ -16,6 +16,19 @@ export const istDate = (d = new Date()) => d.toLocaleDateString('en-IN', { day: 
 /** The product's source_ref: '<host>:<id on that site>' (dedupe key with source 'import'). */
 export const sourceRef = (host: string, ref: string) => `${host}:${ref}`.slice(0, 200);
 
+/** The same site under its other address: "www.shop.com" and "shop.com" are one store. */
+export const hostTwin = (host: string) => (host.startsWith('www.') ? host.slice(4) : `www.${host}`);
+/** A source_ref as the site's other address would have written it ('' when it has no host part). */
+export function refTwin(ref: string): string {
+  const at = ref.indexOf(':');
+  return at > 0 ? `${hostTwin(ref.slice(0, at))}${ref.slice(at)}`.slice(0, 200) : '';
+}
+/** The PostgREST `in.(…)` list for a source_ref: itself and, for an imported product, its other address. */
+export function refList(source: string, ref: string): string {
+  const twin = source === 'import' ? refTwin(ref) : '';
+  return [ref, ...(twin ? [twin] : [])].map(r => `"${r.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`).join(',');
+}
+
 /** What ingest() gets for one found product. Exported for the tests. */
 export function ingestBody(f: Found, run: { host: string; use_their_price: boolean; platform?: string | null }, vendor: string, date = istDate()): Record<string, unknown> {
   const unknownCur = !f.currency && run.platform === 'shopify';

@@ -64,8 +64,10 @@ export const productTitle = (p: ProductRow) => p.name || p.sku || 'Untitled prod
 export const missingOf = (p: Pick<ProductRow, 'cost_price' | 'sell_price' | 'category' | 'fabric' | 'color' | 'missing_attrs' | 'pb_product_images'>) =>
   missingAll(missingDetails(p, p.pb_product_images.length), p.missing_attrs);
 
-/** The status label, with what is missing on a Needs-info product: "Needs info · Missing: Fabric, Colour". */
-export const statusLabel = (p: Pick<ProductRow, 'status' | 'cost_price' | 'sell_price' | 'category' | 'fabric' | 'color' | 'missing_attrs' | 'pb_product_images'>) => {
+/** The status label of a Needs-info product says why: "Needs info · Already here as KB 264 WINE XS" (it looks like a
+ *  copy; `copyOf` from data/duplicates.ts heldLabels) and / or "Missing: Fabric, Colour". */
+export const statusLabel = (p: Pick<ProductRow, 'status' | 'cost_price' | 'sell_price' | 'category' | 'fabric' | 'color' | 'missing_attrs' | 'pb_product_images'>, copyOf?: string) => {
   const miss = p.status === 'needs_info' ? missingOf(p) : [];
-  return miss.length ? `${PRODUCT_STATUS.needs_info.label} · Missing: ${miss.join(', ')}` : PRODUCT_STATUS[p.status].label;
+  const why = [p.status === 'needs_info' && copyOf ? `Already here as ${copyOf}` : '', miss.length ? `Missing: ${miss.join(', ')}` : ''].filter(Boolean);
+  return why.length ? `${PRODUCT_STATUS.needs_info.label} · ${why.join(' · ')}` : PRODUCT_STATUS[p.status].label;
 };

@@ -19,6 +19,7 @@ import { STALE_MS } from '../types.ts';
 import { MAX_PAGE_ERRORS, MAX_PRODUCTS, MAX_SCANNED } from './cursor.ts';
 import { readRobots, shopCurrency } from './detect.ts';
 import { addProducts, capped, type Counts } from './batch.ts';
+import { hostTwin } from './body.ts';
 import { type Gate, needsPage } from './enrich.ts';
 import { RateLimited, pageError, setPace } from './fetch.ts';
 import { type Found } from './normalize.ts';
@@ -45,13 +46,18 @@ export async function ownDomains(): Promise<string[]> {
   return d;
 }
 
-/** Which of these refs (ids on that site) were imported before. */
+/** Which of these refs (ids on that site) were imported before, under either address of the site, so a
+ *  second import of the same store (typed with or without "www.") adds only what is new. */
 async function known(host: string, refs: string[]): Promise<Set<string>> {
   if (!refs.length) return new Set();
-  const full = refs.slice(0, 60).map(r => `${host}:${r}`.slice(0, 200));
-  const list = full.map(r => `"${r.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`).join(',');
-  const rows = await sel<{ source_ref: string }>(`pb_products?source=eq.import&source_ref=in.(${enc(list)})&select=source_ref`);
-  return new Set(rows.map(r => r.source_ref.slice(host.length + 1)));
+  const out = new Set<string>();
+  for (const h of [host, hostTwin(host)]) {
+    const full = refs.slice(0, 60).map(r => `${h}:${r}`.slice(0, 200));
+    const list = full.map(r => `"${r.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`).join(',');
+    const rows = await sel<{ source_ref: string }>(`pb_products?source=eq.import&source_ref=in.(${enc(list)})&select=source_ref`);
+    for (const r of rows) out.add(r.source_ref.slice(h.length + 1));
+  }
+  return out;
 }
 
 /** Where to carry on in a page that was cut short: after the product `skip_ref` (else at index `skip`). */

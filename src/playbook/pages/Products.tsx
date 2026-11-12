@@ -9,6 +9,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import MissingTagsBar from '../components/product/list/MissingTagsBar';
 import { friendlyError } from '../../lib/friendlyError';
+import { logSwallowed } from '../../lib/errorLogger';
+import { heldLabels, listSources } from '../data/duplicates';
 import { useBackClose } from '../../hooks/useBackClose';
 import { useConfirm } from '../../components/ui/ConfirmModal';
 import type { AddToast } from '../components/PbToasts';
@@ -43,6 +45,8 @@ export default function Products({ addToast, start = {}, onGuide }: { addToast: 
   const [vendors, setVendors] = useState<VendorLite[]>([]);
   const [sites, setSites] = useState<WebsiteLite[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
+  const [sources, setSources] = useState<{ v: string; label: string }[]>([]);
+  const [held, setHeld] = useState<Record<string, string>>({});
   const [adding, setAdding] = useState(!!start.add);
   const [importing, setImporting] = useState<{ open: boolean; url: string }>({ open: false, url: '' });
   const imp = useImportRun();
@@ -57,6 +61,11 @@ export default function Products({ addToast, start = {}, onGuide }: { addToast: 
     const what = dirtyTitle();
     if (what && !force) { void ask(discardAsk(what)).then(ok => { if (ok) setOpenId(null); }); return false; }
     setOpenId(null);
+  };
+  // From one product straight to another (a match in "Already added?"): the same question about unsaved typing first.
+  const openOther = (id: string) => {
+    const what = dirtyTitle();
+    if (what) void ask(discardAsk(what)).then(ok => { if (ok) setOpenId(id); }); else setOpenId(id);
   };
   useBackClose(!!openId, leave);
   useReturnFocus(openId);
@@ -81,6 +90,8 @@ export default function Products({ addToast, start = {}, onGuide }: { addToast: 
       const last = Math.max(0, Math.ceil(r.count / PAGE_SIZE) - 1);
       if (page > last) { setPage(last); return; }
       setRows(r.rows); setCount(r.count); setLoadErr('');
+      // Which Needs-info rows look already added: a second, smaller read, so the list itself shows first.
+      heldLabels(r.rows).then(h => { if (my === seq.current) setHeld(h); }).catch(e => logSwallowed('pb copies', e));
     } catch (e) {
       if (my !== seq.current) return;
       // The server answers "range not satisfiable" for a page past the end: same cure, from the first page.
@@ -92,8 +103,8 @@ export default function Products({ addToast, start = {}, onGuide }: { addToast: 
   useEffect(() => { void load(); }, [load]);
 
   useEffect(() => {
-    Promise.all([listVendorsLite(), listWebsitesLite(), getPbSettingsLite()])
-      .then(([v, w, s]) => { setVendors(v); setSites(w); setCategories(s.categories); })
+    Promise.all([listVendorsLite(), listWebsitesLite(), getPbSettingsLite(), listSources()])
+      .then(([v, w, s, src]) => { setVendors(v); setSites(w); setCategories(s.categories); setSources(src); })
       .catch((e: unknown) => setLookupErr(e ?? new Error('Lookup failed')));
   }, []);
   // A failed lookup toasts only once the list has answered, and only if the list
@@ -105,7 +116,7 @@ export default function Products({ addToast, start = {}, onGuide }: { addToast: 
   }, [lookupErr, loading, loadErr, addToast]);
 
   const onVendorCreated = (v: VendorLite) => setVendors(list => (list.some(x => x.id === v.id) ? list : [...list, v].sort((a, b) => a.name.localeCompare(b.name))));
-  const filtered = !!(filter.search || filter.status || filter.vendorId || filter.websiteId);
+  const filtered = !!(filter.search || filter.status || filter.vendorId || filter.websiteId || filter.source);
   const add = () => setAdding(true);
   const openImport = (url = '') => setImporting({ open: true, url });
   // The products arrive while the run goes; the list refreshes once when it finishes.
@@ -115,7 +126,7 @@ export default function Products({ addToast, start = {}, onGuide }: { addToast: 
   return (
     <>
       {openId && (
-        <ProductPage id={openId} onClose={() => leave()} onChanged={load} addToast={addToast}
+        <ProductPage id={openId} onClose={() => leave()} onChanged={load} onOpenOther={openOther} addToast={addToast}
           vendors={vendors} onVendorCreated={onVendorCreated} sites={sites} categories={categories} />
       )}
       <div style={{ display: openId ? 'none' : 'block' }}>
@@ -133,8 +144,8 @@ export default function Products({ addToast, start = {}, onGuide }: { addToast: 
         </div>
         {filter.status === 'needs_info' && <MissingTagsBar addToast={addToast} onQueued={() => void load()} />}
         <div className="pb-bento pb-bento--auto">
-          <ProductFilters search={search} onSearch={setSearch} filter={filter} onFilter={setFilter} vendors={vendors} websites={sites} onClear={clearAll} />
-          <ProductResults rows={rows} sites={sites} loading={loading} loadErr={loadErr} filtered={filtered} search={filter.search}
+          <ProductFilters search={search} onSearch={setSearch} filter={filter} onFilter={setFilter} vendors={vendors} websites={sites} sources={sources} onClear={clearAll} />
+          <ProductResults rows={rows} sites={sites} held={held} loading={loading} loadErr={loadErr} filtered={filtered} search={filter.search}
             onOpen={setOpenId} onAdd={add} onClear={clearAll} onRetry={() => void load()} />
         </div>
         {rows.length > 0 && <Pager page={page} pageSize={PAGE_SIZE} count={count} onPage={setPage} />}

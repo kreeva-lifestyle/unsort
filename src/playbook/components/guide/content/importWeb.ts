@@ -51,7 +51,7 @@ export const IMPORT_WEB: GuideSection[] = [
       list(
         'The tile on **Products** shows what it found so far: **found · added · already here · out of stock · failed**. It refreshes by itself.',
         '**Cancel import** stops it between pages; products already added stay.',
-        'Running the same store again skips every product that is **already here**, so it is safe to repeat (for example to pick up new arrivals).',
+        'Running the same store again skips every product that is **already here** (typed with or without "www"), so it is safe to repeat — for example to pick up new arrivals. It does not change the price or stock of the products it skips.',
         'An import stops by itself after **5,000** new products (products already here do not count, so running it again picks up the rest), and after three pages in a row fail — the tile then says why, with **Try again**.',
         'It goes at the pace of the AI: while many products are still waiting to be read or listings to be written, the import pauses, so a big store takes a day or more. If the store asks Playbook to slow down, it also waits a few minutes by itself.',
         'When it is done, **Show these products** lists everything it added (filtered by the vendor).',
