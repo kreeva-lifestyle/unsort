@@ -883,18 +883,14 @@ paid service, no library.
 - **Stock (owner, 2026-11-12: "If stock out/in-stock on playbook that same
   happens in shopify stores")**. `pb_products.in_stock boolean not null
   default true` (migration `20261112190000_pb_product_stock.sql`, partial
-  index for the list filter). Sources: (1) a first import stores the store's
-  own state (`ingestBody` → `importFacts`, import only); (2) EVERY import run
-  refreshes the products already here (`import/stock.ts refreshStock`,
-  called from `addProducts` for the page's known refs, whatever "in stock
-  only" says): `in_stock`, and the sizes on sale while in stock unless
-  `sizes` is kept; (3) the **Stock** switch on the product page (`StockTile`
-  → `set_stock`). Both save through `stock.ts saveStock`: the product row,
+  index for the list filter). Sources: a vendor's stock-out notice (below) and
+  the **Stock** switch on the product page (`StockTile` → `set_stock`). The
+  import-driven refresh this first shipped with was removed the same day
+  (see "Stock-out notices"). Both save through `stock.ts saveStock`: the product row,
   then every `published` listing of it → `publishing` (sent again as it is:
   no AI call, no new approval on a "Review first" website; waiting listings
   are left alone and read the product when they go out), `route_due` when a
-  run is publishing one right now, activity `stock`. Not "kept": the next
-  import sets it again. Shopify
+  run is publishing one right now, activity `stock`. Shopify
   (`productInput.ts`): on a website with Track stock OFF every variant gets,
   on every send, `inventoryItem.tracked: true` and `inventoryPolicy:
   CONTINUE` when in stock, `DENY` when out of stock (owner, same day:
@@ -909,13 +905,7 @@ paid service, no library.
   routing sends a published listing again when it differs (`route.ts
   behind`). `write_inventory` is now a required scope on every website.
   List: "· Out of stock" after the status label, filter "Out of stock"
-  (`stock:out`). Limits, on purpose: a generic (non Shopify / WooCommerce)
-  site's known pages are not fetched again; a WooCommerce run with "in stock
-  only" does not see sold-out products; a product its store no longer lists
-  is never marked out of stock ("not seen" is not "sold out": a run may
-  cover part of a store). Not built: a stock check that runs by itself on a
-  schedule; quantities; per-size sold-out (a size that sells out leaves the
-  size list).
+  (`stock:out`). Not built: quantities; per-size sold-out.
 - **Stock-out notices from vendors (owner, 2026-11-12, nine example
   pictures)**. A vendor announces sold-out designs as a picture (often a
   collage) with the codes written on it: "Permanent stock Out D no 5081",
@@ -952,9 +942,36 @@ paid service, no library.
   mark out of stock and clear that note. List: "· Temporarily out (vendor)"
   after the status, filter `stock:temp`; product page: a line on the Stock
   tile with the date and "Clear note" (`data/stock.ts clearTempOut`).
-  Not built: hiding a permanently sold-out product from the websites, "back
-  in stock" notices, a notice mixed into a product's album, acting on
-  another vendor's matching code.
+  **Permanent archives (owner, same day, asked "Sold out or off the
+  websites?": "Archive it")**: `stock.ts takeOffSale` sets `in_stock =
+  false`, `perm_out_at` (migration `20261112220000_pb_perm_stock_out.sql`),
+  sends every listing that is on Shopify once more (published / review /
+  failed → `publishing`) and sets aside the ones not there yet. While
+  `permOut(p)` (out of stock + `perm_out_at`), `buildProductInput` sends
+  `status: ARCHIVED`; `publishOne` then saves the listing as `skipped` with
+  `shopify_status = ARCHIVED` and `PERM_NOTE`, skips the channel step, never
+  creates a product for it, refuses a manual publish, and `retire` archives
+  the Playbook product once no listing of it is still on its way. A failed
+  send stays a Failed listing of a Ready product (visible, "Retry all").
+  Switching Stock on clears `perm_out_at`; Delete counts ARCHIVED like
+  DRAFT. A notice with neither word marks out of stock only (Sold out).
+  **Back in stock (owner: "after 7 days we got a broadcast of that product
+  with all the details then … that product is back in stock")**: when a
+  newly read vendor post is held by the gate as a copy (`pb_dup_held`), the
+  product it copies loses `temp_out_at` (`stockNotice.ts backInStock`).
+  **The source website's stock is not used (owner: "Dont check for stock in
+  source website. What if source website stopped doing business")**: the
+  import's stock refresh of #1377 (`import/stock.ts`) and the first
+  import's `in_stock` are removed; stock changes only by a vendor notice or
+  the Stock switch. The import's own "In stock only" choice (which products
+  to copy) is unchanged.
+  Why the AI reader and not OCR: OCR returns letters only; which number is
+  a code, which words are its colours in a collage, "Pur" / "both colour" /
+  "Only Lehenga", permanent or temporary, and whether the picture is a
+  notice at all still has to be decided, and the reader already looks at
+  every vendor post's photos in the same call, so it costs nothing extra.
+  Not built: a notice mixed into a product's album, acting on another
+  vendor's matching code.
 - Product list: "Needs info · Already here as KB 264 WINE XS"
   (`data/duplicates.ts heldLabels`, one RPC per page for its Needs-info rows);
   every row says "from Telegram" / "from bahupalace.com" (`sourceText`); a

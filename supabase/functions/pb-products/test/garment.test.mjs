@@ -128,6 +128,14 @@ test('stock: where Playbook decides, "Continue selling when out of stock" is on 
   assert.deepEqual([counted.variants[1].inventoryPolicy, counted.variants[1].inventoryItem.tracked], ['DENY', true]);
 });
 
+test('a permanent stock-out archives the Shopify product; switching Stock back on ends it', () => {
+  const existing = { ...STORE, options: [{ id: 'o1', name: 'Size', values: [{ id: 'v-m', name: 'M' }] }], variants: [{ id: 'var-m', key: 'size=m' }] };
+  const gone = ask({ existing, p: { ...P, in_stock: false, perm_out_at: '2026-11-12T10:00:00Z' }, sendStatus: false, files: null });
+  assert.equal(gone.status, 'ARCHIVED');                                                   // even on a plain update, which sends no status otherwise
+  assert.ok(!('status' in ask({ existing, p: { ...P, in_stock: false }, sendStatus: false, files: null })));           // out of stock only: Sold out, still listed
+  assert.ok(!('status' in ask({ existing, p: { ...P, in_stock: true, perm_out_at: '2026-11-12T10:00:00Z' }, sendStatus: false, files: null }))); // back in stock by hand
+});
+
 test('a choice someone added in Shopify stops the update instead of being deleted', () => {
   const existing = { ...STORE, options: [{ id: 'o1', name: 'Size', values: [] }, { id: 'o2', name: 'Colour', values: [] }] };
   assert.throws(() => ask({ existing, sendStatus: false, files: null }), e => e.status === 400 && /Kreeva India: this product has a choice on Shopify that Playbook did not make \(Colour\)/.test(e.message));

@@ -43,7 +43,7 @@ import { shopCategory } from './garment.ts';
 import { HttpError } from './http.ts';
 import { apiVersion } from './shopify.ts';
 import { type Existing, MF_KEY, MF_NAMESPACE, variantKey } from './shopifyProduct.ts';
-import type { ListingRow, ProductRow, WebsiteRow } from './types.ts';
+import { permOut, type ListingRow, type ProductRow, type WebsiteRow } from './types.ts';
 
 export const PRODUCT_SET = `mutation PbProductSet($input: ProductSetInput!, $identifier: ProductSetIdentifiers) {
   productSet(synchronous: true, input: $input, identifier: $identifier) {
@@ -156,7 +156,8 @@ export function buildProductInput(a: { l: ListingRow; p: ProductRow; site: Websi
     productType: l.product_type || p.category || '',
     ...(category ? { category } : {}),
     tags: l.tags || [],
-    ...(a.sendStatus ? { status: a.live ? 'ACTIVE' : 'DRAFT' } : {}),
+    // A permanent stock-out (stock.ts takeOffSale): the Shopify product is archived, whatever else this send says.
+    ...(permOut(p) ? { status: 'ARCHIVED' } : a.sendStatus ? { status: a.live ? 'ACTIVE' : 'DRAFT' } : {}),
     seo: { title: l.seo_title || l.title, description: l.seo_description || '' },
     ...(existing ? {} : { metafields: [{ namespace: MF_NAMESPACE, key: MF_KEY, type: 'single_line_text_field', value: l.id }] }),
     productOptions: [{
