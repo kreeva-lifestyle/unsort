@@ -23,6 +23,7 @@ import { pbInput, pbMeta } from '../pbTheme';
 import { PbButton, PbConfirm, PbPageHeader, PbSection, PbTile } from '../components/ui';
 import AutomationTile from '../components/settings/AutomationTile';
 import TelegramTile from '../components/settings/telegram/TelegramTile';
+import BulkTile from '../components/settings/BulkTile';
 import ImportHistoryTile from '../components/settings/ImportHistoryTile';
 import TagsTile from '../components/settings/TagsTile';
 import Tags from './Tags';
@@ -129,6 +130,7 @@ export default function PbSettings({ addToast, onBack, onGuide }: { addToast: Ad
       </PbTile>
       <TagsTile onOpen={() => setTagsOpen(true)} />
       <TelegramTile addToast={addToast} onGuide={() => onGuide?.('telegram')} />
+      <BulkTile addToast={addToast} canEdit={canEdit} />
       <ImportHistoryTile />
     </>
   );

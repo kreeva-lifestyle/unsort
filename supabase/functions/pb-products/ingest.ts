@@ -124,7 +124,8 @@ async function download(url: string, store: string | null): Promise<{ bytes: Uin
   return { bytes, ...kind };
 }
 
-export async function ingest(b: IngestBody): Promise<Record<string, unknown>> {
+/** `run`: the bulk change (a website import) this product is added by; the database records it under that run (bulkLog.ts). */
+export async function ingest(b: IngestBody, run?: string): Promise<Record<string, unknown>> {
   const source = String(b.source || '');
   if (!['telegram', 'import'].includes(source)) throw new HttpError(400, "source must be 'telegram' or 'import'.");
   const ref = String(b.source_ref ?? '').trim();
@@ -138,7 +139,7 @@ export async function ingest(b: IngestBody): Promise<Record<string, unknown>> {
   const vendor_id = await vendorId(String(b.vendor_name ?? '').replace(/\s+/g, ' ').trim().slice(0, 120));
   let id: string;
   try {
-    id = (await insert<{ id: string }>('pb_products', [{ source, source_ref: ref, raw_text: rawText || null, vendor_id, status: 'new', claimed_at: nowIso(), ...more }]))[0].id;
+    id = (await insert<{ id: string }>('pb_products', [{ source, source_ref: ref, raw_text: rawText || null, vendor_id, status: 'new', claimed_at: nowIso(), ...more }], { run }))[0].id;
   } catch (e) {
     const again = e instanceof HttpError && e.status === 409 ? await findDup() : null;
     if (again) return { ok: true, product_id: again.id, duplicate: true };

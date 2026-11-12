@@ -20,7 +20,7 @@ const products = [1, 2, 3, 4, 5, 6, 7].map(n => ({ ...base, id: 800 + n, handle:
 const pageHtml = read('shopify.page.html');
 
 function fakeWorld(run, store = null) {
-  const calls = { site: [], inserts: [], saves: [], known: [], values: [], suggest: [] };
+  const calls = { site: [], inserts: [], saves: [], known: [], values: [], suggest: [], bulk: [], tagged: [] };
   globalThis.fetch = async (url, init = {}) => {
     const u = String(url), method = init.method || 'GET';
     const ok = (body, status = 200, headers = {}) => new Response(typeof body === 'string' ? body : JSON.stringify(body), { status, headers });
@@ -60,7 +60,12 @@ function fakeWorld(run, store = null) {
     if (path.startsWith('pb_products?source=eq.import&source_ref=in.')) return ok([]);
     if (path.startsWith('pb_products?source=eq.import&source_ref=eq.')) return ok([]);
     if (path.startsWith('pb_vendors?') && method === 'POST') return ok([{ id: 'v1' }]);
-    if (path.startsWith('pb_products?') && method === 'POST') { const row = JSON.parse(init.body)[0]; calls.inserts.push(row); return ok([{ id: `p${calls.inserts.length}` }]); }
+    if (path.startsWith('pb_products?') && method === 'POST') { const row = JSON.parse(init.body)[0]; calls.inserts.push(row); calls.tagged.push(init.headers['x-pb-bulk'] ?? null); return ok([{ id: `p${calls.inserts.length}` }]); }
+    // The bulk-change log (bulkLog.ts): the run is asked for on every tick, counted and closed when the import ends.
+    if (path.startsWith('pb_bulk_runs?') && method === 'POST') { calls.bulk.push({ open: JSON.parse(init.body)[0] }); return ok([{ id: run.id }], 201); }
+    if (path.startsWith('pb_bulk_items?') && method === 'HEAD') return new Response(null, { status: 200, headers: { 'content-range': `0-0/${calls.inserts.length}` } });
+    if (path.startsWith('pb_bulk_runs?') && method === 'PATCH') { calls.bulk.push({ close: JSON.parse(init.body) }); return ok([{ id: run.id }]); }
+    if (path.startsWith('pb_bulk_runs?') && method === 'DELETE') { calls.bulk.push({ dropped: true }); return new Response(null, { status: 204 }); }
     if (method === 'PATCH' || path.startsWith('pb_activity')) return ok([]);
     throw new Error(`unexpected ${method} ${u}`);
   };
@@ -85,6 +90,10 @@ test('out of time mid-page: known product skipped without its page, cursor.skip 
   assert.equal(save1.claimed_at, null);
   assert.equal(save1.status, undefined); // still running
   assert.deepEqual([save1.found, save1.added, save1.skipped], [4, 3, 1]);
+  // An import is a bulk change: its log entry has the import's own id, and every product is recorded under it.
+  assert.equal(calls.bulk[0].open.id, 'r1'); assert.equal(calls.bulk[0].open.kind, 'import'); assert.equal(calls.bulk[0].open.label, 'Imported products from kumari.example');
+  assert.deepEqual(calls.tagged, ['r1', 'r1', 'r1']);
+  assert.equal(calls.bulk.some(b => b.close), false, 'still running: the log entry stays open');
   const row = calls.inserts[0];
   assert.equal(row.sku, 'KA-5070');
   assert.equal(row.sell_price, 2499); // the store's INR price (meta.json), from the variants on sale
@@ -104,6 +113,8 @@ test('out of time mid-page: known product skipped without its page, cursor.skip 
   out = await advanceImport(Date.now() + 60_000, null);
   assert.deepEqual(out, { run_id: 'r1', found: 3, added: 3 });
   assert.deepEqual(calls.site, ['/robots.txt', '/products.json?limit=50&page=1', '/products/saree-5', '/products/saree-6', '/products/saree-7']);
+  const closed = calls.bulk.find(b => b.close)?.close; // the import is over: its log entry is closed with what it added
+  assert.equal(closed.status, 'done'); assert.equal(closed.details.added, 6); assert.equal(closed.details.host, 'kumari.example');
   const save2 = calls.saves.at(-1);
   assert.equal(save2.status, 'done');
   assert.equal('skip' in save2.cursor, false);

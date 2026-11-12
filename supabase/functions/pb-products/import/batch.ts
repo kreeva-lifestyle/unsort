@@ -54,7 +54,7 @@ export async function addProducts(items: Found[], start: number, counts: Counts,
     taken.push(...batch);
     await Promise.all(batch.map(async (f) => {
       try {
-        const r = await ingest(ingestBody(ctx.perItem ? await enrich(f, ctx.origin, ctx.robots, ctx.gate) : f, ctx.run, ctx.vendor));
+        const r = await ingest(ingestBody(ctx.perItem ? await enrich(f, ctx.origin, ctx.robots, ctx.gate) : f, ctx.run, ctx.vendor), ctx.run.id); // recorded under the import, so it can be taken back
         if (r.duplicate) counts.skipped++; else counts.added++;
       } catch (e) {
         counts.failed++;

@@ -30,7 +30,7 @@ export const onShopify = <T extends Pick<L, 'status' | 'shopify_product_id' | 's
   ls.filter(l => l.shopify_product_id && !(l.status === 'skipped' && ['DRAFT', 'ARCHIVED'].includes(l.shopify_status || '')));
 
 /** Remove files from the bucket (Storage API, service role). Returns how many could NOT be removed. */
-async function removeFiles(paths: string[]): Promise<number> {
+export async function removeFiles(paths: string[]): Promise<number> {
   if (!paths.length) return 0;
   try {
     const r = await fetchT(`${SB_URL}/storage/v1/object/${BUCKET}`, { method: 'DELETE', headers: { ...svcHeaders, 'content-type': 'application/json' }, body: JSON.stringify({ prefixes: paths }) }, 30_000);

@@ -36,14 +36,15 @@ import { claimPublish, PUBLISH_NEEDS_MS, pubCandidates, publishOne } from './pub
 import { temporary } from './publishParts.ts';
 import { claimRead, readCandidates, readOne } from './reader.ts';
 import { retireDue, sendStockDue } from './stockSend.ts';
+import { takeOffDue } from './takeOff.ts';
 import { FILL_NEEDS_MS, fillCandidates, fillQueued, routeDue } from './tagFill.ts';
 import { loadTaxonomy } from './taxonomy.ts';
 import type { Budget } from './types.ts';
 
 /** stock = stock changes sent to stores; paused = automation is paused (the run stopped, or sent stock only); limit = the day's AI limit is used up. */
-export interface WorkResult { read: number; routed: number; generated: number; published: number; failed: number; imported?: number; tagged?: number; stock?: number; paused?: boolean; limit?: boolean }
+export interface WorkResult { read: number; routed: number; generated: number; published: number; failed: number; imported?: number; tagged?: number; stock?: number; taken_off?: number; paused?: boolean; limit?: boolean }
 
-const CAPS = { read: 6, generate: 8, publish: 10, route: 10, fill: 5, stock: 10, media: 5, retire: 5 };
+const CAPS = { read: 6, generate: 8, publish: 10, route: 10, fill: 5, stock: 10, media: 5, retire: 5, takeOff: 10 };
 /** The slice of each run that stock sends may use. */
 const STOCK_MS = 25_000;
 /** Time an AI step needs left before it is claimed: photo checks + a slow answer (Opus / high effort). */
@@ -82,6 +83,10 @@ export async function work(userId: string | null, manual = false): Promise<WorkR
     if (sent) out.stock = sent;
     await retireDue(CAPS.retire); // a permanent stock-out whose archive did not happen when its last listing left Shopify
   } catch (e) { failed('stock', 'run', e); }
+  try { // listings a revert took back while they were live: off their store (takeOff.ts); a person asked, so a pause does not hold it
+    const until = Date.now() + STOCK_MS, off = await takeOffDue(CAPS.takeOff, () => Date.now() < until, userId);
+    if (off) out.taken_off = off;
+  } catch (e) { failed('take_off', 'run', e); }
   if (pausedAtStart && !manual) return { ...out, paused: true };
 
   // Paused while this run is going → it stops starting items. A round a person started while paused runs through.
