@@ -17,7 +17,7 @@ export const IMPORT_WEB: GuideSection[] = [
         'Open **Products**. On a computer tap **Import from website** next to **+ Add product**; on a phone tap the **Import from website** row at the top of the list.',
         'Type or paste the store\'s address (for example `example.com`) and tap **Check website**. Playbook looks at the store for a few seconds. The whole store is imported, even if you paste the address of one collection.',
         'Read the preview: what kind of store it is, about how many products it has, three sample products with their prices, and anything to know (in the yellow box).',
-        '**Vendor name** is filled in from the store\'s name — change it if you like. Every imported product gets this vendor.',
+        '**Vendor** — who these products come from. A website does not say who made a product, so Playbook asks once per website. The box starts from the store\'s name; tap one of your vendors shown under it, or type a new name. Every imported product gets this vendor. A website you imported before is **not asked again**: its vendor is shown with **Change**.',
         'Leave **Only in-stock products** on unless you also want sold-out items.',
         'Leave **Sell at their price** on to use the store\'s price as our selling price (see below).',
         'Tap **Import about 980 products** (the number is the estimate; it reads **Import up to …** when the store cannot say how many are in stock). A tile at the top of **Products** shows the progress; you can leave the page, it keeps going on the server.',
@@ -52,7 +52,7 @@ export const IMPORT_WEB: GuideSection[] = [
       list(
         'The tile on **Products** shows what it found so far: **found · added · already here · out of stock · failed**. It refreshes by itself.',
         '**Cancel import** stops it between pages; products already added stay.',
-        'Running the same store again skips every product that is **already here** (typed with or without "www"), so it is safe to repeat — for example to pick up new arrivals. It does not change the price or stock of the products it skips.',
+        'Running the same store again skips every product that is **already here** (typed with or without "www"), so it is safe to repeat — for example to pick up new arrivals. The check says how many are already here before you start, and the button then reads **Check for new products**. When nothing was new the tile says **Nothing new on …**. A repeat costs nothing: no AI is used for products that are skipped. It does not change the price or stock of the products it skips.',
         'An import stops by itself after **5,000** new products (products already here do not count, so running it again picks up the rest), and after three pages in a row fail — the tile then says why, with **Try again**.',
         'It goes at the pace of the AI: while many products are still waiting to be read or listings to be written, the import pauses, so a big store takes a day or more. If the store asks Playbook to slow down, it also waits a few minutes by itself.',
         'When it is done, **Show these products** lists everything it added (filtered by the vendor).',

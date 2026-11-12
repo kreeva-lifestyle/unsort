@@ -47,25 +47,45 @@ export function estimateLine(c: Pick<ImportCheck, 'estimate' | 'estimate_in_stoc
 }
 
 /** "Import about 980 products" (the in-stock count when only in-stock products are copied) · "Import up to 1,240
- *  products" when the in-stock count is unknown or counting stopped ("5000+") · "Import products". */
-export function importLabel(c: Pick<ImportCheck, 'estimate' | 'estimate_in_stock'>, inStockOnly: boolean): string {
+ *  products" when the in-stock count is unknown or counting stopped ("5000+") · "Import products".
+ *  A website imported before: "Check for new products" when everything it shows is already here, else
+ *  "Import about 14 new products" (the store's count less what Playbook already has from it). */
+export function importLabel(c: Pick<ImportCheck, 'estimate' | 'estimate_in_stock' | 'already_here'>, inStockOnly: boolean): string {
   const stock = estimateText(c.estimate_in_stock), all = estimateText(c.estimate);
   const n = inStockOnly ? stock ?? all : all;
-  if (!n) return 'Import products';
+  if (!n) return c.already_here ? 'Import new products' : 'Import products';
+  if (c.already_here) {
+    const total = /^[\d,]+$/.test(n) ? Number(n.replace(/,/g, '')) : null;
+    if (total === null) return 'Import new products';
+    const fresh = total - c.already_here;
+    return fresh <= 0 ? 'Check for new products' : `Import about ${count(fresh)} new product${fresh === 1 ? '' : 's'}`;
+  }
   const cappedAt = /^([\d,]+)\+$/.exec(n);
   if (cappedAt) { const k = Number(cappedAt[1].replace(/,/g, '')); return k >= 5000 ? 'Import up to 5,000 products' : `Import more than ${count(k)} products`; }
   return inStockOnly && !stock ? `Import up to ${n} products` : `Import about ${n} products`;
 }
 
+/** What Playbook already has from this website, for the preview; '' on a first import. */
+export function alreadyLine(c: Pick<ImportCheck, 'already_here' | 'estimate' | 'estimate_in_stock'>, inStockOnly = true): string {
+  const have = c.already_here ?? 0;
+  if (!have) return '';
+  const n = estimateText(inStockOnly ? c.estimate_in_stock ?? c.estimate : c.estimate);
+  const total = n && /^[\d,]+$/.test(n) ? Number(n.replace(/,/g, '')) : null;
+  const all = total !== null && have >= total;
+  return `${all ? `All ${count(have)}` : count(have)} ${have === 1 ? 'is' : 'are'} already in Playbook from an earlier import. ${all ? 'Only products the store added since then will be copied.' : 'They are skipped: only the new ones are copied.'}`;
+}
+
 /** A check that found nothing to copy: unknown platform and no products. */
 export const nothingFound = (c: ImportCheck) => c.platform === 'unknown' && !c.sample.length && !estimateText(c.estimate);
 
-/** The run's headline: "Importing from example.com", "Imported 975 products from example.com"… */
-export function runTitle(r: Pick<ImportRunRow, 'status' | 'host' | 'added'>): string {
+/** The run's headline: "Importing from example.com", "Imported 975 products from example.com", and for a
+ *  repeat import that found nothing to add, "Nothing new on example.com: every product found is already here". */
+export function runTitle(r: Pick<ImportRunRow, 'status' | 'host' | 'added' | 'skipped'>): string {
   switch (r.status) {
     case 'queued': return `Import from ${r.host} is queued`;
     case 'running': return `Importing from ${r.host}`;
-    case 'done': return `Imported ${count(r.added)} product${r.added === 1 ? '' : 's'} from ${r.host}`;
+    case 'done': return r.added > 0 ? `Imported ${count(r.added)} product${r.added === 1 ? '' : 's'} from ${r.host}`
+      : r.skipped > 0 ? `Nothing new on ${r.host}: every product found is already here` : `Nothing was imported from ${r.host}`;
     case 'failed': return `Import from ${r.host} failed`;
     case 'cancelled': return `Import from ${r.host} was cancelled`;
   }

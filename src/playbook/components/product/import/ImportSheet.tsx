@@ -1,7 +1,8 @@
 // "Import from website" (PbModal sheet on phone / modal on desktop): paste a
-// store's address → Check website → the preview (platform, estimate, 3
-// samples, warnings) and the choices (vendor, in-stock only, their price) →
-// the one primary, "Import ~980 products". The run itself happens on the
+// store's address → Check website → the preview (platform, estimate, what is
+// already here from an earlier import, 3 samples, warnings) and the choices
+// (vendor, in-stock only, their price) → the one primary, "Import ~980
+// products" — or "Check for new products" when the website was imported before. The run itself happens on the
 // server; the Products page shows its progress tile. Only one gradient at a
 // time: "Check website" while nothing is checked, the Import button after.
 // Typing makes the form dirty (PbModal asks "Discard this import?" on ×/Back).
@@ -22,8 +23,10 @@ import { importError, importLabel, normalizeUrl, nothingFound } from './importTe
 
 const CHOICES: ImportChoices = { vendor: '', inStockOnly: true, theirPrice: true };
 
-export default function ImportSheet({ open, initialUrl = '', onClose, onStarted, addToast, onGuide }: {
+export default function ImportSheet({ open, initialUrl = '', onClose, onStarted, addToast, onGuide, vendors = [] }: {
   open: boolean; initialUrl?: string; onClose: () => void; onStarted: (runId: string) => void; addToast: AddToast; onGuide?: (section: string) => void;
+  /** Names of the vendors already in Playbook (offered as one-tap choices). */
+  vendors?: string[];
 }) {
   const [url, setUrl] = useState(initialUrl);
   const [check, setCheck] = useState<ImportCheck | null>(null);
@@ -56,7 +59,8 @@ export default function ImportSheet({ open, initialUrl = '', onClose, onStarted,
         const c = await checkWebsite(address);
         if (my !== seq.current) return;
         setCheck(c);
-        setChoices(x => ({ ...x, vendor: x.vendor || c.vendor_suggestion || c.host }));
+        // A website imported before keeps its vendor; a new one starts from the site's own name.
+        setChoices(x => ({ ...x, vendor: x.vendor || c.last_vendor || c.vendor_suggestion || c.host }));
       } catch (e2) { if (my === seq.current) setErr(importError(e2)); } finally { if (my === seq.current) setBusy(''); }
       return;
     }
@@ -97,8 +101,9 @@ export default function ImportSheet({ open, initialUrl = '', onClose, onStarted,
             {check ? 'Change the address to check another store. The whole store is imported, even from a collection’s address.' : 'Shopify and WooCommerce stores are read fully; other stores as far as their pages allow.'}
           </div>
         </div>
-        {check && <ImportPreview check={check} />}
-        {usable && <ImportOptions value={choices} onChange={v => { setChoices(v); setVendorErr(''); }} disabled={busy === 'start'} vendorError={vendorErr} foreign={foreign} />}
+        {check && <ImportPreview check={check} inStockOnly={choices.inStockOnly} />}
+        {usable && <ImportOptions value={choices} onChange={v => { setChoices(v); setVendorErr(''); }} disabled={busy === 'start'} vendorError={vendorErr} foreign={foreign}
+          lastVendor={check.last_vendor} suggested={check.vendor_suggestion || check.host} vendors={vendors} />}
         {usable && <LegalLine onGuide={onGuide ? () => { reset(); onClose(); onGuide('import-website'); } : undefined} />}
         {busy === 'check' && <div role="status" style={pbMeta}>Looking at the store… this takes a few seconds.</div>}
         {err && <div ref={errBox} role="alert" style={pbErrorBox}>{err}</div>}
