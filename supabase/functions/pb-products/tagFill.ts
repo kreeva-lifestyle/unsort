@@ -88,19 +88,21 @@ export async function fillQueued(c: { id: string; tag_fill_run: string }, tax: T
   return true;
 }
 
-/** Worker step: route products a tag change made Ready (route_due, set by pb_products_refresh). */
+/** Worker step: route products a tag change made Ready (route_due, set by pb_products_refresh), and those whose
+ *  listing was being written or published when they were last checked (route.ts). The flag is cleared BEFORE
+ *  routing, so a listing that is still busy can raise it again. */
 export async function routeDue(limit: number, userId: string | null, inTime: () => boolean): Promise<number> {
   let n = 0;
   for (const c of await sel<{ id: string }>(`pb_products?route_due=eq.true&select=id&order=updated_at.asc&limit=${limit}`)) {
     if (!inTime()) break;
     const p = await one<ProductRow>(`pb_products?id=eq.${enc(c.id)}&select=${PRODUCT_COLS}`);
+    await patch('pb_products', `id=eq.${enc(c.id)}`, { route_due: false });
     try {
       if (p?.status === 'ready') { await routeProduct(p, userId); n++; }
     } catch (e) { // logged on the product's timeline; "Check websites again" there routes it
       console.error(`pb-products route_due ${c.id}: ${plain(e)}`);
       await logActivity({ product_id: c.id, action: 'failed', details: { step: 'route', error: plain(e) }, user_id: userId });
     }
-    await patch('pb_products', `id=eq.${enc(c.id)}`, { route_due: false });
   }
   return n;
 }

@@ -23,6 +23,7 @@ import { claimGenerate, genCandidates, generateOne } from './generate.ts';
 import { advanceImport } from './import/runner.ts';
 import { plain } from './http.ts';
 import { claimPublish, PUBLISH_NEEDS_MS, pubCandidates, publishOne } from './publish.ts';
+import { temporary } from './publishParts.ts';
 import { claimRead, readCandidates, readOne } from './reader.ts';
 import { FILL_NEEDS_MS, fillCandidates, fillQueued, routeDue } from './tagFill.ts';
 import { loadTaxonomy } from './taxonomy.ts';
@@ -91,7 +92,10 @@ export async function work(userId: string | null): Promise<WorkResult> {
     try {
       const r = await publishOne(l, { manual: false, userId, budget });
       if (r.status === 'published') out.published++;
-    } catch (e) { failed('publish', c.id, e); }
+    } catch (e) {
+      failed('publish', c.id, e);
+      if (temporary(e)) break; // Shopify asked for a pause: the rest wait for the next run instead of failing one by one
+    }
   }
 
   try { if (inTime()) out.routed += await routeDue(CAPS.route, userId, inTime); } catch (e) { failed('route_due', 'run', e); }

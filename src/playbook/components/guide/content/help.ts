@@ -20,6 +20,9 @@ export const HELP: GuideSection[] = [
         ['Product **Ready** but on no website', 'No rule matched and the website is on **Do not list it**; or the website is Off', 'Check the rules (conditions, order, switches) and **Active**, then **Check websites again**'],
         ['Product went to the wrong website', 'A wide rule matched first', 'Move a "Keep it off" rule above it; **Remove from site** on the wrong one'],
         ['Failed: "The AI answer was cut off — try a lower effort setting"', 'Effort too high for the length limits', '**Content & AI** → lower **Effort** → **Save changes** → **Regenerate**'],
+        ['Listing **Removed** with "This product was deleted in Shopify…"', 'Someone deleted the product in Shopify. Playbook does not make it again by itself', '**Put back on site** lists it again as a new product; leave it if it should stay off'],
+        ['Failed: "…this product has a choice on Shopify that Playbook did not make"', 'Someone added a choice such as Colour to the product in Shopify. Sending it would delete that choice', 'Remove that choice in Shopify and tap **Update on Shopify**, or look after this product in Shopify'],
+        ['Red note "this store sells in USD…" (or another currency)', 'Playbook\'s prices are rupees. Nothing is sent to a store that sells in another currency', 'Connect the store that sells in rupees, or change the store\'s currency in Shopify'],
         ['Published, but shoppers cannot see it', 'The website is on **Draft**; or the publications permission is missing (noted in the listing\'s red text)', 'Make it visible in Shopify, or add `read_publications` + `write_publications` and tap **Update on Shopify**'],
         ['The price is not what you expected', 'Markup, rounding, minimum or a rule\'s own price — or the price is **kept**', 'Try the cost in the **Pricing → Preview** box; check the rule; empty the price box → **Save changes** → **Regenerate**'],
         ['A tag is missing', 'Its placeholder is empty for this product (e.g. no fabric)', 'Fill that fact on the product → **Save facts** → **Regenerate**'],
@@ -35,6 +38,8 @@ export const HELP: GuideSection[] = [
     blocks: [
       h('Does the app ever delete a product from Shopify?'),
       p('No. **Remove from site** only sets it to Draft. **Archive** and **Delete** do not touch Shopify at all — and Delete is refused while the product is still on Shopify.'),
+      h('I changed something in Shopify by hand. Does Playbook undo it?'),
+      p('When Playbook updates a product it sends its own title, description, price, sizes and tags again, so a change to those made in Shopify is replaced. It leaves these alone: tags you or an app added in Shopify, photos and videos added there, a photo you removed there, the order of the photos (until the photos change in Playbook), the status (Active / Draft), the sales channels, the category, stock, and each size\'s stock setting.'),
       h('I changed a website\'s pricing / tags / writing. Are old products updated?'),
       p('Not by themselves. New listings use the new settings. For a new **price** on a product already on Shopify, open the product and tap **Check websites again** — the price is updated on Shopify and the text stays. For new tags or writing, open the listing and tap **Regenerate** (and **Update on Shopify** if it does not go by itself).'),
       h('Can one product have a different price on each website?'),

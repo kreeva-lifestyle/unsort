@@ -15,7 +15,7 @@
 //   ingest             secret         { source:'telegram'|'import', source_ref, raw_text, vendor_name?, image_urls?[], less_amount?, source_url?, intake_notes?[], sell_price?, price_note?, attributes?{}, sku? } (attributes / sku: source 'import' only)
 //                                                                          → { ok, product_id, duplicate?, images?, warnings? }
 //   read_product       staff          { product_id }                      → { ok, product, routed, warning? }
-//   route_product      staff          { product_id }                      → { ok, routed, repriced, listings, warning? }
+//   route_product      staff          { product_id, resend? }             → { ok, routed, repriced, resent, listings, warning? }
 //   delete_product     admin|manager  { product_id }                      → { ok, photos_left }   (409 while it is on Shopify or being worked on)
 //   route_website      staff          { website_id }                      → { ok, queued, matched, more }
 //   generate_listing   staff          { listing_id }                      → { ok, listing }

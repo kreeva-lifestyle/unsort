@@ -6,6 +6,9 @@
 // They go out with metafieldsSet AFTER productSet (publish.ts): metafieldsSet
 // writes only the keys it is given, so other apps' and the merchant's fields
 // are never touched (productSet would delete every field not in its input).
+// metafieldsSet saves all or nothing: a field the store refuses (its own
+// definition has another type) is left out and the rest sent again
+// (publishParts.ts sendFields, by `elementIndex`).
 // An empty fact is not sent; a fact that went empty is left as it is on the
 // store. No I/O — tested in test/fields.test.mjs.
 import type { Faq } from './seoCheck.ts';
@@ -13,7 +16,7 @@ import type { ProductRow } from './types.ts';
 
 export const FIELD_NS = 'custom';
 export const METAFIELDS_SET = `mutation PbFields($metafields: [MetafieldsSetInput!]!) {
-  metafieldsSet(metafields: $metafields) { userErrors { field message code } }
+  metafieldsSet(metafields: $metafields) { userErrors { field message code elementIndex } }
 }`;
 
 export interface FieldInput { ownerId: string; namespace: string; key: string; type: string; value: string }

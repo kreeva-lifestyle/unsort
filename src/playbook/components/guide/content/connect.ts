@@ -2,7 +2,7 @@
 // token or a Dev Dashboard app with client ID + secret), test, switch on.
 import { type GuideSection, h, list, p, steps, table, tip, warn } from '../types';
 
-const SCOPES = '`write_products`, `read_products`, `write_publications`, `read_publications`, `write_files`';
+const SCOPES = '`write_products`, `read_products`, `write_publications`, `read_publications`';
 
 export const CONNECT: GuideSection[] = [
   {

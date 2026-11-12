@@ -45,17 +45,23 @@ test('a product is removed: the row first, then its files, and one line stays to
 });
 
 test('refused while it is on Shopify, naming the website; a listing taken off the site does not block', async () => {
-  const live = { id: 'l1', status: 'published', shopify_product_id: 'gid://shopify/Product/1', claimed_at: null, pb_websites: { name: 'Arya Store' } };
+  const live = { id: 'l1', status: 'published', shopify_product_id: 'gid://shopify/Product/1', shopify_status: 'ACTIVE', claimed_at: null, pb_websites: { name: 'Arya Store' } };
+  const off = { ...live, status: 'skipped', shopify_status: 'DRAFT' }; // Remove from site: removed here and Draft there
   const w = { product: product(), listings: [live], files: [`${ID}/1.jpg`] };
   world(w);
   await assert.rejects(deleteProduct({ product_id: ID }, null), e => e.status === 409 && /on Shopify \(Arya Store\)/.test(e.message) && /Remove from site/.test(e.message));
   assert.equal(w.deleted, undefined); assert.equal(w.removed, undefined); assert.equal(w.logged, undefined);
   const failed = { ...live, status: 'failed' }; // an update that failed: the product is still on Shopify
-  assert.equal(onShopify([failed, { ...live, status: 'skipped' }, { ...live, shopify_product_id: null }]).length, 1);
-  const w2 = { product: product(), listings: [{ ...live, status: 'skipped' }], files: [] };
+  assert.equal(onShopify([failed, off, { ...live, shopify_product_id: null }]).length, 1);
+  const w2 = { product: product(), listings: [off], files: [] };
   world(w2);
   assert.equal((await deleteProduct({ product_id: ID }, null)).ok, true);
   assert.equal(w2.deleted, true);
+  // Removed in Playbook but perhaps still on sale on Shopify: not deleted, and the way out is named.
+  const w3 = { product: product(), listings: [{ ...live, status: 'skipped' }], files: [] };
+  world(w3);
+  await assert.rejects(deleteProduct({ product_id: ID }, null), e => e.status === 409 && /Put back on site, then Remove from site/.test(e.message));
+  assert.equal(w3.deleted, undefined);
 });
 
 test('refused while the AI reads it or a listing is being written or sent', async () => {
