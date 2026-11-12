@@ -14,17 +14,21 @@ export interface Existing {
   id: string; handle: string;
   options: { id: string; name: string; values: { id: string; name: string }[] }[];
   variants: { id: string; key: string }[]; // key = "option=value|option=value", lower-case
+  /** The product's photos as the store has them, in order (videos and 3D models left out). */
+  media: { id: string; alt: string }[];
 }
 
 const FIELDS = `id handle
   options { id name optionValues { id name } }
   variants(first: 100) { nodes { id selectedOptions { name value } } }
+  media(first: 50) { nodes { id alt mediaContentType } }
   metafield(namespace: "${MF_NAMESPACE}", key: "${MF_KEY}") { value }`;
 
 interface Node {
   id: string; handle: string;
   options: { id: string; name: string; optionValues: { id: string; name: string }[] }[];
   variants: { nodes: { id: string; selectedOptions: { name: string; value: string }[] }[] };
+  media?: { nodes: { id: string; alt: string | null; mediaContentType: string }[] };
   metafield: { value: string } | null;
 }
 
@@ -35,6 +39,7 @@ const shape = (n: Node): Existing => ({
   id: n.id, handle: n.handle,
   options: (n.options || []).map(o => ({ id: o.id, name: o.name, values: (o.optionValues || []).map(v => ({ id: v.id, name: v.name })) })),
   variants: (n.variants?.nodes || []).map(v => ({ id: v.id, key: variantKey(v.selectedOptions || []) })),
+  media: (n.media?.nodes || []).filter(m => m.mediaContentType === 'IMAGE').map(m => ({ id: m.id, alt: m.alt || '' })),
 });
 
 /** The product as the store has it now; null when it was deleted in Shopify. */

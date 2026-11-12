@@ -11,7 +11,7 @@ import { HttpError, fetchT } from './http.ts';
 import type { SecretsRow, WebsiteRow } from './types.ts';
 
 const TIMEOUT = 30_000;
-export const REQUIRED_SCOPES = ['write_products', 'read_products', 'write_publications', 'read_publications'];
+export const REQUIRED_SCOPES = ['write_products', 'read_products', 'write_publications', 'read_publications', 'write_files']; // write_files: photo descriptions of a rewritten listing (fileUpdate)
 
 /** "https://My-Shop.myshopify.com/" → "my-shop.myshopify.com" */
 export const shopHost = (d: string) => String(d || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');

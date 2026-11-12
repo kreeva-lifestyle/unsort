@@ -135,7 +135,7 @@ Types: `src/playbook/types.ts` (jsonb shapes documented there).
    creating legacy custom apps on 2026-01-01; new apps come from the Dev
    Dashboard (same organisation as the store) and use client credentials.
    Scopes: write_products, read_products, write_publications,
-   read_publications (+ write_inventory when tracking stock).
+   read_publications, write_files (+ write_inventory when tracking stock).
 5. Every step writes `pb_activity` (action: read, routed, generated,
    published, failed, edited, unpublished…).
 
@@ -551,6 +551,31 @@ AI's extra tags are an enum of it.
   FAQ. Hard rule 10: a fabric is written word for word as PRODUCT FACTS gives
   it, and left out of a short field rather than shortened. Spelling is
   corrected once, by the reader, not by the writer.
+- **Research rules (owner, 2026-11-12; report "Product listing SEO and AEO",
+  `reports/`, not in git)**. Writer: the description's first sentence says
+  what the product is and what comes with it (a fact the title lacks), the
+  angle follows; fact bullets are "Label: fact" in one order (`FACT_ORDER`);
+  the facts block lists what shoppers of that garment expect
+  (`garment.ts expectedFacts`, by category) and the writer names the absent
+  ones in `missing_facts`; FAQ answers begin with the answer and use shopper
+  wording; the first alt names the product and the view, later ones only what
+  the photo adds, never "image of"; default title formula = colour, fabric,
+  work or pattern, type, what comes with it; "for Women" in the SEO title
+  when it fits. `manufacturer` (an imported store's) is withheld from the
+  writer. Checks: `title` (HARD: a humanCopy tell, a word of 4+ capitals that
+  is not a size, an emoji or one of `! * # @ $ ₹ ™ ® ©` in an AI title) and
+  `alt_opening` (soft). Shopify: `vendor` = the store profile's brand (the
+  supplier is never sent; the default tag template is `Vendor_{vendor_code}`,
+  dropped when the vendor has no code); `category` = Shopify's standard
+  taxonomy id from `garment.ts shopCategory` (ids read live 2026-11-12; sent
+  with the status only: create, recovered create, Put back); alt texts of
+  unchanged photos go out with `fileUpdate` (`altUpdates`: only when the store
+  has the same number of photos; needs `write_files`, now in
+  `REQUIRED_SCOPES`; a failure is a warning on the listing, never a failed
+  publish). Not built, waiting on the owner: standard category attributes
+  (needs their colour / fabric matching list), a hold on "pure" / origin
+  claim words, dropping the Ordering block, Western spellings per market,
+  country of origin, up to five FAQ questions (needs the listing editor).
 - **A program finishes the draft**: pattern title (`title_template`), the SEO
   title always ends `| <brand>` inside `meta_title_max` (`withBrand`), cuts,
   kept (locked) fields; handle = 3–6 clean words with the design code taken

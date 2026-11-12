@@ -12,7 +12,14 @@
 // update keeps the status people set in Shopify. `tail` is the FAQ a store
 // shows at the end of its description (fields.ts faqHtml); the listing's own
 // custom fields go out separately, with metafieldsSet (publish.ts).
+// Owner, 2026-11-12 (research report): `vendor` is the STORE'S BRAND, never the
+// supplier (themes publish the vendor as the brand; the supplier stays inside
+// Playbook), and Shopify's standard category (garment.ts) is set when the
+// product is created — a later update leaves the category people chose in
+// Shopify. Alt text for photos that did not change goes out with fileUpdate
+// (ALT_UPDATE, publish.ts), because `files` here would upload them again.
 import { cleanHtml } from './content.ts';
+import { shopCategory } from './garment.ts';
 import { publicUrl } from './db.ts';
 import { type Existing, MF_KEY, MF_NAMESPACE, variantKey } from './shopifyProduct.ts';
 import type { ListingRow, ProductRow, WebsiteRow } from './types.ts';
@@ -26,6 +33,9 @@ export const PRODUCT_SET = `mutation PbProductSet($input: ProductSetInput!, $ide
 export const PUBLISH = `mutation PbPublish($id: ID!, $input: [PublicationInput!]!) {
   publishablePublish(id: $id, input: $input) { userErrors { field message } }
 }`;
+export const ALT_UPDATE = `mutation PbAlts($files: [FileUpdateInput!]!) {
+  fileUpdate(files: $files) { userErrors { field message } }
+}`;
 export const UNPUBLISH = `mutation PbUnpublish($product: ProductUpdateInput!) {
   productUpdate(product: $product) { product { id status } userErrors { field message } }
 }`;
@@ -35,7 +45,15 @@ export const STOCK_WARNING = 'Stock tracking is on for this website: the product
 
 const money = (n: number | null) => (n === null || n === undefined || !(Number(n) > 0) ? null : Number(n).toFixed(2));
 
-export function buildProductInput(a: { l: ListingRow; p: ProductRow; site: WebsiteRow; vendor: string; paths: string[]; withFiles: boolean; live: boolean; sendStatus: boolean; existing: Existing | null; tail?: string }): Record<string, unknown> {
+/** The photos whose alt text on the store differs from the listing's: only when the store still has exactly
+ *  the photos Playbook sent, in the same number (someone who added or removed one in Shopify keeps their own). */
+export function altUpdates(media: { id: string; alt: string }[], alts: string[], photos: number): { id: string; alt: string }[] {
+  if (!photos || media.length !== photos) return [];
+  return media.flatMap((m, i) => { const alt = String(alts[i] || '').slice(0, 512); return alt && alt !== m.alt ? [{ id: m.id, alt }] : []; });
+}
+
+/** `vendor` = the store's brand name (profile.brand). */
+export function buildProductInput(a: { l: ListingRow; p: ProductRow; site: WebsiteRow; vendor: string; paths: string[]; withFiles: boolean; live: boolean; sendStatus: boolean; existing: Existing | null; tail?: string; noCategory?: boolean }): Record<string, unknown> {
   const { l, p, site, existing } = a;
   const tracked = !!site.track_inventory;
   const price = money(l.price);
@@ -57,6 +75,7 @@ export function buildProductInput(a: { l: ListingRow; p: ProductRow; site: Websi
     };
   };
   const handleMoves = !!existing && !!l.handle && l.handle !== existing.handle;
+  const category = a.sendStatus && !a.noCategory ? shopCategory(p.category, p.attributes?.set_contents) : null; // with the status: on a create, a recovered create or Put back
   const input: Record<string, unknown> = {
     title: l.title,
     descriptionHtml: cleanHtml(l.description_html || '') + (a.tail || ''),   // staff edits come straight from the table: clean again here
@@ -64,6 +83,7 @@ export function buildProductInput(a: { l: ListingRow; p: ProductRow; site: Websi
     ...(handleMoves ? { redirectNewHandle: true } : {}), // the old URL keeps working
     ...(a.vendor ? { vendor: a.vendor } : {}),
     productType: l.product_type || p.category || '',
+    ...(category ? { category } : {}),
     tags: l.tags || [],
     ...(a.sendStatus ? { status: a.live ? 'ACTIVE' : 'DRAFT' } : {}),
     seo: { title: l.seo_title || l.title, description: l.seo_description || '' },

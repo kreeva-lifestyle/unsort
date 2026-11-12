@@ -11,6 +11,8 @@
 //               words and in the meta title; not stuffed
 //   brand       the meta title ends with the brand name
 //   names       supplier name, design code, links, phone numbers
+//   title       an AI-written title with a sales word, a word in ALL CAPS,
+//               an emoji or a symbol (the title is what every feed reads)
 //   fabric      the description names the product's fabric word for word
 //               (owner, 2026-11-12: the fabric is never shortened or reworded)
 // A field a person typed (kept) is theirs: only what the AI wrote is checked.
@@ -46,6 +48,9 @@ const CLAIMS = /\bno\.?\s*1\b|\bnumber one\b|#\s*1\b|\bonly \d+ (?:left|pieces? 
 // A web address, an email, or a phone number (an Indian mobile, or 10 to 13 digits in a row). A size run
 // such as "38 40 42 44 46" is not a phone number, and "kurta.In" (a missing space) is not a website.
 const LINKS = [/https?:\/\/|\bwww\./i, /\b[a-z0-9-]{3,}\.(?:com|in|co|net|org|shop|store)\b(?![A-Za-z])/, /[\w.+-]+@[\w-]+\.\w+/, /(?:\+?91[\s-]?)?\b[6-9]\d{4}[\s-]?\d{5}\b|\b\d{10,13}\b/];
+// Sizes such as XXXL, and short codes of up to three letters, are not shouting.
+const SHOUT = /(?<![\p{L}\p{N}])(?!X+L\b)\p{Lu}{4,}(?![\p{L}\p{N}])/u;
+const SYMBOLS = /[\p{Extended_Pictographic}!*#@$₹™®©★☆]/u;
 const whole = (text: string, name: string) => new RegExp(`(?<![\\p{L}\\p{N}])${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\p{L}\\p{N}])`, 'iu').test(text);
 
 export function checkCopy(i: CheckInput): Problem[] {
@@ -98,6 +103,10 @@ export function checkCopy(i: CheckInput): Problem[] {
   const claim = CLAIMS.exec(written)?.[0];
   if (claim) add('claims', true, `Makes a claim the facts do not support: ${q(claim)}.`, `Remove ${q(claim)} and any other ranking, scarcity or review claim.`);
 
+  if (ai.title) {
+    const bad = [...copyTells(c.title), ...(SHOUT.test(c.title) ? ['a word in ALL CAPS'] : []), ...(SYMBOLS.test(c.title) ? ['an emoji or symbol'] : [])];
+    if (bad.length) add('title', true, `The title is not plain (${bad.join(', ')}).`, `Rewrite the title in plain words: what the product is, nothing else. Remove: ${bad.join(', ')}.`);
+  }
   const fabric = String(i.fabric ?? '').replace(/\s+/g, ' ').trim();
   if (fabric && ai.desc && !countPhrase(desc, fabric)) add('fabric', true, `The description does not name the fabric as given (${q(fabric)}).`, `Name the fabric in the description word for word as PRODUCT FACTS gives it: ${q(fabric)}. Do not shorten it, reword it or change its spelling.`);
 
@@ -113,6 +122,7 @@ export function checkCopy(i: CheckInput): Problem[] {
   if (ai.desc && n > L.wordsMax * 1.15) add('too_long', false, `The description is ${n} words (the limit is ${L.wordsMax}).`, `Cut the description to at most ${L.wordsMax} words (it is ${n}).`);
   const alts = (c.image_alts || []).map(a => wordsOf(a).join(' ')).filter(Boolean);
   const dupAlt = alts.length !== new Set(alts).size || i.others.some(o => (o.image_alts || []).some((a, x) => !!alts[x] && wordsOf(a).join(' ') === alts[x]));
+  if ((c.image_alts || []).some(a => /^\s*(?:an? )?(?:image|photo|picture) of\b/i.test(a))) add('alt_opening', false, 'A photo description begins with "image of" or "photo of".', 'Begin each image alt text with what is shown, never with "image of", "photo of" or "picture of".');
   if (dupAlt) add('alts', false, 'Some photo descriptions repeat (in this listing or another store\'s).', 'Make every image alt text different from the others and from the other stores\' alt texts.');
   const tells = copyTells(written);
   if (tells.length) add('tells', false, `Reads like sales copy in places (${tells.join(', ')}).`, `Rewrite the sentences with these patterns as plain facts: ${tells.join(', ')}.`);
