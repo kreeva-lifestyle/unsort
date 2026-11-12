@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 globalThis.Deno ??= { env: { get: () => '' } }; // readerPrompt.ts → db.ts reads Deno.env
 const { ATTRS, COLOURS, READ_PHOTOS, readerPrompt, readerSchema } = await import('../readerPrompt.ts');
 const { readChanges } = await import('../readChanges.ts');
+const { nameWithColour } = await import('../readName.ts');
 
 test('reader prompt: photos first, a plain colour, the fabric as written', () => {
   const sys = readerPrompt(['Anarkali', 'Kurta Set', 'anarkali']);
@@ -40,4 +41,20 @@ test('what a fresh read changed: only fields that had a value, with what they we
   assert.deepEqual(readChanges({ name: '', color: null, attributes: null }, { name: 'A', color: 'Red', attributes: { work: 'Zari' } }), {});
   assert.deepEqual(readChanges(p, {}), {});
   assert.equal(readChanges({ name: 'x'.repeat(400) }, { name: 'y' }).name[0].length, 200);
+});
+
+test('the name leads with the colour the product has', () => {
+  const F = 'Pure Roman Silk Chanderi';
+  // another word for the colour in front of the fabric → the colour field wins
+  assert.equal(nameWithColour(`Dark Pink ${F} Anarkali Suit Set with Mirror Lace Work`, 'Rani Pink', F), `Rani Pink ${F} Anarkali Suit Set with Mirror Lace Work`);
+  assert.equal(nameWithColour('olive green pure roman silk chanderi Kurta Set', 'Mehendi Green', F), 'Mehendi Green pure roman silk chanderi Kurta Set');
+  assert.equal(nameWithColour(`${F} Anarkali Suit Set`, 'Wine', F), `Wine ${F} Anarkali Suit Set`);             // no colour at all → it goes in front
+  // already right, or nothing safe to do → untouched
+  assert.equal(nameWithColour(`Rani  Pink ${F} Anarkali`, 'rani pink', F), `Rani Pink ${F} Anarkali`);
+  assert.equal(nameWithColour('White Anarkali Suit Set with Jacquard Work', 'Off White', 'Fancy Banarasi Jacquard Dola Silk'), 'White Anarkali Suit Set with Jacquard Work'); // no fabric in the name: not guessed
+  assert.equal(nameWithColour(`Party Wear Heavy Designer Look ${F} Gown`, 'Red', F), `Party Wear Heavy Designer Look ${F} Gown`); // a long opening is not a colour
+  assert.equal(nameWithColour(`2 Piece ${F} Set`, 'Red', F), `2 Piece ${F} Set`);                                 // nor is one with digits
+  assert.equal(nameWithColour('Zari Kurta Set', '', 'Georgette'), 'Zari Kurta Set');
+  assert.equal(nameWithColour('Zari Kurta Set', 'Maroon', ''), 'Zari Kurta Set');
+  assert.equal(nameWithColour('', 'Maroon', 'Georgette'), '');
 });

@@ -32,7 +32,11 @@ Types: `src/playbook/types.ts` (jsonb shapes documented there).
    it as "already known" unless locked (the fabric always is: it stays, apart
    from a spelling mistake), a reader key it now answers
    with nothing is dropped, and the activity row records
-   `changed: { field: [was, now] }` (`readChanges.ts`). Then `needs_info` if `cost_price` or `category`
+   `changed: { field: [was, now] }` (`readChanges.ts`). The name is built as
+   colour + fabric + what it is; when the AI's name carries the fabric but
+   opens with another word for the colour, a program puts the product's colour
+   there (`readName.ts`). If the AI cannot open one of the photos, the read is
+   tried once more with the first two. Then `needs_info` if `cost_price` or `category`
    is missing (and, since 2026-11-12, fabric, colour or a photo: the gate, see
    "One store, one voice"), else `ready` and route (step 2). On AI error: back to `new`
    with `ai_error`, `claimed_at` left so it retries after 5 min; after 3

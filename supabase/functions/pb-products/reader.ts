@@ -32,6 +32,7 @@ import { ago, enc, getSettings, logActivity, nowIso, one, patch, sel } from './d
 import { HttpError, plain } from './http.ts';
 import { aiPhotos } from './photos.ts';
 import { readChanges } from './readChanges.ts';
+import { nameWithColour } from './readName.ts';
 import { READ_PHOTOS, readerPrompt, readerSchema, type ReadOut } from './readerPrompt.ts';
 import { routeProduct } from './route.ts';
 import { stripLess } from '../pb-telegram/group.ts';
@@ -75,6 +76,7 @@ function merge(p: ProductRow, out: ReadOut, categories: string[], manual: boolea
     if (s && can(f)) set[f] = s;
   };
   str('name', out.name, 200); str('sku', out.sku, 80); str('fabric', out.fabric, 80); str('color', out.color, 80);
+  if (set.name) set.name = nameWithColour(set.name, set.color ?? p.color, set.fabric ?? p.fabric).slice(0, 200); // the name says the colour the product has
   const cat = categories.find(c => c.toLowerCase() === String(out.category || '').trim().toLowerCase());
   if (cat && can('category')) set.category = cat;
   const sizes = [...new Set((Array.isArray(out.sizes) ? out.sizes : []).map(s => String(s ?? '').trim().slice(0, 40)).filter(Boolean))].slice(0, 30);
@@ -104,12 +106,15 @@ export async function readOne(p: ProductRow, o: { manual: boolean; prevStatus?: 
       sel<{ path: string }>(`pb_product_images?product_id=eq.${enc(p.id)}&kind=eq.image&select=path&order=position.asc&limit=${READ_PHOTOS}`),
     ]);
     const photos = await aiPhotos(imgs.map(i => i.path));
-    const ai = await askClaude<ReadOut>({
+    const ask = (n: number) => askClaude<ReadOut>({
       model: s.reader.model, effort: s.reader.effort,
       system: readerPrompt(s.categories, p.source === 'import', spec),
-      content: [...photos.blocks, { type: 'text', text: factsText(p, vendor?.name ?? '', o.manual || again) }],
+      content: [...photos.blocks.slice(0, n), { type: 'text', text: factsText(p, vendor?.name ?? '', o.manual || again) }],
       schema: readerSchema(s.categories, spec), maxTokens: 8000, timeoutMs: o.budget.hard - Date.now(),
     });
+    // A photo the AI cannot open must not stop the read: once more with the first two (what the reader had before 2026-11-12).
+    let used = photos.blocks.length;
+    const ai = await ask(used).catch((e) => { if (used <= 2 || !/could not open one of the product photos/.test(plain(e))) throw e; used = 2; return ask(2); });
     const set = merge(p, ai.data, s.categories, o.manual, again);
     const changed = o.manual || again ? readChanges(p, set) : {};
     const next = { ...p, ...set } as ProductRow;
@@ -118,7 +123,7 @@ export async function readOne(p: ProductRow, o: { manual: boolean; prevStatus?: 
       { ...set, status, ai_read_at: nowIso(), ai_error: null, claimed_at: null }, PRODUCT_COLS);
     if (!saved[0]) throw new HttpError(409, 'The product changed while it was being read — open it again.');
     product = await tagAfterRead(saved[0], tax, spec, ai.data, o.userId);
-    await logActivity({ product_id: p.id, action: 'read', details: { model: ai.model, effort: ai.effort, usd: ai.usd, status: product.status, filled: Object.keys(set), ...(product.missing_attrs?.length ? { missing: product.missing_attrs } : {}), ...(photos.sent.length < imgs.length ? { photos_skipped: imgs.length - photos.sent.length } : {}), ...(Object.keys(changed).length ? { changed } : {}) }, user_id: o.userId });
+    await logActivity({ product_id: p.id, action: 'read', details: { model: ai.model, effort: ai.effort, usd: ai.usd, status: product.status, filled: Object.keys(set), ...(product.missing_attrs?.length ? { missing: product.missing_attrs } : {}), ...(used < imgs.length ? { photos_skipped: imgs.length - used } : {}), ...(Object.keys(changed).length ? { changed } : {}) }, user_id: o.userId });
   } catch (e) {
     const msg = plain(e);
     await logActivity({ product_id: p.id, action: 'failed', details: { step: 'read', error: msg }, user_id: o.userId });
