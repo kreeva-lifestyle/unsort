@@ -3,7 +3,9 @@
 // really gives — a key is left out when the store has nothing for it (never
 // guessed; brand is never copied into manufacturer). Sources:
 //   Shopify  vendor → brand, product_type, tags → store_tags, first variant
-//            barcode / grams, options Material|Fabric and Colour.
+//            barcode / grams, options Material|Fabric and Colour, and the two
+//            dates the store keeps: created_at → source_created_at (uploaded
+//            there), published_at → source_published_at (on sale there since).
 //   Woo      brands[] or the "Brand" attribute, category names → product_type,
 //            tag names → store_tags, weight + unit, global_unique_id → barcode.
 //   JSON-LD  brand, manufacturer, category, gtin13 / gtin / ean, weight, material, color.
@@ -17,6 +19,7 @@ import { MAX_HTML, decode } from './text.ts';
 export const IMPORT_ATTRS = [
   'brand', 'manufacturer', 'product_type', 'store_tags', 'sku', 'barcode', 'weight', 'compare_at_price',
   'currency', 'seo_title', 'seo_description', 'material', 'colour', 'source_page_url',
+  'source_created_at', 'source_published_at',
 ] as const;
 
 export type Meta = Record<string, string>;
@@ -62,6 +65,12 @@ function weightText(value: unknown, unit: unknown): string {
   return `${v} ${units[u.toLowerCase()] ?? u}`;
 }
 
+/** A date as the store gives it → ISO (UTC). Nothing for an unreadable date, one before 2000 or one in the future. */
+export function storeDate(v: unknown, now = Date.now()): string {
+  const t = Date.parse(txt(v, 40));
+  return Number.isFinite(t) && t >= Date.UTC(2000, 0, 1) && t <= now + 86_400_000 ? new Date(t).toISOString() : '';
+}
+
 export interface Base { url: string; sku: string | null; price: number | null; compare_at: number | null; currency: string | null }
 /** Keys every platform has: sku, currency, compare-at (only when above the price), the page address. */
 export const baseMeta = (f: Base): Meta => cleanMeta({
@@ -78,6 +87,7 @@ export function shopifyMeta(p: Obj, f: Base, optionValues: (test: (n: unknown) =
     barcode: variants.map(x => txt(x.barcode, 40)).find(Boolean),
     weight: g ? gramsText(g.grams) : w ? weightText(w.weight, w.weight_unit) : '',
     material: optionValues(isMaterial).join(', '), colour: optionValues(isColour).join(', '),
+    source_created_at: storeDate(p.created_at), source_published_at: storeDate(p.published_at),
   });
 }
 

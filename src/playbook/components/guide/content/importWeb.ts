@@ -33,6 +33,7 @@ export const IMPORT_WEB: GuideSection[] = [
       h('The details it copies'),
       p('Besides the name, description, photos, sizes and price, Playbook keeps every detail the other store shows about a product. They appear on the product page in the **From the website** tile (text only — they are never sent back to that store), and the AI reader leaves them as they are.'),
       table(['On the product page', 'Where it comes from'],
+        ['**Uploaded on their site**, **On sale there since**', 'The dates the other store keeps for the product: when it was added there, and — only when it is a different day — since when shoppers could see it. Shopify stores give both; other stores usually give none'],
         ['**Brand**', 'The store\'s brand or vendor field'],
         ['**Manufacturer**', 'Only when the store names a maker separately from the brand'],
         ['**Product type**', 'The store\'s product type or categories'],

@@ -126,7 +126,7 @@ export default function Products({ addToast, start = {}, onGuide }: { addToast: 
   return (
     <>
       {openId && (
-        <ProductPage id={openId} onClose={() => leave()} onChanged={load} onOpenOther={openOther} addToast={addToast}
+        <ProductPage id={openId} onClose={() => leave()} onChanged={load} onOpenOther={openOther} onDeleted={() => { setOpenId(null); void load(); }} addToast={addToast}
           vendors={vendors} onVendorCreated={onVendorCreated} sites={sites} categories={categories} />
       )}
       <div style={{ display: openId ? 'none' : 'block' }}>

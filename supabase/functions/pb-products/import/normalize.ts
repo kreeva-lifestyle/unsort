@@ -32,6 +32,7 @@ export interface ShopifyProduct {
   variants?: { price?: string | number; compare_at_price?: string | number | null; available?: boolean; sku?: string; barcode?: string | null; grams?: number; option1?: string | null; option2?: string | null; option3?: string | null }[];
   options?: { name?: string; position?: number; values?: string[] }[];
   images?: { src?: string; position?: number }[];
+  created_at?: string | null; published_at?: string | null; // when the store uploaded it / first showed it (meta.ts)
 }
 
 /** `currency` = the store's own (its /meta.json, read once per run); Shopify's product list does not say. */

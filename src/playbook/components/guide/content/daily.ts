@@ -88,6 +88,7 @@ export const DAILY: GuideSection[] = [
         ['**Check websites again**', 'Runs every website\'s rules again for this product — use it after you change a rule. Published listings also get the price from today\'s cost and pricing, sent to Shopify without rewriting the text (a **kept** price stays).'],
         ['**Save facts**', 'Saves your changes. If the cost, category, vendor, fabric, name, SKU or details changed, the websites are checked again: unpublished listings are re-priced and rewritten, published ones are re-priced and updated on Shopify (their text stays; a **kept** price stays).'],
         ['**Archive** / **Restore**', 'Archive hides the product and stops sending it anywhere. Listings already on Shopify stay — use **Remove from site** first if they should go. Restore makes the AI read it again.'],
+        ['**Delete**', 'Admins and managers only (the bin button; on a phone under **More actions**). After one confirmation the product is removed from Playbook completely: facts, photos, tags, listings and history. It cannot be undone. Not possible while the product is on Shopify — tap **Remove from site** on that website first. A product copied from a website is added again by the next import of that website; **Archive** keeps it out.'],
         ['**+ Add photos**', 'Adds more photos to the product.'],
       ),
     ],

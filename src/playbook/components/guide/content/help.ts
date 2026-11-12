@@ -13,6 +13,7 @@ export const HELP: GuideSection[] = [
         ['Client ID + secret refused although they are right', 'The app is in a different Shopify organisation, or not installed on this store', 'Create the app in the store\'s own organisation and install it on the store'],
         ['**Active** will not switch on', 'The store has never passed a test', '**Save credentials**, then a green **Test connection**'],
         ['Products stay **New** for more than a few minutes', 'Automation is paused, or a big batch is being worked through', 'Dashboard banner → **Open Settings** → switch Automation on; or tap **Run now**'],
+        ['**Delete** says "This product is on Shopify (…)"', 'A listing of it is on that website and was not taken off', 'Open that website on the product → **Remove from site** → then **Delete**'],
         ['Product in **Needs info**', 'Cost price, category, fabric, colour, a photo or a required tag missing ("Missing: Fabric, Photo"), or the AI could not read it (red "AI reader" note)', 'Fill the facts → **Save facts** (already filled: **Mark ready**); a photo: **Add photos**; a tag: **Let AI decide** or choose it under **Tags**; or **Read again with AI**'],
         ['**Needs info · Already here as …**', 'The same design code from the same vendor is already in Products', 'Open it; under **This looks already added** tap **It is a copy**, **Another colour** or **Different product**'],
         ['Listing in **Needs review** on a **Live** website', 'A check found something: copied wording, the search phrase missing, the same title as another store… The listing says which', 'Open it, read "Check before it goes out", fix the text or tap **Regenerate**, then **Approve**'],
@@ -33,7 +34,7 @@ export const HELP: GuideSection[] = [
     title: 'Questions people ask',
     blocks: [
       h('Does the app ever delete a product from Shopify?'),
-      p('No. **Remove from site** only sets it to Draft. **Archive** does not touch Shopify at all.'),
+      p('No. **Remove from site** only sets it to Draft. **Archive** and **Delete** do not touch Shopify at all — and Delete is refused while the product is still on Shopify.'),
       h('I changed a website\'s pricing / tags / writing. Are old products updated?'),
       p('Not by themselves. New listings use the new settings. For a new **price** on a product already on Shopify, open the product and tap **Check websites again** — the price is updated on Shopify and the text stays. For new tags or writing, open the listing and tap **Regenerate** (and **Update on Shopify** if it does not go by itself).'),
       h('Can one product have a different price on each website?'),
