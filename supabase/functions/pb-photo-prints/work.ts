@@ -1,12 +1,13 @@
 // One call = a small batch of waiting photos, one after the other: claim a
 // photo, download it, work out its print, hand the answer back (pb_photo_put
-// pairs it with the photos already printed), then the next — until the batch
-// has used its share of the call's CPU. An edge function gets 2 seconds of
-// CPU per request; reading a photo's block averages takes 20–50 ms for the
-// 15–20 megapixel originals kept here and well under a second for the largest
-// file the bucket takes, so the batch stops claiming after 400 ms of reading:
-// even a worst-case last photo ends far inside the limit. pg_cron sends
-// several calls a minute while photos are waiting (trigger_pb_photo_prints).
+// pairs it with the photos already printed), then the next.
+// How big a batch may be was measured on the live project (2026-11-12): a
+// photo costs about 20 ms of CPU (15–20 megapixel originals), and the 2
+// seconds of CPU an edge function gets are counted per WORKER, across every
+// call it is serving — eight calls at once, a dozen photos each, were all
+// cut off together. So a call stops claiming after 500 ms of reading or 20
+// photos, and pg_cron sends one call a minute, two when many photos wait
+// (trigger_pb_photo_prints): a worker stays far inside its allowance.
 // A photo that cannot be printed is answered with the reason and never asked
 // again; one whose download fails, or whose call is cut off, stays claimed
 // and is handed out again 10 minutes later (three times at most).
@@ -64,7 +65,7 @@ export async function runOne(d: Deps): Promise<Result> {
   };
 }
 
-export const BATCH = { readMs: 400, photos: 20, wallMs: 25_000 };
+export const BATCH = { readMs: 500, photos: 20, wallMs: 25_000 };
 export interface BatchResult { done: number; skipped: number; paired: number; read_ms: number; notes: string[]; stopped?: string }
 
 /** Photos one after the other until none is waiting or the batch has used its share of the call. */

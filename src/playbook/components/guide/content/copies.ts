@@ -1,6 +1,6 @@
 // Guide: "Already added?" — how Playbook notices a product that is already
-// here (design code + colour), what the three answers do, and the source
-// label / Source filter on Products.
+// here (design code + colour, and the same photo saved again), what the three
+// answers do, and the source label / Source filter on Products.
 import { type GuideSection, h, list, p, table, tip } from '../types';
 
 export const COPIES: GuideSection[] = [
@@ -8,7 +8,7 @@ export const COPIES: GuideSection[] = [
     id: 'copies',
     short: 'Already added?',
     title: 'Already added? — copies, colours and where a product came from',
-    lead: 'The same design often arrives twice: in a vendor\'s Telegram post and again from a website, or in two posts. Playbook compares every product with the ones already here by its design code, so one design is not listed twice.',
+    lead: 'The same design often arrives twice: in a vendor\'s Telegram post and again from a website, or in two posts. Playbook compares every product with the ones already here — by its design code, and by its photos — so one design is not listed twice.',
     blocks: [
       h('What it does by itself'),
       table(['It finds', 'What happens', 'What you do'],
@@ -16,12 +16,20 @@ export const COPIES: GuideSection[] = [
         ['The same design code from the **same vendor**, in the same colour or with no colour given (`KB 302` and `KB 302 XS Blue`)', 'The later one waits in **Needs info · Already here as KB 302 XS Blue**. Nothing is written for the websites', 'Open it and answer (below)'],
         ['The same code from the same vendor in a **different colour** (`KB 264 Wine` and `KB 264 Royal Blue`)', 'Nothing waits: each colour is its own product. The product page lists the other colours under **Same design**', 'Nothing'],
         ['A near match: the same code at **another vendor**, or the same number with other letters (`KB 25` and `NKB 25`)', 'Nothing waits. The product page asks **Could this be already added?**', 'Answer when you see it'],
+        ['The **same photo** on two products — saved again at another size or quality — when their codes say nothing (no code, or different codes)', 'Nothing waits. The product page asks **Could this be already added?** and shows the photo that matched, marked **Same photo**', 'Answer when you see it'],
       ),
       h('How the code is read'),
       list(
         'From the **SKU**: letters, then numbers. `KB 302`, `KB-302`, `kb302` and `KB 302 XS Blue` are all the design **KB 302** — spaces, dashes and capitals do not matter, and size or colour words after the code are not part of it.',
         'The colour is the words after the code (`KB 264 ROYAL BLUE XS` → royal blue); when there are none, the product\'s **Colour**.',
         'A product without a SKU is never held back.',
+      ),
+      h('How photos are compared'),
+      list(
+        'Each photo is checked once, in the background, a few minutes after the product arrives. No AI is used and it costs nothing.',
+        'It recognises the **same picture** saved again: smaller, larger, more compressed, a little brighter, or turned upright from a phone. A different photo of the same dress is **not** matched, and neither is a cropped or mirrored copy.',
+        'It does not look at colour, so the same pose in another colour can match — that is why a photo match only asks, and never holds a product by itself.',
+        'A picture that is on many products (a size chart, a banner) is ignored. JPEG photos only; PNG and WEBP photos are not compared.',
       ),
       h('Answering'),
       p('A product that waits shows **This looks already added** with the earlier product (photo, code, colour, where it came from). Tap the earlier product to open it and compare, then answer:'),
@@ -40,7 +48,7 @@ export const COPIES: GuideSection[] = [
         'Each product on **Products** says where it came from: "from Telegram" or "from bahupalace.com". A product you typed in shows nothing.',
         'The **Source** filter lists only the products from Telegram, typed in, or copied from one website.',
       ),
-      tip('Give vendors\' products their design code as the SKU (the AI reads it from the post). Without a code there is nothing to compare.'),
+      tip('Give vendors\' products their design code as the SKU (the AI reads it from the post). Without a code only the photos can be compared.'),
     ],
   },
 ];
