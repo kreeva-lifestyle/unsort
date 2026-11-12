@@ -14,7 +14,7 @@
 // Best effort: a tag failure is logged and never loses the product.
 import { SB_URL, enc, insert, logActivity, nowIso, one, patch, sel, svcHeaders } from './db.ts';
 import { HttpError, fetchT, plain } from './http.ts';
-import { refList } from './import/body.ts';
+import { importFacts, refList } from './import/body.ts';
 import { siteBytes } from './import/fetch.ts';
 import { autoTag } from './tagStore.ts';
 import { loadTaxonomy } from './taxonomy.ts';
@@ -32,8 +32,8 @@ export interface IngestBody {
   less_amount?: unknown; source_url?: unknown; intake_notes?: unknown;
   // Optional (import from website, 2026-11-08): sell at exactly this price everywhere, and where it came from.
   sell_price?: unknown; price_note?: unknown;
-  // Import from website only: the store's facts as plain strings, and its SKU.
-  attributes?: unknown; sku?: unknown;
+  // Import from website only: the store's facts as plain strings, its SKU, and its size choices as it writes them.
+  attributes?: unknown; sku?: unknown; sizes?: unknown;
 }
 
 /** The optional fields, validated (exported for the tests). */
@@ -57,20 +57,7 @@ export function extras(b: IngestBody): Record<string, unknown> {
   }
   const note = String(b.price_note ?? '').replace(/\s+/g, ' ').trim();
   if (note) out.price_note = note.slice(0, 300);
-  if ((b.attributes !== undefined && b.attributes !== null) || (b.sku !== undefined && b.sku !== null && b.sku !== '')) {
-    if (b.source !== 'import') throw new HttpError(400, "attributes and sku are taken only from a website import (source 'import').");
-    const sku = String(b.sku ?? '').replace(/\s+/g, ' ').trim();
-    if (sku) out.sku = sku.slice(0, 80);
-    if (b.attributes !== undefined && b.attributes !== null) {
-      if (typeof b.attributes !== 'object' || Array.isArray(b.attributes)) throw new HttpError(400, 'attributes must be an object of short texts.');
-      const attrs: Record<string, string> = {};
-      for (const [k, v] of Object.entries(b.attributes as Record<string, unknown>).slice(0, 30)) {
-        const s = String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, 500);
-        if (/^[a-z][a-z0-9_]{0,39}$/.test(k) && s && typeof v !== 'object') attrs[k] = s;
-      }
-      if (Object.keys(attrs).length) out.attributes = attrs;
-    }
-  }
+  Object.assign(out, importFacts(b)); // attributes, sku and sizes: from a website import only
   return out;
 }
 

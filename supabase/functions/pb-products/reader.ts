@@ -80,7 +80,7 @@ function merge(p: ProductRow, out: ReadOut, categories: string[], manual: boolea
   const cat = categories.find(c => c.toLowerCase() === String(out.category || '').trim().toLowerCase());
   if (cat && can('category')) set.category = cat;
   const sizes = [...new Set((Array.isArray(out.sizes) ? out.sizes : []).map(s => String(s ?? '').trim().slice(0, 40)).filter(Boolean))].slice(0, 30);
-  if (sizes.length && can('sizes')) set.sizes = sizes;
+  if (sizes.length && can('sizes') && !(p.source === 'import' && !empty(p.sizes))) set.sizes = sizes; // an imported product's sizes are the store's own choices
   // A Telegram "Less" comes off the RATE the AI read — in code, never by the AI: cost = rate − less.
   // Less >= rate leaves the cost empty (needs_info) instead of ₹0.
   const cost = Number(out.cost_price) - (Number(p.less_amount) > 0 ? Number(p.less_amount) : 0);

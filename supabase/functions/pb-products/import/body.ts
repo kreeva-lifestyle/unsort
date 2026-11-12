@@ -9,6 +9,7 @@
 // price in rupees) — $29 must never become ₹29. The store's extra
 // facts (meta.ts) go to attributes, its SKU to the sku column; the product type
 // and material also go in raw_text so the reader can pick category and fabric.
+import { HttpError } from '../http.ts';
 import type { Found } from './normalize.ts';
 
 export const istDate = (d = new Date()) => d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' });
@@ -29,6 +30,32 @@ export function refList(source: string, ref: string): string {
   return [ref, ...(twin ? [twin] : [])].map(r => `"${r.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`).join(',');
 }
 
+/** A store's size choices as it writes them ("XS (34)"), cleaned: short texts, no repeats, at most 30. */
+export const storeSizes = (v: unknown): string[] =>
+  [...new Set((Array.isArray(v) ? v : []).map(s => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, 40)).filter(Boolean))].slice(0, 30);
+
+/** The facts only a website import may hand to ingest(): the store's SKU, its size choices as written, and its
+ *  extra facts as short plain texts (keys a-z0-9_). Anything else that sends them is refused. */
+export function importFacts(b: { source?: unknown; sku?: unknown; sizes?: unknown; attributes?: unknown }): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  const sizes = storeSizes(b.sizes), sku = String(b.sku ?? '').replace(/\s+/g, ' ').trim();
+  const given = b.attributes !== undefined && b.attributes !== null;
+  if (!given && !sku && !sizes.length) return out;
+  if (b.source !== 'import') throw new HttpError(400, "attributes, sku and sizes are taken only from a website import (source 'import').");
+  if (sku) out.sku = sku.slice(0, 80);
+  if (sizes.length) out.sizes = sizes; // kept as written ("XS (34)"): the reader never retypes them
+  if (given) {
+    if (typeof b.attributes !== 'object' || Array.isArray(b.attributes)) throw new HttpError(400, 'attributes must be an object of short texts.');
+    const attrs: Record<string, string> = {};
+    for (const [k, v] of Object.entries(b.attributes as Record<string, unknown>).slice(0, 30)) {
+      const t = String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, 500);
+      if (/^[a-z][a-z0-9_]{0,39}$/.test(k) && t && typeof v !== 'object') attrs[k] = t;
+    }
+    if (Object.keys(attrs).length) out.attributes = attrs;
+  }
+  return out;
+}
+
 /** What ingest() gets for one found product. Exported for the tests. */
 export function ingestBody(f: Found, run: { host: string; use_their_price: boolean; platform?: string | null }, vendor: string, date = istDate()): Record<string, unknown> {
   const unknownCur = !f.currency && run.platform === 'shopify';
@@ -47,6 +74,7 @@ export function ingestBody(f: Found, run: { host: string; use_their_price: boole
     vendor_name: vendor, image_urls: f.images, source_url: f.url,
     ...(copy ? { sell_price: f.price } : {}), ...(note ? { price_note: note } : {}),
     // The store's facts (brand, type, tags, barcode, weight, SEO…) → attributes; the SKU → the sku column.
-    ...(Object.keys(m).length ? { attributes: m } : {}), ...(f.sku ? { sku: f.sku } : {}),
+    // The size choices go in as they are, so the reader does not retype them (it shortened "XS (34)" to "XS" on 109 of 136).
+    ...(Object.keys(m).length ? { attributes: m } : {}), ...(f.sku ? { sku: f.sku } : {}), ...(f.sizes.length ? { sizes: storeSizes(f.sizes) } : {}),
   };
 }

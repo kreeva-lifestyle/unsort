@@ -594,7 +594,13 @@ AI's extra tags are an enum of it.
   of the `Size` option, shown as scraped ("XS (34)"). Its SKU is the product's
   base SKU plus the size without its measurement (`skuBase`: an imported
   product carries its first size's own SKU, "NKB 47 PURPLE XS" →
-  "NKB 47 PURPLE-XS", "NKB 47 PURPLE-S"…).
+  "NKB 47 PURPLE-XS", "NKB 47 PURPLE-S"…). An import hands its size choices
+  to `ingest` as a list (`importFacts`, import only), exactly as the store
+  writes them, and the reader never replaces an imported product's sizes;
+  before this the reader retyped them from the text and shortened "XS (34)"
+  to "XS" on 109 of 136 products (restored from each product's own
+  "Sizes:" line on 2026-11-12). For other sources the reader keeps a
+  measurement written with the size.
 - **A program finishes the draft**: pattern title (`title_template`), the SEO
   title always ends `| <brand>` inside `meta_title_max` (`withBrand`), cuts,
   kept (locked) fields; handle = 3–6 clean words with the design code taken

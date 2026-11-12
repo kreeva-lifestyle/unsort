@@ -10,6 +10,9 @@ const found = {
 
 test('price copied: sell_price, note, and the selling-price line in raw_text', () => {
   const b = ingestBody(found, { host: 'kumari.example', use_their_price: true }, 'Kumari Art', '8 Nov 2026');
+  assert.deepEqual(b.sizes, ['Free Size']); // the store's size choices go in as they are (the reader never retypes them)
+  assert.deepEqual(ingestBody({ ...found, sizes: ['XS (34)', 'S (36)'] }, { host: 'h.example', use_their_price: true }, 'V').sizes, ['XS (34)', 'S (36)']);
+  assert.ok(!('sizes' in ingestBody({ ...found, sizes: [] }, { host: 'h.example', use_their_price: true }, 'V')));
   assert.equal(b.source, 'import');
   assert.equal(b.source_ref, 'kumari.example:7001');
   assert.equal(b.vendor_name, 'Kumari Art');

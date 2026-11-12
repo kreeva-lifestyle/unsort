@@ -131,4 +131,9 @@ test('ingest: attributes and sku only from an import, cleaned', () => {
   assert.throws(() => extras({ source: 'telegram', attributes: { brand: 'x' } }), /only from a website import/);
   assert.throws(() => extras({ source: 'import', attributes: ['x'] }), /must be an object/);
   assert.deepEqual(extras({ source: 'telegram' }), {});
+  // Owner, 2026-11-12: the store's size choices come in as written, measurement included, and only from an import.
+  assert.deepEqual(extras({ source: 'import', sizes: [' XS (34) ', 'S  (36)', 'XS (34)', '', null, 'Free Size'] }).sizes, ['XS (34)', 'S (36)', 'Free Size']);
+  assert.ok(!('sizes' in extras({ source: 'import', sizes: [] })) && !('sizes' in extras({ source: 'import', sizes: 'XS' })));
+  assert.throws(() => extras({ source: 'telegram', sizes: ['M'] }), /only from a website import/);
+  assert.equal(extras({ source: 'import', sizes: Array.from({ length: 40 }, (_, i) => `S${i}`) }).sizes.length, 30);
 });
