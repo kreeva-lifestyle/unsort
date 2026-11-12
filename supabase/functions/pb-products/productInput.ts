@@ -9,7 +9,9 @@
 // which lets a lost create be found again, is written on create only: on an
 // update productSet would delete every metafield not in the input (apps',
 // the merchant's). `status` is sent only when asked (create / Put back), so an
-// update keeps the status people set in Shopify.
+// update keeps the status people set in Shopify. `tail` is the FAQ a store
+// shows at the end of its description (fields.ts faqHtml); the listing's own
+// custom fields go out separately, with metafieldsSet (publish.ts).
 import { cleanHtml } from './content.ts';
 import { publicUrl } from './db.ts';
 import { type Existing, MF_KEY, MF_NAMESPACE, variantKey } from './shopifyProduct.ts';
@@ -33,7 +35,7 @@ export const STOCK_WARNING = 'Stock tracking is on for this website: the product
 
 const money = (n: number | null) => (n === null || n === undefined || !(Number(n) > 0) ? null : Number(n).toFixed(2));
 
-export function buildProductInput(a: { l: ListingRow; p: ProductRow; site: WebsiteRow; vendor: string; paths: string[]; withFiles: boolean; live: boolean; sendStatus: boolean; existing: Existing | null }): Record<string, unknown> {
+export function buildProductInput(a: { l: ListingRow; p: ProductRow; site: WebsiteRow; vendor: string; paths: string[]; withFiles: boolean; live: boolean; sendStatus: boolean; existing: Existing | null; tail?: string }): Record<string, unknown> {
   const { l, p, site, existing } = a;
   const tracked = !!site.track_inventory;
   const price = money(l.price);
@@ -57,7 +59,7 @@ export function buildProductInput(a: { l: ListingRow; p: ProductRow; site: Websi
   const handleMoves = !!existing && !!l.handle && l.handle !== existing.handle;
   const input: Record<string, unknown> = {
     title: l.title,
-    descriptionHtml: cleanHtml(l.description_html || ''),   // staff edits come straight from the table: clean again here
+    descriptionHtml: cleanHtml(l.description_html || '') + (a.tail || ''),   // staff edits come straight from the table: clean again here
     ...(l.handle ? { handle: l.handle } : {}),
     ...(handleMoves ? { redirectNewHandle: true } : {}), // the old URL keeps working
     ...(a.vendor ? { vendor: a.vendor } : {}),

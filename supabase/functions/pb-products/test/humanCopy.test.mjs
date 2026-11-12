@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { HUMAN_RULES, copyTells, tidyCopy } from '../humanCopy.ts';
 globalThis.Deno ??= { env: { get: () => '' } }; // genPrompt.ts → readerPrompt.ts → db.ts reads Deno.env
 const { genSystem } = await import('../genPrompt.ts');
+const { profileOf } = await import('../profile.ts');
 
 const EM = '—', EN = '–';
 
@@ -57,15 +58,17 @@ test('the rules themselves follow the rules they can: no dashes, no curly quotes
 });
 
 test('writer prompt: carries the rules, and the store owner still has the last word', () => {
-  const sys = genSystem('Kreeva', { description_words: 90, extra_instructions: 'Always mention free shipping.' }, 0, 2);
+  const profile = profileOf({ name: 'Kreeva', content: {} });
+  const ask = { profile, extraMax: 0, allowed: [], photos: 2, imported: false };
+  const sys = genSystem({ ...ask, c: { description_words: 90, extra_instructions: 'Always mention free shipping.' } });
   assert.ok(sys.includes(HUMAN_RULES[0]));
   assert.ok(sys.includes('never pad to reach the word count'));
-  assert.ok(sys.includes('at most about 90 words (fewer when there is less to say)'));
+  assert.ok(sys.includes('description_html: 59 to 90 words (fewer only when the facts are few)'));
   const lines = sys.split('\n');
   const lastRule = lines.lastIndexOf(HUMAN_RULES[HUMAN_RULES.length - 1]);
   const owner = lines.findIndex(l => l.startsWith('Extra instructions from the store owner:'));
   assert.ok(lastRule > 0 && owner === lastRule + 1 && owner === lines.length - 1);
-  assert.ok(sys.includes('Use ONLY the facts given'));        // the old guard rails are still there
-  const noExtra = genSystem('Kreeva', {}, 3, 0);
+  assert.ok(sys.includes('Use only the facts under PRODUCT FACTS'));        // the old guard rails are still there
+  const noExtra = genSystem({ ...ask, c: {}, extraMax: 3, photos: 0 });
   assert.equal(noExtra.split('\n').at(-1), HUMAN_RULES.at(-1));
 });

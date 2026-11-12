@@ -4,10 +4,16 @@
 // listing made earlier (id lost to a timeout / crash) is found by handle +
 // metafield and updated instead, and the Shopify id is saved the moment
 // productSet returns. Unpublish lives in unpublish.ts.
+// The listing's custom fields (fabric, work, colour, occasion, set contents and
+// the FAQ: fields.ts) follow with metafieldsSet, which touches only those keys;
+// if the store refuses them the product is still published, with a warning.
 import { ago, enc, logActivity, nowIso, one, patch, sel } from './db.ts';
+import { faqHtml, fieldInputs, METAFIELDS_SET } from './fields.ts';
 import { HttpError, plain } from './http.ts';
 import { compareAt } from './pricing.ts';
+import { profileOf } from './profile.ts';
 import { buildProductInput, PRODUCT_SET, PUBLISH, STOCK_WARNING } from './productInput.ts';
+import { seoGet } from './seoStore.ts';
 import { gql, onlineStoreId } from './shopify.ts';
 import { adoptable, type Existing, existingProduct } from './shopifyProduct.ts';
 import { ARCHIVED, LISTING_COLS, MAX_ATTEMPTS, NEEDS_INFO, PRODUCT_COLS, RETRY_MS, STALE_MS, WEBSITE_COLS, type Budget, type ListingRow, type ProductRow, type WebsiteRow } from './types.ts';
@@ -66,7 +72,11 @@ export async function publishOne(l: ListingRow, o: { manual: boolean; putBack?: 
     if (p.status === 'needs_info') throw new HttpError(400, NEEDS_INFO);
     if (!String(l.title || '').trim()) throw new HttpError(400, 'This listing has no title — regenerate it or type one.');
     if (!(Number(l.price) > 0)) throw new HttpError(400, 'This listing has no price — regenerate it or type one.');
-    const vendor = p.vendor_id ? await one<{ name: string }>(`pb_vendors?id=eq.${enc(p.vendor_id)}&select=name`) : null;
+    const [vendor, seoRows] = await Promise.all([
+      p.vendor_id ? one<{ name: string }>(`pb_vendors?id=eq.${enc(p.vendor_id)}&select=name`) : Promise.resolve(null),
+      seoGet([l.id]),
+    ]);
+    const profile = profileOf(site), faq = seoRows.get(l.id)?.faq ?? [];
     const paths = imgs.map(i => i.path);
     const live = site.publish_mode !== 'draft'; // review sites go live once a person approved
     const altHandle = (h: string | null) => `${String(h || 'product').slice(0, 72)}-${l.id.slice(0, 6)}`;
@@ -84,7 +94,7 @@ export async function publishOne(l: ListingRow, o: { manual: boolean; putBack?: 
     // whatever people set in Shopify (e.g. a draft site's product made visible there).
     const sendStatus = !existing || !!adopted || !!o.putBack;
     const run = (handle: string | null) => { if (handle) sent.push(handle); return gql<SetReply>(site, PRODUCT_SET, {
-      input: buildProductInput({ l: { ...l, handle, compare_at_price: compare }, p, site, vendor: vendor?.name || '', paths, withFiles: photosChanged, live, sendStatus, existing }),
+      input: buildProductInput({ l: { ...l, handle, compare_at_price: compare }, p, site, vendor: vendor?.name || '', paths, withFiles: photosChanged, live, sendStatus, existing, tail: profile.faq_in_description ? faqHtml(faq) : '' }),
       identifier: existing ? { id: existing.id } : null,
     }, ms(SET_MS)); };
     let handle = l.handle;
@@ -103,6 +113,16 @@ export async function publishOne(l: ListingRow, o: { manual: boolean; putBack?: 
 
     const warnings: string[] = [];
     if (site.track_inventory && !existing) warnings.push(STOCK_WARNING);
+    const fields = profile.custom_fields ? fieldInputs(prod.id, p, faq) : [];
+    if (fields.length) {
+      try {
+        const r = await gql<{ metafieldsSet: { userErrors: { message: string }[] } }>(site, METAFIELDS_SET, { metafields: fields }, ms(30_000));
+        const ue = r.metafieldsSet?.userErrors || [];
+        if (ue.length) warnings.push(`Saved on Shopify, but its custom fields (fabric, work, FAQ…) were not: ${ue.map(e => e.message).join('; ').slice(0, 200)}`);
+      } catch (e) {
+        warnings.push(`Saved on Shopify, but its custom fields (fabric, work, FAQ…) were not: ${plain(e)}`);
+      }
+    }
     if (live) {
       try {
         const pub = await onlineStoreId(site, ms(30_000));
