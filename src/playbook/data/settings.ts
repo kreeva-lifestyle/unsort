@@ -8,8 +8,10 @@ import type { PbSettings } from '../types';
 export const DEFAULT_SETTINGS: PbSettings = {
   reader: { model: 'claude-haiku-5-5', effort: '' },
   categories: [],
-  automation: { paused: false },
+  automation: { paused: false, daily_limit_inr: null },
 };
+/** The daily AI limit the server uses while none was ever saved (pb-products db.ts DEFAULT_DAILY_LIMIT). */
+export const DEFAULT_DAILY_LIMIT = 500;
 
 export async function getSettings(): Promise<PbSettings> {
   const { data, error } = await supabase.from('pb_settings').select('key,value').in('key', ['reader', 'categories', 'automation']);
@@ -19,7 +21,7 @@ export async function getSettings(): Promise<PbSettings> {
   return {
     reader: { ...DEFAULT_SETTINGS.reader, ...(reader && typeof reader === 'object' ? reader : {}) },
     categories: Array.isArray(cats) ? cats.map(String) : [],
-    automation: { paused: !!auto?.paused },
+    automation: { paused: !!auto?.paused, daily_limit_inr: typeof auto?.daily_limit_inr === 'number' ? auto.daily_limit_inr : null },
   };
 }
 
@@ -31,5 +33,6 @@ export async function saveSetting<K extends keyof PbSettings>(key: K, value: PbS
     .then(({ error: e }) => { if (e) logSwallowed('pb_activity insert', e); });
 }
 
-export type WorkResult = { ok: boolean; read: number; routed: number; generated: number; published: number; failed: number };
+/** stock = stock changes sent to stores · paused = the run stopped because automation was paused · limit = today's AI limit is used up. */
+export type WorkResult = { ok: boolean; read: number; routed: number; generated: number; published: number; failed: number; stock?: number; paused?: boolean; limit?: boolean };
 export const runWorker = () => pbCall<WorkResult>('work');

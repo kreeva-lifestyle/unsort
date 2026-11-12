@@ -132,7 +132,7 @@ export default function ProductPage({ id, onClose, onChanged, onOpenOther, onDel
   };
   const addPhoto = () => fileInput.current?.click();
   // The page's one gradient: Edit on the first listing waiting for approval, else Save facts.
-  const waiting = p.pb_listings.some(l => l.status === 'review');
+  const waiting = p.pb_listings.some(l => l.status === 'review'), owed = p.pb_listings.filter(l => l.stock_due).length;
   const facts = (
     <ProductFacts key={p.id} product={p} vendors={vendors} categories={categories} onVendorCreated={onVendorCreated}
       onSaved={refresh} addToast={addToast} primary={!waiting} />
@@ -150,7 +150,7 @@ export default function ProductPage({ id, onClose, onChanged, onOpenOther, onDel
           <PhoneNameCard p={p} vendors={vendors} copyOf={copyOf} />
           {dupTile()}
           <IntakeNotesTile p={p} addToast={addToast} onChanged={refresh} />
-          <StockTile p={p} addToast={addToast} onChanged={refresh} />
+          <StockTile p={p} owed={owed} addToast={addToast} onChanged={refresh} />
           {listings}
           {facts}
           <WebMetaTile p={p} />
@@ -171,7 +171,7 @@ export default function ProductPage({ id, onClose, onChanged, onOpenOther, onDel
             <WebsitesStat p={p} />
             {dupTile(12)}
             <IntakeNotesTile p={p} span={12} addToast={addToast} onChanged={refresh} />
-            <StockTile p={p} span={12} addToast={addToast} onChanged={refresh} />
+            <StockTile p={p} owed={owed} span={12} addToast={addToast} onChanged={refresh} />
             {/* Facts 8 + AI 4 on their own 12-column grid: its lines match the outer grid at 12 and 6 columns, so the row stays full. */}
             <div className="pb-span-12" style={{ display: 'grid', gridTemplateColumns: 'repeat(12, minmax(0, 1fr))', gap: 16 }}>
               <div style={{ gridColumn: 'span 8', display: 'grid', minWidth: 0 }}>{facts}</div>

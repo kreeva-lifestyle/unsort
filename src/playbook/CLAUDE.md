@@ -65,9 +65,11 @@ mobile". Playbook instead:
 - Reading DailyWork data (e.g. sales for a dashboard) goes through a view or
   RPC built for Playbook, never by writing to DailyWork tables.
 - `npm run build` does not type-check edge functions. Before merging a change
-  under `supabase/functions/pb-products/`, run `deno check
-  supabase/functions/pb-products/index.ts` (or `tsc --noEmit` over the folder
-  with a small `Deno` stub) — a missing import there is a runtime 500.
+  under `supabase/functions/pb-*`, run `npm run check:server` (TypeScript over
+  the three functions, set up in `supabase/functions/_check/`) and
+  `npm run test:server` (their unit tests) — a missing import there is a
+  runtime 500. The deploy workflow runs both before the build. A merge does
+  not deploy the functions: see `docs/playbook/DEPLOY.md`.
 
 ## Design — load the `playbook-design` skill before any Playbook UI work
 - The skill (`.claude/skills/playbook-design/SKILL.md`) has you read

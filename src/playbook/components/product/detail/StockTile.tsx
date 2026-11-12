@@ -1,8 +1,9 @@
 // Product page: In stock / Out of stock (owner, 2026-11-12: "If stock
 // out/in-stock on playbook that same happens in shopify stores"). One switch,
-// saved at once (no Save button): the server sends the listings already on
-// Shopify again, so they show Sold out, or can be ordered again, within a few
-// minutes. Stock is never taken from a source website (owner, 2026-11-12:
+// saved at once (no Save button): the server sends just the stock to every
+// store that has the product, at once (stockSend.ts). `owed` = the stores it
+// has not reached yet (tried again every 5 minutes): the tile says so instead
+// of claiming it is done. Stock is never taken from a source website (owner, 2026-11-12:
 // "What if source website stopped doing business"): it changes here, or by a
 // vendor's stock-out notice.
 // Two signals: "Saving…" beside the switch, then a toast.
@@ -21,7 +22,7 @@ import { PbButton, PbTile } from '../../ui';
 import PbSwitch from '../../ui/PbSwitch';
 import { Dot, NEUTRAL, shortDate } from '../status';
 
-export default function StockTile({ p, span, addToast, onChanged }: { p: Pick<ProductDetail, 'id' | 'in_stock' | 'temp_out_at' | 'perm_out_at'>; span?: 12; addToast: AddToast; onChanged: () => void }) {
+export default function StockTile({ p, owed = 0, span, addToast, onChanged }: { p: Pick<ProductDetail, 'id' | 'in_stock' | 'temp_out_at' | 'perm_out_at'>; owed?: number; span?: 12; addToast: AddToast; onChanged: () => void }) {
   const [busy, setBusy] = useState(false);
   const [clearing, setClearing] = useState(false);
   const on = p.in_stock !== false;
@@ -35,7 +36,7 @@ export default function StockTile({ p, span, addToast, onChanged }: { p: Pick<Pr
     setBusy(true);
     try {
       const r = await setStock(p.id, !on);
-      const sent = r.resent ? ` — ${r.resent} listing${r.resent === 1 ? '' : 's'} on Shopify will ${on ? 'show Sold out' : 'be orderable again'} within a few minutes` : '';
+      const sent = r.resent ? ` — sent to the ${r.resent === 1 ? 'website' : `${r.resent} websites`} it is on` : '';
       addToast(`${on ? 'Marked out of stock' : 'Back in stock'}${sent}`, 'success');
       onChanged();
     } catch (e) { addToast(friendlyError(e), 'error'); } finally { setBusy(false); }
@@ -45,8 +46,9 @@ export default function StockTile({ p, span, addToast, onChanged }: { p: Pick<Pr
       <div style={{ flex: '1 1 240px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
         <h2 id="pb-stock-title" style={pbTileTitle}>Stock</h2>
         <span style={pbMeta}>
-          {on ? 'Shoppers can order it on every website it is listed on.' : p.perm_out_at ? 'Taken off every website it was listed on.' : 'Shown as Sold out on every website it is listed on.'}
+          {on ? 'Shoppers can order it on every website it is listed on.' : p.perm_out_at ? (owed ? 'Being taken off the websites it is listed on.' : 'Taken off every website it was listed on.') : 'Shown as Sold out on every website it is listed on.'}
         </span>
+        {owed > 0 && <Dot color={PB.review} style={{ whiteSpace: 'normal' }} label={`Not on ${owed === 1 ? '1 website' : `${owed} websites`} yet. Playbook sends it within a minute, and tries again every 5 minutes while a store cannot be reached.`} />}
       </div>
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 12, opacity: busy ? 0.5 : 1, pointerEvents: busy ? 'none' : 'auto' }}>
         <Dot color={on ? PB.live : NEUTRAL} label={busy ? 'Saving…' : on ? 'In stock' : 'Out of stock'} />
@@ -54,7 +56,7 @@ export default function StockTile({ p, span, addToast, onChanged }: { p: Pick<Pr
       </span>
       {!on && p.perm_out_at && (
         <Dot color={NEUTRAL} style={{ whiteSpace: 'normal', flex: '1 1 100%', minWidth: 0 }}
-          label={`The vendor said permanent stock out (${shortDate(p.perm_out_at)}). It was archived and taken off your websites. Switch Stock on to sell it again.`} />
+          label={`The vendor said permanent stock out (${shortDate(p.perm_out_at)}). It ${owed ? 'is being taken off your websites and archived' : 'was archived and taken off your websites'}. Switch Stock on to sell it again.`} />
       )}
       {p.temp_out_at && (
         <div style={{ flex: '1 1 100%', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', minWidth: 0 }}>

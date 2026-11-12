@@ -3,6 +3,7 @@
 // + four 3×1 attention tiles, two on each of the hero's rows.
 // Desktop (6×2)(3)(3)/(3)(3) · 6 cols (6×2)/(3)(3)/(3)(3) · phone hero, then 2 per row.
 import { PB, pbNum } from '../../pbTheme';
+import { istRelative } from '../../format';
 import { PbStatTile, PbTile } from '../ui';
 import { count, groupTotal, type DashData, type DashGo } from './dashShared';
 
@@ -58,7 +59,7 @@ export default function DashTop({ d, go }: { d: DashData; go: DashGo }) {
       <PbStatTile span={3} phoneHalf label="Needs info" dot={PB.review} tone={d.products.needs_info ? 'review' : undefined}
         value={count(d.products.needs_info)} meta="Cost, category or a tag missing" onClick={() => go('products', { status: 'needs_info' })} />
       <PbStatTile span={3} phoneHalf label="Needs review" dot={PB.review} tone={d.review ? 'review' : undefined}
-        value={count(d.review)} meta="Written, waiting for approval" onClick={() => go('products', { status: 'l:review' })} />
+        value={count(d.review)} meta={d.review && d.oldestReview ? `Written, waiting. Oldest: ${istRelative(d.oldestReview)}` : 'Written, waiting for approval'} onClick={() => go('products', { status: 'l:review' })} />
       <PbStatTile span={3} phoneHalf label="Failed" dot={PB.failed} tone={d.failed ? 'failed' : undefined}
         value={count(d.failed)} meta="Could not publish. Open to see why" onClick={() => go('products', { status: 'l:failed' })} />
       <PbStatTile span={3} phoneHalf label="In progress" dot={PB.busy}

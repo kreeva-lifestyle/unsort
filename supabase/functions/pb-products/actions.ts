@@ -1,8 +1,8 @@
 // Product / listing actions run by staff from the app (and 'work' / 'ingest').
 // Each returns the JSON body; failures throw HttpError with a plain sentence.
-import { enc, getSettings, one, patch } from './db.ts';
+import { enc, insert, nowIso, one, patch } from './db.ts';
 import { claimGenerate, generateOne } from './generate.ts';
-import { HttpError } from './http.ts';
+import { HttpError, plain } from './http.ts';
 import { ingest } from './ingest.ts';
 import { claimPublish, publishOne } from './publish.ts';
 import { claimRead, readOne } from './reader.ts';
@@ -20,9 +20,12 @@ export function uuid(v: unknown, what: string): string {
 }
 
 export async function doWork(fromSecret: boolean, userId: string | null) {
-  // The pause switch stops the cron; "Run now" from the app still runs.
-  if (fromSecret && (await getSettings()).automation.paused) return { ok: true, paused: true, read: 0, routed: 0, generated: 0, published: 0, failed: 0 };
-  return { ok: true, ...(await work(userId)) };
+  // Paused: the cron's call sends only the stock that is owed to a store (worker.ts); "Run now" from the app runs its round.
+  const r = await work(userId, !fromSecret);
+  // When it last ran and what it did: the dashboard shows "automation last ran …" and warns when work waits and this is old.
+  await insert('pb_settings', [{ key: 'worker', value: { at: nowIso(), ...r } }], { onConflict: 'key', mode: 'merge', select: 'key' })
+    .catch(e => console.error(`pb-products heartbeat: ${plain(e)}`));
+  return { ok: true, ...r };
 }
 
 export const doIngest = (b: Body) => ingest(b);

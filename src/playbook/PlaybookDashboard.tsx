@@ -1,5 +1,7 @@
 // Playbook's home: what the Product Directory is doing right now — products by
-// status, listings per website, what needs a person, and whether automation is paused.
+// status, listings per website, what needs a person, and whether automation is paused,
+// stalled, over its daily AI limit or cut off from a store (DashAlerts). The numbers
+// refresh by themselves every minute while the page is in view.
 // V2 bento (layout-and-components.md §4): [paused banner 12]
 // (hero 6×2)(3)(3)/(3)(3) · (products 12) · websites by count (12 | 6+6 | 4+4+4 …).
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -8,12 +10,14 @@ import { logSwallowed } from '../lib/errorLogger';
 import type { PbPage } from './components/PbNav';
 import type { AddToast } from './components/PbToasts';
 import type { ProductsStart } from './pages/Products';
-import { getPbSettingsLite, listWebsitesLite } from './data/products';
-import { listingCounts, listingTotal, productCounts } from './data/dashboard';
+import { listWebsitesLite } from './data/products';
+import { automationState, listingCounts, listingTotal, notedTotal, oldestReview, productCounts } from './data/dashboard';
 import { getAiCostSince } from './data/listingSeo';
-import { istMonthStart } from './format';
+import { USD_INR, istDayStart, istMonthStart, istRelative } from './format';
+import { useAutoRefresh } from './hooks/useAutoRefresh';
 import { PbButton, PbPageHeader } from './components/ui';
 import type { DashData } from './components/dashboard/dashShared';
+import DashAlerts from './components/dashboard/DashAlerts';
 import DashTop from './components/dashboard/DashTop';
 import DashProducts from './components/dashboard/DashProducts';
 import DashWebsites from './components/dashboard/DashWebsites';
@@ -25,43 +29,49 @@ export default function PlaybookDashboard({ name, addToast, go }: { name: string
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const loaded = useRef(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  /** `quiet`: the every-minute refresh — no dimming, and a failure keeps the numbers on screen without a toast. */
+  const load = useCallback(async (quiet = false) => {
+    if (!quiet) setLoading(true);
     try {
       // The AI cost is a side figure: if it cannot be read, the rest of the dashboard still shows.
       const cost = getAiCostSince(istMonthStart()).catch(e => { logSwallowed('pb ai cost', e); return null; });
-      const [products, sites, settings, failed, review, ai] = await Promise.all([productCounts(), listWebsitesLite(), getPbSettingsLite(), listingTotal('failed'), listingTotal('review'), cost]);
+      const today = getAiCostSince(istDayStart()).then(c => Math.round(c.usd * USD_INR * 100) / 100).catch(e => { logSwallowed('pb ai cost today', e); return null; });
+      const [products, sites, auto, failed, review, ai, noted, oldest, spentToday] = await Promise.all([productCounts(), listWebsitesLite(), automationState(),
+        listingTotal('failed'), listingTotal('review'), cost, notedTotal(), oldestReview(), today]);
       const perSite = await listingCounts(sites.map(s => s.id));
-      setD({ products, sites, perSite, failed, review, paused: settings.paused, ai });
+      setD({ products, sites, perSite, failed, review, paused: auto.paused, ai, noted, oldestReview: oldest, lastRun: auto.lastRun, limit: auto.limit, spentToday });
       loaded.current = true;
       setLoadErr(null);
     } catch (e) {
+      if (quiet) { logSwallowed('pb dashboard refresh', e); return; }
       // First load: the failed tile with Try again is the signal (no toast on top).
       // A failed Refresh keeps the old numbers on screen, so it must say so.
       const m = friendlyError(e);
       setLoadErr(m);
       if (loaded.current) addToast(m, 'error');
-    } finally { setLoading(false); }
+    } finally { if (!quiet) setLoading(false); }
   }, [addToast]);
   useEffect(() => { void load(); }, [load]);
+  useAutoRefresh(() => { if (loaded.current) void load(true); });
 
   const refresh = (block?: boolean) => (
-    <PbButton icon="refresh" onClick={load} busy={loading} busyLabel="Refreshing…" block={block}>Refresh</PbButton>
+    <PbButton icon="refresh" onClick={() => void load()} busy={loading} busyLabel="Refreshing…" block={block}>Refresh</PbButton>
   );
   const add = () => go('products', { add: true });
 
   return (
     <>
-      <PbPageHeader title={name ? `Hello, ${name}` : 'Dashboard'} sub="Product Directory at a glance"
+      <PbPageHeader title={name ? `Hello, ${name}` : 'Dashboard'} sub={d?.lastRun ? `Product Directory at a glance · automation last ran ${istRelative(d.lastRun)}` : 'Product Directory at a glance'}
         actions={<>{refresh()}<PbButton kind="primary" icon="plus" onClick={add}>Add product</PbButton></>}
         phoneAction={<PbButton kind="primary" icon="plus" iconOnly aria-label="Add product" onClick={add} />} />
 
       {!d ? (
-        loadErr ? <DashError message={loadErr} busy={loading} onRetry={load} /> : <DashSkeleton />
+        loadErr ? <DashError message={loadErr} busy={loading} onRetry={() => void load()} /> : <DashSkeleton />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--pb-pad-tile)', opacity: loading ? 0.6 : 1, transition: 'opacity .3s ease' }}
           aria-busy={loading || undefined}>
           {d.paused && <PausedBanner onOpen={() => go('settings')} />}
+          <DashAlerts d={d} go={go} />
           <div className="pb-bento pb-bento--dash">
             <DashTop d={d} go={go} />
             <DashProducts d={d} go={go} />

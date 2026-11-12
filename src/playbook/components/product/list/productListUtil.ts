@@ -23,6 +23,7 @@ export const STATUS_CHIPS: { v: string; label: string }[] = [
 export const MORE_STATUSES: { v: string; label: string }[] = [
   ...(['new', 'reading', 'ready', 'archived'] as const).map(s => ({ v: s, label: PRODUCT_STATUS[s].label })),
   ...(['publishing', 'skipped'] as const).map(s => ({ v: `l:${s}`, label: `Listing: ${LISTING_STATUS[s].label}` })),
+  { v: 'l:warn', label: 'Published with a note' },
   { v: 'stock:out', label: 'Out of stock' },
   { v: 'stock:temp', label: 'Temporarily out (vendor)' },
 ];

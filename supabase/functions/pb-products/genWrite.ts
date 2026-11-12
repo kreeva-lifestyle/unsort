@@ -8,7 +8,7 @@
 import { askClaude, type Block } from './ai.ts';
 import { fixAsk, type GenOut } from './genPrompt.ts';
 import { tidyCopy } from './humanCopy.ts';
-import { plain } from './http.ts';
+import { plain, usdOf } from './http.ts';
 import { better, type Problem } from './seoCheck.ts';
 import { dropSection } from './seoText.ts';
 import type { Budget } from './types.ts';
@@ -54,6 +54,7 @@ export async function writeCopy(a: {
     const two = a.check(draft);
     if (better(two.problems, one.problems) <= 0) { out.g = two.g; out.problems = two.problems; }
   } catch (e) {
+    out.usd += usdOf(e); // a rewrite that was cut off or unreadable was still paid for
     console.error(`pb-products rewrite: ${plain(e)}`); // the first draft stands; its problems decide what happens next
   }
   return out;

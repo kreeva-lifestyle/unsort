@@ -85,15 +85,17 @@ export async function askClaude<T>(o: { model: string; effort: string; system: s
     if (/image|url|fetch/i.test(msg)) throw new HttpError(502, 'The AI could not open one of the product photos.');
     throw new HttpError(502, `The AI request was refused (${r.status})${msg ? `: ${msg.slice(0, 160)}` : ''}.`);
   }
-  if (data.stop_reason === 'refusal') throw new HttpError(422, 'The AI declined to handle this product — fill it in by hand.');
-  if (data.stop_reason === 'max_tokens') throw new HttpError(502, 'The AI answer was cut off — try a lower effort setting.');
+  // The model answered and was paid for: a failure from here on carries its cost (http.ts usdOf), so it is logged and counted.
+  const paid = (status: number, msg: string) => Object.assign(new HttpError(status, msg), { usd: estUsd(model, data.usage || {}) });
+  if (data.stop_reason === 'refusal') throw paid(422, 'The AI declined to handle this product — fill it in by hand.');
+  if (data.stop_reason === 'max_tokens') throw paid(502, 'The AI answer was cut off — try a lower effort setting.');
   const text = (data.content || []).find(b => b.type === 'text')?.text || '';
   let parsed: T;
   try {
     const s = text.indexOf('{'), e = text.lastIndexOf('}');
     parsed = JSON.parse(s >= 0 && e > s ? text.slice(s, e + 1) : text) as T;
   } catch {
-    throw new HttpError(502, 'Could not read the AI answer — it will be tried again.');
+    throw paid(502, 'Could not read the AI answer — it will be tried again.');
   }
   return { data: parsed, usd: estUsd(model, data.usage || {}), model, effort };
 }

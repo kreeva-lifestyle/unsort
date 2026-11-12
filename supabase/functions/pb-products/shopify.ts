@@ -82,6 +82,14 @@ async function rawGql<T>(site: WebsiteRow, token: string, query: string, variabl
   return { status: r.status, body: await r.json().catch(() => ({})) as GqlReply<T> };
 }
 
+/** Shopify refused this store's key, a permission or the store itself (pre-launch check, 2026-11-13, D8): the reason is
+ *  written on the website, so its card and the dashboard say "connection problem" until a test passes again, instead of
+ *  "Connected" over a store nothing can be sent to. */
+async function refused(site: WebsiteRow, msg: string): Promise<HttpError> {
+  await patch('pb_websites', `id=eq.${enc(site.id)}`, { last_error: msg }).catch(e => console.error(`pb-products last_error ${site.id}: ${e instanceof Error ? e.message : e}`));
+  return new HttpError(400, msg);
+}
+
 /** One GraphQL call with a plain-sentence error for every failure. A rejected
  *  client-credentials token is refreshed once and the call retried. `ms` = time limit of the call. */
 export async function gql<T>(site: WebsiteRow, query: string, variables: Record<string, unknown> = {}, ms = TIMEOUT): Promise<T> {
@@ -90,18 +98,18 @@ export async function gql<T>(site: WebsiteRow, query: string, variables: Record<
   if (res.status === 401 && site.auth_mode === 'client_credentials') res = await rawGql<T>(site, await tokenFor(site, true), query, variables, ms);
   const { status, body } = res;
   const name = site.name;
-  if (status === 401) throw new HttpError(400, `${name}: Shopify rejected the access token — save the website's credentials again.`);
-  if (status === 402) throw new HttpError(400, `${name}: this Shopify store is frozen or unpaid.`);
-  if (status === 403) throw new HttpError(400, `${name}: the Shopify app is missing a permission for this — check its access scopes.`);
-  if (status === 404) throw new HttpError(400, `${name}: Shopify could not find this store or API version — check the shop domain (…myshopify.com).`);
-  if (status === 423) throw new HttpError(400, `${name}: this Shopify store is locked.`);
+  if (status === 401) throw await refused(site, `${name}: Shopify rejected the access token — save the website's credentials again.`);
+  if (status === 402) throw await refused(site, `${name}: this Shopify store is frozen or unpaid.`);
+  if (status === 403) throw await refused(site, `${name}: the Shopify app is missing a permission for this — check its access scopes.`);
+  if (status === 404) throw await refused(site, `${name}: Shopify could not find this store or API version — check the shop domain (…myshopify.com).`);
+  if (status === 423) throw await refused(site, `${name}: this Shopify store is locked.`);
   if (status === 429) throw new HttpError(503, `${name}: Shopify asked us to slow down — it will be tried again shortly.`);
   if (status >= 500) throw new HttpError(503, `${name}: Shopify is having trouble right now (${status}) — it will be tried again.`);
   const err = body.errors?.[0];
   if (err) {
     const code = err.extensions?.code || '';
     if (code === 'THROTTLED') throw new HttpError(503, `${name}: Shopify asked us to slow down — it will be tried again shortly.`);
-    if (code === 'ACCESS_DENIED') throw new HttpError(400, `${name}: the Shopify app is missing a permission — ${String(err.message || '').slice(0, 160)}`);
+    if (code === 'ACCESS_DENIED') throw await refused(site, `${name}: the Shopify app is missing a permission — ${String(err.message || '').slice(0, 160)}`);
     throw new HttpError(400, `${name}: Shopify said "${String(err.message || 'unknown error').slice(0, 200)}".`);
   }
   if (!body.data) throw new HttpError(502, `${name}: Shopify sent an empty answer (${status}).`);

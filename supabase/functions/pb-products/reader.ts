@@ -30,7 +30,7 @@
 import { askClaude } from './ai.ts';
 import { aiBusy, freeTry } from './aiRetry.ts';
 import { ago, enc, getSettings, logActivity, nowIso, one, patch, sel } from './db.ts';
-import { HttpError, plain } from './http.ts';
+import { HttpError, plain, usdOf } from './http.ts';
 import { aiPhotos } from './photos.ts';
 import { readChanges } from './readChanges.ts';
 import { nameWithColour } from './readName.ts';
@@ -132,7 +132,7 @@ export async function readOne(p: ProductRow, o: { manual: boolean; prevStatus?: 
   } catch (e) {
     const msg = plain(e);
     const free = !o.manual && await freeTry(e, `product_id=eq.${enc(p.id)}&listing_id=is.null`, 'read', 'read'); // the AI was busy: read again, no try used up (aiRetry.ts)
-    await logActivity({ product_id: p.id, action: 'failed', details: { step: 'read', error: msg, ...(aiBusy(e) ? { temporary: true } : {}) }, user_id: o.userId });
+    await logActivity({ product_id: p.id, action: 'failed', details: { step: 'read', error: msg, ...(aiBusy(e) ? { temporary: true } : {}), ...(usdOf(e) ? { usd: usdOf(e) } : {}) }, user_id: o.userId });
     if (o.manual) {
       await patch('pb_products', `id=eq.${enc(p.id)}&status=eq.reading`, { status: o.prevStatus || 'new', ai_error: msg, claimed_at: null });
       throw e instanceof HttpError ? e : new HttpError(502, msg);

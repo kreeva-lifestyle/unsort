@@ -83,16 +83,20 @@ export function uniqueCi(list: string[]): string[] {
   return list.map(c => c.replace(/\s+/g, ' ').trim()).filter(c => c && !seen.has(c.toLowerCase()) && !!seen.add(c.toLowerCase()));
 }
 
+/** The daily AI limit in rupees: nothing saved → DEFAULT_DAILY_LIMIT; 0 (or less) → no limit. */
+export const DEFAULT_DAILY_LIMIT = 500;
+export const dailyLimit = (v: unknown) => (v === undefined || v === null || v === '' || !Number.isFinite(Number(v)) ? DEFAULT_DAILY_LIMIT : Math.max(0, Math.round(Number(v))));
+
 export async function getSettings(): Promise<Settings> {
   const rows = await sel<{ key: string; value: unknown }>('pb_settings?select=key,value');
   const m = new Map(rows.map(r => [r.key, r.value]));
   const reader = (m.get('reader') || {}) as { model?: string; effort?: string };
   const cats = m.get('categories');
-  const auto = (m.get('automation') || {}) as { paused?: boolean };
+  const auto = (m.get('automation') || {}) as { paused?: boolean; daily_limit_inr?: number | null };
   return {
     reader: { model: String(reader.model || ''), effort: String(reader.effort || '') },
     categories: uniqueCi(Array.isArray(cats) ? cats.map(c => String(c ?? '')) : []),
-    automation: { paused: auto.paused === true },
+    automation: { paused: auto.paused === true, daily_limit_inr: dailyLimit(auto.daily_limit_inr) },
   };
 }
 

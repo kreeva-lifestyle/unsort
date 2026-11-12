@@ -15,7 +15,7 @@ import { cleanHandle, cleanHtml, cut, fillTitle, stripTags, withBrand } from './
 import { ago, enc, logActivity, nowIso, one, patch, sel, uniqueCi } from './db.ts';
 import { factValues, genFacts, genSchema, genSystem, limitsOf, type GenOut } from './genPrompt.ts';
 import { writeCopy } from './genWrite.ts';
-import { HttpError, plain } from './http.ts';
+import { HttpError, plain, usdOf } from './http.ts';
 import { aiPhotos } from './photos.ts';
 import { compareAt, listingPrice } from './pricing.ts';
 import { cleanKeyword, keywordOf, profileOf } from './profile.ts';
@@ -150,7 +150,7 @@ export async function generateOne(l: ListingRow, o: { manual: boolean; prevStatu
     if (waited) throw e; // put back already: nothing failed
     const msg = plain(e);
     const free = !o.manual && await freeTry(e, `listing_id=eq.${enc(l.id)}`, 'generate', 'generated'); // the AI was busy: tried again, no try used up
-    await logActivity({ product_id: l.product_id, website_id: l.website_id, listing_id: l.id, action: 'failed', details: { step: 'generate', error: msg, ...(aiBusy(e) ? { temporary: true } : {}) }, user_id: o.userId });
+    await logActivity({ product_id: l.product_id, website_id: l.website_id, listing_id: l.id, action: 'failed', details: { step: 'generate', error: msg, ...(aiBusy(e) ? { temporary: true } : {}), ...(usdOf(e) ? { usd: usdOf(e) } : {}) }, user_id: o.userId });
     if (o.manual) {
       await patch('pb_listings', `id=eq.${enc(l.id)}&status=eq.generating`, { status: o.prevStatus || 'queued', error: msg, claimed_at: null });
       throw e instanceof HttpError ? e : new HttpError(502, msg);

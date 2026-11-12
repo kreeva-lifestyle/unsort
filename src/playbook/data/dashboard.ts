@@ -4,6 +4,7 @@
 // not counted: the Products list these tiles open never shows archived products.
 import { supabase } from '../../lib/supabase';
 import type { PbListingStatus, PbProductStatus } from '../types';
+import { DEFAULT_DAILY_LIMIT } from './settings';
 
 export const PRODUCT_STATUSES: PbProductStatus[] = ['new', 'reading', 'needs_info', 'ready', 'archived'];
 export const LISTING_GROUPS: { id: string; label: string; statuses: PbListingStatus[]; filter: string }[] = [
@@ -40,3 +41,24 @@ export async function listingCounts(siteIds: string[]): Promise<Record<string, R
 }
 
 export const listingTotal = (status: PbListingStatus) => count(listings().eq('status', status));
+
+/** Published listings that carry a note (a photo Shopify could not process, a field it refused, no stock on a Track-stock website). */
+export const notedTotal = () => count(listings().eq('status', 'published').not('error', 'is', null));
+
+/** When the listing that has waited longest for approval was written; null when none waits. */
+export async function oldestReview(): Promise<string | null> {
+  const { data, error } = await supabase.from('pb_listings').select('updated_at,pb_products!inner(status)').eq('status', 'review')
+    .neq('pb_products.status', 'archived').order('updated_at').limit(1);
+  if (error) throw error;
+  return (data?.[0] as { updated_at: string } | undefined)?.updated_at ?? null;
+}
+
+/** Is automation paused, what is the day's AI limit (₹; 0 = none) and when did the worker last run (null = never recorded)? */
+export async function automationState(): Promise<{ paused: boolean; limit: number; lastRun: string | null }> {
+  const { data, error } = await supabase.from('pb_settings').select('key,value').in('key', ['automation', 'worker']);
+  if (error) throw error;
+  const v = (k: string) => data?.find(r => r.key === k)?.value as Record<string, unknown> | undefined;
+  const auto = v('automation'), at = v('worker')?.at;
+  return { paused: !!auto?.paused, limit: typeof auto?.daily_limit_inr === 'number' ? auto.daily_limit_inr : DEFAULT_DAILY_LIMIT, lastRun: typeof at === 'string' ? at : null };
+}
+

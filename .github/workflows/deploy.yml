@@ -32,14 +32,28 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Node 22: the server tests below run TypeScript files directly
+      # (node --experimental-strip-types), which Node 20 cannot do.
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
         run: npm ci
+
+      # The Playbook edge functions (supabase/functions/pb-*) are not part of
+      # `npm run build`, and they go live by a separate hand deploy. These two
+      # steps are the only automatic check on them: a type error (a missing
+      # import there is a runtime 500) or a failing unit test stops the deploy,
+      # so it is seen before the server is redeployed. See
+      # supabase/functions/_check/README.md and docs/playbook/DEPLOY.md.
+      - name: Server type-check
+        run: npm run check:server
+
+      - name: Server tests
+        run: npm run test:server
 
       - name: Build
         run: npm run build

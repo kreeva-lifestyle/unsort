@@ -44,7 +44,7 @@ export function PausedBanner({ onOpen }: { onOpen: () => void }) {
         <h2 id="pb-dash-paused" style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>
           <Dot color={PB.review} label="Automation is paused" style={{ fontSize: 13, color: PB.tx, fontWeight: 600 }} />
         </h2>
-        <p style={{ ...pbBody, margin: 0, color: PB.tx2 }}>Nothing is read, written or published on its own. Buttons on a product still work.</p>
+        <p style={{ ...pbBody, margin: 0, color: PB.tx2 }}>Nothing is read, written or published on its own. Stock changes still reach your stores, and buttons on a product still work.</p>
       </div>
       <PbButton onClick={onOpen}>Open Settings</PbButton>
     </PbTile>

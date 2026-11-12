@@ -86,7 +86,7 @@ export const WRITING: GuideSection[] = [
       table(['Switch', 'Where', 'What it does'],
         ['**Active** (one website)', 'Websites → website → Connection', 'Off = nothing new is sent to this store. Products already there stay. On again = the matching products are sent.'],
         ['Rule switch (one rule)', 'Websites → website → Routing rules', 'That rule stops sorting products.'],
-        ['**Automation** (everything)', 'Settings → Automation', 'Paused = nothing is read, written or published on its own. Buttons like **Publish now** still work. The Dashboard shows a yellow banner.'],
+        ['**Automation** (everything)', 'Settings → Automation', 'Paused = nothing is read, written or published on its own, and a run that was going stops. Stock changes still reach your stores. Buttons like **Publish now** and **Run one round now** still work. The Dashboard shows a yellow banner.'],
       ),
       p('**Settings → Run now** does one round straight away (it can take up to 2 minutes) and shows how many products were read, routed, written, published and failed.'),
       h('A safe first day for a new website'),
