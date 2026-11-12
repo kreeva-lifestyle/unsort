@@ -35,7 +35,11 @@ test('prompt: the store profile, the ten rules and the output shape', () => {
     'begins with the answer itself', '"Is the blouse stitched?"', 'The first names the product (colour, fabric, garment, work) and the view', 'never begin with "image of"',
     'no word in ALL CAPS, no emoji or symbols', 'add "for Women" before the brand', 'SHOPPERS OF THIS GARMENT EXPECT']) assert.ok(sys.includes(part), part);
   const bare = genSystem({ c: {}, profile: profileOf({ name: 'Arya', content: {} }), extraMax: 0, allowed: [], photos: 0, imported: false });
-  assert.ok(bare.includes('- Title formula: what the product is: colour, fabric, the work or pattern, type, then what comes with it'));
+  assert.ok(bare.includes('- Title formula: what the product is: colour, fabric and type together, then the main work or pattern and what comes with it'));
+  // A brand too long for the SEO title is not asked for (D2): "| Brand" must leave the product 12 characters.
+  assert.ok(bare.includes('ending with "| Arya"'));
+  const longBrand = genSystem({ c: {}, profile: profileOf({ name: 'Shree Rangoli Creations and Exports Private Ltd', content: {} }), extraMax: 0, allowed: [], photos: 0, imported: false });
+  assert.ok(longBrand.includes('seo_title: at most 60 characters, without the brand name') && !longBrand.includes('ending with "|'));
   const facts = genFacts({ ...P, attributes: { ...P.attributes, manufacturer: 'Other Store Mills' } }, { keyword: 'k', photos: 1, others: [] });
   assert.ok(facts.includes('SHOPPERS OF THIS GARMENT EXPECT') && facts.includes('- the kurta length') && facts.includes('- the bottom type'));
   assert.ok(!facts.includes('Other Store Mills')); // another store's manufacturer never reaches the writer
@@ -163,3 +167,20 @@ test('a rewrite never changes how many photos are described', async () => {
 test('fixAsk lists the fixes in order', () => {
   assert.ok(fixAsk(tidyOut(DRAFT), [problem('a', true), problem('b', false)]).includes('1. fix a\n2. fix b'));
 });
+
+// Pre-launch check, 2026-11-13 (D3): a title in the default formula's own order must pass the title check.
+test('the default title formula and the default search phrase agree: its own example passes the title check', async () => {
+  const { DEFAULT_FORMULA } = await import('../genPrompt.ts');
+  const { DEFAULT_KEYWORD, keywordOf } = await import('../profile.ts');
+  const { countPhrase } = await import('../seoText.ts');
+  const { checkCopy } = await import('../seoCheck.ts');
+  const example = DEFAULT_FORMULA.match(/"([^"]+)"/)[1], keyword = keywordOf(DEFAULT_KEYWORD, P);
+  assert.equal(keyword, 'Maroon Georgette Kurta Set');
+  assert.equal(countPhrase(example, keyword), 1);
+  const ask = (title) => checkCopy({ copy: { title, description_html: '<p>Maroon Georgette Kurta Set with zari on the yoke.</p>', seo_title: 'Maroon Georgette Kurta Set | Kreeva', seo_description: 'x'.repeat(150), image_alts: [], faq: [] },
+    keyword, brand: 'Kreeva', aiTitle: true, source: '', others: [], facts: [], vendor: '', sku: '', limits: { metaDescMin: 140, metaDescMax: 155, wordsMin: 1, wordsMax: 200 } }).map(x => x.code);
+  assert.equal(ask(example).includes('keyword_title'), false);
+  // The old order (work between fabric and type) could never hold the phrase word for word.
+  assert.ok(ask('Maroon Georgette Zari Work Kurta Set with Dupatta').includes('keyword_title'));
+});
+

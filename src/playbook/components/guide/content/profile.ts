@@ -22,7 +22,7 @@ export const PROFILE: GuideSection[] = [
       ),
       h('What every listing gets'),
       list(
-        'A **title** with the search phrase in it once, in plain words: colour, fabric, the work or pattern, the garment, then what comes with it ("with Dupatta").',
+        'A **title** with the search phrase in it once, in plain words: colour, fabric and the garment together, then the main work or pattern and what comes with it ("Maroon Georgette Kurta Set with Zari Work and Dupatta").',
         'A **web address** of 3 to 6 plain words, with no design codes.',
         'An **SEO title** that ends with the brand name, and an **SEO description** of about 140 to 155 characters.',
         'A **description** whose first sentence says what the product is and what comes with it; the store\'s angle follows. Then 5 to 7 fact bullets in one order (what is in the set and whether it is stitched, fabric and lining, measurements and fit, work, pattern, care) and "How to wear it". Nothing about delivery, returns or prices.',

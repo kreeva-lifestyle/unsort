@@ -21,18 +21,25 @@ export function Scopes() {
   );
 }
 
+/** Shopify answered. Usable (green) only with every permission, rupees and an Online Store channel; otherwise what is missing. */
 export function ResultBox({ result, missing }: { result: ConnectionResult; missing: string[] }) {
-  if (missing.length) return (
+  const problems = result.problems ?? [];
+  if (missing.length || problems.length) return (
     <div role="status" style={{ ...box, background: PB.reviewBg, border: `1px solid ${PB.reviewBd}` }}>
-      <Dot color={PB.review} label={`Connected to ${result.shop_name}, but permissions are missing`} style={wrapDot} />
-      <span style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>{missing.map(s => <PbTag key={s} mono>{s}</PbTag>)}</span>
-      <span>Add them to the app in Shopify, reinstall it, then test again.</span>
+      <Dot color={PB.review} label={`Reached ${result.shop_name || 'the store'}, but it cannot be used yet`} style={wrapDot} />
+      {missing.length > 0 && <>
+        <span>The Shopify app is missing these permissions:</span>
+        <span style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>{missing.map(s => <PbTag key={s} mono>{s}</PbTag>)}</span>
+        <span>Add them to the app in Shopify, reinstall it, then test again.</span>
+      </>}
+      {problems.map(p => <span key={p}>{p}</span>)}
+      <span style={{ color: PB.tx2 }}>Fix this and test again. Until the test passes the website cannot be switched on.</span>
     </div>
   );
   return (
     <div role="status" style={{ ...box, background: PB.ctl, border: `1px solid ${PB.ctlBd}` }}>
       <Dot color={PB.live} label={`Connected to ${result.shop_name}`} style={wrapDot} />
-      <span style={{ color: PB.tx2 }}>All needed permissions are there.</span>
+      <span style={{ color: PB.tx2 }}>All needed permissions are there, the store sells in rupees and it has an Online Store channel.</span>
     </div>
   );
 }

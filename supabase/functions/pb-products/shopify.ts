@@ -15,6 +15,7 @@ export const REQUIRED_SCOPES = ['write_products', 'read_products', 'write_public
 /** Playbook's prices are rupees: a store that sells in another currency would show ₹2,499 as 2,499 of its own. */
 export const CURRENCY = 'INR';
 export const wrongCurrency = (name: string, code: string) => `${name}: this store sells in ${code}, and Playbook's prices are in rupees (${CURRENCY}). Nothing is sent there, so a rupee price is never shown as ${code}.`;
+export const noChannel = (name: string) => `${name}: this store has no Online Store sales channel, so products would be saved there but no shopper could see them. Add the Online Store channel in Shopify, then test again.`;
 
 /** "https://My-Shop.myshopify.com/" → "my-shop.myshopify.com" */
 export const shopHost = (d: string) => String(d || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
@@ -120,20 +121,22 @@ export async function shopCurrency(site: WebsiteRow, ms = TIMEOUT): Promise<stri
   return code;
 }
 
-/** shop name + granted scopes + currency; records connected_at / last_error on the website. */
-export async function testConnection(site: WebsiteRow): Promise<{ shop_name: string; scopes: string[]; missing_scopes: string[]; currency: string }> {
+/** shop name + granted scopes + currency + the Online Store channel. The website counts as connected
+ *  (connected_at, which the "On" switch asks for) only when it can really be used: every permission is there,
+ *  the store sells in rupees and it has a channel to show products on. `problems` = the last two, in words. */
+export async function testConnection(site: WebsiteRow): Promise<{ shop_name: string; scopes: string[]; missing_scopes: string[]; currency: string; problems: string[] }> {
   try {
     const d = await gql<{ shop: { name: string; currencyCode: string }; currentAppInstallation: { accessScopes: { handle: string }[] } }>(site,
       '{ shop { name currencyCode } currentAppInstallation { accessScopes { handle } } }');
     const scopes = (d.currentAppInstallation?.accessScopes || []).map(a => a.handle);
     const missing = REQUIRED_SCOPES.filter(s => !hasScope(scopes, s));
     const shop_name = d.shop?.name || '', currency = String(d.shop?.currencyCode || '');
-    const notes = [
-      ...(missing.length ? [`Connected, but the Shopify app is missing: ${missing.join(', ')}.`] : []),
-      ...(currency && currency !== CURRENCY ? [wrongCurrency(site.name, currency)] : []),
-    ];
-    await patch('pb_websites', `id=eq.${enc(site.id)}`, { shop_name, connected_at: nowIso(), last_error: notes.join(' ') || null });
-    return { shop_name, scopes, missing_scopes: missing, currency };
+    const problems = currency && currency !== CURRENCY ? [wrongCurrency(site.name, currency)] : [];
+    // Without read_publications the channel cannot be looked up (the missing permission says so); a lookup that fails is not "no channel".
+    if (hasScope(scopes, 'read_publications') && !(await onlineStoreId(site).catch(() => 'unknown'))) problems.push(noChannel(site.name));
+    const notes = [...(missing.length ? [`The Shopify app is missing these permissions: ${missing.join(', ')}.`] : []), ...problems];
+    await patch('pb_websites', `id=eq.${enc(site.id)}`, { shop_name, connected_at: notes.length ? null : nowIso(), last_error: notes.join(' ') || null });
+    return { shop_name, scopes, missing_scopes: missing, currency, problems };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     await patch('pb_websites', `id=eq.${enc(site.id)}`, { last_error: msg })

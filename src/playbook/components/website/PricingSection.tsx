@@ -56,9 +56,10 @@ export default function PricingSection({ siteId, dirty, draft, set, addToast }: 
           <Seg label="Rounding" value={p.rounding} onChange={v => put({ rounding: v })} options={ROUNDINGS} />
         </Field>
         <div style={pbMeta}>A routing rule can replace the markup and add ₹ for the products it sends here (Routing rules, price override).</div>
+        <div style={{ ...pbMeta, marginTop: 8 }}>Products copied from another website are not priced by this formula: they sell at the price that website had. Only the compare-at % is added to them.</div>
       </Section></Cell>
 
-      <Cell><Section title="Preview" hint="Try a cost to see what this store will charge (with the unsaved values above).">
+      <Cell><Section title="Preview" hint="Try a cost to see what this store will charge (with the unsaved values above). Copied products keep their copied price instead.">
         <div style={{ display: 'flex', gap: 16, alignItems: 'stretch', flexWrap: 'wrap' }}>
           <div style={{ flex: '1 1 180px', maxWidth: 320, minWidth: 0 }}>
             <Field label="Sample cost ₹" htmlFor="pbp-sample">

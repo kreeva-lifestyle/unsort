@@ -28,6 +28,7 @@
 // routing failure is not a read failure (see routeAfterRead), but it counts
 // towards the same 3 tries.
 import { askClaude } from './ai.ts';
+import { aiBusy, freeTry } from './aiRetry.ts';
 import { ago, enc, getSettings, logActivity, nowIso, one, patch, sel } from './db.ts';
 import { HttpError, plain } from './http.ts';
 import { aiPhotos } from './photos.ts';
@@ -130,12 +131,13 @@ export async function readOne(p: ProductRow, o: { manual: boolean; prevStatus?: 
     await logActivity({ product_id: p.id, action: 'read', details: { model: ai.model, effort: ai.effort, usd: ai.usd, status: product.status, filled: Object.keys(set), ...(product.missing_attrs?.length ? { missing: product.missing_attrs } : {}), ...(used < imgs.length ? { photos_skipped: imgs.length - used } : {}), ...(Object.keys(changed).length ? { changed } : {}) }, user_id: o.userId });
   } catch (e) {
     const msg = plain(e);
-    await logActivity({ product_id: p.id, action: 'failed', details: { step: 'read', error: msg }, user_id: o.userId });
+    const free = !o.manual && await freeTry(e, `product_id=eq.${enc(p.id)}&listing_id=is.null`, 'read', 'read'); // the AI was busy: read again, no try used up (aiRetry.ts)
+    await logActivity({ product_id: p.id, action: 'failed', details: { step: 'read', error: msg, ...(aiBusy(e) ? { temporary: true } : {}) }, user_id: o.userId });
     if (o.manual) {
       await patch('pb_products', `id=eq.${enc(p.id)}&status=eq.reading`, { status: o.prevStatus || 'new', ai_error: msg, claimed_at: null });
       throw e instanceof HttpError ? e : new HttpError(502, msg);
     }
-    const n = Number(TRY_RE.exec(p.ai_error || '')?.[1] || 0) + 1;
+    const n = Number(TRY_RE.exec(p.ai_error || '')?.[1] || 0) + (free ? 0 : 1);
     const giveUp = n >= MAX_ATTEMPTS;
     const complete = hasPrice(p) && !!String(p.category || '').trim();
     if (giveUp && complete) { // staff already gave what websites need: ready anyway, the error stays as a note
@@ -146,7 +148,7 @@ export async function readOne(p: ProductRow, o: { manual: boolean; prevStatus?: 
     }
     // claimed_at stays: a 'new' product is retried only once it is 5 minutes old.
     await patch('pb_products', `id=eq.${enc(p.id)}&status=eq.reading`,
-      { status: giveUp ? 'needs_info' : 'new', ai_error: giveUp ? msg : `${msg.slice(0, 260)} (attempt ${n} of ${MAX_ATTEMPTS})` });
+      { status: giveUp ? 'needs_info' : 'new', ai_error: giveUp || !n ? msg : `${msg.slice(0, 260)} (attempt ${n} of ${MAX_ATTEMPTS})` });
     throw e;
   }
   if (product.status !== 'ready') return { product, routed: 0 };
