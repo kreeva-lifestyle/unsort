@@ -11,6 +11,8 @@ export interface ProductRow {
   in_stock: boolean;
   /** When a vendor notice called it TEMPORARILY out of stock: a note only, nothing changes on Shopify (stockNotice.ts). */
   temp_out_at: string | null;
+  /** When a vendor notice said PERMANENT stock out (stock.ts takeOffSale); it counts while in_stock is false: see permOut. */
+  perm_out_at: string | null;
   /** Import from website: sell at exactly this price on every website (pricing rules skipped); price_note says where it came from. */
   sell_price: number | null; price_note: string | null;
   attributes: Record<string, string>; status: string; locked: string[];
@@ -104,7 +106,7 @@ export type Caller = { kind: 'secret' } | { kind: 'staff'; id: string; role: str
 /** Per-call time limits: stop starting new items after `soft`; every outside call ends by `hard`. */
 export interface Budget { soft: number; hard: number }
 
-export const PRODUCT_COLS = 'id,vendor_id,source,source_ref,raw_text,sku,name,category,fabric,color,sizes,in_stock,temp_out_at,cost_price,less_amount,sell_price,price_note,attributes,tags,missing_attrs,status,locked,ai_read_at,ai_error,claimed_at,created_at,updated_at';
+export const PRODUCT_COLS = 'id,vendor_id,source,source_ref,raw_text,sku,name,category,fabric,color,sizes,in_stock,temp_out_at,perm_out_at,cost_price,less_amount,sell_price,price_note,attributes,tags,missing_attrs,status,locked,ai_read_at,ai_error,claimed_at,created_at,updated_at';
 export const LISTING_COLS = 'id,product_id,website_id,status,rule_id,price,compare_at_price,title,description_html,seo_title,seo_description,handle,tags,product_type,image_alts,locked,ai_model,ai_effort,ai_cost_usd,generated_at,shopify_product_id,shopify_status,published_at,attempts,claimed_at,error,created_at,updated_at';
 export const WEBSITE_COLS = 'id,name,shop_domain,auth_mode,api_version,active,publish_mode,routing_default,track_inventory,pricing,tag_rules,content,connected_at,shop_name,last_error';
 export const RULE_COLS = 'id,website_id,position,name,enabled,action,conditions,price_override';
@@ -120,5 +122,7 @@ export const ARCHIVED = 'The product was archived.';
 /** A listing is not written or published while its product lacks a necessary detail (the gate: pb_products_refresh / tagGate.ts). */
 export const NEEDS_INFO = 'The product is held in Needs info: it needs its cost price, category, fabric, colour, a photo and a value for every attribute of its category, or it looks already added. Open the product to see which.';
 /** Ready for websites: a category plus EITHER a cost price (priced by the website's rules) OR a selling price copied from another store. */
+/** Permanently out of stock (a vendor said so and nobody switched Stock back on): archived on Shopify, never made or updated there. */
+export const permOut = (p: { in_stock?: boolean; perm_out_at?: string | null }) => p.in_stock === false && !!p.perm_out_at;
 export const hasPrice = (p: { cost_price: number | null; sell_price?: number | null }) =>
   (p.cost_price !== null && p.cost_price !== undefined) || (p.sell_price !== null && p.sell_price !== undefined);

@@ -33,7 +33,7 @@ export interface IngestBody {
   // Optional (import from website, 2026-11-08): sell at exactly this price everywhere, and where it came from.
   sell_price?: unknown; price_note?: unknown;
   // Import from website only: the store's facts as plain strings, its SKU, and its size choices as it writes them.
-  attributes?: unknown; sku?: unknown; sizes?: unknown; in_stock?: unknown;
+  attributes?: unknown; sku?: unknown; sizes?: unknown;
 }
 
 /** The optional fields, validated (exported for the tests). */

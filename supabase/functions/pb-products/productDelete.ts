@@ -11,7 +11,7 @@
 //   * a listing that is on Shopify and not taken off the site (Playbook
 //     would forget the Shopify product and could never unlist it; a later
 //     import would list it twice) → "Remove from site" first. "Taken off"
-//     means removed in Playbook AND Draft on Shopify: a removed listing whose
+//     means removed in Playbook AND Draft (or Archived) on Shopify: a removed listing whose
 //     product may still be on sale counts as on Shopify;
 //   * the AI is reading it, or a listing is being written / sent right now.
 // Shopify is never touched here. The row goes first, the files second: a
@@ -27,7 +27,7 @@ interface L { id: string; status: string; shopify_product_id: string | null; sho
 
 /** The listings that are on Shopify and were not taken off the site ("Removed" = Draft there). */
 export const onShopify = <T extends Pick<L, 'status' | 'shopify_product_id' | 'shopify_status'>>(ls: T[]) =>
-  ls.filter(l => l.shopify_product_id && !(l.status === 'skipped' && l.shopify_status === 'DRAFT'));
+  ls.filter(l => l.shopify_product_id && !(l.status === 'skipped' && ['DRAFT', 'ARCHIVED'].includes(l.shopify_status || '')));
 
 /** Remove files from the bucket (Storage API, service role). Returns how many could NOT be removed. */
 async function removeFiles(paths: string[]): Promise<number> {

@@ -25,7 +25,8 @@ import { busyStreak, filesFor, FREE_RETRIES, type Gallery, knownPhotos, leaveGal
 import { seoGet } from './seoStore.ts';
 import { CURRENCY, gql, shopCurrency, wrongCurrency } from './shopify.ts';
 import { adoptable, type Existing, existingProduct } from './shopifyProduct.ts';
-import { ARCHIVED, LISTING_COLS, MAX_ATTEMPTS, NEEDS_INFO, PRODUCT_COLS, RETRY_MS, STALE_MS, WEBSITE_COLS, type Budget, type ListingRow, type ProductRow, type WebsiteRow } from './types.ts';
+import { PERM_NOTE, retire } from './stock.ts';
+import { ARCHIVED, LISTING_COLS, MAX_ATTEMPTS, NEEDS_INFO, PRODUCT_COLS, RETRY_MS, STALE_MS, WEBSITE_COLS, permOut, type Budget, type ListingRow, type ProductRow, type WebsiteRow } from './types.ts';
 
 /** Time a publish needs left before it starts: lookups + a slow productSet + the Online Store step. */
 export const PUBLISH_NEEDS_MS = 60_000;
@@ -87,6 +88,8 @@ export async function publishOne(l: ListingRow, o: { manual: boolean; putBack?: 
       return r[0] ?? l;
     }
     if (p.status === 'needs_info') throw new HttpError(400, NEEDS_INFO);
+    const gone = permOut(p); // a permanent stock-out: this send archives the Shopify product (productInput.ts)
+    if (gone && o.manual) throw new HttpError(400, 'The vendor said this product is permanently out of stock. Switch Stock on first to sell it again.');
     if (!String(l.title || '').trim()) throw new HttpError(400, 'This listing has no title — regenerate it or type one.');
     if (!(Number(l.price) > 0)) throw new HttpError(400, 'This listing has no price — regenerate it or type one.');
     const currency = await shopCurrency(site, ms(15_000));
@@ -105,6 +108,11 @@ export async function publishOne(l: ListingRow, o: { manual: boolean; putBack?: 
     let existing: Existing | null = l.shopify_product_id ? await existingProduct(site, l.shopify_product_id, ms(30_000)) : null;
     let adopted = !existing ? await adoptable(site, l.id, [first, altHandle(first), ...earlier], ms(30_000)) : null;
     existing = existing || adopted;
+    if (gone && !existing) { // not on this store (never was, or deleted there): nothing to take off, and nothing is made
+      const r = await patch<ListingRow>('pb_listings', mine, { status: 'skipped', error: PERM_NOTE, shopify_product_id: null, shopify_status: null, claimed_at: null }, LISTING_COLS);
+      await retire(p.id);
+      return r[0] ?? l;
+    }
     if (l.shopify_product_id && !existing && !o.manual) { // deleted in Shopify by someone: only a person brings it back
       const r = await patch<ListingRow>('pb_listings', mine, { status: 'skipped', error: GONE, shopify_product_id: null, shopify_status: null, claimed_at: null }, LISTING_COLS);
       if (r.length) await logActivity({ product_id: l.product_id, website_id: l.website_id, listing_id: l.id, action: 'unpublished', details: { deleted_in_shopify: true, shopify_product_id: l.shopify_product_id }, user_id: o.userId });
@@ -145,7 +153,7 @@ export async function publishOne(l: ListingRow, o: { manual: boolean; putBack?: 
     // Active in Shopify), on Put back, and while an earlier run still owes it — not on every update, which would
     // undo a channel choice made in Shopify.
     const since = last?.created_at ?? '';
-    owed = sendStatus || !l.published_at || was?.channel === false || tried.some(t => t.details?.channel_due && t.created_at > since);
+    owed = !gone && (sendStatus || !l.published_at || was?.channel === false || tried.some(t => t.details?.channel_due && t.created_at > since));
     // Saved at once, whatever happens next, so a retry updates this product instead of making another.
     // Only while this run still holds the listing (a store move or takeover re-queued it meanwhile).
     const held = await patch('pb_listings', mine, { shopify_product_id: prod.id, shopify_status: prod.status, handle: prod.handle || handle, compare_at_price: compare });
@@ -167,10 +175,11 @@ export async function publishOne(l: ListingRow, o: { manual: boolean; putBack?: 
     // What the store has of Playbook's photos now. The store refused the change → what it had before.
     const media = photoRecord(gallery, paths, known, (prod.media?.nodes || []).map(m => m.id));
     const photos = noFiles ? { photos: was?.photos ?? [], ...(was?.media ? { media: was.media } : {}) } : { photos: paths, ...(media ? { media } : {}) };
-    const saved = await patch<ListingRow>('pb_listings', mine, {
-      status: 'published', shopify_status: prod.status, published_at: nowIso(), attempts: 0, error: warning, claimed_at: null,
-    }, LISTING_COLS);
+    const saved = await patch<ListingRow>('pb_listings', mine, gone
+      ? { status: 'skipped', shopify_status: prod.status, attempts: 0, error: PERM_NOTE, claimed_at: null } // archived on Shopify: off the website
+      : { status: 'published', shopify_status: prod.status, published_at: nowIso(), attempts: 0, error: warning, claimed_at: null }, LISTING_COLS);
     await logActivity({ product_id: l.product_id, website_id: l.website_id, listing_id: l.id, action: 'published', details: { shopify_product_id: prod.id, status: prod.status, update: !!existing, ...(adopted ? { adopted: true } : {}), ...photos, tags: l.tags || [], sizes: p.sizes || [], sku: p.sku || '', in_stock: p.in_stock !== false, ...(shown ? {} : { channel: false }), ...(warning ? { warning } : {}) }, user_id: o.userId });
+    if (gone) await retire(l.product_id);
     if (!saved[0]) throw new HttpError(409, 'Published on Shopify, but the listing changed meanwhile — open it again.');
     return saved[0];
   } catch (e) {

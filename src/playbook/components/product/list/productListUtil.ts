@@ -68,8 +68,8 @@ export const missingOf = (p: Pick<ProductRow, 'cost_price' | 'sell_price' | 'cat
 
 /** The status label of a Needs-info product says why: "Needs info · Already here as KB 264 WINE XS" (it looks like a
  *  copy; `copyOf` from data/duplicates.ts heldLabels) and / or "Missing: Fabric, Colour". */
-export const statusLabel = (p: Pick<ProductRow, 'status' | 'cost_price' | 'sell_price' | 'category' | 'fabric' | 'color' | 'missing_attrs' | 'pb_product_images'> & { in_stock?: boolean; temp_out_at?: string | null }, copyOf?: string) => {
+export const statusLabel = (p: Pick<ProductRow, 'status' | 'cost_price' | 'sell_price' | 'category' | 'fabric' | 'color' | 'missing_attrs' | 'pb_product_images'> & { in_stock?: boolean; temp_out_at?: string | null; perm_out_at?: string | null }, copyOf?: string) => {
   const miss = p.status === 'needs_info' ? missingOf(p) : [];
   const why = [p.status === 'needs_info' && copyOf ? `Already here as ${copyOf}` : '', miss.length ? `Missing: ${miss.join(', ')}` : ''].filter(Boolean);
-  return (why.length ? `${PRODUCT_STATUS.needs_info.label} · ${why.join(' · ')}` : PRODUCT_STATUS[p.status].label) + (p.in_stock === false ? ' · Out of stock' : p.temp_out_at ? ' · Temporarily out (vendor)' : '');
+  return (why.length ? `${PRODUCT_STATUS.needs_info.label} · ${why.join(' · ')}` : PRODUCT_STATUS[p.status].label) + (p.in_stock === false ? (p.perm_out_at ? ' · Permanent stock out (vendor)' : ' · Out of stock') : p.temp_out_at ? ' · Temporarily out (vendor)' : '');
 };

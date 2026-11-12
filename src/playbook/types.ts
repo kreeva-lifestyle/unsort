@@ -26,10 +26,12 @@ export interface PbProduct {
   id: string; vendor_id: string | null; source: 'manual' | 'telegram' | 'import'; source_ref: string | null;
   raw_text: string | null; sku: string | null; name: string | null; category: string | null;
   fabric: string | null; color: string | null; sizes: string[]; cost_price: number | null;
-  /** false = out of stock: Shopify shows it as Sold out. Set by the importer from the source store, and by staff on the product page. */
+  /** false = out of stock: Shopify shows it as Sold out. Set by a vendor's stock-out notice and by staff on the product page (never from a source website). */
   in_stock: boolean;
   /** When a vendor's notice called it TEMPORARILY out of stock: a note you can filter by; nothing changes on the websites. */
   temp_out_at: string | null;
+  /** When a vendor's notice said PERMANENT stock out: with in_stock false the product is archived here and on Shopify. */
+  perm_out_at: string | null;
   /** tags: its chosen values' names (cache; pb_product_values, tagTypes.ts) · missing_attrs: required attributes still empty → Needs info. */
   tags: string[]; missing_attrs: string[];
   /** Anything else the AI read: work, occasion, pattern, set_contents, wash_care, notes… (string values). */

@@ -3,8 +3,10 @@
 // '<host>:<id on that site>' — three at a time. Shopify / WooCommerce also
 // fetch each NEW product's own page once (enrich.ts), so:
 //   - products imported before are found with ONE lookup per page and skipped
-//     before their page is fetched; their STOCK is brought up to date from the
-//     list itself (stock.ts), whatever the "in stock only" choice of the run;
+//     before their page is fetched. Their stock is NOT looked at (owner,
+//     2026-11-12: "Dont check for stock in source website. What if source
+//     website stopped doing business"): stock comes from the vendor's own
+//     notices and the Stock switch only;
 //   - no new batch starts in the last META_RESERVE_MS of the import clock (the
 //     runner then saves where it stopped and the next tick carries on there).
 // Caps: MAX_PRODUCTS new products (added + failed) per run — products already
@@ -16,7 +18,6 @@ import { MAX_PRODUCTS, MAX_SCANNED } from './cursor.ts';
 import { ingestBody } from './body.ts';
 import { type Gate, enrich } from './enrich.ts';
 import { type Found } from './normalize.ts';
-import { refreshStock } from './stock.ts';
 import { type Robots } from './urlCheck.ts';
 
 const INGEST_AT_ONCE = 3;
@@ -35,7 +36,7 @@ export const capped = (c: Counts) => c.added + c.failed >= MAX_PRODUCTS || c.fou
 
 /** Add the page's products from index `start`; returns where it stopped and the new products it sent to ingest. */
 export async function addProducts(items: Found[], start: number, counts: Counts, ctx: PageCtx): Promise<{ next: number; taken: Found[] }> {
-  const taken: Found[] = [], here: Found[] = [];
+  const taken: Found[] = [];
   let i = start;
   const seen = ctx.perItem && i < items.length ? await ctx.known(items.slice(i).map(f => f.ref)) : new Set<string>();
   while (i < items.length && !capped(counts)) {
@@ -44,7 +45,6 @@ export async function addProducts(items: Found[], start: number, counts: Counts,
     while (i < items.length && batch.length < INGEST_AT_ONCE && counts.added + counts.failed + batch.length < MAX_PRODUCTS && counts.found < MAX_SCANNED) {
       const f = items[i++];
       counts.found++;
-      if (seen.has(f.ref)) here.push(f);
       if (!f.in_stock && ctx.run.in_stock_only) counts.out_of_stock++;
       else if (seen.has(f.ref)) counts.skipped++;
       else batch.push(f);
@@ -62,7 +62,5 @@ export async function addProducts(items: Found[], start: number, counts: Counts,
       }
     }));
   }
-  // A failure here must not stop the import: the next run compares again.
-  if (here.length) await refreshStock(ctx.run.host, here).catch(e => console.error(`pb-products import ${ctx.run.id} stock: ${plain(e)}`));
   return { next: i, taken };
 }
