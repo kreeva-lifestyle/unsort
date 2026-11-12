@@ -1,5 +1,5 @@
 // One product in the desktop results grid (the caller places it: 4 of 12 bento columns): the
-// first photo in a fixed box, name (2-line clamp), vendor · SKU · category,
+// first photo in a fixed box, name (2-line clamp), vendor · category · where it came from · SKU,
 // the cost in mono with the product status, then one dot + label per website.
 // A flat glass tile (no blur in a results grid); tinted when it needs action.
 import type { ProductRow, WebsiteLite } from '../../data/products';
@@ -8,11 +8,13 @@ import PbTile from '../ui/PbTile';
 import { Dot, LISTING_STATUS, PRODUCT_STATUS, rupees } from './status';
 import ProductPhoto from './list/ProductPhoto';
 import { productTitle, productTone, siteNamer, statusLabel } from './list/productListUtil';
+import { sourceText } from '../../data/duplicates';
 
-export default function ProductCard({ p, sites, onOpen }: { p: ProductRow; sites: WebsiteLite[]; onOpen: () => void }) {
+export default function ProductCard({ p, sites, onOpen, copyOf }: { p: ProductRow; sites: WebsiteLite[]; onOpen: () => void; copyOf?: string }) {
   const st = PRODUCT_STATUS[p.status];
   const siteName = siteNamer(sites);
-  const meta = [p.pb_vendors?.name, p.category].filter(Boolean).join(' · ');
+  const from = sourceText(p.source, p.source_ref);
+  const meta = [p.pb_vendors?.name, p.category, from && `from ${from}`].filter(Boolean).join(' · ');
   return (
     <PbTile as="button" flat variant={productTone(p) ?? 'default'} onClick={onOpen} data-open-id={p.id}
       style={{ padding: 8, display: 'flex', flexDirection: 'column', gap: 0, fontFamily: PB.sans, color: PB.tx, height: '100%' }}>
@@ -28,7 +30,7 @@ export default function ProductCard({ p, sites, onOpen }: { p: ProductRow; sites
           {p.cost_price != null ? <span style={{ ...pbNum, fontSize: 15, fontWeight: 500, color: PB.tx }}>{rupees(p.cost_price)}</span>
             : p.sell_price != null ? <span style={pbMeta}>Sells at <span style={{ ...pbNum, fontSize: 15, fontWeight: 500, color: PB.tx }}>{rupees(p.sell_price)}</span></span>
               : <span style={pbMeta}>No price</span>}
-          <Dot color={st.color} label={statusLabel(p)} style={{ whiteSpace: 'normal' }} />
+          <Dot color={st.color} label={statusLabel(p, copyOf)} style={{ whiteSpace: 'normal', overflowWrap: 'anywhere', minWidth: 0 }} />
         </span>
         {p.pb_listings.length > 0 && (
           <span style={{ display: 'flex', flexWrap: 'wrap', columnGap: 12, rowGap: 4, borderTop: `1px solid ${PB.tileBd}`, paddingTop: 8, marginTop: 'auto' }}>

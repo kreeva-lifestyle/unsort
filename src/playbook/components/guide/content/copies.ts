@@ -1,0 +1,46 @@
+// Guide: "Already added?" — how Playbook notices a product that is already
+// here (design code + colour), what the three answers do, and the source
+// label / Source filter on Products.
+import { type GuideSection, h, list, p, table, tip } from '../types';
+
+export const COPIES: GuideSection[] = [
+  {
+    id: 'copies',
+    short: 'Already added?',
+    title: 'Already added? — copies, colours and where a product came from',
+    lead: 'The same design often arrives twice: in a vendor\'s Telegram post and again from a website, or in two posts. Playbook compares every product with the ones already here by its design code, so one design is not listed twice.',
+    blocks: [
+      h('What it does by itself'),
+      table(['It finds', 'What happens', 'What you do'],
+        ['The very same post or page again (the same Telegram message, the same page of a website, typed with or without "www")', 'It is not added a second time. An import counts it as **already here**', 'Nothing'],
+        ['The same design code from the **same vendor**, in the same colour or with no colour given (`KB 302` and `KB 302 XS Blue`)', 'The later one waits in **Needs info · Already here as KB 302 XS Blue**. Nothing is written for the websites', 'Open it and answer (below)'],
+        ['The same code from the same vendor in a **different colour** (`KB 264 Wine` and `KB 264 Royal Blue`)', 'Nothing waits: each colour is its own product. The product page lists the other colours under **Same design**', 'Nothing'],
+        ['A near match: the same code at **another vendor**, or the same number with other letters (`KB 25` and `NKB 25`)', 'Nothing waits. The product page asks **Could this be already added?**', 'Answer when you see it'],
+      ),
+      h('How the code is read'),
+      list(
+        'From the **SKU**: letters, then numbers. `KB 302`, `KB-302`, `kb302` and `KB 302 XS Blue` are all the design **KB 302** — spaces, dashes and capitals do not matter, and size or colour words after the code are not part of it.',
+        'The colour is the words after the code (`KB 264 ROYAL BLUE XS` → royal blue); when there are none, the product\'s **Colour**.',
+        'A product without a SKU is never held back.',
+      ),
+      h('Answering'),
+      p('A product that waits shows **This looks already added** with the earlier product (photo, code, colour, where it came from). Tap the earlier product to open it and compare, then answer:'),
+      table(['Button', 'What it does'],
+        ['**It is a copy**', 'Archives this product; the earlier one stays. **Restore** brings it back.'],
+        ['**Another colour**', 'Keeps both as separate products. This one becomes Ready and goes to the websites.'],
+        ['**Different product**', 'Keeps both — for two designs that happen to share a code. This one becomes Ready and goes to the websites.'],
+      ),
+      list(
+        'An answer is remembered: the same two products are never asked about again.',
+        'Nothing is merged or deleted, on either product.',
+        'Tapped the wrong answer? **Archive** the copy yourself.',
+      ),
+      h('Where a product came from'),
+      list(
+        'Each product on **Products** says where it came from: "from Telegram" or "from bahupalace.com". A product you typed in shows nothing.',
+        'The **Source** filter lists only the products from Telegram, typed in, or copied from one website.',
+      ),
+      tip('Give vendors\' products their design code as the SKU (the AI reads it from the post). Without a code there is nothing to compare.'),
+    ],
+  },
+];

@@ -11,6 +11,8 @@ import PbConfirm from '../components/ui/PbConfirm';
 import type { AddToast } from '../components/PbToasts';
 import { pbCall } from '../data/pbFunctions';
 import { getAiCost } from '../data/listingSeo';
+import { dupName, getDupMatches, type DupMatch } from '../data/duplicates';
+import DupTile from '../components/product/detail/DupTile';
 import { refreshGate } from '../data/tags';
 import { logSwallowed } from '../../lib/errorLogger';
 import type { PbAiCost } from '../seoTypes';
@@ -31,10 +33,12 @@ import { useIsPhone } from '../hooks/useIsPhone';
 
 type Props = {
   id: string; onClose: () => void; onChanged: () => void; addToast: AddToast;
+  /** Open another product from here (a match in "Already added?"); asks first when the facts hold unsaved typing. */
+  onOpenOther: (id: string) => void;
   vendors: VendorLite[]; onVendorCreated: (v: VendorLite) => void; sites: WebsiteLite[]; categories: string[];
 };
 
-export default function ProductPage({ id, onClose, onChanged, addToast, vendors, onVendorCreated, sites, categories }: Props) {
+export default function ProductPage({ id, onClose, onChanged, onOpenOther, addToast, vendors, onVendorCreated, sites, categories }: Props) {
   const [p, setP] = useState<ProductDetail | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [loadErr, setLoadErr] = useState('');
@@ -46,10 +50,12 @@ export default function ProductPage({ id, onClose, onChanged, addToast, vendors,
   const { ask, modalProps } = useConfirm();
 
   const [cost, setCost] = useState<PbAiCost | null>(null);
+  const [dups, setDups] = useState<DupMatch[]>([]);
   const load = useCallback(async () => {
     try { setP(await getProduct(id)); setLoadErr(''); }
     catch (e) { const m = friendlyError(e); setLoadErr(m); addToast(m, 'error'); }
     getAiCost(id).then(setCost).catch(e => logSwallowed('pb ai cost', e)); // a figure beside the listings: the page does not wait for it
+    getDupMatches([id]).then(setDups).catch(e => logSwallowed('pb copies', e)); // "Already added?": the gate has judged already, this only explains it
   }, [id, addToast]);
   useEffect(() => { void load(); }, [load]);
   const refresh = () => { void load(); onChanged(); };
@@ -110,6 +116,9 @@ export default function ProductPage({ id, onClose, onChanged, addToast, vendors,
     <ProductFacts key={p.id} product={p} vendors={vendors} categories={categories} onVendorCreated={onVendorCreated}
       onSaved={refresh} addToast={addToast} primary={!waiting} />
   );
+  const heldAs = dups.find(m => m.product_id === p.id && m.kind === 'held');
+  const copyOf = heldAs ? dupName(heldAs) : undefined;
+  const dupTile = (span?: 12) => <DupTile productId={p.id} matches={dups.filter(m => m.product_id === p.id)} span={span} onChanged={refresh} onOpen={onOpenOther} addToast={addToast} />;
   const listings = <ProductListings listings={p.pb_listings} sites={sites} onChanged={refresh} addToast={addToast} busy={busy} primary={waiting} phone={phone} cost={cost} />;
 
   return (
@@ -117,7 +126,8 @@ export default function ProductPage({ id, onClose, onChanged, addToast, vendors,
       {phone ? (
         <>
           <PhonePhotoHero images={p.pb_product_images} onAdd={addPhoto} busy={busy} onBack={onClose} />
-          <PhoneNameCard p={p} vendors={vendors} />
+          <PhoneNameCard p={p} vendors={vendors} copyOf={copyOf} />
+          {dupTile()}
           <IntakeNotesTile p={p} addToast={addToast} onChanged={refresh} />
           {listings}
           {facts}
@@ -129,14 +139,15 @@ export default function ProductPage({ id, onClose, onChanged, addToast, vendors,
         <div>
           <PbPageHeader title={name} back={{ label: 'Products', onBack: onClose }}
             sub={<span style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span style={{ display: 'inline-flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}><Dot color={st.color} label={st.label} /><span style={pbMeta}>{statusHint(p)}</span></span>
+              <span style={{ display: 'inline-flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}><Dot color={st.color} label={st.label} /><span style={pbMeta}>{statusHint(p, copyOf)}</span></span>
               <SourceLine p={p} />
             </span>}
             actions={<ProductActions {...actionProps} />} />
           <div className="pb-bento">
             <PhotosTile images={p.pb_product_images} onAdd={addPhoto} busy={busy} />
-            <ProductHero p={p} vendors={vendors} />
+            <ProductHero p={p} vendors={vendors} copyOf={copyOf} />
             <WebsitesStat p={p} />
+            {dupTile(12)}
             <IntakeNotesTile p={p} span={12} addToast={addToast} onChanged={refresh} />
             {/* Facts 8 + AI 4 on their own 12-column grid: its lines match the outer grid at 12 and 6 columns, so the row stays full. */}
             <div className="pb-span-12" style={{ display: 'grid', gridTemplateColumns: 'repeat(12, minmax(0, 1fr))', gap: 16 }}>

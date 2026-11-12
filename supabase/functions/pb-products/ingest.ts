@@ -14,6 +14,7 @@
 // Best effort: a tag failure is logged and never loses the product.
 import { SB_URL, enc, insert, logActivity, nowIso, one, patch, sel, svcHeaders } from './db.ts';
 import { HttpError, fetchT, plain } from './http.ts';
+import { refList } from './import/body.ts';
 import { siteBytes } from './import/fetch.ts';
 import { autoTag } from './tagStore.ts';
 import { loadTaxonomy } from './taxonomy.ts';
@@ -144,8 +145,7 @@ export async function ingest(b: IngestBody): Promise<Record<string, unknown>> {
   const rawText = String(b.raw_text ?? '').slice(0, 20_000);
   const urls = Array.isArray(b.image_urls) ? b.image_urls.map(String).filter(Boolean).slice(0, MAX_IMAGES) : [];
   const more = extras(b);
-  const findDup = () => one<{ id: string }>(`pb_products?source=eq.${enc(source)}&source_ref=eq.${enc(ref)}&select=id`);
-
+  const findDup = () => one<{ id: string }>(`pb_products?source=eq.${enc(source)}&source_ref=in.(${enc(refList(source, ref))})&select=id&order=created_at.asc`); // refList: also the site's other address (www / bare)
   const dup = await findDup();
   if (dup) return { ok: true, product_id: dup.id, duplicate: true };
   const vendor_id = await vendorId(String(b.vendor_name ?? '').replace(/\s+/g, ' ').trim().slice(0, 120));

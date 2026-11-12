@@ -11,16 +11,17 @@ export type { ListingFull } from './listings';
 
 export const PAGE_SIZE = 25;
 
-export type ProductRow = Pick<PbProduct, 'id' | 'name' | 'sku' | 'cost_price' | 'sell_price' | 'status' | 'category' | 'fabric' | 'color' | 'missing_attrs' | 'ai_error' | 'created_at'> & {
+export type ProductRow = Pick<PbProduct, 'id' | 'name' | 'sku' | 'cost_price' | 'sell_price' | 'status' | 'category' | 'fabric' | 'color' | 'missing_attrs' | 'ai_error' | 'source' | 'source_ref' | 'created_at'> & {
   pb_vendors: { name: string } | null;
   pb_product_images: { path: string; position: number }[];
   pb_listings: { id: string; website_id: string; status: PbListingStatus }[];
 };
-/** status: '' = everything but archived · a product status · 'l:failed' / 'l:queued,generating,publishing' = has a listing in that state (one or a comma list). */
-export type ProductFilter = { search: string; status: string; vendorId: string; websiteId: string };
-export const EMPTY_FILTER: ProductFilter = { search: '', status: '', vendorId: '', websiteId: '' };
+/** status: '' = everything but archived · a product status · 'l:failed' / 'l:queued,generating,publishing' = has a listing in that state (one or a comma list).
+ *  source: '' = any · 'telegram' · 'manual' (typed in) · 'import:<host>' (copied from that website, with or without "www."). */
+export type ProductFilter = { search: string; status: string; vendorId: string; websiteId: string; source: string };
+export const EMPTY_FILTER: ProductFilter = { search: '', status: '', vendorId: '', websiteId: '', source: '' };
 
-const LIST_COLS = 'id,name,sku,cost_price,sell_price,status,category,fabric,color,missing_attrs,ai_error,created_at,pb_vendors(name),pb_product_images(path,position),pb_listings(id,website_id,status)';
+const LIST_COLS = 'id,name,sku,cost_price,sell_price,status,category,fabric,color,missing_attrs,ai_error,source,source_ref,created_at,pb_vendors(name),pb_product_images(path,position),pb_listings(id,website_id,status)';
 
 export async function listProducts(f: ProductFilter, page: number): Promise<{ rows: ProductRow[]; count: number }> {
   const lStatus = f.status.startsWith('l:') ? f.status.slice(2) : '';
@@ -32,6 +33,11 @@ export async function listProducts(f: ProductFilter, page: number): Promise<{ ro
   if (lList.length > 1) q = q.in('hit.status', lList); else if (lStatus) q = q.eq('hit.status', lStatus);
   if (f.websiteId) q = q.eq('hit.website_id', f.websiteId);
   if (f.vendorId) q = q.eq('vendor_id', f.vendorId);
+  if (f.source === 'telegram' || f.source === 'manual') q = q.eq('source', f.source);
+  else if (f.source.startsWith('import:')) {
+    const host = f.source.slice(7).replace(/[^\w.-]/g, ''); // a host name's own characters only; matched with or without "www."
+    q = q.eq('source', 'import').likeAnyOf('source_ref', [`${host}:%`, `www.${host}:%`]);
+  }
   const s = f.search.replace(/[,()"\\%*:]/g, ' ').trim();
   if (s) q = q.or(`name.ilike.%${s}%,sku.ilike.%${s}%,raw_text.ilike.%${s}%`);
   const { data, error, count } = await q

@@ -114,7 +114,7 @@ export const MAX_ATTEMPTS = 3;
 /** Listing error written when its product was archived; routing undoes this skip once the product is ready again. */
 export const ARCHIVED = 'The product was archived.';
 /** A listing is not written or published while its product lacks a necessary detail (the gate: pb_products_refresh / tagGate.ts). */
-export const NEEDS_INFO = 'The product needs its cost price, category, fabric, colour, a photo and a value for every attribute of its category before it can go to websites — fill them on the product page.';
+export const NEEDS_INFO = 'The product is held in Needs info: it needs its cost price, category, fabric, colour, a photo and a value for every attribute of its category, or it looks already added. Open the product to see which.';
 /** Ready for websites: a category plus EITHER a cost price (priced by the website's rules) OR a selling price copied from another store. */
 export const hasPrice = (p: { cost_price: number | null; sell_price?: number | null }) =>
   (p.cost_price !== null && p.cost_price !== undefined) || (p.sell_price !== null && p.sell_price !== undefined);
