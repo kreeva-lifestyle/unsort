@@ -4,7 +4,7 @@
 // on desktop (logo, nav pills, DailyWork switch, Log out), and on phone a
 // fixed 4-tab glass bar (Home · Products · Websites · More) with page headers
 // owned by the pages (PbPageHeader). Also the page switch and the toasts.
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useConfirm } from '../components/ui/ConfirmModal';
 import { setDivision } from '../lib/division';
@@ -13,6 +13,7 @@ import { DailyWorkMark, PlaybookMark } from '../components/brand/DivisionLogos';
 import PbNav, { PbTabBar, PB_PAGES, pageLabel, type PbPage } from './components/PbNav';
 import { PbToasts, usePbToasts } from './components/PbToasts';
 import { PbButton, PbConfirm } from './components/ui';
+import { PbPageSkeleton, lazyPage } from './components/ui/PbPageLoad';
 import { discardAsk } from './components/ui/discard';
 import { dirtyTitle } from './hooks/useDirty';
 import { PB, pbRootVars, pbTile } from './pbTheme';
@@ -20,11 +21,17 @@ import { useIsPhone } from './hooks/useIsPhone';
 import { useKeyboardInset } from './hooks/useKeyboardInset';
 import PlaybookDashboard from './PlaybookDashboard';
 import Products, { type ProductsStart } from './pages/Products';
-import Websites from './pages/Websites';
-import Vendors from './pages/Vendors';
-import PbSettings from './pages/PbSettings';
-import Guide from './pages/Guide';
 import More from './pages/More';
+
+// Fetched on first open, so the first download is the shell, Dashboard and Products only (PbPageLoad.tsx).
+const LOAD = {
+  websites: () => import('./pages/Websites'), vendors: () => import('./pages/Vendors'),
+  settings: () => import('./pages/PbSettings'), guide: () => import('./pages/Guide'),
+};
+const Websites = lazyPage(LOAD.websites);
+const Vendors = lazyPage(LOAD.vendors);
+const PbSettings = lazyPage(LOAD.settings);
+const Guide = lazyPage(LOAD.guide);
 
 // The page is kept in state + localStorage, never in the URL hash (the hidden DailyWork tree owns hash routing).
 const PAGE_KEY = 'pb-page';
@@ -53,6 +60,19 @@ export default function PlaybookApp() {
   const isPhone = useIsPhone();
   useKeyboardInset();
   const { ask, modalProps } = useConfirm();
+  // Once the first page is up and the phone is idle, fetch the other pages too, so a later tap is instant.
+  // Not offline or in data-saver mode: a fetch that fails stays failed for this visit (the page then shows
+  // Reload), so it is left to the tap that opens the page.
+  useEffect(() => {
+    const nav = navigator as Navigator & { connection?: { saveData?: boolean } };
+    const all = () => {
+      if (!nav.onLine || nav.connection?.saveData) return;
+      Object.values(LOAD).forEach(load => { load().catch(() => { /* the page's own tap shows Reload */ }); });
+    };
+    const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number };
+    const t = window.setTimeout(() => { if (w.requestIdleCallback) w.requestIdleCallback(all, { timeout: 4000 }); else all(); }, 2500);
+    return () => window.clearTimeout(t);
+  }, []);
   // 'more' is a phone-only page: on desktop it never stays selected (the top bar lists every page).
   const shown: PbPage = page === 'more' && !isPhone ? 'dashboard' : page;
 
@@ -143,6 +163,7 @@ export default function PlaybookApp() {
           </PbButton>
         </header>
         <main id="pb-main" tabIndex={-1}>
+          <Suspense fallback={<PbPageSkeleton />}>
           {shown === 'dashboard' && <PlaybookDashboard name={profile?.full_name?.split(' ')[0] || ''} addToast={addToast} go={go} />}
           {shown === 'products' && <Products key={start.key} addToast={addToast} start={start.value} onGuide={id => void go('guide', undefined, id)} />}
           {shown === 'websites' && <Websites addToast={addToast} />}
@@ -150,6 +171,7 @@ export default function PlaybookApp() {
           {shown === 'settings' && <PbSettings addToast={addToast} onBack={backToMore} onGuide={id => void go('guide', undefined, id)} />}
           {shown === 'guide' && <Guide addToast={addToast} onBack={backToMore} at={guideAt} />}
           {shown === 'more' && <More go={p => go(p)} onSwitch={toDailyWork} onSignOut={out} signingOut={signingOut} />}
+          </Suspense>
           {underMore && <MoreBack key={shown} onBack={toMore} />}
         </main>
       </div>

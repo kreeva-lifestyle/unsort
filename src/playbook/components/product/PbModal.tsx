@@ -61,7 +61,7 @@ export default function PbModal({ open, title, onClose, children, width = 520, f
         onClick={e => e.stopPropagation()}
         style={{ ...pbSheet, width, maxWidth: 'calc(100vw - 32px)', maxHeight: '90dvh', borderRadius: PB.r.heroDesk, boxSizing: 'border-box' }}>
         <div onPointerDown={drag.onPointerDown} onPointerMove={drag.onPointerMove} onPointerUp={drag.onPointerUp} onPointerCancel={drag.onPointerCancel} style={{ flex: 'none', padding: phone ? '8px 16px 8px' : '20px 20px 12px', ...drag.style }}>
-          {phone && <div aria-hidden="true" style={{ width: 36, height: 5, borderRadius: PB.r.handle, background: PB.handle, margin: '0 auto 16px' }} />}
+          {phone && <div aria-hidden="true" className="pb-sheet-handle" style={{ width: 36, height: 5, borderRadius: PB.r.handle, background: PB.handle, margin: '0 auto 16px' }} />}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
             <h2 ref={head} id={titleId} tabIndex={-1} style={{ ...pbTileTitle, minWidth: 0, overflowWrap: 'anywhere', outline: 'none' }}>{title}</h2>
             <button type="button" onClick={() => request()} aria-label="Close" className="pb-pill"
@@ -74,7 +74,7 @@ export default function PbModal({ open, title, onClose, children, width = 520, f
           {children}
         </div>
         {footer != null && (
-          <div style={{ flex: 'none', padding: phone ? '12px 16px calc(16px + env(safe-area-inset-bottom))' : '12px 20px 20px', borderTop: `1px solid ${PB.tileBd}` }}>
+          <div className="pb-sheet-foot" style={{ flex: 'none', padding: phone ? '12px 16px calc(16px + env(safe-area-inset-bottom))' : '12px 20px 20px', borderTop: `1px solid ${PB.tileBd}` }}>
             {footer}
           </div>
         )}

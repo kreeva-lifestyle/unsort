@@ -3,7 +3,7 @@
 // modal on desktop, with the dialog role, Tab trap, device Back and the 44px
 // close. "Previous" / "Next" are real buttons in the footer (never swipe-only).
 import { useState } from 'react';
-import { pbImageUrl } from '../../../data/pbFunctions';
+import { pbPhotoUrl, photoFallback } from '../../../data/pbFunctions';
 import type { ProductDetail } from '../../../data/products';
 import { PB } from '../../../pbTheme';
 import PbButton from '../../ui/PbButton';
@@ -23,7 +23,8 @@ export function PhotoViewer({ photos, index, onIndex, onClose }: { photos: Img[]
           <PbButton onClick={() => onIndex(index + 1)} disabled={index === photos.length - 1} style={{ flex: '1 1 0' }}>Next</PbButton>
         </div>
       ) : undefined}>
-      <img key={img.id} src={pbImageUrl(img.path)} alt={`Photo ${index + 1}`} decoding="async"
+      {/* Whole photo, sized for a phone screen (about 1440 × 1800 px); the original only if resizing fails. */}
+      <img key={img.id} src={pbPhotoUrl(img.path, 720, 900)} alt={`Photo ${index + 1}`} decoding="async" onError={photoFallback(img.path)}
         style={{ display: 'block', width: '100%', maxHeight: '70dvh', objectFit: 'contain', borderRadius: PB.r.photo, background: PB.ctl }} />
     </PbModal>
   );
