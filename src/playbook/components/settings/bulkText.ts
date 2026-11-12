@@ -39,7 +39,7 @@ export function plan(run: Pick<PbBulkRun, 'kind' | 'details'>, c: BulkCounts): P
     add(v('aside'), `${n(v('aside'), 'listing')} not on the store yet ${s(v('aside'), 'is', 'are')} taken back: nothing more is written or published for ${s(v('aside'), 'it', 'them')}.`);
     add(v('live'), `${n(v('live'), 'listing')} ${s(v('live'), 'is', 'are')} live on the store. Playbook takes ${s(v('live'), 'it', 'them')} off in the next minutes: hidden in Shopify, not deleted.`);
     add(v('off'), `${n(v('off'), 'listing')} ${s(v('off'), 'was', 'were')} already removed.`);
-    note = 'They stay off this website until you tap Send matching products now again.';
+    note = 'They stay off this website until you send them again: Send matching products now for the ones that never reached the store, Put back on site for one that was hidden there.';
     confirm = `Take back ${n(todo, 'listing')}`; danger = v('live') > 0;
   } else if (run.kind === 'reprice_site') {
     todo = v('restored');

@@ -96,10 +96,12 @@ export const testConnection = (websiteId: string) =>
   pbCall<ConnectionResult>('test_connection', { website_id: websiteId });
 
 /** Send the Ready products already in the directory that match this (active) website's saved rules. */
-export type SendResult = { queued: number; matched: number; more: boolean };
+/** hidden = listings a revert hid on the store: they stay off until put back from their own page. */
+export type SendResult = { queued: number; matched: number; more: boolean; hidden?: number };
 export const sendMatchingProducts = (websiteId: string) => pbCall<SendResult>('route_website', { website_id: websiteId });
 export const sentMessage = (name: string, r: SendResult) =>
-  `${r.queued ? `${r.queued} matching product${r.queued > 1 ? 's' : ''} queued for ${name}` : `No new matching products for ${name}`}${r.more ? ' — there are more: tap "Send matching products now" again' : ''}${r.queued ? `. ${UNDO_HINT}` : ''}`;
+  `${r.queued ? `${r.queued} matching product${r.queued > 1 ? 's' : ''} queued for ${name}` : `No new matching products for ${name}`}${r.more ? ' — there are more: tap "Send matching products now" again' : ''}${r.queued ? `. ${UNDO_HINT}` : ''}`
+  + `${r.hidden ? `. ${r.hidden} taken off the store by a revert stay${r.hidden > 1 ? '' : 's'} off: open ${r.hidden > 1 ? 'each' : 'it'} and tap Put back on site` : ''}`;
 /** After a bulk change: where it can be taken back (components/settings/BulkTile.tsx). */
 export const UNDO_HINT = 'To take it back: Settings → Bulk changes';
 

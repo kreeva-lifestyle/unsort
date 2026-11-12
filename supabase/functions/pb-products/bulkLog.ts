@@ -22,9 +22,10 @@ import { plain } from './http.ts';
 
 export type BulkKind = 'import' | 'route_site' | 'reprice_site' | 'retry_failed' | 'reread_failed' | 'reread';
 
-/** The note on a listing a revert took back. Routing leaves such a listing alone; "Send matching products now" takes it
- *  again (routeSite.ts). No quotes, commas or brackets: it travels inside database filters. */
-export const REVERTED = 'Taken back by a revert of the bulk send that put it here. Send matching products now sends it again if it still matches.';
+/** The note on a listing a revert took back. Routing leaves such a listing alone. "Send matching products now" queues it
+ *  again when it never reached the store (routeSite.ts); one that was hidden on the store is put back from its own page.
+ *  No quotes, commas or brackets: it travels inside database filters. */
+export const REVERTED = 'Taken back by a revert of the bulk send that put it here. Put back on site lists it again.';
 
 /** Open a bulk change and return its id. `id`: use this id (an import's own run id); an existing row is left as it is. */
 export async function startRun(kind: BulkKind, label: string, o: { id?: string; websiteId?: string | null; userId?: string | null; createdAt?: string } = {}): Promise<string> {
