@@ -91,6 +91,32 @@ test('brand ending, supplier name, design code, links and claims', () => {
   assert.deepEqual(codes({ vendor: 'RG', sku: '101' }), []); // too short to tell apart from ordinary words
 });
 
+test('false alarms: a size run is not a phone number, a missing space is not a website, the store\'s own brand is not a supplier', () => {
+  const sizes = { ...GOOD, faq: [{ q: 'Which sizes?', a: 'It comes in 38 40 42 44 46 and 36-38-40-42-44.Check the chart.' }] };
+  assert.deepEqual(codes({ copy: sizes }), []);
+  assert.deepEqual(codes({ copy: { ...GOOD, faq: [{ q: 'Contact?', a: 'Write to care@example.com or see example.in today.' }] } }), ['names']);
+  assert.deepEqual(codes({ vendor: 'Kreeva' }), []);                  // the supplier IS the brand: "| Kreeva" is fine
+  assert.deepEqual(codes({ vendor: 'Rangoli', copy: { ...GOOD, faq: [{ q: 'Who makes it?', a: 'Rangoli makes it.' }] } }), ['names']);
+});
+
+test('a field typed by hand is the owner\'s: only what the AI wrote is checked', () => {
+  const bad = { ...GOOD, title: 'Zari Kurta Set', seo_title: 'My own SEO title', description_html: '<p>Zari runs along the yoke of this lovely piece, by Rangoli Fashions.</p>', seo_description: 'Short.' };
+  const all = codes({ copy: bad, source: 'Zari runs along the yoke of this lovely piece' });
+  assert.deepEqual(all, ['copied', 'keyword_title', 'keyword_start', 'keyword_meta', 'brand', 'names', 'meta_length']);
+  assert.deepEqual(codes({ copy: bad, source: 'Zari runs along the yoke of this lovely piece', kept: ['title', 'description_html', 'seo_title', 'seo_description'] }), []);
+  assert.deepEqual(codes({ copy: bad, kept: ['seo_title', 'seo_description'] }), ['keyword_title', 'keyword_start', 'names']);
+});
+
+test('a phrase that cannot fit is not demanded: long brand, short SEO title', () => {
+  const copy = { ...GOOD, seo_title: 'Kurta Set | Svaraa Ethnic Wear Online Store India' };
+  const limits = { ...LIMITS, titleMax: 70, metaTitleMax: 60 };
+  const p = checkCopy(input({ copy, brand: 'Svaraa Ethnic Wear Online Store India', limits })); // 26 + 3 + 37 characters > 60
+  assert.deepEqual(p.map(x => [x.code, x.hard]), [['keyword_fit', false]]);
+  assert.match(p[0].say, /do not fit in the SEO title together \(60 characters\)/);
+  assert.deepEqual(codes({ limits }), []);                            // the usual brand: the phrase fits and is checked
+  assert.deepEqual(codes({ limits, copy: { ...GOOD, seo_title: 'Zari Kurta Set | Kreeva' } }), ['keyword_meta']);
+});
+
 test('ordering: only the numbers the store profile gives', () => {
   const bad = GOOD.description_html.replace('5 to 7 days', '2 days');
   const p = checkCopy(input({ copy: { ...GOOD, description_html: bad } }));

@@ -106,7 +106,7 @@ export async function generateOne(l: ListingRow, o: { manual: boolean; prevStatu
         seo_title: locked.has('seo_title') && l.seo_title !== null ? l.seo_title : withBrand(g.seo_title || title, profile.brand, L.metaTitleMax),
         seo_description: locked.has('seo_description') && l.seo_description !== null ? l.seo_description : cut(g.seo_description || stripTags(description_html), L.metaDescMax),
         faq: seo?.faq_locked ? seo.faq : g.faq };
-      return { g: done, problems: checkCopy({ copy: done, keyword, brand: profile.brand, aiTitle, source: p.raw_text || '', others, facts,
+      return { g: done, problems: checkCopy({ copy: done, keyword, brand: profile.brand, aiTitle, kept: [...locked], source: p.raw_text || '', others, facts,
         vendor: vendor?.name || '', sku: p.sku || '', ordering: hasOrdering(profile) ? `${profile.delivery} ${profile.stitching} ${profile.returns}` : '', limits: L }) };
     };
     const w = await writeCopy({
