@@ -115,10 +115,12 @@ const ask = (check, hardMs = 120_000) => writeCopy({ model: 'claude-haiku-5-5', 
   schema: genSchema(), check, budget: { soft: Date.now() + 60_000, hard: Date.now() + hardMs } });
 const problem = (code, hard) => ({ code, hard, say: `say ${code}`, fix: `fix ${code}` });
 
-test('tidyOut: safe fixes only: no long dashes, at most two questions, empty entries dropped', () => {
+test('tidyOut: safe fixes only: no long dashes, at most five questions, empty entries dropped', () => {
   const t = tidyOut(DRAFT);
   assert.equal(t.description_html, '<p>D, more</p>');
-  assert.deepEqual(t.faq, [{ q: 'Q1', a: 'A1' }, { q: 'Q3', a: 'A3' }]);
+  assert.deepEqual(t.faq, [{ q: 'Q1', a: 'A1' }, { q: 'Q3', a: 'A3' }, { q: 'Q4', a: 'A4' }]);
+  const seven = Array.from({ length: 7 }, (_, i) => ({ q: `Q${i}`, a: `A${i}` }));
+  assert.deepEqual(tidyOut({ ...DRAFT, faq: seven }).faq, seven.slice(0, 5)); // owner, 2026-11-12: two to five
   assert.deepEqual(t.missing_facts, ['wash care']);
 });
 
