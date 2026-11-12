@@ -587,6 +587,14 @@ AI's extra tags are an enum of it.
   `ordering` check is now SOFT: a description that talks about delivery,
   shipping, returns, refunds or cash on delivery. This replaces the older
   "Ordering from" lines in this section and the HARD numbers check.
+- **Sizes are size choices, not text (owner, 2026-11-12)**. The writer is
+  given the sizes on sale as a fact but never lists them in the description
+  or the FAQ (`FACT_ORDER` has no sizes bullet); a measurement that belongs to
+  a size, or "free size", may be a fit fact. On Shopify each size is one value
+  of the `Size` option, shown as scraped ("XS (34)"). Its SKU is the product's
+  base SKU plus the size without its measurement (`skuBase`: an imported
+  product carries its first size's own SKU, "NKB 47 PURPLE XS" →
+  "NKB 47 PURPLE-XS", "NKB 47 PURPLE-S"…).
 - **A program finishes the draft**: pattern title (`title_template`), the SEO
   title always ends `| <brand>` inside `meta_title_max` (`withBrand`), cuts,
   kept (locked) fields; handle = 3–6 clean words with the design code taken

@@ -134,7 +134,8 @@ export function genFacts(p: ProductRow, o: { keyword: string; photos: number; ot
     '',
     'PRODUCT FACTS',
     ...fact('name', p.name), ...fact('category', p.category), ...fact('fabric', p.fabric), ...fact('colour', p.color),
-    p.sizes?.length ? `- sizes: ${p.sizes.join(', ')}` : '- sizes: not given (do not mention sizes)',
+    p.sizes?.length ? `- sizes on sale: ${p.sizes.join(', ')} (these are the size choices on the product page: never list them in the description or the questions; a measurement that belongs to a size, or "free size", may be given as a fit fact)`
+      : '- sizes: not given (do not mention sizes)',
     ...attrs,
     ...fact('tagged as', (o.tags || []).join(', ')),
     '',

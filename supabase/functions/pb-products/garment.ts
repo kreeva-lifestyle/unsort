@@ -54,17 +54,18 @@ const FACTS: Record<Kind, string[]> = {
   saree: ['the saree length', 'whether a blouse piece is included, its length and whether it is stitched', 'the fabric', 'the work and where it sits', 'care'],
   lehenga: [SET, 'the waist or size range', 'the lehenga length and flare', 'whether a can-can is attached', 'the dupatta fabric and length', 'care'],
   dupatta: ['the length and width', 'the fabric', 'the work or border', 'care'],
-  blouse: ['whether it is stitched', 'the sizes', 'the sleeve length', 'the fabric and lining', 'care'],
+  blouse: ['whether it is stitched', 'the bust or size range it fits', 'the sleeve length', 'the fabric and lining', 'care'],
   anarkali: [SET, 'the length and flare', 'the sleeve length', 'the lining', 'the dupatta fabric and length', 'the bottom type', 'care'],
   kurta: [SET, 'the kurta length', 'the sleeve length', 'the bottom type', 'the dupatta fabric and length when one is included', 'care'],
   suit: [SET, 'the top length', 'the sleeve length', 'the bottom type', 'the dupatta fabric and length', 'care'],
   gown: ['the length', 'the sleeve length', 'the lining', 'whether it is stitched', 'care'],
   coord: [SET, 'the top length', 'the bottom type and length', 'the lining', 'care'],
 };
-const ANY = ['what is in the set', 'the sizes', 'the fabric', 'care'];
+const ANY = ['what is in the set', 'the fabric', 'measurements', 'care'];
 
 /** What a shopper of this garment expects to be told (for the writer's fact bullets and its missing_facts). */
 export const expectedFacts = (category: unknown): string[] => { const k = garmentKind(category); return k ? FACTS[k] : ANY; };
 
-/** The order of the fact bullets, the same on every listing. */
-export const FACT_ORDER = 'what is in the set (each piece, stitched or unstitched), fabric and lining, measurements, the work and where it sits, pattern, sizes, care';
+/** The order of the fact bullets, the same on every listing. The sizes on sale are not a bullet (owner, 2026-11-12):
+ *  they are the size choices on the Shopify product, and they change as sizes sell out. */
+export const FACT_ORDER = 'what is in the set (each piece, stitched or unstitched), fabric and lining, measurements and fit, the work and where it sits, pattern, care';
