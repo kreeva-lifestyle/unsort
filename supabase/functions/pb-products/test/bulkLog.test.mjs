@@ -12,6 +12,7 @@ const { REVERTED, startRun, endRun, settledRun } = await import('../bulkLog.ts')
 const { retryFailed, rereadFailed } = await import('../bulk.ts');
 const { bulkPreview, bulkRevert, counts } = await import('../bulkRevert.ts');
 const { takeOffDue } = await import('../takeOff.ts');
+const { routeWebsite } = await import('../routeSite.ts');
 
 const RUN = '11111111-2222-4333-8444-555555555555';
 const SITE = 'aaaaaaaa-2222-4333-8444-555555555555';
@@ -39,7 +40,7 @@ const head = (n) => new Response(null, { status: 200, headers: { 'content-range'
 
 test('the note on a listing a revert took back can travel inside a database filter', () => {
   assert.doesNotMatch(REVERTED, /["',()]/, 'no quotes, commas or brackets');
-  assert.match(REVERTED, /Send matching products now/);
+  assert.match(REVERTED, /Put back on site/);
 });
 
 test('a bulk change opens a run; its own id is used when given, and an existing run is left alone', async () => {
@@ -176,3 +177,25 @@ test('taking listings off their store: a store that fails is tried once a run, a
   assert.ok(patches.some(p => p.id === 'l1' && p.status === 'published'), 'and it is put back as it was: it is still on the store');
   assert.ok(shopify >= 2);
 });
+
+test('a new send queues a taken-back listing that never reached the store, and only counts the ones hidden there', async () => {
+  const P = 'cccccccc-2222-4333-8444-555555555555';
+  const calls = world((m, u) => {
+    if (m === 'HEAD' && u.startsWith('/rest/v1/pb_bulk_items')) return head(1);
+    if (m === 'HEAD' && u.startsWith('/rest/v1/pb_listings')) return head(2); // hidden on the store by a revert
+    if (m === 'GET' && u.startsWith('/rest/v1/pb_websites')) return [{ id: SITE, name: 'Arya Store', active: true, routing_default: 'all' }];
+    if (m === 'GET' && u.startsWith('/rest/v1/pb_products')) return [{ id: P, status: 'ready', category: 'Saree', vendor_id: null, cost_price: 100, sizes: [], attributes: {} }];
+    if (m === 'GET' && u.startsWith('/rest/v1/pb_listings')) return [{ id: 'l-back', product_id: P }];
+    if (m === 'PATCH' && u.startsWith('/rest/v1/pb_listings?id=eq.l-back')) return [{ id: 'l-back' }];
+    return undefined;
+  });
+  assert.deepEqual(await routeWebsite({ website_id: SITE }, 'u1'), { ok: true, queued: 1, matched: 1, more: false, hidden: 2 });
+  const asked = calls.find(c => c.method === 'GET' && c.u.startsWith('/rest/v1/pb_listings'));
+  assert.match(asked.u, /status=eq\.skipped&shopify_product_id=is\.null&error=in\.\(/, 'only listings that are not on Shopify are queued again');
+  assert.ok(asked.u.includes(`"${REVERTED}"`));
+  const back = calls.find(c => c.method === 'PATCH' && c.u.startsWith('/rest/v1/pb_listings?id=eq.l-back'));
+  assert.equal(back.body.status, 'queued'); assert.equal(back.run, RUN);
+  const hidden = calls.find(c => c.method === 'HEAD' && c.u.startsWith('/rest/v1/pb_listings'));
+  assert.match(hidden.u, /status=eq\.skipped&shopify_product_id=not\.is\.null&error=eq\./);
+});
+

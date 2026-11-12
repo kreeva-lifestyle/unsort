@@ -5,7 +5,7 @@
 // also while automation is paused (a person asked for it). Each one goes
 // through unpublish.ts — the same "Remove from site": the listing is set
 // aside, the Shopify product becomes a draft, nothing is deleted — and then
-// carries the REVERTED note, so "Send matching products now" can take it back.
+// carries the REVERTED note; "Put back on site" on its page lists it again.
 // A store that cannot be reached is tried once a run and again 5 minutes
 // later, for as long as it takes; the listing stays live, and marked, till then.
 import { REVERTED } from './bulkLog.ts';
