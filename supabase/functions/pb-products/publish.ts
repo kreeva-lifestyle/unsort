@@ -170,7 +170,7 @@ export async function publishOne(l: ListingRow, o: { manual: boolean; putBack?: 
     const saved = await patch<ListingRow>('pb_listings', mine, {
       status: 'published', shopify_status: prod.status, published_at: nowIso(), attempts: 0, error: warning, claimed_at: null,
     }, LISTING_COLS);
-    await logActivity({ product_id: l.product_id, website_id: l.website_id, listing_id: l.id, action: 'published', details: { shopify_product_id: prod.id, status: prod.status, update: !!existing, ...(adopted ? { adopted: true } : {}), ...photos, tags: l.tags || [], sizes: p.sizes || [], sku: p.sku || '', ...(shown ? {} : { channel: false }), ...(warning ? { warning } : {}) }, user_id: o.userId });
+    await logActivity({ product_id: l.product_id, website_id: l.website_id, listing_id: l.id, action: 'published', details: { shopify_product_id: prod.id, status: prod.status, update: !!existing, ...(adopted ? { adopted: true } : {}), ...photos, tags: l.tags || [], sizes: p.sizes || [], sku: p.sku || '', in_stock: p.in_stock !== false, ...(shown ? {} : { channel: false }), ...(warning ? { warning } : {}) }, user_id: o.userId });
     if (!saved[0]) throw new HttpError(409, 'Published on Shopify, but the listing changed meanwhile — open it again.');
     return saved[0];
   } catch (e) {

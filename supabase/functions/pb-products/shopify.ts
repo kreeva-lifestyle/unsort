@@ -11,7 +11,7 @@ import { HttpError, fetchT } from './http.ts';
 import type { SecretsRow, WebsiteRow } from './types.ts';
 
 const TIMEOUT = 30_000;
-export const REQUIRED_SCOPES = ['write_products', 'read_products', 'write_publications', 'read_publications'];
+export const REQUIRED_SCOPES = ['write_products', 'read_products', 'write_publications', 'read_publications', 'write_inventory']; // write_inventory: a size is switched between counted (sold out) and not counted (in stock)
 /** Playbook's prices are rupees: a store that sells in another currency would show ₹2,499 as 2,499 of its own. */
 export const CURRENCY = 'INR';
 export const wrongCurrency = (name: string, code: string) => `${name}: this store sells in ${code}, and Playbook's prices are in rupees (${CURRENCY}). Nothing is sent there, so a rupee price is never shown as ${code}.`;
@@ -126,8 +126,7 @@ export async function testConnection(site: WebsiteRow): Promise<{ shop_name: str
     const d = await gql<{ shop: { name: string; currencyCode: string }; currentAppInstallation: { accessScopes: { handle: string }[] } }>(site,
       '{ shop { name currencyCode } currentAppInstallation { accessScopes { handle } } }');
     const scopes = (d.currentAppInstallation?.accessScopes || []).map(a => a.handle);
-    const need = [...REQUIRED_SCOPES, ...(site.track_inventory ? ['write_inventory'] : [])];
-    const missing = need.filter(s => !hasScope(scopes, s));
+    const missing = REQUIRED_SCOPES.filter(s => !hasScope(scopes, s));
     const shop_name = d.shop?.name || '', currency = String(d.shop?.currencyCode || '');
     const notes = [
       ...(missing.length ? [`Connected, but the Shopify app is missing: ${missing.join(', ')}.`] : []),

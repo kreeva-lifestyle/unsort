@@ -18,6 +18,7 @@
 //   route_product      staff          { product_id }                      → { ok, routed, repriced, resent, listings, warning? }
 //   reprice_website    staff          { website_id }                      → { ok, repriced, kept, more }   (bulk.ts)
 //   retry_failed       staff          { website_id? }                     → { ok, retried }                (bulk.ts)
+//   set_stock          staff          { product_id, in_stock }            → { ok, resent }                 (stock.ts)
 //   delete_product     admin|manager  { product_id }                      → { ok, photos_left }   (409 while it is on Shopify or being worked on)
 //   route_website      staff          { website_id }                      → { ok, queued, matched, more }
 //   generate_listing   staff          { listing_id }                      → { ok, listing }
@@ -63,6 +64,7 @@ import { importCancel, importCheck, importList, importStart } from './import/act
 import { repriceWebsite, retryFailed } from './bulk.ts';
 import { deleteProduct } from './productDelete.ts';
 import { routeWebsite } from './routeSite.ts';
+import { setStock } from './stock.ts';
 import { previewPrice, saveCredentials, testSite } from './siteActions.ts';
 import * as T from './tagsActions.ts';
 import { fillStatus, suggestionAct, suggestionsList, tagsAiFill } from './tagsQueue.ts';
@@ -79,6 +81,7 @@ const ACTIONS: Record<string, { who: Who; run: (b: A.Body, c: Caller) => Promise
   route_website: { who: 'staff', run: (b, c) => routeWebsite(b, userOf(c)) },
   reprice_website: { who: 'staff', run: (b, c) => repriceWebsite(b, userOf(c)) },
   retry_failed: { who: 'staff', run: (b, c) => retryFailed(b, userOf(c)) },
+  set_stock: { who: 'staff', run: (b, c) => setStock(b, userOf(c)) },
   generate_listing: { who: 'staff', run: (b, c) => A.generateListing(b, userOf(c)) },
   publish_listing: { who: 'staff', run: (b, c) => A.publishListing(b, userOf(c)) },
   unpublish_listing: { who: 'staff', run: (b, c) => A.unpublishListing(b, userOf(c)) },

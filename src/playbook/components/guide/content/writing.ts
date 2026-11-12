@@ -81,7 +81,7 @@ export const WRITING: GuideSection[] = [
         ['**Draft**', 'Sent to Shopify as a draft — someone makes it visible inside Shopify', 'You want a last look inside Shopify'],
         ['**Review first**', 'Waits in Products as **Needs review** until someone taps **Approve**, then publishes', 'A new website, the first weeks'],
       ),
-      p('**Track stock** — on: Shopify counts stock and stops selling at 0 (the app needs `write_inventory`). New products start at 0, so they cannot be bought until you set their quantities in Shopify. Off: always orderable — right for made-to-order or vendor-held stock.'),
+      p('**Track stock** — off (the usual choice): Playbook decides. A product that is **In stock** can always be ordered; one marked **Out of stock** in Playbook (by an import, or with the **Stock** switch on the product) shows as Sold out on the store. On: Shopify counts stock and stops selling at 0. New products start at 0, so they cannot be bought until you set their quantities in Shopify, and Playbook\'s Out of stock is not sent.'),
       h('Three ways to stop things'),
       table(['Switch', 'Where', 'What it does'],
         ['**Active** (one website)', 'Websites → website → Connection', 'Off = nothing new is sent to this store. Products already there stay. On again = the matching products are sent.'],

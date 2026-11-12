@@ -880,6 +880,36 @@ paid service, no library.
   2026-10); `inventoryItem.countryCodeOfOrigin: 'IN'` on a new variant only.
   Hand edits are made in Playbook only (owner), so Playbook's title,
   description and price replacing Shopify's is intended.
+- **Stock (owner, 2026-11-12: "If stock out/in-stock on playbook that same
+  happens in shopify stores")**. `pb_products.in_stock boolean not null
+  default true` (migration `20261112190000_pb_product_stock.sql`, partial
+  index for the list filter). Sources: (1) a first import stores the store's
+  own state (`ingestBody` → `importFacts`, import only); (2) EVERY import run
+  refreshes the products already here (`import/stock.ts refreshStock`,
+  called from `addProducts` for the page's known refs, whatever "in stock
+  only" says): `in_stock`, and the sizes on sale while in stock unless
+  `sizes` is kept; (3) the **Stock** switch on the product page (`StockTile`
+  → `set_stock`). Both save through `stock.ts saveStock`: the product row,
+  then every `published` listing of it → `publishing` (sent again as it is:
+  no AI call, no new approval on a "Review first" website; waiting listings
+  are left alone and read the product when they go out), `route_due` when a
+  run is publishing one right now, activity `stock`. Not "kept": the next
+  import sets it again. Shopify
+  (`productInput.ts`): on a website with Track stock OFF every variant gets,
+  on every send, `inventoryPolicy: CONTINUE` + `inventoryItem.tracked: false`
+  when in stock and `DENY` + `tracked: true` when out of stock (counted with
+  nothing to sell → the theme shows Sold out); with Track stock ON Shopify's
+  own numbers decide as before. The `published` row records `in_stock`, and
+  routing sends a published listing again when it differs (`route.ts
+  behind`). `write_inventory` is now a required scope on every website.
+  List: "· Out of stock" after the status label, filter "Out of stock"
+  (`stock:out`). Limits, on purpose: a generic (non Shopify / WooCommerce)
+  site's known pages are not fetched again; a WooCommerce run with "in stock
+  only" does not see sold-out products; a product its store no longer lists
+  is never marked out of stock ("not seen" is not "sold out": a run may
+  cover part of a store). Not built: a stock check that runs by itself on a
+  schedule; quantities; per-size sold-out (a size that sells out leaves the
+  size list).
 - Product list: "Needs info · Already here as KB 264 WINE XS"
   (`data/duplicates.ts heldLabels`, one RPC per page for its Needs-info rows);
   every row says "from Telegram" / "from bahupalace.com" (`sourceText`); a

@@ -2,7 +2,7 @@
 // token or a Dev Dashboard app with client ID + secret), test, switch on.
 import { type GuideSection, h, list, p, steps, table, tip, warn } from '../types';
 
-const SCOPES = '`write_products`, `read_products`, `write_publications`, `read_publications`';
+const SCOPES = '`write_products`, `read_products`, `write_publications`, `read_publications`, `write_inventory`';
 
 export const CONNECT: GuideSection[] = [
   {
@@ -28,7 +28,7 @@ export const CONNECT: GuideSection[] = [
       h('Way A — an existing custom app (token starting shpat_)'),
       steps(
         'In the Shopify admin open Settings → Apps and sales channels → Develop apps, and open the app.',
-        `Check its Admin API scopes include ${SCOPES} — plus \`write_inventory\` if this website will track stock. If you add any, save and reinstall the app when Shopify asks.`,
+        `Check its Admin API scopes include ${SCOPES}. If you add any, save and reinstall the app when Shopify asks.`,
         'Copy the **Admin API access token** (it starts with `shpat_`). Shopify shows it only once — if nobody saved it, use Way B instead.',
         'In the app: **Websites →** your website **→ Connection**. Under **How the app signs in** pick **Access token**, paste it into **Admin API access token**, tap **Save credentials**.',
       ),
@@ -36,7 +36,7 @@ export const CONNECT: GuideSection[] = [
       steps(
         'Sign in to the Shopify Dev Dashboard (dev.shopify.com) with a Shopify account in the **same organisation as the store**. An app from another organisation cannot connect to the store.',
         'Create an app, e.g. `DailyOffice Product Directory`.',
-        `In the app's access settings add the scopes ${SCOPES} — plus \`write_inventory\` if this website will track stock. Release that version.`,
+        `In the app's access settings add the scopes ${SCOPES}. Release that version.`,
         'Install the app on the store and approve it.',
         'Open the app\'s settings and copy the **Client ID** and the **Client secret**.',
         'In the app: **Websites →** your website **→ Connection**. Under **How the app signs in** pick **Client ID + secret**, paste both, tap **Save credentials**.',

@@ -146,7 +146,7 @@ export default function ConnectionSection({ site, draft, set, creds, setCreds, o
                   </Field>
                 </Grid2>
               )}
-              <Scopes inventory={draft.track_inventory} />
+              <Scopes />
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <PbButton type="submit" className="pb-phone-full" busy={doing === 'save'} busyLabel="Saving…" dim={doing !== '' && doing !== 'save'}>Save credentials</PbButton>
                 <PbButton onClick={() => void run('test')} className="pb-phone-full" disabled={moving} title={moving ? 'Save the credentials for the new store first' : undefined}
