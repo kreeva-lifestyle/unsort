@@ -652,6 +652,47 @@ price or stock of what it skips.
   archived), and only the LATER product of a pair is ever held. Indexes: `pb_products_code_key_idx`,
   `pb_products_code_num_idx` (both skip archived rows).
 
+### 3. The same photo, saved again
+Migration `20261112170000_pb_photo_prints.sql`, edge function
+`pb-photo-prints` (verify_jwt false; takes only `x-sync-secret`). No AI, no
+paid service, no library.
+- **The print** (`print.ts`): the photo averaged to a 64 × 64 brightness grid,
+  a cosine transform of it, the 16 × 16 slowest patterns (without the flat
+  average) each turned into one bit by their median → 256 bits. The same
+  picture at another size / quality / brightness differs by 0–14 bits;
+  another picture by ~128 (measured on real product photos: other poses of
+  the same dress 96–146). Colour is not in it. A crop of more than ~2 %, a
+  mirror image and a different photo do not match.
+- **Reading the photo** (`jpegDc.ts`): the stored photos are 15–20 megapixel
+  originals, which do not decode inside an edge function's 2 s of CPU. A JPEG
+  keeps each 8 × 8 block's average (its DC value); the reader takes only
+  those and steps over the detail — 20–50 ms a photo, a few MB of memory.
+  Baseline and progressive, any chroma layout, restart markers, EXIF
+  orientation (the grid is turned upright). Not read: PNG / WEBP, CMYK,
+  12-bit, arithmetic-coded; under 256 px a side; a nearly blank picture.
+- **Queue**: `private.pb_photo_prints` (one row per photo: `working` / `done`
+  / `skipped` + why; a photo with no row is waiting). `pb_photo_claim` hands
+  out the newest waiting photo (one claim at a time, advisory lock; a claim
+  not answered in 10 minutes is handed out again, 3 times at most);
+  `pb_photo_put` saves the print and pairs it. Both service role only.
+  `trigger_pb_photo_prints()` (pg_cron `pb-photo-prints`, every minute while
+  photos wait; paused with Automation) sends one call, two when more than 40
+  photos wait; a call takes up to 20 photos or 500 ms of reading
+  (`work.ts BATCH`) — about 20–40 photos a minute. Kept low on purpose: the
+  2 s of CPU are counted per worker across the calls it serves (measured:
+  8 calls at once, a dozen photos each, were all cut off; a photo costs
+  ~20 ms).
+- **Pairs**: `private.pb_photo_pairs (a < b, a_image, b_image, apart)` — per
+  two products their closest two photos, kept when ≤ 40 bits apart; found at
+  write time (one new print against all prints: a popcount scan).
+- **Shown** through `pb_dup_matches` = the design-code scan, then
+  `private.pb_photo_scan` for pairs the scan said nothing about: `apart ≤ 32`
+  → `kind = 'maybe'`, `how = 'photo'`, `other_photo` = the photo that
+  matched. Left out: a picture that pairs this product with more than 8
+  others (a size chart, a banner). A photo match never holds a product; a
+  person's "It is a copy" is a verdict `same`, which `pb_dup_scan` always
+  carries (so a restored copy is held by the gate, whatever found it).
+
 ### UI
 - Product page: `detail/DupTile.tsx` — "This looks already added" (held,
   review-tinted) / "Could this be already added?" (suggestions) / "Same
