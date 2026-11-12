@@ -1,9 +1,12 @@
-// One call = ONE waiting photo: claim it, download it, work out its print,
-// hand the answer back (pb_photo_put pairs it with the photos already
-// printed). One photo a call on purpose: an edge function gets 2 seconds of
-// CPU per request, so each photo has the whole allowance to itself; pg_cron
-// sends several calls a minute while photos are waiting
-// (trigger_pb_photo_prints).
+// One call = a small batch of waiting photos, one after the other: claim a
+// photo, download it, work out its print, hand the answer back (pb_photo_put
+// pairs it with the photos already printed), then the next — until the batch
+// has used its share of the call's CPU. An edge function gets 2 seconds of
+// CPU per request; reading a photo's block averages takes 20–50 ms for the
+// 15–20 megapixel originals kept here and well under a second for the largest
+// file the bucket takes, so the batch stops claiming after 400 ms of reading:
+// even a worst-case last photo ends far inside the limit. pg_cron sends
+// several calls a minute while photos are waiting (trigger_pb_photo_prints).
 // A photo that cannot be printed is answered with the reason and never asked
 // again; one whose download fails, or whose call is cut off, stays claimed
 // and is handed out again 10 minutes later (three times at most).
@@ -59,4 +62,25 @@ export async function runOne(d: Deps): Promise<Result> {
     state: r.print ? 'done' : 'skipped', image: img.image_id, paired, ...(r.note ? { note: r.note } : {}),
     ...(r.width && r.height ? { pixels: r.width * r.height } : {}), bytes: bytes.length, read_ms: r.ms,
   };
+}
+
+export const BATCH = { readMs: 400, photos: 20, wallMs: 25_000 };
+export interface BatchResult { done: number; skipped: number; paired: number; read_ms: number; notes: string[]; stopped?: string }
+
+/** Photos one after the other until none is waiting or the batch has used its share of the call. */
+export async function runBatch(d: Deps, limit = BATCH): Promise<BatchResult> {
+  const out: BatchResult = { done: 0, skipped: 0, paired: 0, read_ms: 0, notes: [] }, t0 = d.now();
+  while (out.done + out.skipped < limit.photos && out.read_ms < limit.readMs && d.now() - t0 < limit.wallMs) {
+    let r: Result;
+    try { r = await runOne(d); } catch (e) {
+      // A download that failed: that photo stays claimed for later. What was done before it counts; a first failure is the call's.
+      if (!out.done && !out.skipped) throw e;
+      out.stopped = String(e instanceof Error ? e.message : e).slice(0, 160);
+      break;
+    }
+    if (r.state === 'idle') break;
+    if (r.state === 'done') out.done++; else { out.skipped++; if (r.note && out.notes.length < 5 && !out.notes.includes(r.note)) out.notes.push(r.note); }
+    out.paired += r.paired ?? 0; out.read_ms += r.read_ms ?? 0;
+  }
+  return out;
 }

@@ -248,9 +248,9 @@ begin
 end $$;
 
 -- ── 5. Every minute, while photos are waiting ────────────────────────────
--- Up to eight calls a minute, one photo each (so every photo has the edge
--- function's whole CPU allowance to itself). Only pg_cron and the service
--- role may start it; paused automation pauses it too.
+-- One call per dozen waiting photos, eight calls a minute at most (a call takes
+-- a small batch and stops itself well inside its CPU allowance: work.ts). Only
+-- pg_cron and the service role may start it; paused automation pauses it too.
 create or replace function public.trigger_pb_photo_prints()
 returns int
 language plpgsql security definer set search_path to 'public', 'extensions', 'vault' as $$
@@ -271,11 +271,11 @@ begin
     left join private.pb_photo_prints pr on pr.image_id = i.id
     where i.kind = 'image'
       and (pr.image_id is null or (pr.state = 'working' and pr.claimed_at < now() - interval '10 minutes'))
-    limit 12) w;
+    limit 96) w;
   if v_left = 0 then return 0; end if;
   select decrypted_secret into v_secret from vault.decrypted_secrets where name = 'pb_worker_secret';
   if v_secret is null then raise warning 'pb_worker_secret missing from vault'; return 0; end if;
-  v_calls := least(8, v_left);
+  v_calls := least(8, ceil(v_left / 12.0)::int);
   for n in 1..v_calls loop
     perform net.http_post(
       url := 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/pb-photo-prints',
