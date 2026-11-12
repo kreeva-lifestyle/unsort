@@ -17,6 +17,7 @@ test('reader prompt: photos first, a plain colour, the fabric as written', () =>
     'name: a plain product name in this order: the colour you return, the fabric you return, what the product is', 'never the post\'s trade name for the colour, never a shortened fabric',
     'fabric: exactly as the post writes it', 'correct only an obvious spelling mistake', 'A fabric listed under "Already known" stays as it is',
     'color: the main colour of the product as the photos show it', 'a trade name (Rama, Liril, Sky, Mehendi) becomes the plain colour', 'the photos win',
+    'sizes: the size labels in order, exactly as the post writes them', '"XS (34)"',
     'no disclaimers such as "colour may vary"', 'category: exactly one of: Anarkali, Kurta Set —']) assert.ok(sys.includes(part), part);
   assert.ok(!sys.includes('fabric and color: as written')); // the old rule let the text win
   assert.ok(sys.includes(`Prefer one of: ${COLOURS.join(', ')}.`));
