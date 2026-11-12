@@ -19,6 +19,14 @@ export interface TagFacts {
   tags?: string[];
 }
 
+/** {vendor_code}: of the vendor's short names (pb_vendors.codes, e.g. KB and NKB), the one this product's
+ *  code starts with ("NKB 25 WINE" → NKB); the first one when the code starts with none of them. */
+export function vendorCode(codes: string[] | null | undefined, sku: string | null | undefined): string {
+  const list = (codes || []).map(c => String(c ?? '').trim()).filter(Boolean);
+  const lead = (String(sku ?? '').toUpperCase().match(/^[^A-Z0-9]*([A-Z]+)/) || [])[1] || '';
+  return list.find(c => c.toUpperCase() === lead) || list[0] || '';
+}
+
 /** One chosen value with its attribute (pb_product_values → pb_attribute_values → pb_attributes). */
 export interface ChosenTag { name: string; attribute: string; prefix: string | null }
 

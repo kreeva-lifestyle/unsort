@@ -22,7 +22,7 @@ export const WRITING: GuideSection[] = [
         ['`{fabric}`', 'The fabric', 'Banarasi Silk'],
         ['`{color}`', 'The colour', 'Maroon'],
         ['`{vendor}`', 'Vendor name', 'Rangoli'],
-        ['`{vendor_code}`', 'Vendor short code', 'RG'],
+        ['`{vendor_code}`', 'Vendor short name (with several, the one the product code starts with)', 'RG'],
         ['`{size}`', 'One tag per size', 'Size_S, Size_M, Size_L'],
         ['`{sku}`', 'Product code', 'RG-101'],
         ['`{attr:occasion}`', 'Any detail the AI read — work, occasion, pattern, set_contents, wash_care…', 'Festive'],

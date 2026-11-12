@@ -1,7 +1,7 @@
 // node --test --experimental-strip-types supabase/functions/pb-products/test/
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildTags, fillTemplate, maxSiteTags, valueTags } from '../tags.ts';
+import { buildTags, fillTemplate, maxSiteTags, valueTags, vendorCode } from '../tags.ts';
 
 const facts = {
   category: 'Kurta Set', fabric: 'Cotton', color: 'Pink', vendor: 'Bahu Palace', vendor_code: 'BP', sku: 'KB261', sizes: ['S', 'M'],
@@ -51,4 +51,20 @@ test('valueTags: {tags} as plain value names, or Prefix_Value with the Shopify p
   assert.deepEqual(valueTags(vals, undefined), ['Black', 'Embroidery']);
   assert.deepEqual(valueTags(vals, 'prefixed'), ['Colour_Black', 'Work Type_Embroidery']);
   assert.deepEqual(buildTags({ templates: ['{tags}'], max_tags: 1 }, { ...facts, tags: valueTags(vals, 'prefixed') }, []), ['Colour_Black']);
+});
+
+test('{vendor_code}: of several short names, the one the product code starts with; else the first; none → empty', () => {
+  assert.equal(vendorCode(['KB', 'NKB'], 'NKB 25 WINE XS'), 'NKB');
+  assert.equal(vendorCode(['KB', 'NKB'], 'KB 273 WINE XS'), 'KB');
+  assert.equal(vendorCode(['KB', 'NKB'], 'kb-302'), 'KB');
+  assert.equal(vendorCode(['KB', 'NKB'], 'KBX 12'), 'KB', 'other letters: the first short name, never a part match');
+  assert.equal(vendorCode(['KB', 'NKB'], 'NB 101 DARK RANIPINK XS'), 'KB');
+  assert.equal(vendorCode(['KB', 'NKB'], 'D no 5081'), 'KB');
+  assert.equal(vendorCode(['KB', 'NKB'], '5081'), 'KB');
+  assert.equal(vendorCode(['KB', 'NKB'], null), 'KB');
+  assert.equal(vendorCode(['RG'], 'RG-101'), 'RG');
+  assert.equal(vendorCode([], 'KB 1'), '');
+  assert.equal(vendorCode(null, 'KB 1'), '');
+  assert.deepEqual(buildTags({ templates: ['Vendor_{vendor_code}'] }, { ...facts, vendor_code: vendorCode(['KB', 'NKB'], 'NKB 25') }, []), ['Vendor_NKB']);
+  assert.deepEqual(buildTags({ templates: ['Vendor_{vendor_code}'] }, { ...facts, vendor_code: vendorCode([], 'NKB 25') }, []), [], 'no short name: the template is dropped');
 });
