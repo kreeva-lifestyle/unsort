@@ -8,8 +8,10 @@
 //   was archived) and not on Shopify → queued again;
 //   a published listing whose price is not kept by hand → re-priced from the
 //   current cost / pricing / rule and sent to Shopify again (no new AI call);
-//   `resend` (the sizes or the SKU changed: the Shopify variants must follow)
-//   → a published listing is sent again as it is, price changed or not;
+//   a published listing sent with other sizes or another SKU than the product
+//   has now (the `published` activity row records what was sent) → sent again
+//   as it is, so the Shopify variants follow; found here, not passed in, so
+//   every way of routing (save, re-read, tags, the worker's route_due) gets it;
 //   one being written / published right now goes out with what it was given,
 //   and the product is flagged (route_due) so the worker checks it again once
 //   that is done — the change is not lost;
@@ -35,13 +37,23 @@ const autoSkipped = (l: ListingRow) => l.status === 'skipped' && AUTO_SKIP.inclu
 type Site = { id: string; name: string; routing_default: string; publish_mode: string; pricing: Partial<Pricing> };
 export type RouteResult = { routed: number; repriced: number; resent: number; busy: boolean; listings: ListingRow[]; warning?: string };
 
-export async function routeProduct(p: ProductRow, userId: string | null, o: { resend?: boolean } = {}): Promise<RouteResult> {
+/** The sizes and SKU each listing was last sent with (newest `published` row per listing; none → not known). */
+async function lastSent(productId: string): Promise<Map<string, { sizes?: string[]; sku?: string }>> {
+  const rows = await sel<{ listing_id: string | null; details: { sizes?: string[]; sku?: string } | null }>(`pb_activity?product_id=eq.${enc(productId)}&action=eq.published&select=listing_id,details&order=created_at.desc&limit=40`);
+  const out = new Map<string, { sizes?: string[]; sku?: string }>();
+  for (const r of rows) if (r.listing_id && !out.has(r.listing_id)) out.set(r.listing_id, r.details || {});
+  return out;
+}
+
+export async function routeProduct(p: ProductRow, userId: string | null): Promise<RouteResult> {
   const sites = await sel<Site>('pb_websites?active=eq.true&select=id,name,routing_default,publish_mode,pricing&order=name.asc');
   const existing = await sel<ListingRow>(`pb_listings?product_id=eq.${enc(p.id)}&select=${LISTING_COLS}`);
   if (!sites.length) return { routed: 0, repriced: 0, resent: 0, busy: false, listings: existing };
   const ids = sites.map(s => s.id).join(',');
   const rules = await sel<RuleRow>(`pb_routing_rules?website_id=in.(${ids})&enabled=eq.true&select=${RULE_COLS}&order=position.asc`);
   const bySite = new Map(existing.map(l => [l.website_id, l]));
+  const sent = existing.some(l => l.status === 'published') ? await lastSent(p.id) : new Map<string, { sizes?: string[]; sku?: string }>();
+  const behind = (l: ListingRow) => { const s = sent.get(l.id); return !!s && Array.isArray(s.sizes) && (s.sizes.join('|') !== (p.sizes || []).join('|') || String(s.sku ?? '') !== String(p.sku ?? '')); };
   const queued: string[] = [], kept: string[] = [], removed: string[] = [], stillLive: string[] = [], repriced: string[] = [], resent: string[] = [], busy: string[] = [];
   for (const s of sites) {
     const d = decide(rules.filter(r => r.website_id === s.id), s.routing_default, p);
@@ -71,7 +83,7 @@ export async function routeProduct(p: ProductRow, userId: string | null, o: { re
       // The cost / copied selling price or the site's pricing changed: only the price moves; the written text stays.
       const calc = !(cur.locked || []).includes('price') && hasPrice(p) ? listingPrice(p, s.pricing || {}, d.rule?.price_override ?? null) : null;
       const priced = !!calc && calc.price > 0 && !(Number(cur.price) === calc.price && Number(cur.compare_at_price ?? 0) === Number(calc.compare_at ?? 0));
-      if (!priced && !o.resend) { kept.push(s.name); continue; }
+      if (!priced && !behind(cur)) { kept.push(s.name); continue; }
       const done = await patch('pb_listings', `id=eq.${enc(cur.id)}&status=eq.published`, {
         ...(priced ? { price: calc!.price, compare_at_price: calc!.compare_at, rule_id: d.rule?.id ?? null } : {}),
         status: s.publish_mode === 'review' ? 'review' : 'publishing', attempts: 0, error: null, claimed_at: null,

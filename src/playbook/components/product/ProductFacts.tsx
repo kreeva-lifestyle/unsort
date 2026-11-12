@@ -102,8 +102,8 @@ export default function ProductFacts({ product, vendors, categories, onVendorCre
       const still = (lostInfo || g?.status === 'needs_info') && miss.length ? ` — still needs ${miss.join(', ')}` : '';
       if ((nowReady || reroute) && !lostInfo) {
         try {
-          // New sizes or a new SKU: listings already on Shopify are sent again, so the choices and codes there follow.
-          const r = await pbCall<{ warning?: string; repriced?: number; resent?: number }>('route_product', { product_id: product.id, resend: changed.some(k => k === 'sizes' || k === 'sku') });
+          // New sizes or a new SKU: the server sends listings already on Shopify again, so the choices and codes there follow.
+          const r = await pbCall<{ warning?: string; repriced?: number; resent?: number }>('route_product', { product_id: product.id });
           const done = nowReady ? 'Saved — sent to the matching websites'
             : `Saved — websites checked again${r.repriced ? ` (${r.repriced} published listing${r.repriced > 1 ? 's' : ''} re-priced and sent to Shopify)` : ''}${r.resent ? ` (${r.resent} published listing${r.resent > 1 ? 's' : ''} sent to Shopify again)` : ''}`
               + (costChanged && kept ? `. ${kept} listing${kept > 1 ? 's have' : ' has'} a price typed by hand and keep${kept > 1 ? '' : 's'} it` : '');

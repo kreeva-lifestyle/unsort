@@ -50,18 +50,20 @@ export const STOCK_WARNING = 'Stock tracking is on for this website: the product
 /** A size label without its measurement: "XS (34)" → "XS". */
 const sizeCore = (s: string) => s.replace(/\(.*?\)/g, ' ').replace(/\s+/g, ' ').trim();
 
-/** Size words a code can end in, whatever sizes the product has today (the size in its code may have sold out). */
-const SIZE_WORDS = ['xxs', 'xs', 's', 'm', 'l', 'xl', 'xxl', 'xxxl', '2xl', '3xl', '4xl', '5xl', '6xl', 'free size', 'freesize', 'fs'];
+/** Size words a code can end in when the product's own sizes are of the same kind: the size in its code may
+ *  have sold out ("KB 302 XL" with S and M on sale). Never across kinds: "-M" on a free-size product is not a size. */
+const SIZE_KINDS = [['xxs', 'xs', 's', 'm', 'l', 'xl', 'xxl', 'xxxl', '2xl', '3xl', '4xl', '5xl', '6xl'], ['free size', 'freesize', 'fs']];
 
 /** The product's SKU without a size at its end, and what joined the two ("NKB 47 PURPLE XS" → "NKB 47 PURPLE" and
  *  " "). A product copied from another store carries one size's own SKU; each size on Shopify gets the base, the
  *  same joiner and its own size, which gives back the store's own code for every size ("NKB 47 PURPLE S"). The
- *  ending counts as a size when it is one of the product's sizes or an ordinary size word, and only after a
- *  joiner. A SKU with no size at its end is the base, joined with "-" ("RG-1042" → "RG-1042-M"). */
+ *  ending counts as a size when it is one of the product's sizes or a size word of their kind, and only after
+ *  a joiner. A SKU with no size at its end is the base, joined with "-" ("RG-1042" → "RG-1042-M"). */
 export function skuParts(sku: string, sizes: string[]): { base: string; join: string } {
   const s = String(sku || '').trim(), low = s.toLowerCase();
   if (!sizes.length) return { base: s, join: '-' }; // a product with no sizes keeps its code whole
-  const ends = [...new Set([...sizes.map(x => sizeCore(x).toLowerCase()).filter(Boolean), ...SIZE_WORDS])].sort((a, b) => b.length - a.length);
+  const own = sizes.map(x => sizeCore(x).toLowerCase()).filter(Boolean);
+  const ends = [...new Set([...own, ...SIZE_KINDS.filter(k => own.some(c => k.includes(c))).flat()])].sort((a, b) => b.length - a.length);
   for (const size of ends) {
     if (!low.endsWith(size)) continue;
     const head = s.slice(0, s.length - size.length), join = /[\s\-_/]+$/.exec(head);
@@ -96,15 +98,25 @@ export function buildProductInput(a: { l: ListingRow; p: ProductRow; site: Websi
   if (foreign.length) throw new HttpError(400, `${site.name}: this product has a choice on Shopify that Playbook did not make (${foreign.join(', ')}). Playbook left the product as it is. Remove that choice in Shopify, or look after this product there.`);
   const oldOpt = existing?.options.find(o => o.name.trim().toLowerCase() === optName.toLowerCase());
   const oldVariant = new Map((existing?.variants || []).map(v => [v.key, v.id]));
-  // The same size under another label ("S" on the store, "S (36)" here): matched by the size without its measurement, when only one has it.
+  // The same size under another label ("S" on the store, "S (36)" here): matched by the size without its
+  // measurement, but only what the labels left unmatched, and only when one size here and one there share it —
+  // so no store variant is ever given to two sizes.
   const core = (v: string) => sizeCore(v).toLowerCase();
-  const once = (rows: [string, string][]) => new Map(rows.filter(([k]) => k && rows.filter(([x]) => x === k).length === 1));
   const lead = `${optName.toLowerCase()}=`;
-  const variantByCore = once((existing?.variants || []).map((v): [string, string] => [v.key.startsWith(lead) && !v.key.includes('|') ? core(v.key.slice(lead.length)) : '', v.id]));
-  const valueByCore = once((oldOpt?.values || []).map((v): [string, string] => [core(v.name), v.id]));
+  const pair = (exact: (name: string) => string | undefined, store: [string, string][]): (string | undefined)[] => {
+    const ids = values.map(exact), used = new Set(ids.filter(Boolean));
+    const free = store.filter(([k, id]) => k && !used.has(id));
+    const want = values.map((n, i) => (ids[i] || !sizes.length ? '' : core(n)));
+    const one = <T,>(list: T[], is: (x: T) => boolean) => list.filter(is).length === 1;
+    return values.map((_, i) => ids[i] ?? (want[i] && one(want, w => w === want[i]) && one(free, ([k]) => k === want[i]) ? free.find(([k]) => k === want[i])![1] : undefined));
+  };
+  const variantIds = pair(name => oldVariant.get(variantKey([{ name: optName, value: name }])),
+    (existing?.variants || []).map((v): [string, string] => [v.key.startsWith(lead) && !v.key.includes('|') ? core(v.key.slice(lead.length)) : '', v.id]));
+  const valueIds = pair(name => oldOpt?.values.find(v => v.name.trim().toLowerCase() === name.toLowerCase())?.id,
+    (oldOpt?.values || []).map((v): [string, string] => [core(v.name), v.id]));
   const weight = weightOf(p.attributes?.weight), cost = Number(p.cost_price) > 0 ? Number(p.cost_price).toFixed(2) : null;
   const variant = (name: string, i: number) => {
-    const id = oldVariant.get(variantKey([{ name: optName, value: name }])) ?? (sizes.length ? variantByCore.get(core(name)) : undefined);
+    const id = variantIds[i];
     return {
       ...(id ? { id } : { inventoryPolicy: tracked ? 'DENY' : 'CONTINUE' }), // an existing variant keeps the stock policy set in Shopify
       optionValues: [{ optionName: optName, name }],
@@ -131,10 +143,7 @@ export function buildProductInput(a: { l: ListingRow; p: ProductRow; site: Websi
     ...(existing ? {} : { metafields: [{ namespace: MF_NAMESPACE, key: MF_KEY, type: 'single_line_text_field', value: l.id }] }),
     productOptions: [{
       ...(oldOpt ? { id: oldOpt.id } : {}), name: optName, position: 1,
-      values: values.map(name => {
-        const vid = oldOpt?.values.find(v => v.name.trim().toLowerCase() === name.toLowerCase())?.id ?? (sizes.length ? valueByCore.get(core(name)) : undefined);
-        return vid ? { id: vid, name } : { name };
-      }),
+      values: values.map((name, i) => (valueIds[i] ? { id: valueIds[i], name } : { name })),
     }],
     variants: values.map((s, i) => variant(s, i)),
   };

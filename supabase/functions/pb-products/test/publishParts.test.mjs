@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 globalThis.Deno ??= { env: { get: () => '' } }; // db.ts reads Deno.env
-const { busyStreak, filesFor, FREE_RETRIES, knownPhotos, mergeTags, photoRecord, temporary } = await import('../publishParts.ts');
+const { busyStreak, filesFor, FREE_RETRIES, knownPhotos, leaveGallery, mergeTags, photoRecord, temporary } = await import('../publishParts.ts');
 const { HttpError } = await import('../http.ts');
 
 const m = (id, alt = '', o = {}) => ({ id, alt, image: true, failed: false, ...o });
@@ -58,10 +58,20 @@ test('photos: which Shopify media each photo is, remembered for the next publish
   const added = filesFor({ paths: more, alts: [], known, store: [m('m1'), m('m2'), m('theirs')] });
   assert.deepEqual(photoRecord(added, more, known, ['m1', 'm9', 'm2', 'theirs']), ['m1', 'm9', 'm2']);
   assert.deepEqual(knownPhotos({ photos: paths, media: ['m1', 'm2'] }, [m('m1')], false), known);
-  assert.deepEqual(knownPhotos({ photos: paths }, [m('x1'), m('vid', '', { image: false }), m('x2')], false), [{ path: 'a/1.jpg', id: 'x1' }, { path: 'a/2.jpg', id: 'x2' }]); // an older publish: by position
-  assert.deepEqual(knownPhotos({ photos: paths }, [m('x1')], false), []);                  // the store has another number of photos
+  assert.deepEqual(knownPhotos({ photos: paths }, [m('x1'), m('x2')], false), []);         // no ids on record: never guessed from the order
   assert.deepEqual(knownPhotos({ photos: paths, media: ['m1', 'm2'] }, [m('m1')], true), []); // a recovered lost create
   assert.deepEqual(knownPhotos(null, [m('m1')], false), []);
+});
+
+test('photos with no ids on record: the gallery is left alone until the photos change in Playbook', () => {
+  const paths = ['a/1.jpg', 'a/2.jpg'];
+  assert.equal(leaveGallery({ photos: paths }, paths, [], true, false), true);             // same photos as last time: nothing sent, nothing of the store's lost
+  assert.equal(leaveGallery({ photos: paths }, ['a/1.jpg', 'a/3.jpg'], [], true, false), false); // changed here: sent afresh
+  assert.equal(leaveGallery(null, paths, [], true, false), false);                         // a first publish that failed half-way
+  assert.equal(leaveGallery({ photos: paths }, paths, [], true, true), false);             // a recovered lost create
+  assert.equal(leaveGallery({ photos: paths }, paths, [], false, false), false);           // a create
+  assert.equal(leaveGallery({ photos: paths }, paths, [{ path: 'a/1.jpg', id: 'm1' }], true, false), false); // ids on record: filesFor decides
+  assert.equal(photoRecord({ files: null, fresh: [] }, paths, [], ['x', 'y']), null);      // and no ids are made up afterwards
 });
 
 test('Shopify being busy is tried again without using up the attempts, but not for ever', () => {

@@ -67,7 +67,9 @@ test('sizes on Shopify: one choice per size, each with the base SKU plus its own
   assert.equal(skuBase('KB-280-M', ['M', 'L']), 'KB-280');
   assert.equal(skuBase('RG-1', ['M', 'L']), 'RG-1');                                      // no size at the end: untouched
   assert.equal(skuBase('KB 302 XL', ['S', 'M']), 'KB 302');                               // the code's own size sold out: still a size
-  assert.equal(skuBase('KB 302 FREE SIZE', ['S', 'M']), 'KB 302');
+  assert.equal(skuBase('KB 9 FS', ['Free Size']), 'KB 9');
+  assert.equal(skuBase('SAREE-RED-M', ['Free Size']), 'SAREE-RED-M');                     // "-M" on a free-size product is not a size
+  assert.equal(skuBase('KB 302 XL', ['38', '40']), 'KB 302 XL');                          // nor on one sold by number
   assert.equal(skuBase('KB 302 MAROON', ['S', 'M']), 'KB 302 MAROON');                    // a colour is not a size
   assert.equal(skuBase('KBXL', ['XL']), 'KBXL');                                          // only after a joiner
   assert.equal(skuBase('DUPATTA-12-FS', []), 'DUPATTA-12-FS');                            // a product with no sizes keeps its code whole
@@ -99,6 +101,10 @@ test('an update keeps the sizes the store has: same variant for a relabelled siz
   // two store sizes with the same core: no guessing, matched by the exact label only
   const twice = { ...existing, variants: [{ id: 'a', key: 'size=s (36)' }, { id: 'b', key: 'size=s (38)' }] };
   assert.deepEqual(ask({ existing: twice, p: { ...P, sizes: ['S'] }, sendStatus: false, files: null }).variants.map(v => v.id), [undefined]);
+  // two sizes here that could both be the store's "S": the label match takes it, the other is new (never one variant twice)
+  const both = ask({ existing, p: { ...P, sizes: ['S', 'S (36)', 'M (38)', 'M (40)'] }, sendStatus: false, files: null });
+  assert.deepEqual(both.variants.map(v => v.id), ['var-s', undefined, undefined, undefined]);
+  assert.deepEqual(both.productOptions[0].values.map(v => v.id), ['v-s', undefined, undefined, undefined]);
   assert.deepEqual(weightOf('1.25 kg'), { value: 1.25, unit: 'KILOGRAMS' });
   for (const w of ['', 'heavy', '0 g', null]) assert.equal(weightOf(w), null);
 });

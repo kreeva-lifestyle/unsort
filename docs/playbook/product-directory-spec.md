@@ -800,22 +800,29 @@ paid service, no library.
     Playbook's photos and order are unchanged the store's order stays (no
     `files` at all when nothing changed). The `published` row records
     `media` (Shopify media ids aligned with `photos`, from the `productSet`
-    reply; `photoRecord`); no record → by position while the counts match,
-    else every photo afresh. **Options**: a choice other than Size / Title
-    on the store stops the update with a plain sentence (it would be
-    deleted). **Variants**: an existing size is matched by label, else by the
-    size without its measurement when unique, so "S" → "S (36)" renames the
-    variant and keeps its stock. **Category** goes out on a create only.
-    **Channel**: `publishablePublish` runs on a create (draft sites too, so
-    the product shows once made Active), on Put back, and after it failed
-    (`channel: false` on the activity row) — not on every update.
+    reply; `photoRecord`). Ids not on record are never guessed from the
+    order: while Playbook's photos are the ones sent last time the gallery
+    is left alone (`leaveGallery`), and only a change of photos in Playbook
+    sends them afresh. When the store refuses the photo change the update
+    still goes out without `files`, and the record keeps what the store had.
+    **Options**: a choice other than Size / Title on the store stops the
+    update with a plain sentence (it would be deleted). **Variants**: an
+    existing size is matched by label, else by the size without its
+    measurement when one size here and one unmatched size there share it, so
+    "S" → "S (36)" renames the variant and keeps its stock and no store
+    variant is ever given to two sizes. **Category** goes out on a create
+    only. **Channel**: `publishablePublish` runs on a create (draft sites
+    too, so the product shows once made Active), on Put back, and while it
+    is still owed (`channel: false` on the last `published` row, or
+    `channel_due` on a later `failed` row) — not on every update.
   - *A product deleted in Shopify is not made again by the worker*: the
     listing becomes `skipped` with the note `GONE` and its Shopify id is
     cleared; a manual Publish / Put back creates it anew.
   - *Failures*: HttpError 503 (429, 5xx, THROTTLED) is `temporary`: the
     listing fails and is retried after 10 min without using an attempt, up to
     `FREE_RETRIES` (10) in a row (`busyStreak` over the last 12 failed rows),
-    and the worker stops publishing for that run. A busy or unreachable
+    and the worker leaves that store's other listings for the next run (the
+    other stores go on; it reads 30 candidates to send 10). A busy or unreachable
     Shopify at the channel step (status ≥ 500) or a 503 at the custom fields
     fails the listing (retried) instead of calling it published. After
     `productSet` went through, a failed Put back is `failed`, not `skipped`.
@@ -827,20 +834,25 @@ paid service, no library.
     handle (six full products passed the 1,000-point query limit).
     `onlineStoreId` asks `catalogType: APP` first and forgets a cached id
     Shopify refuses. An archived product's listing that is on Shopify goes
-    back to `published` (it is on sale; it was `skipped`, which let Delete
-    forget a live product).
+    back to `published` with a note (it is on sale; it was `skipped`, which
+    let Delete forget a live product).
   - *Currency*: `shopCurrency` (cached per instance); a store that does not
     sell in INR gets nothing, and Test connection says so in `last_error`.
-  - *SKU per size*: `skuParts` also takes an ordinary size word at the end of
-    the code (the code's own size may have sold out), never for a product
-    with no sizes; the importer takes the SKU of a size on sale. New variants
+  - *SKU per size*: `skuParts` also takes a size word of the same kind as
+    the product's own sizes at the end of the code (the code's own size may
+    have sold out: "KB 302 XL" with S and M on sale; never "-M" on a
+    free-size or numbered product, never for a product with no sizes); the
+    importer takes the SKU of a size on sale. New variants
     get `inventoryItem.measurement.weight` (attribute `weight`, "700 g") and
     `cost` (cost price).
-  - *Changes that used to be lost*: `route_product { resend }` (sizes or SKU
-    changed on Save facts, or by a re-read) sends a published listing again
-    as it is; a listing being written or published when its product is
-    routed sets `route_due`, and `routeDue` clears the flag before routing,
-    so the worker checks it again (not logged each minute).
+  - *Changes that used to be lost*: the `published` row records the `sizes`
+    and `sku` sent; routing sends a published listing again as it is when
+    the product now has others (`route.ts lastSent` / `behind`), whichever
+    way the product was routed (Save facts, a re-read, tags, the worker). A
+    listing being written or published when its product is routed sets
+    `route_due`; `routeDue` clears the flag before routing and the other
+    callers leave it while a listing is busy, so the worker checks it again
+    (not logged each minute).
   - *Delete* refuses unless every listing with a Shopify id is removed AND
     `shopify_status = 'DRAFT'`.
   Not built, each needs the owner's decision: stock and price sync from the

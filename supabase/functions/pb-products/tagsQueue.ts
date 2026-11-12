@@ -122,8 +122,9 @@ export async function tagsAiFill(b: Body, userId: string | null) {
     let routed = 0;
     if (r.refreshed?.was === 'needs_info' && r.refreshed.status === 'ready') {
       const now = await one<ProductRow>(`pb_products?id=eq.${enc(p.id)}&select=${PRODUCT_COLS}`);
-      if (now) routed = (await routeProduct(now, userId)).routed;
-      await patch('pb_products', `id=eq.${enc(p.id)}`, { route_due: false });
+      const r = now ? await routeProduct(now, userId) : null;
+      routed = r?.routed ?? 0;
+      if (!r?.busy) await patch('pb_products', `id=eq.${enc(p.id)}`, { route_due: false }); // a busy listing keeps the flag: the worker checks again
     }
     return { ok: true, filled: r.filled, left: r.left, status: r.refreshed?.status ?? p.status, missing: r.refreshed?.missing ?? p.missing_attrs, routed };
   }

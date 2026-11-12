@@ -47,8 +47,7 @@ export async function routeOne(b: Body, userId: string | null) {
   if (!p) throw new HttpError(404, 'That product no longer exists.');
   if (p.status === 'archived') throw new HttpError(400, 'This product is archived.');
   if (p.status !== 'ready') throw new HttpError(400, 'This product is held in Needs info (something is missing, or it looks already added). Open it to see why: only ready products go to websites.');
-  // `resend`: the sizes or the SKU changed, so a published listing is sent to Shopify again as it is.
-  const r = await routeProduct(p, userId, { resend: b.resend === true });
+  const r = await routeProduct(p, userId);
   // routed now: the worker's route_due step (tagFill.ts) need not route it again, unless a listing was busy
   if (!r.busy) await patch('pb_products', `id=eq.${enc(id)}&route_due=eq.true`, { route_due: false });
   return { ok: true, routed: r.routed, repriced: r.repriced, resent: r.resent, listings: r.listings, ...(r.warning ? { warning: r.warning } : {}) };

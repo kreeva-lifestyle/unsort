@@ -40,8 +40,9 @@ export async function productValuesSet(b: Body, userId: string | null) {
   let routed = 0;
   if (fin?.was === 'needs_info' && fin.status === 'ready') {
     const now = await one<ProductRow>(`pb_products?id=eq.${enc(id)}&select=${PRODUCT_COLS}`);
-    if (now) routed = (await routeProduct(now, userId)).routed;
-    await patch('pb_products', `id=eq.${enc(id)}`, { route_due: false });
+    const r = now ? await routeProduct(now, userId) : null;
+    routed = r?.routed ?? 0;
+    if (!r?.busy) await patch('pb_products', `id=eq.${enc(id)}`, { route_due: false }); // a busy listing keeps the flag: the worker checks again
   }
   await logActivity({ product_id: id, action: 'edited', details: { fields: ['tags'], count: want.length, status: fin?.status }, user_id: userId });
   return { ok: true, status: fin?.status ?? p.status, missing: fin?.missing ?? p.missing_attrs, locked, routed };

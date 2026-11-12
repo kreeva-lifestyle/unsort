@@ -21,7 +21,7 @@ import { HttpError, plain } from './http.ts';
 import { compareAt } from './pricing.ts';
 import { profileOf } from './profile.ts';
 import { buildProductInput, PRODUCT_SET, STOCK_WARNING } from './productInput.ts';
-import { busyStreak, filesFor, FREE_RETRIES, type Gallery, knownPhotos, mergeTags, photoRecord, sendFields, temporary, toOnlineStore } from './publishParts.ts';
+import { busyStreak, filesFor, FREE_RETRIES, type Gallery, knownPhotos, leaveGallery, mergeTags, photoRecord, sendFields, temporary, toOnlineStore } from './publishParts.ts';
 import { seoGet } from './seoStore.ts';
 import { CURRENCY, gql, shopCurrency, wrongCurrency } from './shopify.ts';
 import { adoptable, type Existing, existingProduct } from './shopifyProduct.ts';
@@ -36,7 +36,7 @@ const due = () => {
   return `or=(and(status.eq.publishing,or(claimed_at.is.null,claimed_at.lt.${t})),and(status.eq.failed,attempts.lt.${MAX_ATTEMPTS},updated_at.lt.${ago(RETRY_MS)}))`;
 };
 export const pubCandidates = (limit: number) =>
-  sel<{ id: string }>(`pb_listings?${due()}&select=id,pb_websites!inner(active)&pb_websites.active=eq.true&order=updated_at.asc&limit=${limit}`);
+  sel<{ id: string; website_id: string }>(`pb_listings?${due()}&select=id,website_id,pb_websites!inner(active)&pb_websites.active=eq.true&order=updated_at.asc&limit=${limit}`);
 
 export async function claimPublish(id: string, manual: boolean): Promise<ListingRow | null> {
   const t = ago(STALE_MS);
@@ -50,6 +50,8 @@ interface SetReply { productSet: { product: { id: string; status: string; handle
 interface Sent { photos?: string[]; media?: string[]; tags?: string[]; channel?: boolean }
 /** The listing's note when its product was deleted in Shopify and the worker left it that way. */
 export const GONE = 'This product was deleted in Shopify, so Playbook stopped sending it. Tap Put back on site to list it again.';
+/** An archived product's listing that is on Shopify: nothing is sent, and it is not called removed while it is on sale. */
+const KEPT = 'This product is archived, so the last change was not sent. It is still on Shopify as it was: tap Remove from site to take it off.';
 
 /** `putBack`: staff tapped "Put back on site" on a removed listing — the only update that sets the Shopify status again. */
 export async function publishOne(l: ListingRow, o: { manual: boolean; putBack?: boolean; userId: string | null; budget: Budget }): Promise<ListingRow> {
@@ -67,20 +69,20 @@ export async function publishOne(l: ListingRow, o: { manual: boolean; putBack?: 
     return r[0] ?? l;
   }
   const sent: string[] = []; // handles sent to productSet, kept on a failure so a lost create is found again
-  let streak = 0, onStore = false; // passing failures in a row before this run; productSet went through in this run
+  let streak = 0, onStore = false, owed = false; // passing failures in a row before this run; productSet went through in this run; the Online Store step is still to do
   try {
     const [p, site, imgs, last, tried] = await Promise.all([
       one<ProductRow>(`pb_products?id=eq.${enc(l.product_id)}&select=${PRODUCT_COLS}`),
       one<WebsiteRow>(`pb_websites?id=eq.${enc(l.website_id)}&select=${WEBSITE_COLS}`),
       sel<{ path: string }>(`pb_product_images?product_id=eq.${enc(l.product_id)}&kind=eq.image&select=path&order=position.asc&limit=20`),
       one<{ details: Sent | null; created_at: string }>(`pb_activity?product_id=eq.${enc(l.product_id)}&listing_id=eq.${enc(l.id)}&action=eq.published&select=details,created_at&order=created_at.desc`),
-      sel<{ details: { handles?: string[]; temporary?: boolean } | null; created_at: string }>(`pb_activity?product_id=eq.${enc(l.product_id)}&listing_id=eq.${enc(l.id)}&action=eq.failed&select=details,created_at&order=created_at.desc&limit=12`),
+      sel<{ details: { handles?: string[]; temporary?: boolean; channel_due?: boolean } | null; created_at: string }>(`pb_activity?product_id=eq.${enc(l.product_id)}&listing_id=eq.${enc(l.id)}&action=eq.failed&select=details,created_at&order=created_at.desc&limit=12`),
     ]);
     streak = busyStreak(tried, last?.created_at ?? null);
     if (!p || !site) throw new HttpError(404, 'The product or website for this listing no longer exists.');
     if (p.status === 'archived') {
       // Not sent. A listing that is on Shopify stays "published" (it is on sale there; Remove from site takes it off).
-      const r = await patch<ListingRow>('pb_listings', mine, l.shopify_product_id ? { status: 'published', claimed_at: null } : { status: 'skipped', error: ARCHIVED, claimed_at: null }, LISTING_COLS);
+      const r = await patch<ListingRow>('pb_listings', mine, l.shopify_product_id ? { status: 'published', error: KEPT, attempts: 0, claimed_at: null } : { status: 'skipped', error: ARCHIVED, claimed_at: null }, LISTING_COLS);
       if (o.manual) throw new HttpError(400, 'This product is archived.');
       return r[0] ?? l;
     }
@@ -117,7 +119,8 @@ export async function publishOne(l: ListingRow, o: { manual: boolean; putBack?: 
     const run = () => {
       sendStatus = !existing || !!adopted || !!o.putBack;
       known = knownPhotos(was, existing?.media ?? null, !!adopted);
-      gallery = noFiles ? { files: null, fresh: [] } : filesFor({ paths, alts: l.image_alts || [], known, store: existing?.media ?? null });
+      gallery = noFiles || leaveGallery(was, paths, known, !!existing, !!adopted) ? { files: null, fresh: [] }
+        : filesFor({ paths, alts: l.image_alts || [], known, store: existing?.media ?? null });
       const tags = existing ? mergeTags(existing.tags, adopted ? null : was?.tags ?? null, l.tags || []) : l.tags || [];
       const input = buildProductInput({ l: { ...l, handle, tags, compare_at_price: compare }, p, site, vendor: profile.brand, files: gallery.files, live, sendStatus, existing, tail: profile.faq_in_description ? faqHtml(faq) : '', noCategory });
       sent.push(handle);
@@ -138,6 +141,11 @@ export async function publishOne(l: ListingRow, o: { manual: boolean; putBack?: 
     if (errs.length || !res.productSet.product) throw new HttpError(400, `${site.name}: Shopify said "${errs.map(e => e.message).join('; ').slice(0, 250) || 'the product was not saved'}".`);
     const prod = res.productSet.product;
     onStore = true;
+    // The Online Store step: on a create (a draft site's product too, so it shows the moment someone makes it
+    // Active in Shopify), on Put back, and while an earlier run still owes it — not on every update, which would
+    // undo a channel choice made in Shopify.
+    const since = last?.created_at ?? '';
+    owed = sendStatus || !l.published_at || was?.channel === false || tried.some(t => t.details?.channel_due && t.created_at > since);
     // Saved at once, whatever happens next, so a retry updates this product instead of making another.
     // Only while this run still holds the listing (a store move or takeover re-queued it meanwhile).
     const held = await patch('pb_listings', mine, { shopify_product_id: prod.id, shopify_status: prod.status, handle: prod.handle || handle, compare_at_price: compare });
@@ -149,18 +157,20 @@ export async function publishOne(l: ListingRow, o: { manual: boolean; putBack?: 
     if (noFiles) warnings.push('Saved on Shopify, but the store did not take the change to its photos: check the photos there.');
     const fw = await sendFields(site, profile.custom_fields ? fieldInputs(prod.id, p, faq) : [], ms(30_000));
     if (fw) warnings.push(fw);
-    // A draft site's product goes on the channel too, so it shows the moment someone makes it Active in Shopify.
     let shown = true;
-    if (sendStatus || !l.published_at || was?.channel === false) {
+    if (owed) {
       const cw = await toOnlineStore(site, prod.id, ms(30_000));
       if (cw) { warnings.push(cw); shown = false; }
+      owed = false;
     }
     const warning = warnings.join(' ') || null;
+    // What the store has of Playbook's photos now. The store refused the change → what it had before.
     const media = photoRecord(gallery, paths, known, (prod.media?.nodes || []).map(m => m.id));
+    const photos = noFiles ? { photos: was?.photos ?? [], ...(was?.media ? { media: was.media } : {}) } : { photos: paths, ...(media ? { media } : {}) };
     const saved = await patch<ListingRow>('pb_listings', mine, {
       status: 'published', shopify_status: prod.status, published_at: nowIso(), attempts: 0, error: warning, claimed_at: null,
     }, LISTING_COLS);
-    await logActivity({ product_id: l.product_id, website_id: l.website_id, listing_id: l.id, action: 'published', details: { shopify_product_id: prod.id, status: prod.status, update: !!existing, ...(adopted ? { adopted: true } : {}), photos: paths, ...(media ? { media } : {}), tags: l.tags || [], ...(shown ? {} : { channel: false }), ...(warning ? { warning } : {}) }, user_id: o.userId });
+    await logActivity({ product_id: l.product_id, website_id: l.website_id, listing_id: l.id, action: 'published', details: { shopify_product_id: prod.id, status: prod.status, update: !!existing, ...(adopted ? { adopted: true } : {}), ...photos, tags: l.tags || [], sizes: p.sizes || [], sku: p.sku || '', ...(shown ? {} : { channel: false }), ...(warning ? { warning } : {}) }, user_id: o.userId });
     if (!saved[0]) throw new HttpError(409, 'Published on Shopify, but the listing changed meanwhile — open it again.');
     return saved[0];
   } catch (e) {
@@ -173,7 +183,7 @@ export async function publishOne(l: ListingRow, o: { manual: boolean; putBack?: 
       const free = temporary(e) && streak < FREE_RETRIES; // Shopify was busy: tried again, no attempt used up
       const r = await patch('pb_listings', mine, o.putBack && !onStore ? { status: 'skipped', claimed_at: null }
         : { status: 'failed', attempts: (l.attempts || 0) + (free ? 0 : 1), error: msg, claimed_at: null });
-      if (r.length) await logActivity({ product_id: l.product_id, website_id: l.website_id, listing_id: l.id, action: 'failed', details: { step: 'publish', error: msg, ...(temporary(e) ? { temporary: true } : {}), ...(sent.length ? { handles: [...new Set(sent)] } : {}) }, user_id: o.userId });
+      if (r.length) await logActivity({ product_id: l.product_id, website_id: l.website_id, listing_id: l.id, action: 'failed', details: { step: 'publish', error: msg, ...(temporary(e) ? { temporary: true } : {}), ...(onStore && owed ? { channel_due: true } : {}), ...(sent.length ? { handles: [...new Set(sent)] } : {}) }, user_id: o.userId });
     }
     throw e instanceof HttpError ? e : new HttpError(502, msg);
   }

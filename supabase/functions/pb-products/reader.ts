@@ -95,7 +95,7 @@ const TRY_RE = / \(attempt (\d+) of \d+\)$/;
 /** Read one CLAIMED product. Returns the saved product, how many listings routing queued,
  *  and a warning when the read worked but routing did not. */
 export async function readOne(p: ProductRow, o: { manual: boolean; prevStatus?: string; userId: string | null; budget: Budget }): Promise<{ product: ProductRow; routed: number; warning?: string }> {
-  let product: ProductRow, resend = false;
+  let product: ProductRow;
   const again = !o.manual && !!p.ai_read_at; // read before and sent back: the AI's own answers are judged afresh
   try {
     const s = await getSettings();
@@ -117,7 +117,6 @@ export async function readOne(p: ProductRow, o: { manual: boolean; prevStatus?: 
     const ai = await ask(used).catch((e) => { if (used <= 2 || !/could not open one of the product photos/.test(plain(e))) throw e; used = 2; return ask(2); });
     const set = merge(p, ai.data, s.categories, o.manual, again);
     const changed = o.manual || again ? readChanges(p, set) : {};
-    resend = 'sizes' in changed || 'sku' in changed; // the Shopify variants of a published listing must follow
     const next = { ...p, ...set } as ProductRow;
     const status = !hasPrice(next) || !String(next.category || '').trim() ? 'needs_info' : 'ready'; // the gate (tagAfterRead → pb_products_refresh) then also asks for fabric, colour, a photo and the tags
     const saved = await patch<ProductRow>('pb_products', `id=eq.${enc(p.id)}&status=eq.reading`,
@@ -147,7 +146,7 @@ export async function readOne(p: ProductRow, o: { manual: boolean; prevStatus?: 
     throw e;
   }
   if (product.status !== 'ready') return { product, routed: 0 };
-  return await routeAfterRead(product, o, p.ai_error, resend);
+  return await routeAfterRead(product, o, p.ai_error);
 }
 
 /** Route a product that was just read. On failure: logged as a 'route' failure (not a read
@@ -155,9 +154,9 @@ export async function readOne(p: ProductRow, o: { manual: boolean; prevStatus?: 
  *  product back to 'new' so the next run (after 5 min) reads and routes it again — counted with
  *  the read errors in ai_error (`prevErr` = ai_error before this read), so after 3 tries in all it
  *  stays Ready with the note and "Check websites again" routes it. */
-async function routeAfterRead(product: ProductRow, o: { manual: boolean; userId: string | null }, prevErr: string | null, resend = false): Promise<{ product: ProductRow; routed: number; warning?: string }> {
+async function routeAfterRead(product: ProductRow, o: { manual: boolean; userId: string | null }, prevErr: string | null): Promise<{ product: ProductRow; routed: number; warning?: string }> {
   try {
-    const r = await routeProduct(product, o.userId, { resend });
+    const r = await routeProduct(product, o.userId);
     return { product, routed: r.routed, ...(r.warning ? { warning: r.warning } : {}) };
   } catch (e) {
     const msg = plain(e);

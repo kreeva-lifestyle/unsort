@@ -44,16 +44,18 @@ export interface Photo { path: string; id: string }
 export interface Gallery { files: Record<string, unknown>[] | null; fresh: string[] }
 type StoreMedia = Existing['media'];
 
-/** The photos Playbook sent at the last publish with the ids Shopify gave them. No ids on record (an older
- *  publish) → the store's photos in order, but only while it has as many as were sent. None for a recovered
- *  lost create: its photos are sent again and replace what is there. */
+/** The photos Playbook sent at the last publish with the ids Shopify gave them. None when the ids are not on
+ *  record (never guessed from the order: someone may have moved the photos in Shopify) and for a recovered
+ *  lost create, whose photos are sent again and replace what is there. */
 export function knownPhotos(last: { photos?: string[]; media?: string[] } | null | undefined, store: StoreMedia | null, adopted: boolean): Photo[] {
   const photos = last?.photos || [], media = last?.media || [];
-  if (!store || adopted || !photos.length) return [];
-  if (media.length === photos.length) return photos.map((path, i) => ({ path, id: media[i] }));
-  const images = store.filter(m => m.image);
-  return images.length === photos.length ? photos.map((path, i) => ({ path, id: images[i].id })) : [];
+  return store && !adopted && photos.length && media.length === photos.length ? photos.map((path, i) => ({ path, id: media[i] })) : [];
 }
+
+/** A product on the store whose photo ids are not on record, and whose photos in Playbook are the ones sent
+ *  last time: the gallery is left alone (sending them afresh would replace everything the store has). */
+export const leaveGallery = (last: { photos?: string[] } | null | undefined, paths: string[], known: Photo[], onStore: boolean, adopted: boolean) =>
+  onStore && !adopted && !known.length && !!paths.length && (last?.photos || []).join('|') === paths.join('|');
 
 /** The product's gallery for productSet. Nothing known about the store's photos (a create, a recovered lost
  *  create) → every photo afresh. Otherwise: a photo removed in Shopify by someone stays removed; one Shopify
