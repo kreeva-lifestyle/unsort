@@ -1,0 +1,20 @@
+#!/bin/bash
+# The bulk-change log's SQL, tried on a throwaway local PostgreSQL (never on the live database).
+# Needs a local server:  PGHOST / PGPORT / PGUSER as usual (defaults: localhost, 54329, postgres).
+# It builds a database "pbt" with a minimal copy of the Playbook tables (bootstrap.sql), loads the
+# repository's real tag, stock and bulk-log SQL, then runs the scenarios: a change is made the way
+# the server makes it (the x-pb-bulk header set), previewed, reverted, and compared with the start.
+# Pass more .sql files to load after the standard ones (e.g. one from docs/playbook/sql-to-run/).
+cd "$(dirname "$0")/../../.." || exit 1
+T=supabase/tests/bulk_log; M=supabase/migrations
+P0="psql -h ${PGHOST:-localhost} -p ${PGPORT:-54329} -U ${PGUSER:-postgres} -q"
+$P0 -c "drop database if exists pbt" -c "create database pbt" 2>&1 | grep -i error
+P="$P0 -d pbt"
+export PGOPTIONS="-c check_function_bodies=off -c client_min_messages=warning"
+for f in $T/bootstrap.sql $M/20261110090000_pb_tags.sql $M/20261113040000_pb_stock_save.sql $M/20261113050000_pb_bulk_run_header.sql $M/20261113060000_pb_bulk_log.sql $M/20261113080000_pb_bulk_log_server_only.sql "$@"; do
+  out=$($P -f "$f" 2>&1 | grep -iE "error|fatal" | grep -v "already exists" | cut -c1-220)
+  [ -n "$out" ] && echo "== $(basename "$f")" && echo "$out"
+done
+export PGOPTIONS="-c client_min_messages=warning" # the bulk-log functions once more, with their bodies checked
+for f in $M/20261113060000_pb_bulk_log.sql $M/20261113080000_pb_bulk_log_server_only.sql "$@"; do $P -f "$f" 2>&1 | grep -iE "error|fatal" | cut -c1-220; done
+for t in $T/t_tags.sql $T/t_stock.sql; do echo "== $(basename "$t")"; $P -f "$t" 2>&1 | grep -vE "^\{|^service_role|^\s*$" | cut -c1-340; done

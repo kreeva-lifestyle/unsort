@@ -1198,7 +1198,26 @@ from what was on record (`20261113070000_pb_bulk_log_backfill.sql`).
 Changes to the tag lists that reach many products (merge / delete a value or
 an attribute, category links, suggestions in bulk, "Retag all", "Let AI
 decide"), a vendor's stock notice, and moving a website to another store.
-They are the next step of this work.
+
+**Part 2, written and tested, waiting to be run** (2026-11-13). The database
+side for the tag lists and the stock notice is in
+`docs/playbook/sql-to-run/20261113090000_pb_bulk_log_tags_stock.sql`: the
+recording trigger on the six tag tables, one revert for every tag change
+(`pb_bulk_revert_tags`: what the change deleted comes back, what it added
+goes, in the order the tables depend on each other; a product tagged by hand
+since is left alone; a preview runs the same code and is rolled back), the
+stock-notice revert (`pb_bulk_revert_stock`) and `pb_listings.put_back`
+("this send also makes the product visible again"). It could not be applied
+from here: the automated path holds SQL that contains a `delete` for a
+confirmation that does not reach the owner. It was proven on a local
+PostgreSQL instead (`supabase/tests/bulk_log/run.sh`): delete a value, merge
+two values, delete an attribute, change a category's tags and the category
+list, retag, a suggestion made into a value, a stock notice with out of
+stock / permanent / temporary lines. Every scenario returns the data exactly
+to its start, and a preview changes nothing. Once the owner has run the file,
+the server side follows (the tag actions and the notice open a run and mark
+their calls; a change that reaches fewer than two products is not bulk and
+leaves the log).
 
 ### UI
 Settings → **Bulk changes** (`BulkTile`): the last 7 days, newest first:
