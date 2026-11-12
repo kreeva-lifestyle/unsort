@@ -13,6 +13,7 @@ test('reader prompt: photos first, a plain colour, the fabric as written', () =>
   const sys = readerPrompt(['Anarkali', 'Kurta Set', 'anarkali']);
   for (const part of ['PHOTOS FIRST', 'the photos are right', 'With no photos, use the text',
     'is not a fact: never turn it into a pattern',
+    'name: a plain product name in this order: the colour you return, the fabric you return, what the product is', 'never the post\'s trade name for the colour, never a shortened fabric',
     'fabric: exactly as the post writes it', 'correct only an obvious spelling mistake', 'A fabric listed under "Already known" stays as it is',
     'color: the main colour of the product as the photos show it', 'a trade name (Rama, Liril, Sky, Mehendi) becomes the plain colour', 'the photos win',
     'no disclaimers such as "colour may vary"', 'category: exactly one of: Anarkali, Kurta Set —']) assert.ok(sys.includes(part), part);
