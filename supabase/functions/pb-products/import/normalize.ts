@@ -56,7 +56,8 @@ export function fromShopify(p: ShopifyProduct, origin: string, currency: string 
   const colors = valuesOf(isColor);
   const url = `${origin}/products/${encodeURIComponent(String(p.handle || ''))}`;
   const f: Found = {
-    ref: String(p.id), name: txt(p.title, 200), url, sku: txt(variants.find(v => v.sku)?.sku, 80) || null,
+    // The SKU of a size that is on sale (the same sizes as `sizes`), else of any size: it is the base of every size's code.
+    ref: String(p.id), name: txt(p.title, 200), url, sku: txt((use.find(v => v.sku) ?? variants.find(v => v.sku))?.sku, 80) || null,
     description: htmlToText(p.body_html),
     price, compare_at: compareAt, currency: currency && /^[A-Z]{3}$/.test(currency) ? currency : null,
     in_stock: variants.some(v => v.available === true), sizes: valuesOf(isSize), color: colors.length === 1 ? colors[0] : null,

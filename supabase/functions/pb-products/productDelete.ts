@@ -10,7 +10,9 @@
 // Refused, in plain words, while deleting would leave something half-done:
 //   * a listing that is on Shopify and not taken off the site (Playbook
 //     would forget the Shopify product and could never unlist it; a later
-//     import would list it twice) → "Remove from site" first;
+//     import would list it twice) → "Remove from site" first. "Taken off"
+//     means removed in Playbook AND Draft on Shopify: a removed listing whose
+//     product may still be on sale counts as on Shopify;
 //   * the AI is reading it, or a listing is being written / sent right now.
 // Shopify is never touched here. The row goes first, the files second: a
 // failed file removal leaves files nothing points to (reported, harmless),
@@ -21,10 +23,11 @@ import { BUCKET, STALE_MS } from './types.ts';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 interface P { id: string; name: string | null; sku: string | null; status: string; source: string; source_ref: string | null; claimed_at: string | null }
-interface L { id: string; status: string; shopify_product_id: string | null; claimed_at: string | null; pb_websites: { name: string } | null }
+interface L { id: string; status: string; shopify_product_id: string | null; shopify_status: string | null; claimed_at: string | null; pb_websites: { name: string } | null }
 
 /** The listings that are on Shopify and were not taken off the site ("Removed" = Draft there). */
-export const onShopify = (ls: Pick<L, 'status' | 'shopify_product_id' | 'pb_websites'>[]) => ls.filter(l => l.shopify_product_id && l.status !== 'skipped');
+export const onShopify = <T extends Pick<L, 'status' | 'shopify_product_id' | 'shopify_status'>>(ls: T[]) =>
+  ls.filter(l => l.shopify_product_id && !(l.status === 'skipped' && l.shopify_status === 'DRAFT'));
 
 /** Remove files from the bucket (Storage API, service role). Returns how many could NOT be removed. */
 async function removeFiles(paths: string[]): Promise<number> {
@@ -43,11 +46,13 @@ export async function deleteProduct(b: { product_id?: unknown }, userId: string 
   const p = await one<P>(`pb_products?id=eq.${enc(id)}&select=id,name,sku,status,source,source_ref,claimed_at`);
   if (!p) throw new HttpError(404, 'That product no longer exists.');
   if (p.status === 'reading' && p.claimed_at && p.claimed_at > ago(STALE_MS)) throw new HttpError(409, 'The AI is reading this product right now. Try again in a minute.');
-  const ls = await sel<L>(`pb_listings?product_id=eq.${enc(id)}&select=id,status,shopify_product_id,claimed_at,pb_websites(name)`);
+  const ls = await sel<L>(`pb_listings?product_id=eq.${enc(id)}&select=id,status,shopify_product_id,shopify_status,claimed_at,pb_websites(name)`);
   const live = onShopify(ls);
   if (live.length) {
     const names = [...new Set(live.map(l => l.pb_websites?.name || 'a website'))].join(', ');
-    throw new HttpError(409, `This product is on Shopify (${names}). Take it off first: open that website on the product, tap Remove from site, then delete.`);
+    // A removed listing has no "Remove from site" button: it is put back first.
+    const how = live.every(l => l.status === 'skipped') ? 'open that website on the product, tap Put back on site, then Remove from site, then delete' : 'open that website on the product, tap Remove from site, then delete';
+    throw new HttpError(409, `This product is on Shopify (${names}). Take it off first: ${how}.`);
   }
   if (ls.some(l => (l.status === 'generating' || l.status === 'publishing') && l.claimed_at && l.claimed_at > ago(STALE_MS))) {
     throw new HttpError(409, 'A listing of this product is being written or sent to Shopify right now. Try again in a minute.');

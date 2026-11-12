@@ -14,21 +14,23 @@ export interface Existing {
   id: string; handle: string;
   options: { id: string; name: string; values: { id: string; name: string }[] }[];
   variants: { id: string; key: string }[]; // key = "option=value|option=value", lower-case
-  /** The product's photos as the store has them, in order (videos and 3D models left out). */
-  media: { id: string; alt: string }[];
+  /** Everything in the product's gallery as the store has it, in order. `failed` = Shopify could not process it. */
+  media: { id: string; alt: string; image: boolean; failed: boolean }[];
+  tags: string[];
 }
 
-const FIELDS = `id handle
+const FIELDS = `id handle tags
   options { id name optionValues { id name } }
   variants(first: 100) { nodes { id selectedOptions { name value } } }
-  media(first: 50) { nodes { id alt mediaContentType } }
+  media(first: 250) { nodes { id alt mediaContentType status } }
   metafield(namespace: "${MF_NAMESPACE}", key: "${MF_KEY}") { value }`;
 
 interface Node {
   id: string; handle: string;
   options: { id: string; name: string; optionValues: { id: string; name: string }[] }[];
   variants: { nodes: { id: string; selectedOptions: { name: string; value: string }[] }[] };
-  media?: { nodes: { id: string; alt: string | null; mediaContentType: string }[] };
+  tags?: string[];
+  media?: { nodes: { id: string; alt: string | null; mediaContentType: string; status?: string }[] };
   metafield: { value: string } | null;
 }
 
@@ -39,7 +41,8 @@ const shape = (n: Node): Existing => ({
   id: n.id, handle: n.handle,
   options: (n.options || []).map(o => ({ id: o.id, name: o.name, values: (o.optionValues || []).map(v => ({ id: v.id, name: v.name })) })),
   variants: (n.variants?.nodes || []).map(v => ({ id: v.id, key: variantKey(v.selectedOptions || []) })),
-  media: (n.media?.nodes || []).filter(m => m.mediaContentType === 'IMAGE').map(m => ({ id: m.id, alt: m.alt || '' })),
+  media: (n.media?.nodes || []).map(m => ({ id: m.id, alt: m.alt || '', image: m.mediaContentType === 'IMAGE', failed: m.status === 'FAILED' })),
+  tags: Array.isArray(n.tags) ? n.tags : [],
 });
 
 /** The product as the store has it now; null when it was deleted in Shopify. */
@@ -53,10 +56,11 @@ export async function existingProduct(site: WebsiteRow, id: string, ms: number):
 export async function adoptable(site: WebsiteRow, listingId: string, handles: string[], ms: number): Promise<Existing | null> {
   const hs = [...new Set(handles.filter(Boolean))].slice(0, 6);
   if (!hs.length) return null;
+  // Only the id and the marker per handle: the full product for six handles would pass Shopify's 1,000-point limit for one query.
   const q = `query PbByHandle(${hs.map((_, i) => `$h${i}: String!`).join(', ')}) {
-    ${hs.map((_, i) => `p${i}: productByIdentifier(identifier: { handle: $h${i} }) { ${FIELDS} }`).join('\n    ')}
+    ${hs.map((_, i) => `p${i}: productByIdentifier(identifier: { handle: $h${i} }) { id metafield(namespace: "${MF_NAMESPACE}", key: "${MF_KEY}") { value } }`).join('\n    ')}
   }`;
-  const d = await gql<Record<string, Node | null>>(site, q, Object.fromEntries(hs.map((h, i) => [`h${i}`, h])), ms);
+  const d = await gql<Record<string, { id: string; metafield: { value: string } | null } | null>>(site, q, Object.fromEntries(hs.map((h, i) => [`h${i}`, h])), ms);
   const hit = hs.map((_, i) => d[`p${i}`]).find(n => n && n.metafield?.value === listingId);
-  return hit ? shape(hit) : null;
+  return hit ? existingProduct(site, hit.id, ms) : null;
 }

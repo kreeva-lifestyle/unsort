@@ -45,6 +45,14 @@ test('Shopify: sizes from variants, colour only when single, sold out when no va
   assert.equal(b.description, '');
 });
 
+test('Shopify: the SKU comes from a size that is on sale, so it ends in one of the product\'s sizes', () => {
+  const v = (sku, size, available) => ({ id: 1, sku, price: '999.00', available, option1: size });
+  const p = { id: 9, title: 'Kurta', handle: 'kurta', options: [{ name: 'Size', position: 1, values: ['XS', 'S', 'M'] }], images: [] };
+  assert.equal(fromShopify({ ...p, variants: [v('KB 9 XS', 'XS', false), v('KB 9 S', 'S', true), v('KB 9 M', 'M', true)] }, 'https://x.example').sku, 'KB 9 S');
+  assert.equal(fromShopify({ ...p, variants: [v('KB 9 XS', 'XS', false), v('', 'S', true)] }, 'https://x.example').sku, 'KB 9 XS'); // none on sale has one: any
+  assert.equal(fromShopify({ ...p, variants: [v('KB 9 XS', 'XS', false), v('KB 9 S', 'S', false)] }, 'https://x.example').sku, 'KB 9 XS'); // all sold out
+});
+
 test('WooCommerce: minor units → rupees, regular price as compare-at, attributes as sizes / colour', () => {
   const f = fromWoo(woo[0], 'https://example-store.in');
   assert.equal(f.ref, '31');

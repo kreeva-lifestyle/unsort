@@ -11,7 +11,10 @@ import { HttpError, fetchT } from './http.ts';
 import type { SecretsRow, WebsiteRow } from './types.ts';
 
 const TIMEOUT = 30_000;
-export const REQUIRED_SCOPES = ['write_products', 'read_products', 'write_publications', 'read_publications', 'write_files']; // write_files: photo descriptions of a rewritten listing (fileUpdate)
+export const REQUIRED_SCOPES = ['write_products', 'read_products', 'write_publications', 'read_publications'];
+/** Playbook's prices are rupees: a store that sells in another currency would show ₹2,499 as 2,499 of its own. */
+export const CURRENCY = 'INR';
+export const wrongCurrency = (name: string, code: string) => `${name}: this store sells in ${code}, and Playbook's prices are in rupees (${CURRENCY}). Nothing is sent there, so a rupee price is never shown as ${code}.`;
 
 /** "https://My-Shop.myshopify.com/" → "my-shop.myshopify.com" */
 export const shopHost = (d: string) => String(d || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
@@ -106,20 +109,32 @@ export async function gql<T>(site: WebsiteRow, query: string, variables: Record<
 
 const hasScope = (scopes: string[], s: string) => scopes.includes(s) || (s.startsWith('read_') && scopes.includes(`write_${s.slice(5)}`));
 
-/** shop name + granted scopes; records connected_at / last_error on the website. */
-export async function testConnection(site: WebsiteRow): Promise<{ shop_name: string; scopes: string[]; missing_scopes: string[] }> {
+const currencies = new Map<string, string>();
+/** The store's currency, asked once and kept while this server instance lives. */
+export async function shopCurrency(site: WebsiteRow, ms = TIMEOUT): Promise<string> {
+  const key = `${site.id}|${shopHost(site.shop_domain)}`;
+  const hit = currencies.get(key);
+  if (hit) return hit;
+  const code = String((await gql<{ shop: { currencyCode: string } }>(site, '{ shop { currencyCode } }', {}, ms)).shop?.currencyCode || '');
+  if (code) currencies.set(key, code);
+  return code;
+}
+
+/** shop name + granted scopes + currency; records connected_at / last_error on the website. */
+export async function testConnection(site: WebsiteRow): Promise<{ shop_name: string; scopes: string[]; missing_scopes: string[]; currency: string }> {
   try {
-    const d = await gql<{ shop: { name: string }; currentAppInstallation: { accessScopes: { handle: string }[] } }>(site,
-      '{ shop { name } currentAppInstallation { accessScopes { handle } } }');
+    const d = await gql<{ shop: { name: string; currencyCode: string }; currentAppInstallation: { accessScopes: { handle: string }[] } }>(site,
+      '{ shop { name currencyCode } currentAppInstallation { accessScopes { handle } } }');
     const scopes = (d.currentAppInstallation?.accessScopes || []).map(a => a.handle);
     const need = [...REQUIRED_SCOPES, ...(site.track_inventory ? ['write_inventory'] : [])];
     const missing = need.filter(s => !hasScope(scopes, s));
-    const shop_name = d.shop?.name || '';
-    await patch('pb_websites', `id=eq.${enc(site.id)}`, {
-      shop_name, connected_at: nowIso(),
-      last_error: missing.length ? `Connected, but the Shopify app is missing: ${missing.join(', ')}.` : null,
-    });
-    return { shop_name, scopes, missing_scopes: missing };
+    const shop_name = d.shop?.name || '', currency = String(d.shop?.currencyCode || '');
+    const notes = [
+      ...(missing.length ? [`Connected, but the Shopify app is missing: ${missing.join(', ')}.`] : []),
+      ...(currency && currency !== CURRENCY ? [wrongCurrency(site.name, currency)] : []),
+    ];
+    await patch('pb_websites', `id=eq.${enc(site.id)}`, { shop_name, connected_at: nowIso(), last_error: notes.join(' ') || null });
+    return { shop_name, scopes, missing_scopes: missing, currency };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     await patch('pb_websites', `id=eq.${enc(site.id)}`, { last_error: msg })
@@ -132,9 +147,14 @@ export async function testConnection(site: WebsiteRow): Promise<{ shop_name: str
 export async function onlineStoreId(site: WebsiteRow, ms = TIMEOUT): Promise<string | null> {
   const s = await secretsOf(site.id);
   if (s?.online_store_publication_id) return s.online_store_publication_id;
-  const d = await gql<{ publications: { nodes: { id: string; catalog: { title: string } | null }[] } }>(site,
-    '{ publications(first: 50) { nodes { id catalog { title } } } }', {}, ms);
-  const hit = (d.publications?.nodes || []).find(n => /^online store$/i.test(String(n.catalog?.title || '').trim()));
+  // Sales channels only first: a store with many markets or B2B catalogs has more than one page of publications.
+  let hit: { id: string } | undefined;
+  for (const only of ['first: 100, catalogType: APP', 'first: 100']) {
+    const d = await gql<{ publications: { nodes: { id: string; catalog: { title: string } | null }[] } }>(site,
+      `{ publications(${only}) { nodes { id catalog { title } } } }`, {}, ms);
+    hit = (d.publications?.nodes || []).find(n => /^online store$/i.test(String(n.catalog?.title || '').trim()));
+    if (hit) break;
+  }
   if (!hit) return null;
   await insert('pb_website_secrets', [{ website_id: site.id, online_store_publication_id: hit.id }], { onConflict: 'website_id', mode: 'merge', select: 'website_id' });
   return hit.id;

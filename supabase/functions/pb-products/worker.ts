@@ -23,6 +23,7 @@ import { claimGenerate, genCandidates, generateOne } from './generate.ts';
 import { advanceImport } from './import/runner.ts';
 import { plain } from './http.ts';
 import { claimPublish, PUBLISH_NEEDS_MS, pubCandidates, publishOne } from './publish.ts';
+import { temporary } from './publishParts.ts';
 import { claimRead, readCandidates, readOne } from './reader.ts';
 import { FILL_NEEDS_MS, fillCandidates, fillQueued, routeDue } from './tagFill.ts';
 import { loadTaxonomy } from './taxonomy.ts';
@@ -84,14 +85,21 @@ export async function work(userId: string | null): Promise<WorkResult> {
 
   // A publish is started only with time to finish it (a slow productSet may take up to 90 s).
   const pubTime = () => left(PUBLISH_NEEDS_MS + 10_000);
-  for (const c of pubTime() ? await pubCandidates(CAPS.publish) : []) {
-    if (!pubTime()) break;
+  const busyStores = new Set<string>(); // a store that asked for a pause: its other listings wait for the next run, the other stores go on
+  let sentNow = 0;
+  for (const c of pubTime() ? await pubCandidates(CAPS.publish * 3) : []) {
+    if (!pubTime() || sentNow >= CAPS.publish) break;
+    if (busyStores.has(c.website_id)) continue;
     const l = await claimPublish(c.id, false);
     if (!l) continue;
+    sentNow++;
     try {
       const r = await publishOne(l, { manual: false, userId, budget });
       if (r.status === 'published') out.published++;
-    } catch (e) { failed('publish', c.id, e); }
+    } catch (e) {
+      failed('publish', c.id, e);
+      if (temporary(e)) busyStores.add(c.website_id);
+    }
   }
 
   try { if (inTime()) out.routed += await routeDue(CAPS.route, userId, inTime); } catch (e) { failed('route_due', 'run', e); }

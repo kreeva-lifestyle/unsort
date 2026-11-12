@@ -114,12 +114,14 @@ Types: `src/playbook/types.ts` (jsonb shapes documented there).
    [{name:"Title", values:[{name:"Default Title"}]}]; variants: one per size
    (optionValues [{optionName:"Size", name}], price, compareAtPrice,
    inventoryItem {tracked: track_inventory}, inventoryPolicy CONTINUE when
-   not tracked, DENY when tracked — new variants only), files: each photo `{originalSource: <public url>,
-   alt: image_alts[i], contentType: IMAGE}` (only on create, or when photos
-   changed). Then (live only) `publishablePublish` to the "Online Store"
-   publication (id cached in pb_website_secrets.online_store_publication_id;
+   not tracked, DENY when tracked — new variants only), files: on a create
+   each photo `{originalSource: <public url>, alt: image_alts[i],
+   contentType: IMAGE}`; on an update see "Shopify sync check" below (a photo
+   the store has goes by its id). Then `publishablePublish` to the "Online
+   Store" publication (id cached in pb_website_secrets.online_store_publication_id;
    needs read/write_publications — a missing scope is logged as a warning in
-   listing.error but the listing still counts as published). Save
+   listing.error but the listing still counts as published; only on a create,
+   Put back, or after that step failed). Save
    shopify_product_id, shopify_status, published_at; status `published`.
    A price typed by hand gets its compare-at from the site's pricing at
    publish time. A lost create is found again by the listing's handles
@@ -127,7 +129,8 @@ Types: `src/playbook/types.ts` (jsonb shapes documented there).
    in pb_activity) + the metafield. API version: `pb_websites.api_version`
    (default 2026-10); one older than the oldest supported (2026-01) is
    raised to the default.
-   Errors: attempts+1, status `failed`, error = short readable text.
+   Errors: attempts+1, status `failed`, error = short readable text (Shopify
+   being busy does not count: "Shopify sync check" below).
    **Credentials**: `auth_mode='token'` → access_token (shpat_… from a legacy
    custom app). `client_credentials` → POST `https://{shop}/admin/oauth/access_token`
    `{grant_type:'client_credentials', client_id, client_secret}` → cache
@@ -135,7 +138,7 @@ Types: `src/playbook/types.ts` (jsonb shapes documented there).
    creating legacy custom apps on 2026-01-01; new apps come from the Dev
    Dashboard (same organisation as the store) and use client credentials.
    Scopes: write_products, read_products, write_publications,
-   read_publications, write_files (+ write_inventory when tracking stock).
+   read_publications (+ write_inventory when tracking stock).
 5. Every step writes `pb_activity` (action: read, routed, generated,
    published, failed, edited, unpublished…).
 
@@ -568,11 +571,9 @@ AI's extra tags are an enum of it.
   supplier is never sent; the default tag template is `Vendor_{vendor_code}`,
   dropped when the vendor has no code); `category` = Shopify's standard
   taxonomy id from `garment.ts shopCategory` (ids read live 2026-11-12; sent
-  with the status only: create, recovered create, Put back); alt texts of
-  unchanged photos go out with `fileUpdate` (`altUpdates`: only when the store
-  has the same number of photos; needs `write_files`, now in
-  `REQUIRED_SCOPES`; a failure is a warning on the listing, never a failed
-  publish). Not built, waiting on the owner: standard category attributes
+  on a create only); alt texts of unchanged photos go out inside
+  `productSet` (`files: [{id, alt}]`, see "Shopify sync check" below; the
+  earlier `fileUpdate` + `write_files` path is gone). Not built, waiting on the owner: standard category attributes
   (needs their colour / fabric matching list), a hold on "pure" / origin
   claim words, dropping the Ordering block, Western spellings per market,
   country of origin, up to five FAQ questions (needs the listing editor).
@@ -785,6 +786,82 @@ paid service, no library.
   design" (other colours, a later copy). Answers, each one `pb_dup_answer` call: **It is a copy** (verdict
   `same` + archive this product), **Another colour**, **Different product**
   (verdict + gate re-applied, so a held product goes on to the websites).
+- **Shopify sync check (owner, 2026-11-12: "check for … any bug in shopify
+  sync")**. Three reviews of the publish path, each finding checked against
+  the code and Shopify's 2026-10 schema. What changed (`publish.ts`,
+  `publishParts.ts`, `productInput.ts`, `shopifyProduct.ts`, `shopify.ts`):
+  - *An update keeps what people did in Shopify.* `productSet` replaces every
+    list it is given, so: **tags** = Playbook's own + the store's tags that
+    Playbook did not send at the last publish (`mergeTags`; the `published`
+    activity row records `tags`); **media** = `filesFor`: a photo the store
+    has goes as `{id}` (or `{id, alt}` when its description changed), a new
+    one as `originalSource`, media Playbook did not put there stays, a photo
+    removed in Shopify stays removed, a FAILED one is sent again, and while
+    Playbook's photos and order are unchanged the store's order stays (no
+    `files` at all when nothing changed). The `published` row records
+    `media` (Shopify media ids aligned with `photos`, from the `productSet`
+    reply; `photoRecord`). Ids not on record are never guessed from the
+    order: while Playbook's photos are the ones sent last time the gallery
+    is left alone (`leaveGallery`), and only a change of photos in Playbook
+    sends them afresh. When the store refuses the photo change the update
+    still goes out without `files`, and the record keeps what the store had.
+    **Options**: a choice other than Size / Title on the store stops the
+    update with a plain sentence (it would be deleted). **Variants**: an
+    existing size is matched by label, else by the size without its
+    measurement when one size here and one unmatched size there share it, so
+    "S" → "S (36)" renames the variant and keeps its stock and no store
+    variant is ever given to two sizes. **Category** goes out on a create
+    only. **Channel**: `publishablePublish` runs on a create (draft sites
+    too, so the product shows once made Active), on Put back, and while it
+    is still owed (`channel: false` on the last `published` row, or
+    `channel_due` on a later `failed` row) — not on every update.
+  - *A product deleted in Shopify is not made again by the worker*: the
+    listing becomes `skipped` with the note `GONE` and its Shopify id is
+    cleared; a manual Publish / Put back creates it anew.
+  - *Failures*: HttpError 503 (429, 5xx, THROTTLED) is `temporary`: the
+    listing fails and is retried after 10 min without using an attempt, up to
+    `FREE_RETRIES` (10) in a row (`busyStreak` over the last 12 failed rows),
+    and the worker leaves that store's other listings for the next run (the
+    other stores go on; it reads 30 candidates to send 10). A busy or unreachable
+    Shopify at the channel step (status ≥ 500) or a 503 at the custom fields
+    fails the listing (retried) instead of calling it published. After
+    `productSet` went through, a failed Put back is `failed`, not `skipped`.
+    `metafieldsSet` is all-or-nothing: the refused entries (`elementIndex`)
+    are left out and the rest sent again (`sendFields`). The handle /
+    category / photos refusals are each given up once, in any order; a taken
+    handle is first checked for this listing's own lost product; a listing
+    with no handle gets `makeHandle`. `adoptable` asks only id + marker per
+    handle (six full products passed the 1,000-point query limit).
+    `onlineStoreId` asks `catalogType: APP` first and forgets a cached id
+    Shopify refuses. An archived product's listing that is on Shopify goes
+    back to `published` with a note (it is on sale; it was `skipped`, which
+    let Delete forget a live product).
+  - *Currency*: `shopCurrency` (cached per instance); a store that does not
+    sell in INR gets nothing, and Test connection says so in `last_error`.
+  - *SKU per size*: `skuParts` also takes a size word of the same kind as
+    the product's own sizes at the end of the code (the code's own size may
+    have sold out: "KB 302 XL" with S and M on sale; never "-M" on a
+    free-size or numbered product, never for a product with no sizes); the
+    importer takes the SKU of a size on sale. New variants
+    get `inventoryItem.measurement.weight` (attribute `weight`, "700 g") and
+    `cost` (cost price).
+  - *Changes that used to be lost*: the `published` row records the `sizes`
+    and `sku` sent; routing sends a published listing again as it is when
+    the product now has others (`route.ts lastSent` / `behind`), whichever
+    way the product was routed (Save facts, a re-read, tags, the worker). A
+    listing being written or published when its product is routed sets
+    `route_due`; `routeDue` clears the flag before routing and the other
+    callers leave it while a listing is busy, so the worker checks it again
+    (not logged each minute).
+  - *Delete* refuses unless every listing with a Shopify id is removed AND
+    `shopify_status = 'DRAFT'`.
+  Not built, each needs the owner's decision: stock and price sync from the
+  source store (a repeat import never updates sizes, price or availability;
+  with Track stock on, products start at 0); archive / rule change / website
+  off never takes a live product down; no bulk re-price or bulk retry;
+  Playbook's title, description and price replace hand edits made in Shopify;
+  colours of one design are not linked on the store; barcode, HSN, country
+  of origin, category attributes and per-size photos are not sent.
 - Product list: "Needs info · Already here as KB 264 WINE XS"
   (`data/duplicates.ts heldLabels`, one RPC per page for its Needs-info rows);
   every row says "from Telegram" / "from bahupalace.com" (`sourceText`); a

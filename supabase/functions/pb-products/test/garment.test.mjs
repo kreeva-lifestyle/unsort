@@ -1,13 +1,14 @@
 // node --test --experimental-strip-types supabase/functions/pb-products/test/
 // What Playbook knows about each kind of garment (garment.ts), and what that
 // puts on the Shopify product (productInput.ts): the store's brand as vendor,
-// Shopify's standard category, and photo descriptions that follow a rewrite.
+// Shopify's standard category, each size's own code, and what an update keeps
+// of the product as the store has it (the photos and tags: publishParts.test.mjs).
 // Owner, 2026-11-12, from the research report "Product listing SEO and AEO".
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { expectedFacts, FACT_ORDER, garmentKind, shopCategory } from '../garment.ts';
 globalThis.Deno ??= { env: { get: () => '' } }; // productInput.ts → db.ts reads Deno.env
-const { altUpdates, buildProductInput, skuBase, skuParts } = await import('../productInput.ts');
+const { buildProductInput, skuBase, skuParts, weightOf } = await import('../productInput.ts');
 
 const gid = (id) => `gid://shopify/TaxonomyCategory/${id}`;
 
@@ -43,7 +44,9 @@ test('buying facts: each garment has its own, and a fixed bullet order', () => {
 const L = { id: 'l1', title: 'Maroon Georgette Kurta Set', description_html: '<p>x</p>', handle: 'maroon-kurta-set', tags: ['Kurta Set'], price: 999, compare_at_price: null, seo_title: '', seo_description: '', product_type: null, image_alts: ['Front view', 'Back view'], locked: [] };
 const P = { id: 'p1', sku: 'RG-1', sizes: ['M', 'L'], category: 'Kurta Set', attributes: { set_contents: 'Kurta, Pant and Dupatta' } };
 const SITE = { name: 'Kreeva India', track_inventory: false };
-const ask = (o = {}) => buildProductInput({ l: L, p: P, site: SITE, vendor: 'Kreeva', paths: ['a/1.jpg', 'a/2.jpg'], withFiles: true, live: true, sendStatus: true, existing: null, ...o });
+const FILES = [{ originalSource: 'https://x/a/1.jpg', alt: 'Front view', contentType: 'IMAGE' }, { originalSource: 'https://x/a/2.jpg', alt: 'Back view', contentType: 'IMAGE' }];
+const ask = (o = {}) => buildProductInput({ l: L, p: P, site: SITE, vendor: 'Kreeva', files: FILES, live: true, sendStatus: true, existing: null, ...o });
+const STORE = { id: 'gid://shopify/Product/1', handle: 'maroon-kurta-set', options: [], variants: [], media: [], tags: [] };
 
 test('Shopify product: the store brand is the vendor; the category goes out with a create', () => {
   const made = ask();
@@ -51,8 +54,7 @@ test('Shopify product: the store brand is the vendor; the category goes out with
   assert.equal(made.category, gid('aa-1-23-7'));
   assert.equal(made.productType, 'Kurta Set');
   assert.deepEqual(made.files.map(f => f.alt), ['Front view', 'Back view']);
-  const existing = { id: 'gid://shopify/Product/1', handle: 'maroon-kurta-set', options: [], variants: [], media: [] };
-  const update = ask({ existing, sendStatus: false, withFiles: false });
+  const update = ask({ existing: STORE, sendStatus: false, files: null });
   assert.ok(!('category' in update) && !('files' in update) && !('status' in update)); // what people set in Shopify stays
   assert.equal(update.vendor, 'Kreeva');
   assert.ok(!('category' in ask({ p: { ...P, category: 'Kids Wear' } })));
@@ -64,7 +66,13 @@ test('sizes on Shopify: one choice per size, each with the base SKU plus its own
   assert.equal(skuBase('KB 313 YELLOW XS', ['XS (34)', 'S (36)']), 'KB 313 YELLOW');     // the size with its measurement
   assert.equal(skuBase('KB-280-M', ['M', 'L']), 'KB-280');
   assert.equal(skuBase('RG-1', ['M', 'L']), 'RG-1');                                      // no size at the end: untouched
-  assert.equal(skuBase('KB 302 XL', ['S', 'M']), 'KB 302 XL');                            // not one of this product's sizes: untouched
+  assert.equal(skuBase('KB 302 XL', ['S', 'M']), 'KB 302');                               // the code's own size sold out: still a size
+  assert.equal(skuBase('KB 9 FS', ['Free Size']), 'KB 9');
+  assert.equal(skuBase('SAREE-RED-M', ['Free Size']), 'SAREE-RED-M');                     // "-M" on a free-size product is not a size
+  assert.equal(skuBase('KB 302 XL', ['38', '40']), 'KB 302 XL');                          // nor on one sold by number
+  assert.equal(skuBase('KB 302 MAROON', ['S', 'M']), 'KB 302 MAROON');                    // a colour is not a size
+  assert.equal(skuBase('KBXL', ['XL']), 'KBXL');                                          // only after a joiner
+  assert.equal(skuBase('DUPATTA-12-FS', []), 'DUPATTA-12-FS');                            // a product with no sizes keeps its code whole
   assert.equal(skuBase('XS', ['XS']), 'XS');
   const made = ask({ p: { ...P, sku: 'NKB 47 PURPLE XS', sizes: ['XS (34)', 'S (36)', 'Free Size'] } });
   // every size gets the store's own code back: the same base, the same joiner, its own size
@@ -78,13 +86,31 @@ test('sizes on Shopify: one choice per size, each with the base SKU plus its own
   assert.equal(made.productOptions[0].name, 'Size');
 });
 
-test('photo descriptions: only the changed ones, and only while the store has the same photos', () => {
-  const media = [{ id: 'm1', alt: 'Front view' }, { id: 'm2', alt: 'old' }];
-  assert.deepEqual(altUpdates(media, ['Front view', 'Back view'], 2), [{ id: 'm2', alt: 'Back view' }]);
-  assert.deepEqual(altUpdates(media, ['Front view', 'old'], 2), []);
-  assert.deepEqual(altUpdates(media, ['Front view', ''], 2), []);                       // an empty description never wipes one
-  assert.deepEqual(altUpdates(media, ['A', 'B', 'C'], 3), []);                           // a photo was removed in Shopify: theirs
-  assert.deepEqual(altUpdates([...media, { id: 'm3', alt: '' }], ['A', 'B'], 2), []);    // a photo was added in Shopify: theirs
-  assert.deepEqual(altUpdates([], [], 0), []);
-  assert.equal(altUpdates([{ id: 'm1', alt: '' }], ['x'.repeat(600)], 1)[0].alt.length, 512);
+test('an update keeps the sizes the store has: same variant for a relabelled size, weight and cost only on new ones', () => {
+  const existing = { ...STORE,
+    options: [{ id: 'o1', name: 'Size', values: [{ id: 'v-s', name: 'S' }, { id: 'v-m', name: 'M' }] }],
+    variants: [{ id: 'var-s', key: 'size=s' }, { id: 'var-m', key: 'size=m' }] };
+  const p = { ...P, sizes: ['S (36)', 'M (38)', 'L (40)', 'l (40)'], cost_price: 640, attributes: { ...P.attributes, weight: '700 g' } };
+  const made = ask({ existing, p, sendStatus: false, files: null });
+  assert.deepEqual(made.variants.map(v => v.id), ['var-s', 'var-m', undefined]);          // "L" twice (another case) is one size
+  assert.deepEqual(made.productOptions[0].values, [{ id: 'v-s', name: 'S (36)' }, { id: 'v-m', name: 'M (38)' }, { name: 'L (40)' }]);
+  assert.equal(made.productOptions[0].id, 'o1');
+  assert.deepEqual(made.variants[2].inventoryItem, { tracked: false, measurement: { weight: { value: 700, unit: 'GRAMS' } }, cost: '640.00', sku: 'RG-1-L' });
+  assert.deepEqual(made.variants[0].inventoryItem, { sku: 'RG-1-S' });                    // what Shopify has for an existing size stays
+  assert.ok(!('inventoryPolicy' in made.variants[0]) && made.variants[2].inventoryPolicy === 'CONTINUE');
+  // two store sizes with the same core: no guessing, matched by the exact label only
+  const twice = { ...existing, variants: [{ id: 'a', key: 'size=s (36)' }, { id: 'b', key: 'size=s (38)' }] };
+  assert.deepEqual(ask({ existing: twice, p: { ...P, sizes: ['S'] }, sendStatus: false, files: null }).variants.map(v => v.id), [undefined]);
+  // two sizes here that could both be the store's "S": the label match takes it, the other is new (never one variant twice)
+  const both = ask({ existing, p: { ...P, sizes: ['S', 'S (36)', 'M (38)', 'M (40)'] }, sendStatus: false, files: null });
+  assert.deepEqual(both.variants.map(v => v.id), ['var-s', undefined, undefined, undefined]);
+  assert.deepEqual(both.productOptions[0].values.map(v => v.id), ['v-s', undefined, undefined, undefined]);
+  assert.deepEqual(weightOf('1.25 kg'), { value: 1.25, unit: 'KILOGRAMS' });
+  for (const w of ['', 'heavy', '0 g', null]) assert.equal(weightOf(w), null);
+});
+
+test('a choice someone added in Shopify stops the update instead of being deleted', () => {
+  const existing = { ...STORE, options: [{ id: 'o1', name: 'Size', values: [] }, { id: 'o2', name: 'Colour', values: [] }] };
+  assert.throws(() => ask({ existing, sendStatus: false, files: null }), e => e.status === 400 && /Kreeva India: this product has a choice on Shopify that Playbook did not make \(Colour\)/.test(e.message));
+  assert.doesNotThrow(() => ask({ existing: { ...STORE, options: [{ id: 'o1', name: 'Title', values: [{ id: 'v', name: 'Default Title' }] }] }, sendStatus: false, files: null })); // a product that had no sizes
 });

@@ -34,8 +34,9 @@ import { photoCount } from './detail/needs';
 import { numKey, splitList } from './status';
 
 type Form = { name: string; sku: string; vendor_id: string; category: string; fabric: string; color: string; sizes: string; cost_price: string; raw_text: string };
-// Fields the website rules or the price depend on (keywords look at name / sku / details).
-const ROUTE_KEYS: string[] = ['cost_price', 'category', 'fabric', 'vendor_id', 'name', 'sku', 'raw_text'];
+// Fields the website rules, the price or the Shopify product depend on (keywords look at name / sku / details;
+// the colour is in the written text; the sizes and the SKU are the choices and codes on Shopify).
+const ROUTE_KEYS: string[] = ['cost_price', 'category', 'fabric', 'color', 'sizes', 'vendor_id', 'name', 'sku', 'raw_text'];
 const toForm = (p: ProductDetail): Form => ({
   name: p.name ?? '', sku: p.sku ?? '', vendor_id: p.vendor_id ?? '', category: p.category ?? '', fabric: p.fabric ?? '',
   color: p.color ?? '', sizes: p.sizes.join(', '), cost_price: p.cost_price == null ? '' : String(p.cost_price), raw_text: p.raw_text ?? '',
@@ -101,9 +102,10 @@ export default function ProductFacts({ product, vendors, categories, onVendorCre
       const still = (lostInfo || g?.status === 'needs_info') && miss.length ? ` — still needs ${miss.join(', ')}` : '';
       if ((nowReady || reroute) && !lostInfo) {
         try {
-          const r = await pbCall<{ warning?: string; repriced?: number }>('route_product', { product_id: product.id });
+          // New sizes or a new SKU: the server sends listings already on Shopify again, so the choices and codes there follow.
+          const r = await pbCall<{ warning?: string; repriced?: number; resent?: number }>('route_product', { product_id: product.id });
           const done = nowReady ? 'Saved — sent to the matching websites'
-            : `Saved — websites checked again${r.repriced ? ` (${r.repriced} published listing${r.repriced > 1 ? 's' : ''} re-priced and sent to Shopify)` : ''}`
+            : `Saved — websites checked again${r.repriced ? ` (${r.repriced} published listing${r.repriced > 1 ? 's' : ''} re-priced and sent to Shopify)` : ''}${r.resent ? ` (${r.resent} published listing${r.resent > 1 ? 's' : ''} sent to Shopify again)` : ''}`
               + (costChanged && kept ? `. ${kept} listing${kept > 1 ? 's have' : ' has'} a price typed by hand and keep${kept > 1 ? '' : 's'} it` : '');
           if (r.warning) addToast(`${done}, but: ${r.warning}`, 'error'); else addToast(done, 'success');
         } catch (e2) { addToast(`Saved, but checking the websites failed: ${friendlyError(e2)}`, 'error'); }

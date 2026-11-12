@@ -8,8 +8,14 @@
 //   was archived) and not on Shopify → queued again;
 //   a published listing whose price is not kept by hand → re-priced from the
 //   current cost / pricing / rule and sent to Shopify again (no new AI call);
-//   anything else (removed by staff, being written / published right now) is
-//   left alone.
+//   a published listing sent with other sizes or another SKU than the product
+//   has now (the `published` activity row records what was sent) → sent again
+//   as it is, so the Shopify variants follow; found here, not passed in, so
+//   every way of routing (save, re-read, tags, the worker's route_due) gets it;
+//   one being written / published right now goes out with what it was given,
+//   and the product is flagged (route_due) so the worker checks it again once
+//   that is done — the change is not lost;
+//   anything else (removed by staff) is left alone.
 // Exclude (or no rule and default 'none') → a waiting listing NOT on Shopify
 // becomes 'skipped' with NO_MATCH; one already on Shopify is left as is and
 // reported back as a warning (staff decide whether to remove it).
@@ -29,16 +35,26 @@ const waiting = (l: ListingRow) => REQUEUE.includes(l.status) || (l.status === '
 const autoSkipped = (l: ListingRow) => l.status === 'skipped' && AUTO_SKIP.includes(l.error || '') && !l.shopify_product_id;
 
 type Site = { id: string; name: string; routing_default: string; publish_mode: string; pricing: Partial<Pricing> };
-export type RouteResult = { routed: number; repriced: number; listings: ListingRow[]; warning?: string };
+export type RouteResult = { routed: number; repriced: number; resent: number; busy: boolean; listings: ListingRow[]; warning?: string };
+
+/** The sizes and SKU each listing was last sent with (newest `published` row per listing; none → not known). */
+async function lastSent(productId: string): Promise<Map<string, { sizes?: string[]; sku?: string }>> {
+  const rows = await sel<{ listing_id: string | null; details: { sizes?: string[]; sku?: string } | null }>(`pb_activity?product_id=eq.${enc(productId)}&action=eq.published&select=listing_id,details&order=created_at.desc&limit=40`);
+  const out = new Map<string, { sizes?: string[]; sku?: string }>();
+  for (const r of rows) if (r.listing_id && !out.has(r.listing_id)) out.set(r.listing_id, r.details || {});
+  return out;
+}
 
 export async function routeProduct(p: ProductRow, userId: string | null): Promise<RouteResult> {
   const sites = await sel<Site>('pb_websites?active=eq.true&select=id,name,routing_default,publish_mode,pricing&order=name.asc');
   const existing = await sel<ListingRow>(`pb_listings?product_id=eq.${enc(p.id)}&select=${LISTING_COLS}`);
-  if (!sites.length) return { routed: 0, repriced: 0, listings: existing };
+  if (!sites.length) return { routed: 0, repriced: 0, resent: 0, busy: false, listings: existing };
   const ids = sites.map(s => s.id).join(',');
   const rules = await sel<RuleRow>(`pb_routing_rules?website_id=in.(${ids})&enabled=eq.true&select=${RULE_COLS}&order=position.asc`);
   const bySite = new Map(existing.map(l => [l.website_id, l]));
-  const queued: string[] = [], kept: string[] = [], removed: string[] = [], stillLive: string[] = [], repriced: string[] = [], busy: string[] = [];
+  const sent = existing.some(l => l.status === 'published') ? await lastSent(p.id) : new Map<string, { sizes?: string[]; sku?: string }>();
+  const behind = (l: ListingRow) => { const s = sent.get(l.id); return !!s && Array.isArray(s.sizes) && (s.sizes.join('|') !== (p.sizes || []).join('|') || String(s.sku ?? '') !== String(p.sku ?? '')); };
+  const queued: string[] = [], kept: string[] = [], removed: string[] = [], stillLive: string[] = [], repriced: string[] = [], resent: string[] = [], busy: string[] = [];
   for (const s of sites) {
     const d = decide(rules.filter(r => r.website_id === s.id), s.routing_default, p);
     const cur = bySite.get(s.id);
@@ -63,27 +79,30 @@ export async function routeProduct(p: ProductRow, userId: string | null): Promis
       // still on Shopify. The product is back: send it again, or Playbook shows "removed" for a product on sale.
       const done = await patch('pb_listings', `id=eq.${enc(cur.id)}&status=eq.skipped&error=eq.${enc(ARCHIVED)}`, fields);
       (done.length ? queued : kept).push(s.name);
-    } else if (cur.status === 'published' && !(cur.locked || []).includes('price') && hasPrice(p)) {
+    } else if (cur.status === 'published') {
       // The cost / copied selling price or the site's pricing changed: only the price moves; the written text stays.
-      const calc = listingPrice(p, s.pricing || {}, d.rule?.price_override ?? null)!;
-      const same = Number(cur.price) === calc.price && Number(cur.compare_at_price ?? 0) === Number(calc.compare_at ?? 0);
-      if (same || !(calc.price > 0)) { kept.push(s.name); continue; }
+      const calc = !(cur.locked || []).includes('price') && hasPrice(p) ? listingPrice(p, s.pricing || {}, d.rule?.price_override ?? null) : null;
+      const priced = !!calc && calc.price > 0 && !(Number(cur.price) === calc.price && Number(cur.compare_at_price ?? 0) === Number(calc.compare_at ?? 0));
+      if (!priced && !behind(cur)) { kept.push(s.name); continue; }
       const done = await patch('pb_listings', `id=eq.${enc(cur.id)}&status=eq.published`, {
-        price: calc.price, compare_at_price: calc.compare_at, rule_id: d.rule?.id ?? null,
+        ...(priced ? { price: calc!.price, compare_at_price: calc!.compare_at, rule_id: d.rule?.id ?? null } : {}),
         status: s.publish_mode === 'review' ? 'review' : 'publishing', attempts: 0, error: null, claimed_at: null,
       });
-      (done.length ? repriced : kept).push(s.name);
+      (done.length ? (priced ? repriced : resent) : kept).push(s.name);
     } else {
-      if (cur.status === 'publishing') busy.push(s.name); // claimed: goes out with what it was given
+      if (cur.status === 'publishing' || cur.status === 'generating') busy.push(s.name); // claimed: goes out with what it was given
       kept.push(s.name);
     }
   }
+  // Checked again by the worker (tagFill.ts routeDue) once the run that holds the listing is done.
+  if (busy.length) await patch('pb_products', `id=eq.${enc(p.id)}`, { route_due: true });
   const warnings = [
     ...(stillLive.length ? [`No longer matches the rules of ${stillLive.join(', ')}, but it is already on Shopify there — open that listing and tap Remove from site if it should not be sold.`] : []),
-    ...(busy.length ? [`${busy.join(', ')}: being published right now with the earlier details — tap Check websites again in a minute.`] : []),
+    ...(busy.length ? [`${busy.join(', ')}: being written or published right now with the earlier details. Playbook checks it again by itself within a few minutes.`] : []),
   ];
   const warning = warnings.join(' ') || undefined;
-  if (queued.length || removed.length || repriced.length || warning) {
+  // A busy listing alone is not written to the timeline: the worker may meet it every minute until it is free.
+  if (queued.length || removed.length || repriced.length || resent.length || stillLive.length) {
     await logActivity({
       product_id: p.id, action: 'routed', user_id: userId,
       details: {
@@ -91,10 +110,11 @@ export async function routeProduct(p: ProductRow, userId: string | null): Promis
         ...(kept.length ? { unchanged: kept } : {}),
         ...(removed.length ? { removed } : {}),
         ...(repriced.length ? { repriced } : {}),
+        ...(resent.length ? { resent } : {}),
         ...(warning ? { warning } : {}),
       },
     });
   }
   const listings = await sel<ListingRow>(`pb_listings?product_id=eq.${enc(p.id)}&select=${LISTING_COLS}`);
-  return { routed: queued.length, repriced: repriced.length, listings, ...(warning ? { warning } : {}) };
+  return { routed: queued.length, repriced: repriced.length, resent: resent.length, busy: busy.length > 0, listings, ...(warning ? { warning } : {}) };
 }
