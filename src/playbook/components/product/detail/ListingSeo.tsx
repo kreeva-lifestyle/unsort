@@ -2,7 +2,7 @@
 //   ListingChecks     what the program checks found and the facts the writer
 //                     missed, as a review-tinted note (nothing shown when clean)
 //   ListingKeyword    the search phrase this listing is written for
-//   ListingQuestions  the two questions and answers (FAQ)
+//   ListingQuestions  the questions and answers (FAQ): two shown, up to five
 // While the extras load: bars shaped like the fields; if they cannot be read:
 // the reason with Retry (the rest of the editor still works).
 import { PB, pbBody, pbErrorBox, pbLabel, pbMeta, pbTileReview } from '../../../pbTheme';
@@ -10,7 +10,8 @@ import PbButton from '../../ui/PbButton';
 import { PbSkelBar } from '../../ui/PbSkeleton';
 import { Dot } from '../status';
 import ListingField from './ListingField';
-import type { ListingSeoState } from './useListingSeo';
+import { useState } from 'react';
+import { FAQ_SLOTS, type FaqKey, type ListingSeoState } from './useListingSeo';
 
 const note = { ...pbTileReview, backdropFilter: undefined, WebkitBackdropFilter: undefined, borderRadius: PB.r.input, padding: '12px 14px', marginBottom: 16 } as const;
 
@@ -61,16 +62,21 @@ export function ListingKeyword({ s, disabled }: { s: ListingSeoState; disabled: 
 }
 
 export function ListingQuestions({ s, disabled }: { s: ListingSeoState; disabled: boolean }) {
+  const [asked, setAsked] = useState(2);
   if (!s.seo) return <Waiting s={s} what="questions" />;
   // Growing boxes, not one-line inputs: a question is often longer than a phone is wide.
-  const field = (k: 'q1' | 'a1' | 'q2' | 'a2', label: string, area: number, max: number) => (
-    <ListingField id={`pb-l-${k}`} label={label} value={s.f[k]} onChange={s.set(k)} disabled={disabled} kept={s.seo!.faq_locked && k === 'q1'} area={area} max={max} />
+  const field = (k: FaqKey, label: string, area: number, max: number) => (
+    <ListingField key={k} id={`pb-l-${k}`} label={label} value={s.f[k]} onChange={s.set(k)} disabled={disabled} kept={s.seo!.faq_locked && k === 'q1'} area={area} max={max} />
   );
+  // Two are always shown; a third to fifth appear when they hold something, or when asked for.
+  const filled = FAQ_SLOTS.reduce((last: number, n) => (s.f[`q${n}`].trim() || s.f[`a${n}`].trim() ? n : last), 0);
+  const shown = Math.max(2, filled, asked);
   return (
     <fieldset style={{ border: 'none', padding: 0, margin: 0, minWidth: 0 }}>
       <legend style={{ ...pbLabel, padding: 0, marginBottom: 4 }}>Questions shoppers ask (FAQ)</legend>
-      <div style={{ ...pbMeta, marginBottom: 12 }}>Sent to Shopify with the listing. Empty a question and its answer to drop it.</div>
-      {field('q1', 'Question 1', 2, 200)}{field('a1', 'Answer 1', 3, 500)}{field('q2', 'Question 2', 2, 200)}{field('a2', 'Answer 2', 3, 500)}
+      <div style={{ ...pbMeta, marginBottom: 12 }}>Up to five. Sent to Shopify with the listing. Empty a question and its answer to drop it.</div>
+      {FAQ_SLOTS.slice(0, shown).flatMap(n => [field(`q${n}`, `Question ${n}`, 2, 200), field(`a${n}`, `Answer ${n}`, 3, 500)])}
+      {shown < FAQ_SLOTS.length && <PbButton icon="plus" onClick={() => setAsked(shown + 1)} disabled={disabled} style={{ marginBottom: 16 }}>Add a question</PbButton>}
     </fieldset>
   );
 }

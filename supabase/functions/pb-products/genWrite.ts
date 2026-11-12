@@ -25,7 +25,7 @@ export function tidyOut(d: GenOut): GenOut {
     title: tidyCopy(d.title), description_html: tidyCopy(d.description_html), seo_title: tidyCopy(d.seo_title), seo_description: tidyCopy(d.seo_description),
     handle: String(d.handle || ''), extra_tags: Array.isArray(d.extra_tags) ? d.extra_tags.map(String) : [],
     image_alts: Array.isArray(d.image_alts) ? d.image_alts.map(a => tidyCopy(a).slice(0, 110)) : [],
-    faq: (Array.isArray(d.faq) ? d.faq : []).map(f => ({ q: tidyCopy(f?.q).trim().slice(0, 200), a: tidyCopy(f?.a).trim().slice(0, 500) })).filter(f => f.q && f.a).slice(0, 2),
+    faq: (Array.isArray(d.faq) ? d.faq : []).map(f => ({ q: tidyCopy(f?.q).trim().slice(0, 200), a: tidyCopy(f?.a).trim().slice(0, 500) })).filter(f => f.q && f.a).slice(0, 5),
     missing_facts: list(d.missing_facts, 8, 80),
   };
 }
