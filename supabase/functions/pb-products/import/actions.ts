@@ -1,5 +1,8 @@
 // Staff actions for "Import from website" (index.ts action table):
-//   import_check  { url }  → the preview: platform, estimate (+ in stock), 3 samples, warnings, vendor name
+//   import_check  { url }  → the preview: platform, estimate (+ in stock), 3 samples, warnings, vendor name,
+//                 and what Playbook already has from this website: already_here (products) and
+//                 last_vendor (the vendor its last import was filed under), so a repeat import
+//                 says "nothing new" up front and does not ask for the vendor again
 //   import_start  { url, in_stock_only?, use_their_price?, vendor_name?, estimate? } → a queued run
 //                 (estimate = the number the check showed, kept in cursor.estimate for the progress tile)
 //   import_cancel { run_id } → cancelled (unless already done / failed)
@@ -12,8 +15,8 @@
 // and guarded by a unique index, so two quick taps on Start make one run.
 // The run itself is advanced by the worker (runner.ts), one run per tick.
 import { type Body, uuid } from '../actions.ts';
-import { enc, insert, logActivity, patch, sel } from '../db.ts';
-import { HttpError } from '../http.ts';
+import { SB_URL, enc, insert, logActivity, patch, sel, svcHeaders } from '../db.ts';
+import { HttpError, plain } from '../http.ts';
 import { vendorId } from '../ingest.ts';
 import { detect } from './detect.ts';
 import { RUN_COLS, type RunRow, ownDomains } from './runner.ts';
@@ -33,6 +36,16 @@ async function refuseOpen(host: string) {
   if (open[0]) throw new HttpError(409, busySentence(host, open[0].status));
 }
 
+/** What Playbook already holds from this website (www. or not): how many products were copied from it,
+ *  and the vendor its last import was filed under. */
+export async function importedBefore(host: string): Promise<{ count: number; vendor: string | null }> {
+  const like = variants(host).map(h => `source_ref.like."${h}:*"`).join(',');
+  const r = await fetch(`${SB_URL}/rest/v1/pb_products?source=eq.import&or=(${enc(like)})&select=id`, { method: 'HEAD', headers: { ...svcHeaders, prefer: 'count=exact' } });
+  const count = r.ok ? Number((r.headers.get('content-range') || '').split('/')[1]) || 0 : 0;
+  const last = await sel<{ pb_vendors: { name: string } | null }>(`pb_import_runs?host=in.(${variants(host).map(enc).join(',')})&vendor_id=not.is.null&select=pb_vendors(name)&order=created_at.desc&limit=1`);
+  return { count, vendor: last[0]?.pb_vendors?.name ?? null };
+}
+
 export async function importCheck(b: Body) {
   const site = await siteOf(b);
   await refuseOpen(site.host);
@@ -42,13 +55,15 @@ export async function importCheck(b: Body) {
     const extra = d.warnings[0] ? ` ${d.warnings[0]}` : '';
     throw new HttpError(400, (msg + extra).length <= 300 ? msg + extra : msg); // the app shows sentences up to 300 characters as they are
   }
+  // The preview is about the store; what we already hold is a help, so a failed look-up is logged, not fatal.
+  const before = await importedBefore(d.host).catch((e) => { console.error(`pb-products import_check ${d.host}: ${plain(e)}`); return { count: 0, vendor: null }; });
   // A count, '5000+' when counting stopped at the cap, null when this kind of store cannot say.
   const shown = (n: number | null) => (n === null ? null : d.estimate.capped ? `${n}+` : n);
   return {
     ok: true, platform: d.platform, host: d.host, origin: d.origin,
     estimate: shown(d.estimate.total), estimate_in_stock: shown(d.estimate.in_stock),
     sample: d.sample.slice(0, 3).map(f => ({ name: f.name, price: f.price, currency: f.currency, image: f.images[0] ?? null, url: f.url, in_stock: f.in_stock })),
-    warnings: d.warnings, vendor_suggestion: d.vendor_suggestion,
+    warnings: d.warnings, vendor_suggestion: d.vendor_suggestion, already_here: before.count, last_vendor: before.vendor,
   };
 }
 

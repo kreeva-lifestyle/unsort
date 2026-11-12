@@ -1,5 +1,6 @@
 // What "Check website" found, inside the import sheet: the platform in plain
-// words (dot + label), the estimate, 3 sample products and any warnings in
+// words (dot + label), the estimate, what Playbook already has from this
+// website (a repeat import), 3 sample products and any warnings in
 // the review tint. Boxes use the control fill (a sheet is not a tile, so
 // nothing here is a tile on a tile).
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
@@ -9,7 +10,7 @@ import { PB, pbBody, pbMeta, pbName, pbNum } from '../../../pbTheme';
 import PbIcon from '../../ui/PbIcon';
 import PbTag from '../../ui/PbTag';
 import { Dot, rupees } from '../status';
-import { PLATFORM, estimateLine, nothingFound } from './importText';
+import { PLATFORM, alreadyLine, estimateLine, nothingFound } from './importText';
 
 const box: CSSProperties = { display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 16px', borderRadius: PB.r.input, background: PB.ctl, border: `1px solid ${PB.tileBd}`, minWidth: 0 };
 
@@ -34,9 +35,10 @@ function SampleRow({ s }: { s: PbImportSample }) {
   );
 }
 
-export default function ImportPreview({ check }: { check: ImportCheck }) {
+export default function ImportPreview({ check, inStockOnly = true }: { check: ImportCheck; inStockOnly?: boolean }) {
   const plat = PLATFORM[check.platform] ?? PLATFORM.unknown;
   const empty = nothingFound(check);
+  const already = alreadyLine(check, inStockOnly);
   // After a check, focus moves here (the address box was busy), so a screen reader reads the result next.
   const first = useRef<HTMLDivElement>(null);
   useEffect(() => { first.current?.focus(); }, [check]);
@@ -53,6 +55,7 @@ export default function ImportPreview({ check }: { check: ImportCheck }) {
           <>
             <span style={{ ...pbBody, color: PB.tx }}>{estimateLine(check).split(/(\d[\d,+]*)/).map((part, i) => (i % 2 ? <span key={i} style={pbNum}>{part}</span> : part))}</span>
             <span style={{ ...pbMeta }}>{plat.hint}</span>
+            {already && <span style={{ ...pbBody, color: PB.tx }}>{already.split(/(\d[\d,]*)/).map((part, i) => (i % 2 ? <span key={i} style={pbNum}>{part}</span> : part))}</span>}
           </>
         )}
         {check.sample.length > 0 && (

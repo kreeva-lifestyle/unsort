@@ -22,6 +22,10 @@ export type ImportCheck = {
   warnings: string[];
   /** Brand name from the site title / og:site_name, else the host. */
   vendor_suggestion: string | null;
+  /** Products already in Playbook that were copied from this website (0 on a first import). */
+  already_here?: number;
+  /** The vendor the last import from this website was filed under, if there was one. */
+  last_vendor?: string | null;
 };
 
 export const checkWebsite = (url: string) => pbCall<ImportCheck>('import_check', { url });

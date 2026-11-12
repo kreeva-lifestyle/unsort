@@ -153,7 +153,7 @@ export default function Products({ addToast, start = {}, onGuide }: { addToast: 
       <AddProductModal open={adding} onClose={() => setAdding(false)} vendors={vendors} onVendorCreated={onVendorCreated}
         categories={categories} addToast={addToast}
         onSaved={id => { setAdding(false); void load(); setOpenId(id); }} />
-      <ImportSheet open={importing.open} initialUrl={importing.url} onClose={() => setImporting({ open: false, url: '' })} addToast={addToast} onGuide={onGuide}
+      <ImportSheet open={importing.open} initialUrl={importing.url} onClose={() => setImporting({ open: false, url: '' })} addToast={addToast} onGuide={onGuide} vendors={vendors.map(v => v.name)}
         onStarted={() => { setImporting({ open: false, url: '' }); void imp.reload(); }} />
       <PbConfirm {...modalProps} />
     </>
