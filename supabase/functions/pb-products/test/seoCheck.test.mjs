@@ -61,6 +61,27 @@ test('a clean listing passes every check', () => {
   assert.deepEqual(checkCopy(input()), []);
 });
 
+test('title: a sales word, shouting, an emoji or a symbol stops an AI title (research, 2026-11-12)', () => {
+  const t = (title, o = {}) => checkCopy(input({ copy: { ...GOOD, title }, ...o })).filter(p => p.code === 'title');
+  assert.deepEqual(t('Maroon Georgette Kurta Set with Zari Work'), []);
+  assert.deepEqual(t('Maroon Georgette Kurta Set with Zari Work, Sizes M to XXXL'), []);   // a size is not shouting
+  assert.deepEqual(t('Maroon 100% Cotton A-Line Kurta & Pant Set (Lined)'), []);            // ordinary punctuation is fine
+  for (const [bad, why] of [['Stunning Maroon Georgette Kurta Set', 'sales word'], ['Maroon Georgette KURTA Set', 'ALL CAPS'], ['Maroon Georgette Kurta Set ✨', 'emoji or symbol'], ['Maroon Georgette Kurta Set!', 'emoji or symbol']]) {
+    const p = t(bad);
+    assert.equal(p.length, 1, bad);
+    assert.ok(p[0].hard && p[0].say.includes(why), `${bad}: ${p[0]?.say}`);
+  }
+  assert.deepEqual(t('STUNNING Kurta Set!', { aiTitle: false }), []);                        // a title pattern the owner chose is theirs
+  assert.deepEqual(t('STUNNING Kurta Set!', { kept: ['title'] }), []);                       // and so is a title a person typed
+});
+
+test('alt text: never begins with "image of" (noted, not a stop)', () => {
+  const p = checkCopy(input({ copy: { ...GOOD, image_alts: ['Image of the maroon kurta', 'Close view of the zari yoke'] } })).filter(x => x.code === 'alt_opening');
+  assert.equal(p.length, 1);
+  assert.equal(p[0].hard, false);
+  assert.deepEqual(codes({ copy: { ...GOOD, image_alts: ['Maroon kurta, front view', 'Photo studio backdrop behind the dupatta'] } }), []);
+});
+
 test('fabric: the description must name it word for word (owner, 2026-11-12)', () => {
   assert.deepEqual(codes({ fabric: 'Georgette' }), []);                       // "georgette" is there: case and punctuation do not matter
   assert.deepEqual(codes({ fabric: '' }), []);                                // no fabric, or a listing not in English: not checked

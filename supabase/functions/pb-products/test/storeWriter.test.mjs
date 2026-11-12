@@ -29,7 +29,16 @@ test('prompt: the store profile, the ten rules and the output shape', () => {
   // Owner, 2026-11-12: the photos overrule the facts for what can be seen; the fabric is never reworded.
   for (const part of ['9. Check the facts against the photos', 'write what the photos show', 'seo_title, seo_description, image_alts and faq alike',
     '10. The fabric is the one thing a photo cannot tell', 'word for word as PRODUCT FACTS gives it', 'leave the fabric out instead of shortening it']) assert.ok(sys.includes(part), part);
+  // Research, 2026-11-12: what it is first, bullets in one order, answers first, the first alt names the product.
+  for (const part of ['The first says plainly what the product is and what comes with it', 'never the title again', "The store's angle follows from the second sentence",
+    'each "Label: fact", in this order', 'what is in the set (each piece, stitched or unstitched), fabric and lining, measurements',
+    'begins with the answer itself', '"Is the blouse stitched?"', 'The first names the product (colour, fabric, garment, work) and the view', 'never begin with "image of"',
+    'no word in ALL CAPS, no emoji or symbols', 'add "for Women" before the brand', 'SHOPPERS OF THIS GARMENT EXPECT']) assert.ok(sys.includes(part), part);
   const bare = genSystem({ c: {}, profile: profileOf({ name: 'Arya', content: {} }), extraMax: 0, allowed: [], photos: 0, imported: false });
+  assert.ok(bare.includes('- Title formula: what the product is: colour, fabric, the work or pattern, type, then what comes with it'));
+  const facts = genFacts({ ...P, attributes: { ...P.attributes, manufacturer: 'Other Store Mills' } }, { keyword: 'k', photos: 1, others: [] });
+  assert.ok(facts.includes('SHOPPERS OF THIS GARMENT EXPECT') && facts.includes('- the kurta length') && facts.includes('- the bottom type'));
+  assert.ok(!facts.includes('Other Store Mills')); // another store's manufacturer never reaches the writer
   assert.ok(!bare.includes('Check the facts against the photos') && bare.includes('9. The fabric is the one thing a photo cannot tell')); // no photos: nothing to check against
   assert.ok(bare.includes('no ordering section') && bare.includes('image_alts: [].') && bare.includes('extra_tags: [].') && !bare.includes('Ordering from Arya'));
   assert.deepEqual(limitsOf({}), { titleMax: 70, metaTitleMax: 60, metaDescMax: 155, metaDescMin: 140, wordsMax: 200, wordsMin: 130 });

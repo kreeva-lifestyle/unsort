@@ -12,7 +12,7 @@ import { faqHtml, fieldInputs, METAFIELDS_SET } from './fields.ts';
 import { HttpError, plain } from './http.ts';
 import { compareAt } from './pricing.ts';
 import { profileOf } from './profile.ts';
-import { buildProductInput, PRODUCT_SET, PUBLISH, STOCK_WARNING } from './productInput.ts';
+import { ALT_UPDATE, altUpdates, buildProductInput, PRODUCT_SET, PUBLISH, STOCK_WARNING } from './productInput.ts';
 import { seoGet } from './seoStore.ts';
 import { gql, onlineStoreId } from './shopify.ts';
 import { adoptable, type Existing, existingProduct } from './shopifyProduct.ts';
@@ -72,10 +72,7 @@ export async function publishOne(l: ListingRow, o: { manual: boolean; putBack?: 
     if (p.status === 'needs_info') throw new HttpError(400, NEEDS_INFO);
     if (!String(l.title || '').trim()) throw new HttpError(400, 'This listing has no title — regenerate it or type one.');
     if (!(Number(l.price) > 0)) throw new HttpError(400, 'This listing has no price — regenerate it or type one.');
-    const [vendor, seoRows] = await Promise.all([
-      p.vendor_id ? one<{ name: string }>(`pb_vendors?id=eq.${enc(p.vendor_id)}&select=name`) : Promise.resolve(null),
-      seoGet([l.id]),
-    ]);
+    const seoRows = await seoGet([l.id]);
     const profile = profileOf(site), faq = seoRows.get(l.id)?.faq ?? [];
     const paths = imgs.map(i => i.path);
     const live = site.publish_mode !== 'draft'; // review sites go live once a person approved
@@ -93,8 +90,9 @@ export async function publishOne(l: ListingRow, o: { manual: boolean; putBack?: 
     // Status goes out on a create (and a recovered lost create) and on Put back; a plain update leaves
     // whatever people set in Shopify (e.g. a draft site's product made visible there).
     const sendStatus = !existing || !!adopted || !!o.putBack;
+    let noCategory = false; // set when the store refuses Shopify's standard category: the product still goes out
     const run = (handle: string | null) => { if (handle) sent.push(handle); return gql<SetReply>(site, PRODUCT_SET, {
-      input: buildProductInput({ l: { ...l, handle, compare_at_price: compare }, p, site, vendor: vendor?.name || '', paths, withFiles: photosChanged, live, sendStatus, existing, tail: profile.faq_in_description ? faqHtml(faq) : '' }),
+      input: buildProductInput({ l: { ...l, handle, compare_at_price: compare }, p, site, vendor: profile.brand, paths, withFiles: photosChanged, live, sendStatus, existing, tail: profile.faq_in_description ? faqHtml(faq) : '', noCategory }),
       identifier: existing ? { id: existing.id } : null,
     }, ms(SET_MS)); };
     let handle = l.handle;
@@ -102,6 +100,10 @@ export async function publishOne(l: ListingRow, o: { manual: boolean; putBack?: 
     let errs = res.productSet.userErrors || [];
     if (errs.some(e => /handle/i.test((e.field || []).join('.') + e.message))) { // handle taken on this store
       handle = altHandle(handle);
+      res = await run(handle); errs = res.productSet.userErrors || [];
+    }
+    if (errs.some(e => /categor|taxonom/i.test((e.field || []).join('.') + e.message))) { // the category is extra: never the reason a product stays off the store
+      noCategory = true;
       res = await run(handle); errs = res.productSet.userErrors || [];
     }
     if (errs.length || !res.productSet.product) throw new HttpError(400, `${site.name}: Shopify said "${errs.map(e => e.message).join('; ').slice(0, 250) || 'the product was not saved'}".`);
@@ -113,6 +115,7 @@ export async function publishOne(l: ListingRow, o: { manual: boolean; putBack?: 
 
     const warnings: string[] = [];
     if (site.track_inventory && !existing) warnings.push(STOCK_WARNING);
+    if (noCategory) warnings.push('Saved on Shopify without its standard category (the store did not accept it): choose the category in Shopify.');
     const fields = profile.custom_fields ? fieldInputs(prod.id, p, faq) : [];
     if (fields.length) {
       try {
@@ -122,6 +125,16 @@ export async function publishOne(l: ListingRow, o: { manual: boolean; putBack?: 
       } catch (e) {
         warnings.push(`Saved on Shopify, but its custom fields (fabric, work, FAQ…) were not: ${plain(e)}`);
       }
+    }
+    // A rewritten listing with the same photos: its new photo descriptions go out on their own (productSet got no files).
+    const alts = !photosChanged && existing ? altUpdates(existing.media, l.image_alts || [], paths.length) : [];
+    if (alts.length) {
+      const fail = (why: string) => warnings.push(`Saved on Shopify, but the photo descriptions were not updated (give the app write_files): ${why}`);
+      try {
+        const r = await gql<{ fileUpdate: { userErrors: { message: string }[] } }>(site, ALT_UPDATE, { files: alts }, ms(30_000));
+        const ue = r.fileUpdate?.userErrors || [];
+        if (ue.length) fail(ue.map(e => e.message).join('; ').slice(0, 200));
+      } catch (e) { fail(plain(e)); }
     }
     if (live) {
       try {
