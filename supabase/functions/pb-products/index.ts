@@ -16,6 +16,8 @@
 //                                                                          → { ok, product_id, duplicate?, images?, warnings? }
 //   read_product       staff          { product_id }                      → { ok, product, routed, warning? }
 //   route_product      staff          { product_id }                      → { ok, routed, repriced, resent, listings, warning? }
+//   reprice_website    staff          { website_id }                      → { ok, repriced, kept, more }   (bulk.ts)
+//   retry_failed       staff          { website_id? }                     → { ok, retried }                (bulk.ts)
 //   delete_product     admin|manager  { product_id }                      → { ok, photos_left }   (409 while it is on Shopify or being worked on)
 //   route_website      staff          { website_id }                      → { ok, queued, matched, more }
 //   generate_listing   staff          { listing_id }                      → { ok, listing }
@@ -58,6 +60,7 @@ import * as A from './actions.ts';
 import { userOf, whoIs } from './auth.ts';
 import { HttpError, corsHeaders, fail, json, plain } from './http.ts';
 import { importCancel, importCheck, importList, importStart } from './import/actions.ts';
+import { repriceWebsite, retryFailed } from './bulk.ts';
 import { deleteProduct } from './productDelete.ts';
 import { routeWebsite } from './routeSite.ts';
 import { previewPrice, saveCredentials, testSite } from './siteActions.ts';
@@ -74,6 +77,8 @@ const ACTIONS: Record<string, { who: Who; run: (b: A.Body, c: Caller) => Promise
   route_product: { who: 'staff', run: (b, c) => A.routeOne(b, userOf(c)) },
   delete_product: { who: 'admin', run: (b, c) => deleteProduct(b, userOf(c)) },
   route_website: { who: 'staff', run: (b, c) => routeWebsite(b, userOf(c)) },
+  reprice_website: { who: 'staff', run: (b, c) => repriceWebsite(b, userOf(c)) },
+  retry_failed: { who: 'staff', run: (b, c) => retryFailed(b, userOf(c)) },
   generate_listing: { who: 'staff', run: (b, c) => A.generateListing(b, userOf(c)) },
   publish_listing: { who: 'staff', run: (b, c) => A.publishListing(b, userOf(c)) },
   unpublish_listing: { who: 'staff', run: (b, c) => A.unpublishListing(b, userOf(c)) },

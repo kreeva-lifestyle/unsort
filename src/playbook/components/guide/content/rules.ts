@@ -69,7 +69,7 @@ export const RULES: GuideSection[] = [
       h('A rule\'s own price'),
       p('The "Bridal lehengas" rule above uses +150% + ₹200. Cost ₹6,000: 6,000 × 2.5 + 200 = 15,200 → Ends in 99 → **₹15,299**. Rounding, compare-at and the minimum still come from the Pricing tab.'),
       tip('Use the **Preview** box: type a **Sample cost ₹** to see the price, the struck-out price and your margin before you tap **Save changes**.'),
-      p('New pricing applies to listings written from now on. A listing already on Shopify keeps its price until its product is checked again: open the product and tap **Check websites again** — the new price goes to Shopify and the text stays. A price typed by hand (**kept**) never changes on its own.'),
+      p('New pricing applies to listings written from now on. To bring every product already on this website to the new price in one go, tap **Save changes**, then **Update prices on Shopify** at the bottom of the Pricing tab: the changed prices go to Shopify about ten a minute and the text stays. For one product, open it and tap **Check websites again**. A price typed by hand (**kept**) never changes on its own.'),
     ],
   },
 ];

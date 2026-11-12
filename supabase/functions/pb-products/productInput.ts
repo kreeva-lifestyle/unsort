@@ -24,10 +24,15 @@
 // ("S" → "S (36)") renames the variant instead of deleting it and its stock;
 // a choice someone added in Shopify stops the update with a plain sentence
 // instead of being deleted; weight and cost go out with a new variant.
+// Owner, 2026-11-12: "Country of origin by default India. Barcode value same
+// as product code." Every size's barcode is its own code (sent each time, as
+// the SKU is); India is set on a new variant only, so another country chosen
+// in Shopify stays.
 import { cleanHtml } from './content.ts';
 import { uniqueCi } from './db.ts';
 import { shopCategory } from './garment.ts';
 import { HttpError } from './http.ts';
+import { apiVersion } from './shopify.ts';
 import { type Existing, MF_KEY, MF_NAMESPACE, variantKey } from './shopifyProduct.ts';
 import type { ListingRow, ProductRow, WebsiteRow } from './types.ts';
 
@@ -115,16 +120,19 @@ export function buildProductInput(a: { l: ListingRow; p: ProductRow; site: Websi
   const valueIds = pair(name => oldOpt?.values.find(v => v.name.trim().toLowerCase() === name.toLowerCase())?.id,
     (oldOpt?.values || []).map((v): [string, string] => [core(v.name), v.id]));
   const weight = weightOf(p.attributes?.weight), cost = Number(p.cost_price) > 0 ? Number(p.cost_price).toFixed(2) : null;
+  const newBarcodes = apiVersion(site) >= '2026-10'; // `barcodes` replaced the single `barcode` field
   const variant = (name: string, i: number) => {
     const id = variantIds[i];
+    const code = sku ? (sizes.length ? `${sku}${join}${(sizeCore(name) || name).replace(/\s+/g, '')}` : sku) : '';
     return {
       ...(id ? { id } : { inventoryPolicy: tracked ? 'DENY' : 'CONTINUE' }), // an existing variant keeps the stock policy set in Shopify
       optionValues: [{ optionName: optName, name }],
       position: i + 1,
       price, compareAtPrice,
-      // A new variant also gets its weight (for shipping rates) and its cost; an existing one keeps what Shopify has.
-      inventoryItem: { ...(id ? {} : { tracked, ...(weight ? { measurement: { weight } } : {}), ...(cost ? { cost } : {}) }),
-        ...(sku ? { sku: sizes.length ? `${sku}${join}${(sizeCore(name) || name).replace(/\s+/g, '')}` : sku } : {}) },
+      ...(code ? (newBarcodes ? { barcodes: [{ value: code }] } : { barcode: code }) : {}),
+      // A new variant also gets its weight (for shipping rates), its cost and India as its country of origin; an existing one keeps what Shopify has.
+      inventoryItem: { ...(id ? {} : { tracked, countryCodeOfOrigin: 'IN', ...(weight ? { measurement: { weight } } : {}), ...(cost ? { cost } : {}) }),
+        ...(code ? { sku: code } : {}) },
     };
   };
   const handleMoves = !!existing && !!l.handle && l.handle !== existing.handle;

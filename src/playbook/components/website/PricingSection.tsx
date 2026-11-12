@@ -1,10 +1,15 @@
 // Pricing: markup on the vendor cost, a flat ₹ add, rounding, compare-at and a
 // floor — with a live preview for a sample cost (same formula as the server).
-// Layout: (Price formula 12) / (Preview 12); the four fields sit in one row on
-// a wide body, two per row below that, one on phone.
+// Layout: (Price formula 12) / (Preview 12) / (Products already on this website
+// 12: "Update prices on Shopify", the saved formula for every listing already
+// here); the four fields sit in one row on a wide body, two per row below
+// that, one on phone.
 import { useState } from 'react';
+import { friendlyError } from '../../../lib/friendlyError';
 import type { PbRounding } from '../../types';
-import { previewPrice } from '../../data/websites';
+import { previewPrice, repriceWebsite, repricedMessage } from '../../data/websites';
+import type { AddToast } from '../PbToasts';
+import { PbButton } from '../ui';
 import { PB, pbMeta, pbNum } from '../../pbTheme';
 import { rupees } from '../product/status';
 import { Field, NumInput, Section, Seg } from './ui';
@@ -18,7 +23,13 @@ export const ROUNDINGS: { id: PbRounding; label: string; hint: string }[] = [
   { id: 'end_49_99', label: 'Ends in 49 / 99', hint: '1,234 becomes 1,249' },
 ];
 
-export default function PricingSection({ draft, set }: { draft: Draft; set: SetDraft }) {
+export default function PricingSection({ siteId, dirty, draft, set, addToast }: { siteId: string; dirty: boolean; draft: Draft; set: SetDraft; addToast: AddToast }) {
+  const [busy, setBusy] = useState(false);
+  const reprice = async () => {
+    setBusy(true);
+    try { addToast(repricedMessage(await repriceWebsite(siteId)), 'success'); }
+    catch (e) { addToast(friendlyError(e), 'error'); } finally { setBusy(false); }
+  };
   const p = draft.pricing;
   const put = (x: Partial<typeof p>) => set({ pricing: { ...p, ...x } });
   const [sample, setSample] = useState<number | null>(1000);
@@ -71,6 +82,13 @@ export default function PricingSection({ draft, set }: { draft: Draft; set: SetD
               </>
             ) : <span style={{ ...pbMeta }}>Enter a cost to see the price.</span>}
           </div>
+        </div>
+      </Section></Cell>
+
+      <Cell><Section title="Products already on this website" hint="New pricing applies to listings written from now on. This gives every listing already here the price from the saved formula and updates the changed ones on Shopify. The written text stays; a price typed by hand is kept.">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <PbButton icon="refresh" onClick={() => void reprice()} busy={busy} busyLabel="Updating…" dim={dirty}>Update prices on Shopify</PbButton>
+          {dirty && <span style={pbMeta}>Save your changes first.</span>}
         </div>
       </Section></Cell>
     </SectionGrid>
