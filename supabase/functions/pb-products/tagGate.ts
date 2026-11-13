@@ -2,11 +2,12 @@
 // its category a tag is a must" (owner, 2026-11-10) — and the necessary
 // details: "if a few necessary details are not there … do not auto generate
 // until everything is ok" (owner, 2026-11-12). A product is Ready for websites
-// only with a category, a cost price (or a copied selling price), a fabric, a
-// colour, at least one photo AND at least one value for every attribute linked
-// to its category; otherwise it is Needs info with the plain reason
-// "Missing: Colour, Work". The SQL twin is pb_products_refresh
-// (20261112090000_pb_store_writer.sql) — the database applies it
+// only with a category that is on the owner's list, a cost price (or a copied
+// selling price), a fabric, a colour, at least one photo AND at least one value
+// for every attribute linked to its category; otherwise it is Needs info with
+// the plain reason "Missing: Colour, Work" ("Missing: Category" for a category
+// the list no longer has). The SQL twin is pb_products_refresh
+// (20261113150000_pb_gate_category_list.sql) — the database applies it
 // after every tag change; this copy lets the retag dry run project the counts
 // and the reader word its result. A Needs-info product that was never read
 // (photos still uploading from the app) is never moved to Ready here.
@@ -20,6 +21,15 @@ export interface GateProduct {
   has_photo?: boolean;
 }
 export interface LinkedAttr { id: string; name: string }
+
+const catKey = (s: string | null | undefined) => String(s ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
+
+/** A category the owner's list (Settings → Tags) no longer has: the gate holds the product as missing its category
+ *  ("Missing: Category") until one from the list is chosen. With no list saved, nothing is held for this. SQL twin:
+ *  pb_products_refresh in 20261113150000_pb_gate_category_list.sql (owner, 13 Nov 2026: a product stayed Ready
+ *  under "Indo-Western" after that category was removed). */
+export const categoryGone = (category: string | null | undefined, list: string[]): boolean =>
+  !!catKey(category) && list.length > 0 && !list.some(c => catKey(c) === catKey(category));
 
 /** The category's attributes with no value on the product, in the category's order. */
 export const missingAttrs = (linked: LinkedAttr[], filledAttrIds: Iterable<string>): string[] => {

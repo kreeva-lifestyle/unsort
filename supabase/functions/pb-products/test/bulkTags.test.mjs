@@ -127,6 +127,22 @@ test('the category list and a category\'s must-have tags: named by what changed,
   assert.equal(rpcCall(calls, 'pb_category_links_set').run, RUN);
 });
 
+test('saving the category list checks again every product left off it, also where the category had no must-have tags (13 Nov 2026)', async () => {
+  const calls = world(recorded({ kind: 'categories', products: 3 }), (m, u) => {
+    if (m === 'GET' && u.startsWith('/rest/v1/pb_settings?key=eq.categories')) return [{ value: ['Anarkali', 'Gown', 'Indo-Western'] }];
+    if (m === 'GET' && u.startsWith('/rest/v1/pb_category_attributes?')) return [{ category: 'Anarkali' }, { category: 'Gown' }];
+    if (u === '/rest/v1/rpc/pb_categories_prune') return 1;
+    if (m === 'GET' && u.startsWith('/rest/v1/pb_products?')) return [{ id: uid(1), category: 'Anarkali' }, { id: uid(2), category: 'Gown' }, { id: uid(3), category: 'Indo-Western' }, { id: uid(4), category: 'indo-western' }];
+    if (u === '/rest/v1/rpc/pb_products_refresh') return [];
+    return undefined;
+  });
+  const r = await categoriesSave({ categories: ['Anarkali'] }, 'u1');
+  const refresh = calls.filter(c => c.u === '/rest/v1/rpc/pb_products_refresh');
+  assert.deepEqual(refresh.map(c => c.body.p_ids), [[uid(3), uid(4)]]); // Gown had must-have tags: the prune checked its product
+  assert.ok(refresh.every(c => c.run === RUN)); // part of the change, so a revert puts them back
+  assert.equal(r.regated, 3);
+});
+
 test('suggestions: one is an edit (no change opened); two or more at once are one bulk change', async () => {
   const sug = (n, phrase) => ({ id: uid(n), phrase, key: phrase.toLowerCase(), attribute_id: null, status: 'pending', uses: 1, examples: [], source: 'store', first_seen_at: '', last_seen_at: '' });
   let calls = world((m, u) => (m === 'GET' && u.startsWith('/rest/v1/pb_tag_suggestions?id=in.') ? [sug(1, 'Georgette')] : undefined));

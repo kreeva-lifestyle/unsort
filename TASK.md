@@ -14,16 +14,29 @@ Most come from the launch research report sent on 13 Nov 2026 (questions
 Q1 to Q20; the report itself is not in this repository). Each entry gives
 the recommendation; once decided, Claude builds it.
 
-- **Review the tag lists copied from ethnicplus.in (13 Nov).** Added: 10
-  categories (Dress, Palazzo Suit, Sharara Suit, Pant Salwar Suit, Straight
-  Suit, Crop Top Lehenga, Half Saree Lehenga, Pre-Stitched Saree, Men's
-  Kurta, Men's Kurta Set), the attributes Colour, Fabric, Work and Occasion
-  with 95 values, and 2 suggestions (Men, Plus Size). Delete what you don't
-  want in Settings → Tags, then choose which attributes each category must
-  have: until then no product gets these tags. After that, "Retag all" and
-  "Let AI decide" fill them in (a product missing a must-have tag waits in
-  Needs info meanwhile). Settings → Bulk changes takes the whole import back
-  until 20 Nov.
+The first eight come from the tags research report of 13 Nov ("Scrape
+mapping to Playbook taxonomy"). All are small; each changes how products
+are tagged.
+
+- **Salwar Suit and Gown have no tags linked.** Their 12 products show
+  Ready with no tags. In Settings → Tags, link the attributes they need, or
+  tell Claude they need none.
+- **One product is still filed as Indo-Western**, a category you removed.
+  It now waits in Needs info ("Missing: Category"): choose its category.
+- **What makes Anarkali, Kurta Set, Salwar Suit and Co-ord Set different?**
+  One line each (the cut of the top, the kind of bottom). Similar sets were
+  filed three different ways; with these lines the rules and the AI file
+  them the same way every time.
+- **Teal, Rust, Mustard, Mauve:** new Colour values, or part of an existing
+  colour (Teal → Blue, Rust → Orange…)? 18 products have no exact colour.
+- **Two colours ("Pink and White"):** Multicolour, or the main colour?
+  Colour takes one value.
+- **Crunchy, Roman, Glass, Fendy, Rangoli and Vichitra silk:** new Fabric
+  values, or Silk / Art Silk? 27 products are only "some silk" today.
+- **"Wedding":** add it back as another name for Marriage? A deleted word
+  comes back as a question every time it is seen.
+- **Occasion:** let the AI judge it (suppliers never say), or set a default
+  per category?
 - **Photo previews are over the monthly free quota.** Supabase "Storage
   Image Transformations" shows 125 of 100 for this billing month. Choose:
   switch the spend cap off in Supabase (about $5 for each extra 1,000
@@ -68,6 +81,30 @@ the recommendation; once decided, Claude builds it.
 - **Q20 · Public repository.** It has to stay public while the server
   functions load their code from GitHub. Making it private first needs
   another way to deploy them; say if you want that.
+
+## Playbook — approved, being built
+
+- **Put the 13 Nov tag fixes live on the server.** Merged, but the
+  database change (`20261113150000_pb_gate_category_list.sql`) and the
+  server update wait: Claude's Supabase connection was down on 13 Nov.
+  Until then the old behaviour stays. Next: Claude applies both as soon as
+  the connection is back, then checks them.
+- **An import that learns each website's words** (tags research report, 13
+  Nov; owner: "go ahead"). Five steps:
+  1. Look at the whole website first and list every word it uses.
+  2. Settle what the rules and earlier answers can.
+  3. Ask the AI once per leftover word, from your lists only.
+  4. Show you one card per word, the biggest first.
+  5. Remember each answer for that website (or every website), and apply
+     it to products already in, with undo.
+
+  Built in parts:
+  - better word rules (filler words, spellings such as zari / jari, the
+    most specific value wins, colour words count only for Colour);
+  - categories with fixed IDs, and memory per website;
+  - the look-first list and the cards.
+
+  Next: the word rules.
 
 ## Playbook — things only the owner can do
 

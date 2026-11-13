@@ -1,6 +1,6 @@
 // node --test --experimental-strip-types supabase/functions/pb-products/test/
-// "Let AI decide" (tagFill.ts) against a fake database and a fake AI (fetch is replaced):
-// the pass asks ONLY for the empty required attributes, writes 'ai' rows in 'add' mode, re-runs
+// "Let AI decide" (tagFill.ts) against a fake database and a fake AI (fetch is replaced): the word rules first,
+// then the AI ONLY for the empty required attributes they did not settle, rows written in 'add' mode, then
 // the gate, and ticks the run; a locked product is skipped; an AI error counts as "left empty" without
 // losing the queue entry's tick. Leaving the queue comes FIRST and is the claim: a product another
 // worker run already took is neither filled nor ticked.
@@ -143,4 +143,35 @@ test('a queue with no open bulk change (made before the log knew it) writes unta
   await fillQueued({ id: 'p1', tag_fill_run: 'run1' }, TAX, null, budget());
   assert.equal(c.set.length, 1);
   assert.deepEqual(c.tagged, []);
+});
+
+// Word rules first (owner, 13 Nov 2026: rules, then AI, then a person).
+const TAX3 = {
+  ...TAX,
+  attrs: [...TAX.attrs, { id: 'occ', name: 'Occasion', key: 'occasion', multi: true, position: 3, shopify_prefix: null }],
+  values: [...TAX.values, { id: 'party', attribute_id: 'occ', name: 'Party', key: 'party', aliases: [], position: 1 }],
+  links: [...TAX.links, { category: 'Lehenga', attribute_id: 'occ', position: 3 }],
+};
+
+test('the words settle it: a product whose text names its colour gets it from the rules, with no AI call', async () => {
+  const c = world({ product: { ...PRODUCT, raw_text: 'Pink lehenga with beads' } });
+  await fillQueued({ id: 'p1', tag_fill_run: 'run1' }, TAX, null, budget());
+  assert.equal(c.ai.length, 0);
+  assert.deepEqual(c.set[0], { p_product: 'p1', p_rows: [{ value_id: 'pink', source: 'rules' }], p_mode: 'add', p_attributes: null });
+  assert.deepEqual(c.ticks, [{ p_run: 'run1', p_filled: 1, p_left: 0 }]);
+});
+
+test('the AI is asked only for what the words left empty, and both are written together', async () => {
+  const c = world({ product: { ...PRODUCT, raw_text: 'Pink lehenga with beads' }, ai: { tags: { occasion: { values: ['Party'], other: [] } } } });
+  await fillQueued({ id: 'p1', tag_fill_run: 'run1' }, TAX3, null, budget());
+  assert.equal(c.ai.length, 1);
+  assert.deepEqual(Object.keys(c.ai[0].output_config.format.schema.properties.tags.properties), ['occasion']); // never asks for Colour
+  assert.deepEqual(c.set[0].p_rows, [{ value_id: 'pink', source: 'rules' }, { value_id: 'party', source: 'ai' }]);
+});
+
+test('the AI refuses: what the words found is still written, and the product counts as left', async () => {
+  const c = world({ product: { ...PRODUCT, raw_text: 'Pink lehenga with beads' }, aiStatus: 400 });
+  await fillQueued({ id: 'p1', tag_fill_run: 'run1' }, TAX3, null, budget());
+  assert.deepEqual(c.set.map(s => s.p_rows), [[{ value_id: 'pink', source: 'rules' }]]);
+  assert.deepEqual(c.ticks, [{ p_run: 'run1', p_filled: 0, p_left: 1 }]);
 });

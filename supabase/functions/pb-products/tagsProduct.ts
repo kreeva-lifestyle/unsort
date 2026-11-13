@@ -11,7 +11,7 @@ import { enc, logActivity, one, patch, rpc, sel, selAll } from './db.ts';
 import { HttpError } from './http.ts';
 import { routeProduct } from './route.ts';
 import { autoValues, type ValueSet } from './tagAuto.ts';
-import { gateMoves, gateStatus, missingAttrs } from './tagGate.ts';
+import { categoryGone, gateMoves, gateStatus, missingAttrs } from './tagGate.ts';
 import { type Refreshed, writeValues } from './tagStore.ts';
 import { type Taxonomy, attrsFor, loadTaxonomy, matchAttrs } from './taxonomy.ts';
 import { PRODUCT_COLS, type ProductRow } from './types.ts';
@@ -49,8 +49,11 @@ export async function productValuesSet(b: Body, userId: string | null) {
   return { ok: true, status: fin?.status ?? p.status, missing: fin?.missing ?? p.missing_attrs, locked, routed };
 }
 
-/** The rules' rows for one product (+ its AI rows the rules do not replace), or null when unchanged. */
-function next(p: P, have: Pv[], tax: Taxonomy): { rows: ValueSet[]; missing: string[]; before: Set<string> } | null {
+/** The rules' rows for one product (+ its AI rows the rules do not replace); `rows` empty when unchanged. Only the
+ *  attributes of its category are checked again, and only they are replaced (`attributes`): a value found for another
+ *  attribute — at import, before the category was known — stays (owner, 13 Nov 2026: with nothing linked, a retag
+ *  used to delete every value a person had not chosen). */
+function next(p: P, have: Pv[], tax: Taxonomy): { rows: ValueSet[]; missing: string[]; before: Set<string>; attributes: string[] } {
   const attrs = attrsFor(tax, p.category);
   const attrOf = (pv: Pv) => pv.pb_attribute_values?.attribute_id ?? '';
   const manual = new Set(have.filter(v => v.source === 'manual').map(attrOf));
@@ -58,12 +61,13 @@ function next(p: P, have: Pv[], tax: Taxonomy): { rows: ValueSet[]; missing: str
   const inScope = new Set(attrs.map(a => a.id));
   const keepAi = have.filter(v => v.source === 'ai' && inScope.has(attrOf(v)) && !manual.has(attrOf(v)) && !r.filled.has(attrOf(v)));
   const rows: ValueSet[] = [...r.rows, ...keepAi.map(v => ({ value_id: v.value_id, source: 'ai' as const }))];
-  const before = new Set(have.filter(v => v.source !== 'manual').map(v => `${v.value_id}:${v.source}`));
+  const before = new Set(have.filter(v => v.source !== 'manual' && inScope.has(attrOf(v))).map(v => `${v.value_id}:${v.source}`));
   const after = new Set(rows.map(v => `${v.value_id}:${v.source}`));
   const filledAttrs = new Set([...manual, ...r.filled, ...keepAi.map(attrOf)]);
-  const missing = missingAttrs(attrs, filledAttrs);
-  if (before.size === after.size && [...before].every(x => after.has(x))) return { rows: [], missing, before: new Set() };
-  return { rows, missing, before };
+  const missing = [...(categoryGone(p.category, tax.categories) ? ['Category'] : []), ...missingAttrs(attrs, filledAttrs)];
+  const attributes = [...inScope];
+  if (before.size === after.size && [...before].every(x => after.has(x))) return { rows: [], missing, before: new Set(), attributes };
+  return { rows, missing, before, attributes };
 }
 
 // Only products the reader has finished (Ready / Needs info): a new or reading one gets its values from the
@@ -81,7 +85,7 @@ export async function retag(b: Body, userId: string | null) {
   const tax = await loadTaxonomy();
   const name = new Map(tax.values.map(v => [v.id, v.name]));
   let products = 0, locked = 0;
-  const changes: { product_id: string; rows: ValueSet[]; name: string; added: string[]; removed: string[] }[] = [];
+  const changes: { product_id: string; rows: ValueSet[]; attributes: string[]; name: string; added: string[]; removed: string[] }[] = [];
   const moves: { before: string; after: string }[] = [];
   for (let offset = 0; ; offset += PAGE) {
     const { ps, pvs } = await pageOf(offset);
@@ -90,11 +94,10 @@ export async function retag(b: Body, userId: string | null) {
       if ((p.locked || []).includes('tags')) { locked++; continue; }
       const have = pvs.filter(v => v.product_id === p.id);
       const n = next(p, have, tax);
-      if (!n) continue;
       moves.push({ before: p.status, after: gateStatus({ ...p, has_photo: !!p.pb_product_images?.length }, n.missing) });
       if (!n.rows.length && !n.before.size) continue;
       const was = new Set([...n.before].map(x => x.split(':')[0])), now = new Set(n.rows.map(r => r.value_id));
-      changes.push({ product_id: p.id, rows: n.rows, name: p.name || p.sku || 'Untitled',
+      changes.push({ product_id: p.id, rows: n.rows, attributes: n.attributes, name: p.name || p.sku || 'Untitled',
         added: [...now].filter(v => !was.has(v)).map(v => name.get(v) ?? ''), removed: [...was].filter(v => !now.has(v)).map(v => name.get(v) ?? '') });
     }
     if (ps.length < PAGE) break;
@@ -105,7 +108,7 @@ export async function retag(b: Body, userId: string | null) {
   const out = await asBulk('retag', 'Retagged every product by the rules', userId, async (run) => {
     const done: Refreshed[] = [];
     for (let i = 0; i < changes.length; i += 100) {
-      done.push(...await rpc<Refreshed[]>('pb_product_values_bulk', { p_rows: changes.slice(i, i + 100).map(c => ({ product_id: c.product_id, rows: c.rows })) }, run));
+      done.push(...await rpc<Refreshed[]>('pb_product_values_bulk', { p_rows: changes.slice(i, i + 100).map(c => ({ product_id: c.product_id, rows: c.rows, attributes: c.attributes })) }, run));
     }
     return gateMoves(done.map(r => ({ before: r.was, after: r.status })));
   }, (r) => ({ changed: changes.length, ...r }));
@@ -123,8 +126,8 @@ export async function retagProducts(ids: string[], run?: string | null): Promise
   for (const p of ps) {
     if ((p.locked || []).includes('tags')) continue;
     const r = next(p, pvs.filter(v => v.product_id === p.id), tax);
-    if (!r || (!r.rows.length && !r.before.size)) continue;
-    await writeValues(p.id, r.rows, 'auto', undefined, run); n++;
+    if (!r.rows.length && !r.before.size) continue;
+    await writeValues(p.id, r.rows, 'auto', r.attributes, run); n++;
   }
   return n;
 }

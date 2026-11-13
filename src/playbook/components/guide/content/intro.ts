@@ -47,7 +47,7 @@ export const INTRO: GuideSection[] = [
         'Under **Categories**, type each category you sell and tap **Add** — for example `Saree`, `Kurta Set`, `Lehenga`, `Dupatta`, `Co-ord Set`.',
         'Tap a category to choose the attributes it needs (Colour, Work…) — see **Tags: your own lists**.',
       ),
-      p('The AI must pick one of these for every product. A product without a category — or without a value for one of its category\'s attributes — waits in **Needs info**. Routing rules, tags and the Shopify product type all use the category, so spell each one exactly the way you want it to appear on your websites.'),
+      p('The AI must pick one of these for every product. A product without a category, with one no longer on this list ("Missing: Category"), or without a value for one of its category\'s attributes waits in **Needs info**. Routing rules, tags and the Shopify product type all use the category, so spell each one exactly the way you want it to appear on your websites.'),
       h('The AI that reads products'),
       steps(
         'In **Settings → AI that reads products**, pick a **Model** and an **Effort**. `Haiku 5.5` with `Model default` is enough for reading.',

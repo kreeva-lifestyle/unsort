@@ -2,7 +2,7 @@
 // The ready gate with required attributes (tagGate.ts; SQL twin pb_products_refresh).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { gateMoves, gateStatus, missingAttrs, missingDetails, missingNote } from '../tagGate.ts';
+import { categoryGone, gateMoves, gateStatus, missingAttrs, missingDetails, missingNote } from '../tagGate.ts';
 
 const LINKED = [{ id: 'col', name: 'Colour' }, { id: 'work', name: 'Work' }];
 const P = (o = {}) => ({ status: 'ready', cost_price: 900, sell_price: null, category: 'Lehenga', fabric: 'Georgette', color: 'Maroon', has_photo: true, ai_read_at: '2026-11-10T00:00:00Z', ai_error: null, ...o });
@@ -46,4 +46,13 @@ test('necessary details: no fabric, colour or photo holds the product (owner, 20
 
 test('gateMoves counts the dry-run projection', () => {
   assert.deepEqual(gateMoves([{ before: 'ready', after: 'needs_info' }, { before: 'needs_info', after: 'ready' }, { before: 'ready', after: 'ready' }]), { to_needs_info: 1, to_ready: 1 });
+});
+
+test('a category the list no longer has is missing (13 Nov 2026); no list, or no category, is not this rule', () => {
+  assert.equal(categoryGone('Indo-Western', ['Saree', 'Anarkali']), true);
+  assert.equal(categoryGone(' anarkali ', ['Saree', 'Anarkali']), false); // case and spaces aside, as the SQL twin
+  assert.equal(categoryGone("Men's  Kurta", ["Men's Kurta"]), false);
+  assert.equal(categoryGone('Indo-Western', []), false); // no list saved: nothing is held for this
+  assert.equal(categoryGone('', ['Saree']), false); // no category at all: the gate's own "Category" detail
+  assert.equal(categoryGone(null, ['Saree']), false);
 });
