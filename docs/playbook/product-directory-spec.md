@@ -1181,6 +1181,29 @@ back with no way to take it out.
   stays busy until it has reloaded. Adding photos now also calls `photos_sync`.
 - **Local SQL tests** moved to `supabase/tests/sql/` (`t_photos.sql` added).
 
+### Batch 5 — Telegram intake (D13, D14, D15, D16, D20)
+Details and the data flow: `docs/playbook/telegram-intake.md`, "Pre-launch
+fixes". In short:
+- **D13 two dates kept.** `pb_products.source_posted_at` (when the vendor
+  posted it: the forward header, or the crawler's word for a repost) and
+  `pb_listings.first_published_at` (set on the first publish only;
+  `published_at` still moves on every re-send; a store move clears both).
+  Shown as "posted …" on a Telegram product and "First live …" on a listing.
+- **D14 skipped messages can be seen.** `pb_tg_messages.skip_why`; Settings →
+  Telegram counts and lists the ones that may hide something (a text with no
+  photos and no price, chatter, a forward from a person, a lone "Less").
+- **D15 short captions are kept.** `pb-telegram/text.ts`: a design number and
+  a price without an English price word is a description (Hinglish, Hindi and
+  Gujarati marks included); one number is enough on a caption.
+- **D16 not by position alone.** Chatter never joins a product; photos posted
+  15 minutes or more (the vendor's own clock) after the ones before them, in
+  another album, are another product.
+- **D20 the bot out of the group.** Noticed by event and by asking Telegram;
+  Settings says "Not receiving", the dashboard has a banner, and the crawler
+  is told nothing is due, so no cursor moves. Forwards that never arrived are
+  found and sent again (`rewind_to`). Crawler 1.2.0.
+- Migration `20261113110000_pb_tg_dates_skipped_group.sql` (additive).
+
 ## Bulk changes: the log and Revert (owner, 2026-11-12)
 
 Owner: "We should also have revert option. Firstly log all bulk changes we

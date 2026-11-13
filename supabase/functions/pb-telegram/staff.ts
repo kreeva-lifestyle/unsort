@@ -3,7 +3,9 @@
 //                  secret, setWebhook → { ok, bot_username, webhook_ok, webhook_error }
 //   link_code      (admin|manager) → { ok, code, expires_at }   6 digits, 30 minutes, 5 wrong tries
 //   crawler_key    (admin|manager) → { ok, key }          shown once; replaces the old key
-//   test_bot       (staff)  → { ok, url_ok, pending_update_count, last_error_message }
+//   test_bot       (staff)  → { ok, url_ok, pending_update_count, last_error_message, group_ok, group_error }
+//                  also asks Telegram whether the bot is still in the admin group and can read it
+//                  (groupCheck.ts), and makes sure Telegram tells Playbook when the bot is removed
 //   respread       (admin|manager) → { ok, channels }  every channel's daily time spaced evenly
 //                  over the window, in their current order (pb_tg_respread_slots)
 //   save_window    (admin|manager) { start, end } → { ok, start, end, channels }  the overnight
@@ -12,7 +14,8 @@
 import { SB_URL } from '../pb-products/db.ts';
 import { HttpError, plain } from '../pb-products/http.ts';
 import { windowProblem } from './schedule.ts';
-import { botToken, randomHex, rpc, saveConfig, saveSecrets, scrub, secrets, sha256, tg } from './tg.ts';
+import { refreshGroup } from './groupCheck.ts';
+import { botToken, config, randomHex, rpc, saveConfig, saveSecrets, scrub, secrets, sha256, tg } from './tg.ts';
 import { resetCache } from './webhook.ts';
 import { resetKeyCache } from './crawler.ts';
 
@@ -20,7 +23,9 @@ export type Body = Record<string, unknown>;
 
 export const WEBHOOK_URL = `${SB_URL || 'https://ulphprdnswznfztawbvg.supabase.co'}/functions/v1/pb-telegram`;
 
-interface WebhookInfo { url?: string; pending_update_count?: number; last_error_message?: string; last_error_date?: number }
+interface WebhookInfo { url?: string; pending_update_count?: number; last_error_message?: string; last_error_date?: number; allowed_updates?: string[] }
+/** Forwarded messages, and the bot's own place in a chat (removed from the group / added back). */
+const UPDATES = ['message', 'my_chat_member'];
 
 export async function saveBotToken(b: Body) {
   const token = String(b.token ?? '').trim();
@@ -36,7 +41,7 @@ export async function saveBotToken(b: Body) {
   resetCache();
   let webhook_ok = true; let webhook_error: string | null = null;
   try {
-    await tg(token, 'setWebhook', { url: WEBHOOK_URL, secret_token: secret, allowed_updates: ['message'], drop_pending_updates: false });
+    await tg(token, 'setWebhook', { url: WEBHOOK_URL, secret_token: secret, allowed_updates: UPDATES, drop_pending_updates: false });
   } catch (e) {
     webhook_ok = false; webhook_error = scrub(plain(e), token);
     // The same bot saved again: Telegram still sends the earlier secret, so keep accepting that one
@@ -72,8 +77,15 @@ export async function testBot() {
   const last_error_message = info.last_error_message ? scrub(info.last_error_message, token) : null;
   const webhook_error = !url_ok ? 'The bot is not pointed at Playbook — save the bot token again.' : recent ? last_error_message : null;
   await saveConfig({ webhook_ok: url_ok && !webhook_error, webhook_error });
+  // A bot set up before 2026-11-13 asked Telegram for messages only: ask to be told about its removal too (same address, same secret).
+  if (url_ok && Array.isArray(info.allowed_updates) && !info.allowed_updates.includes('my_chat_member')) {
+    const secret = (await secrets()).webhook_secret;
+    if (secret) await tg(token, 'setWebhook', { url: WEBHOOK_URL, secret_token: secret, allowed_updates: UPDATES, drop_pending_updates: false })
+      .catch((e) => console.error(`pb-telegram webhook updates: ${scrub(plain(e), token)}`));
+  }
+  const group = await refreshGroup(token, await config(), true);
   // Only a problem of the last hour is reported: Telegram keeps its last error message for good.
-  return { ok: true, url_ok, pending_update_count: Number(info.pending_update_count || 0), last_error_message: recent ? last_error_message : null };
+  return { ok: true, url_ok, pending_update_count: Number(info.pending_update_count || 0), last_error_message: recent ? last_error_message : null, group_ok: group.ok, group_error: group.error };
 }
 
 export async function respread() {

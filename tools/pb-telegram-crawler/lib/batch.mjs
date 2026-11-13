@@ -1,8 +1,9 @@
 // Pure planning: which channel messages are forwarded together, and where
 // the cursor (last_id = newest message already handled) moves. No I/O.
 //
-// A message here is { id, groupedId: string|null, service: boolean },
-// as lib/telegram.mjs hands it over.
+// A message here is { id, groupedId: string|null, service: boolean, date },
+// as lib/telegram.mjs hands it over (date: unix seconds the vendor posted it,
+// or null). A unit keeps its messages' dates beside their ids (`dates`).
 
 // Splits one page of messages (oldest first) into units:
 //   { ids: [..], lastId, album: true }   an album: same groupedId, one call
@@ -19,12 +20,13 @@ export function planBatches(messages, pageSize) {
     const prev = units[units.length - 1];
     if (m.groupedId && prev?.album && prev.groupedId === m.groupedId) {
       prev.ids.push(m.id);
+      prev.dates.push(m.date ?? null);
       prev.lastId = m.id;
       continue;
     }
     units.push(m.groupedId
-      ? { ids: [m.id], lastId: m.id, album: true, groupedId: m.groupedId }
-      : { ids: [m.id], lastId: m.id });
+      ? { ids: [m.id], dates: [m.date ?? null], lastId: m.id, album: true, groupedId: m.groupedId }
+      : { ids: [m.id], dates: [m.date ?? null], lastId: m.id });
   }
   const full = sorted.length >= pageSize;
   let held = false;

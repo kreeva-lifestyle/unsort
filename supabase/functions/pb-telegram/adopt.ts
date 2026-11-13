@@ -23,7 +23,7 @@ export async function adopt(rows: MsgRow[], token: string, deadline: number, tri
     const u: Used[] = used.map(x => ({ mid: x.origin_message_id, album: x.media_group_id, product_id: x.product_id }));
     const r = stragglers(list.map(m => ({ id: m.id, mid: m.origin_message_id as number, kind: m.kind, album: m.media_group_id })), u);
     if (r.dupes.length) {
-      await patch('pb_tg_messages', `id=in.(${r.dupes.join(',')})&state=in.(pending,failed)`, { state: 'ignored', note: 'The same channel post was forwarded again.' });
+      await patch('pb_tg_messages', `id=in.(${r.dupes.join(',')})&state=in.(pending,failed)`, { state: 'ignored', skip_why: 'repeat', note: 'The same channel post was forwarded again.' });
       r.dupes.forEach(id => done.add(id)); dupes += r.dupes.length;
     }
     for (const [id, productId] of r.adopt) {

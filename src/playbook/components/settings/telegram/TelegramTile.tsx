@@ -20,6 +20,7 @@ import TgGroupStep from './TgGroupStep';
 import TgCrawlerStep from './TgCrawlerStep';
 import { copyText } from './TgStep';
 import TgFailedPosts from './TgFailedPosts';
+import { TgLost, TgSkipped } from './TgNotUsed';
 import TgSchedule from './TgSchedule';
 
 type Busy = '' | 'token' | 'test' | 'code' | 'key' | 'window' | 'spread';
@@ -54,7 +55,10 @@ export default function TelegramTile({ addToast, onGuide }: { addToast: AddToast
   const onTest = () => void run('test', async () => {
     const r = await testBot();
     if (!r.url_ok) throw plainError(canManage ? 'The bot is not connected to Playbook — save the bot token again.' : 'The bot is not connected to Playbook — ask an admin or manager to save the bot token again.');
-    return r.last_error_message ? 'Bot connected. Telegram had trouble delivering recently — it retries by itself' : 'Bot connected';
+    // Connected to Playbook, but not reading the admin group: no vendor post is copied until that is fixed.
+    if (r.group_ok === false) throw plainError(r.group_error || 'The bot is not reading the admin group.');
+    const group = r.group_ok ? ' and reading the group' : '';
+    return r.last_error_message ? `Bot connected${group}. Telegram had trouble delivering recently — it retries by itself` : `Bot connected${group}`;
   });
   const onCode = () => void run('code', async () => { const r = await getLinkCode(); return `Link code ${r.code} — send /link ${r.code} in the group`; });
   const onKey = async () => {
@@ -88,12 +92,15 @@ export default function TelegramTile({ addToast, onGuide }: { addToast: AddToast
         <span style={pbMeta}>Messages waiting <span style={{ ...pbNum, color: PB.tx, fontWeight: 600 }}>{count(status.waiting + status.retrying)}</span></span>
         {status.retrying > 0 && <Dot color={PB.review} label={`${count(status.retrying)} being tried again`} style={{ color: PB.tx }} />}
         {status.failed > 0 && <Dot color={PB.failed} label={`${count(status.failed)} could not be used`} style={{ color: PB.tx }} />}
+        {status.skipped > 0 && <span style={pbMeta}>Not used <span style={{ ...pbNum, color: PB.tx, fontWeight: 600 }}>{count(status.skipped)}</span></span>}
         <span style={pbMeta}>
           Last message <span style={{ color: PB.tx }}>{config?.last_message_at ? istRelative(config.last_message_at) : 'none yet'}</span>
           {config?.last_message_at && <> · {istDate(config.last_message_at)}</>}
         </span>
       </span>
       {status.failed > 0 && <TgFailedPosts failed={status.failed} />}
+      {status.skipped > 0 && <TgSkipped skipped={status.skipped} />}
+      <TgLost lost={status.lost} held={config?.group_ok === false} />
     </div>
   );
   const head = (
@@ -132,7 +139,7 @@ export default function TelegramTile({ addToast, onGuide }: { addToast: AddToast
       <span style={{ ...pbLabel, marginBottom: -4 }}>Set up once, in order</span>
       <ol style={{ margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
         <TgBotStep config={config} canManage={canManage} busy={busy} onSave={onSave} onTest={onTest} />
-        <TgGroupStep config={config} canManage={canManage} busy={busy} onCode={onCode} onCopy={(t, w) => void onCopy(t, w)} />
+        <TgGroupStep config={config} canManage={canManage} busy={busy} onCode={onCode} onTest={onTest} onCopy={(t, w) => void onCopy(t, w)} />
         <TgCrawlerStep config={config} canManage={canManage} busy={busy} newKey={newKey} onKey={() => void onKey()}
           onHideKey={() => setNewKey(null)} onCopy={(t, w) => void onCopy(t, w)} onGuide={onGuide}
           schedule={<TgSchedule rows={status.schedule} channels={config?.crawler_channels ?? []} start={winStart} end={winEnd}

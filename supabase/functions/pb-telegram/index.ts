@@ -11,11 +11,11 @@
 //   save_bot_token   admin|manager { token }  → { ok, bot_username, webhook_ok, webhook_error }
 //   link_code        admin|manager            → { ok, code, expires_at }
 //   crawler_key      admin|manager            → { ok, key }   (shown once; replaces the old key)
-//   test_bot         staff                    → { ok, url_ok, pending_update_count, last_error_message }
+//   test_bot         staff                    → { ok, url_ok, pending_update_count, last_error_message, group_ok, group_error }
 //   respread         admin|manager            → { ok, channels }   daily times spaced evenly
 //   save_window      admin|manager { start, end } → { ok, start, end, channels }
 //   assemble         secret|staff             → { ok, products, less, ignored, failed, waiting }
-//   crawler_config   crawler                  → { ok, now, group_chat_id, group_title, window, channels[] }
+//   crawler_config   crawler                  → { ok, now, group_chat_id, group_title, group_problem, window, channels[] }
 //   crawler_progress crawler { version, error?, channels[], forwarded? } → { ok, mapped }
 // Details of the crawler pair: crawler.ts; of the daily schedule: schedule.ts.
 import { whoIs } from '../pb-products/auth.ts';

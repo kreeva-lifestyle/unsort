@@ -11,7 +11,7 @@ P0="psql -h ${PGHOST:-localhost} -p ${PGPORT:-54329} -U ${PGUSER:-postgres} -q"
 $P0 -c "drop database if exists pbt" -c "create database pbt" 2>&1 | grep -i error
 P="$P0 -d pbt"
 export PGOPTIONS="-c check_function_bodies=off -c client_min_messages=warning"
-for f in $T/bootstrap.sql $M/20261110090000_pb_tags.sql $M/20261113040000_pb_stock_save.sql $M/20261113050000_pb_bulk_run_header.sql $M/20261113060000_pb_bulk_log.sql $M/20261113080000_pb_bulk_log_server_only.sql $M/20261113100000_pb_photos_set.sql "$@"; do
+for f in $T/bootstrap.sql $M/20261110090000_pb_tags.sql $M/20261113040000_pb_stock_save.sql $M/20261113050000_pb_bulk_run_header.sql $M/20261113060000_pb_bulk_log.sql $M/20261113080000_pb_bulk_log_server_only.sql $M/20261113100000_pb_photos_set.sql $T/telegram_base.sql $M/20261113110000_pb_tg_dates_skipped_group.sql "$@"; do
   out=$($P -f "$f" 2>&1 | grep -iE "error|fatal" | grep -v "already exists" | cut -c1-220)
   [ -n "$out" ] && echo "== $(basename "$f")" && echo "$out"
 done
@@ -19,4 +19,4 @@ export PGOPTIONS="-c client_min_messages=warning" # the bulk-log functions once 
 for f in $M/20261113060000_pb_bulk_log.sql $M/20261113080000_pb_bulk_log_server_only.sql "$@"; do $P -f "$f" 2>&1 | grep -iE "error|fatal" | cut -c1-220; done
 # t_tags and t_stock need part 2 of the bulk-change log: pass docs/playbook/sql-to-run/20261113090000_pb_bulk_log_tags_stock.sql
 # (or, once it has been run on the live database and moved, its file under supabase/migrations/).
-for t in $T/t_photos.sql $T/t_tags.sql $T/t_stock.sql; do echo "== $(basename "$t")"; $P -f "$t" 2>&1 | grep -vE "^\{|^service_role|^\s*$" | cut -c1-340; done
+for t in $T/t_photos.sql $T/t_telegram.sql $T/t_tags.sql $T/t_stock.sql; do echo "== $(basename "$t")"; $P -f "$t" 2>&1 | grep -vE "^\{|^service_role|^\s*$" | cut -c1-340; done

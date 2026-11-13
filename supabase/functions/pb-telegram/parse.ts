@@ -6,18 +6,27 @@
 //            from forward_origin type 'channel' (or the legacy
 //            forward_from_chat); forwarded from a person / group it is null
 //            until the crawler's mapping (pb_tg_forwards) names the channel.
+//            origin_date = when that channel posted it (the forward header's
+//            own date; pre-launch fix D13 — it was thrown away).
+//   member   the bot's own place in a chat changed (D20): `my_chat_member`,
+//            or the service message that says who left / was added. The
+//            webhook compares the user ids with the bot's.
 // Media: the largest photo size; a video; a document whose mime is image/* or
 // video/* counts as photo / video; stickers, GIFs and other files are 'other'.
 
 export interface TgRow {
   update_id: number | null; chat_id: number; message_id: number;
   origin_chat_id: number | null; origin_title: string | null; origin_username: string | null; origin_message_id: number | null;
+  /** ISO time the origin channel posted it; null when the header gives none (or names a person). */
+  origin_date: string | null;
   media_group_id: string | null; kind: 'photo' | 'video' | 'text' | 'other'; text: string | null;
   file_id: string | null; file_unique_id: string | null; file_size: number | null; mime: string | null;
 }
 export interface Parsed {
   chat_id?: number; chat_type?: string; chat_title?: string | null;
   link?: string; migrate?: { from: number; to: number }; row?: TgRow;
+  /** `bot`: the update is about the bot itself (my_chat_member); else `users` are the ids that left / were added. */
+  member?: { change: 'left' | 'joined'; bot: boolean; users: number[] };
 }
 
 // deno-lint-ignore no-explicit-any
@@ -44,7 +53,17 @@ function media(m: Any): Pick<TgRow, 'kind' | 'file_id' | 'file_unique_id' | 'fil
   return null;
 }
 
+/** Unix seconds → ISO, when it is a plausible date (after 2015, not in the future beyond a day). */
+const iso = (v: unknown) => { const n = num(v); return n !== null && n > 1_420_000_000 && n * 1000 < Date.now() + 86_400_000 ? new Date(n * 1000).toISOString() : null; };
+
 export function parseUpdate(u: Any): Parsed {
+  const mine = u?.my_chat_member;
+  if (mine && typeof mine === 'object' && mine.chat && num(mine.chat.id) !== null) {
+    const st = String(mine.new_chat_member?.status || '');
+    const change = st === 'left' || st === 'kicked' ? 'left' : st === 'member' || st === 'administrator' || st === 'restricted' ? 'joined' : null;
+    const base: Parsed = { chat_id: mine.chat.id, chat_type: str(mine.chat.type, 40) ?? undefined, chat_title: str(mine.chat.title, 200) };
+    return change ? { ...base, member: { change, bot: true, users: [] } } : base;
+  }
   const m = u?.message;
   if (!m || typeof m !== 'object' || !m.chat) return {};
   const out: Parsed = { chat_id: num(m.chat.id) ?? undefined, chat_type: str(m.chat.type, 40) ?? undefined, chat_title: str(m.chat.title, 200) };
@@ -55,15 +74,19 @@ export function parseUpdate(u: Any): Parsed {
   if (code) return { ...out, link: code[1] };
   if (num(m.migrate_to_chat_id) !== null) return { ...out, migrate: { from: out.chat_id, to: m.migrate_to_chat_id } };
   if (num(m.migrate_from_chat_id) !== null) return { ...out, migrate: { from: m.migrate_from_chat_id, to: out.chat_id } };
+  if (m.left_chat_member && num(m.left_chat_member.id) !== null) return { ...out, member: { change: 'left', bot: false, users: [m.left_chat_member.id] } };
+  if (Array.isArray(m.new_chat_members) && m.new_chat_members.length) {
+    return { ...out, member: { change: 'joined', bot: false, users: m.new_chat_members.map((x: Any) => num(x?.id)).filter((n: number | null): n is number => n !== null) } };
+  }
 
   const fo = m.forward_origin;
-  let origin: { id: number | null; title: string | null; username: string | null; mid: number | null } | null = null;
+  let origin: { id: number | null; title: string | null; username: string | null; mid: number | null; date: string | null } | null = null;
   if (fo && fo.type === 'channel' && fo.chat && num(fo.chat.id) !== null) {
-    origin = { id: fo.chat.id, title: str(fo.chat.title, 200), username: str(fo.chat.username, 64), mid: num(fo.message_id) };
+    origin = { id: fo.chat.id, title: str(fo.chat.title, 200), username: str(fo.chat.username, 64), mid: num(fo.message_id), date: iso(fo.date) };
   } else if (m.forward_from_chat && m.forward_from_chat.type === 'channel' && num(m.forward_from_chat.id) !== null) {
-    origin = { id: m.forward_from_chat.id, title: str(m.forward_from_chat.title, 200), username: str(m.forward_from_chat.username, 64), mid: num(m.forward_from_message_id) };
+    origin = { id: m.forward_from_chat.id, title: str(m.forward_from_chat.title, 200), username: str(m.forward_from_chat.username, 64), mid: num(m.forward_from_message_id), date: iso(m.forward_date) };
   } else if (fo || m.forward_from || m.forward_sender_name || m.forward_from_chat) {
-    origin = { id: null, title: null, username: null, mid: null }; // a vendor's repost of a person's message
+    origin = { id: null, title: null, username: null, mid: null, date: null }; // a vendor's repost of a person's message
   }
   if (!origin || num(m.message_id) === null) return out;
   const med = media(m);
@@ -72,7 +95,7 @@ export function parseUpdate(u: Any): Parsed {
     row: {
       update_id: num(u.update_id), chat_id: out.chat_id, message_id: m.message_id,
       origin_chat_id: origin.id, origin_title: origin.title, origin_username: origin.username ? origin.username.toLowerCase() : null,
-      origin_message_id: origin.mid, media_group_id: str(m.media_group_id, 100),
+      origin_message_id: origin.mid, origin_date: origin.date, media_group_id: str(m.media_group_id, 100),
       kind: med ? med.kind : text ? 'text' : 'other', text,
       file_id: med?.file_id ?? null, file_unique_id: med?.file_unique_id ?? null, file_size: med?.file_size ?? null, mime: med?.mime ?? null,
     },

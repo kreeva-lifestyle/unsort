@@ -15,10 +15,12 @@ export interface TgConfig {
   crawler_seen_at: string | null; crawler_version: string | null; crawler_error: string | null;
   crawler_channels: CrawlerChannel[]; last_message_at: string | null;
   crawl_window_start: number; crawl_window_end: number;
+  /** Is the bot in the admin group and able to read it (groupCheck.ts)? null: not checked yet. */
+  group_ok: boolean | null; group_error: string | null; group_checked_at: string | null;
 }
 /** sent: how many messages the channel's last finished daily check forwarded. */
 export interface CrawlerChannel { username: string | null; channel_id: number | null; title: string | null; last_id: number | null; error: string | null; sent?: number | null }
-export const CONFIG_COLS = 'bot_username,group_chat_id,group_title,link_code,link_code_expires_at,link_attempts,webhook_ok,webhook_error,crawler_seen_at,crawler_version,crawler_error,crawler_channels,last_message_at,crawl_window_start,crawl_window_end';
+export const CONFIG_COLS = 'bot_username,group_chat_id,group_title,link_code,link_code_expires_at,link_attempts,webhook_ok,webhook_error,crawler_seen_at,crawler_version,crawler_error,crawler_channels,last_message_at,crawl_window_start,crawl_window_end,group_ok,group_error,group_checked_at';
 
 const hex = (b: Uint8Array) => [...b].map(x => x.toString(16).padStart(2, '0')).join('');
 export const randomHex = (n: number) => hex(crypto.getRandomValues(new Uint8Array(n)));

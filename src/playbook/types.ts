@@ -33,6 +33,8 @@ export interface PbProduct {
   less_amount: number | null; // the vendor's separate "200 Less" message: cost = RATE − less (₹)
   /** https://t.me/<channel>/<message id> (Telegram), or the product page on the other store (import). */
   source_url: string | null;
+  /** Telegram: when the vendor posted it in their channel (not when Playbook copied it). */
+  source_posted_at: string | null;
   intake_notes: string[]; // notes from the Telegram intake ("No description arrived…", big videos)
   /** Import from website (20261108090000_pb_website_import.sql): sell at exactly this price on every
    *  website (the pricing rules are skipped), and where it came from ("Price copied from example.com on 8 Nov"). */
@@ -118,6 +120,8 @@ export interface PbListing {
   locked: string[];
   ai_model: string | null; ai_effort: string | null; ai_cost_usd: number | null; generated_at: string | null;
   shopify_product_id: string | null; shopify_status: string | null; published_at: string | null;
+  /** The day it first went live on this store (published_at moves on every re-send). */
+  first_published_at: string | null;
   attempts: number; claimed_at: string | null; error: string | null; created_at: string; updated_at: string;
   /** The product's stock is still to be sent to this listing's Shopify product (server: stockSend.ts). */
   stock_due: boolean;
@@ -177,6 +181,8 @@ export interface PbTgConfig {
   /** The overnight window the channels are checked in, IST minutes of day (may cross midnight; default 23:00–07:00). */
   crawl_window_start: number; crawl_window_end: number;
   last_message_at: string | null; updated_at: string;
+  /** Is the bot in the admin group and able to read it? null: not checked yet. */
+  group_ok: boolean | null; group_error: string | null; group_checked_at: string | null;
 }
 
 // ── Import from website (20261108090000_pb_website_import.sql) ──

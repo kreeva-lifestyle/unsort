@@ -9,7 +9,7 @@ import PbButton from '../../ui/PbButton';
 import { PB, pbMeta, pbNum, pbTileTitle } from '../../../pbTheme';
 import PbIcon from '../../ui/PbIcon';
 import PbTile from '../../ui/PbTile';
-import { Dot, rupees } from '../status';
+import { Dot, rupees, shortDate } from '../status';
 
 /** Only real t.me links (public channels) are opened. */
 const postUrl = (u: string | null) => (u && /^https:\/\/t\.me\/[A-Za-z0-9_]{4,32}\/\d+$/.test(u) ? u : null);
@@ -45,6 +45,8 @@ export function SourceLine({ p }: { p: ProductDetail }) {
     <span style={{ ...pbMeta, display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', minWidth: 0 }}>
       <span>From Telegram</span>
       {name && <><span aria-hidden="true">·</span><span style={{ color: PB.tx, overflowWrap: 'anywhere', minWidth: 0 }}>{name}</span></>}
+      {/* When the vendor posted it, not when Playbook copied it (a nightly check copies a whole day at once). */}
+      {p.source_posted_at && <><span aria-hidden="true">·</span><span>posted {shortDate(p.source_posted_at)}</span></>}
       {url && (
         <>
           <span aria-hidden="true">·</span>

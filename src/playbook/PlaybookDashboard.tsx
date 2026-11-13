@@ -12,6 +12,7 @@ import type { AddToast } from './components/PbToasts';
 import type { ProductsStart } from './pages/Products';
 import { listWebsitesLite } from './data/products';
 import { automationState, listingCounts, listingTotal, notedTotal, oldestReview, productCounts } from './data/dashboard';
+import { telegramTrouble } from './data/telegram';
 import { getAiCostSince } from './data/listingSeo';
 import { USD_INR, istDayStart, istMonthStart, istRelative } from './format';
 import { useAutoRefresh } from './hooks/useAutoRefresh';
@@ -36,10 +37,11 @@ export default function PlaybookDashboard({ name, addToast, go }: { name: string
       // The AI cost is a side figure: if it cannot be read, the rest of the dashboard still shows.
       const cost = getAiCostSince(istMonthStart()).catch(e => { logSwallowed('pb ai cost', e); return null; });
       const today = getAiCostSince(istDayStart()).then(c => Math.round(c.usd * USD_INR * 100) / 100).catch(e => { logSwallowed('pb ai cost today', e); return null; });
-      const [products, sites, auto, failed, review, ai, noted, oldest, spentToday] = await Promise.all([productCounts(), listWebsitesLite(), automationState(),
-        listingTotal('failed'), listingTotal('review'), cost, notedTotal(), oldestReview(), today]);
+      const tgNote = telegramTrouble().catch(e => { logSwallowed('pb telegram state', e); return null; }); // a side note too
+      const [products, sites, auto, failed, review, ai, noted, oldest, spentToday, telegram] = await Promise.all([productCounts(), listWebsitesLite(), automationState(),
+        listingTotal('failed'), listingTotal('review'), cost, notedTotal(), oldestReview(), today, tgNote]);
       const perSite = await listingCounts(sites.map(s => s.id));
-      setD({ products, sites, perSite, failed, review, paused: auto.paused, ai, noted, oldestReview: oldest, lastRun: auto.lastRun, limit: auto.limit, spentToday });
+      setD({ products, sites, perSite, failed, review, paused: auto.paused, ai, noted, oldestReview: oldest, lastRun: auto.lastRun, limit: auto.limit, spentToday, telegram });
       loaded.current = true;
       setLoadErr(null);
     } catch (e) {

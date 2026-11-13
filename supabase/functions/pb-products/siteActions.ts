@@ -30,9 +30,9 @@ export async function saveCredentials(b: Body, userId: string | null) {
     if (await one(`pb_websites?shop_domain=ilike.${enc(newDomain)}&id=neq.${enc(w.id)}&select=id`)) throw new HttpError(409, 'Another website already uses that store.');
     await patch('pb_websites', `id=eq.${enc(w.id)}`, { shop_domain: newDomain, active: false, connected_at: null, shop_name: null, last_error: null });
     await patch('pb_website_secrets', `website_id=eq.${enc(w.id)}`, { access_token: null, client_id: null, client_secret: null, token_expires_at: null, online_store_publication_id: null }, 'website_id');
-    await patch('pb_listings', `website_id=eq.${enc(w.id)}&status=neq.skipped`, { shopify_product_id: null, shopify_status: null, published_at: null, status: 'queued', error: null, claimed_at: null, attempts: 0 });
+    await patch('pb_listings', `website_id=eq.${enc(w.id)}&status=neq.skipped`, { shopify_product_id: null, shopify_status: null, published_at: null, first_published_at: null, status: 'queued', error: null, claimed_at: null, attempts: 0 });
     // Removed listings stay removed, but their old-store ids must not follow them (Put back creates the product anew).
-    await patch('pb_listings', `website_id=eq.${enc(w.id)}&status=eq.skipped`, { shopify_product_id: null, shopify_status: null, published_at: null });
+    await patch('pb_listings', `website_id=eq.${enc(w.id)}&status=eq.skipped`, { shopify_product_id: null, shopify_status: null, published_at: null, first_published_at: null });
     await logActivity({ website_id: w.id, action: 'store_moved', details: { from: w.shop_domain, to: newDomain }, user_id: userId });
     w.shop_domain = newDomain;
     w.active = false;

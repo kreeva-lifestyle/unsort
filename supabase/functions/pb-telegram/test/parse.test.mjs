@@ -41,3 +41,27 @@ test('not forwarded → no row; forwarded from a person → row with no origin y
   assert.deepEqual(parseUpdate({ message: { message_id: 3, chat: { id: -55, type: 'group' }, migrate_to_chat_id: -100555 } }).migrate, { from: -55, to: -100555 });
   assert.deepEqual(parseUpdate({ edited_message: {} }), {});
 });
+
+test('D13: when the channel posted it is kept (forward header), a junk date is not', () => {
+  const at = 1794304800; // 2026-11-10 10:00 UTC
+  const r = parseUpdate({ update_id: 1, message: { message_id: 6, chat: group, forward_origin: { type: 'channel', chat: channel, message_id: 4212, date: at }, text: 'CODE KA-5070 rate 1600' } }).row;
+  assert.equal(r.origin_date, '2026-11-10T10:00:00.000Z');
+  assert.equal(parseUpdate(fwd({ text: 'x' })).row.origin_date, null, 'date: 1 is not a date');
+  const legacy = parseUpdate({ message: { message_id: 7, chat: group, forward_from_chat: channel, forward_from_message_id: 4213, forward_date: at, text: 'y' } }).row;
+  assert.equal(legacy.origin_date, '2026-11-10T10:00:00.000Z');
+  // From a person: no channel, so no channel date either (the crawler's mapping supplies both).
+  const person = parseUpdate({ message: { message_id: 8, chat: group, forward_origin: { type: 'user', sender_user: { id: 1 }, date: at }, text: 'z' } }).row;
+  assert.equal(person.origin_date, null);
+});
+
+test('D20: the bot removed from a chat, or added to it', () => {
+  const mine = (status) => parseUpdate({ update_id: 5, my_chat_member: { chat: group, from: { id: 9 }, new_chat_member: { user: { id: 123456, is_bot: true }, status } } });
+  assert.deepEqual(mine('kicked').member, { change: 'left', bot: true, users: [] }); assert.equal(mine('kicked').chat_id, group.id);
+  assert.deepEqual(mine('left').member, { change: 'left', bot: true, users: [] });
+  assert.deepEqual(mine('administrator').member, { change: 'joined', bot: true, users: [] });
+  assert.equal(mine('creator').member, undefined);
+  // The service message everyone in the group sees: the webhook compares the ids with the bot's own.
+  assert.deepEqual(parseUpdate({ message: { message_id: 9, chat: group, left_chat_member: { id: 123456, is_bot: true } } }).member, { change: 'left', bot: false, users: [123456] });
+  assert.deepEqual(parseUpdate({ message: { message_id: 10, chat: group, new_chat_members: [{ id: 7 }, { id: 123456 }] } }).member, { change: 'joined', bot: false, users: [7, 123456] });
+  assert.equal(parseUpdate({ message: { message_id: 11, chat: group, text: 'hello' } }).member, undefined);
+});

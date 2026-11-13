@@ -21,8 +21,10 @@ export interface MsgRow {
   id: number; chat_id: number; message_id: number; origin_chat_id: number | null; origin_title: string | null; origin_username: string | null;
   origin_message_id: number | null; media_group_id: string | null; kind: string; text: string | null;
   file_id: string | null; file_size: number | null; state: string; note: string | null; received_at: string;
+  /** When the vendor posted it in their channel (null: not known). */
+  origin_date: string | null;
 }
-export const MSG_COLS = 'id,chat_id,message_id,origin_chat_id,origin_title,origin_username,origin_message_id,media_group_id,kind,text,file_id,file_size,state,note,received_at';
+export const MSG_COLS = 'id,chat_id,message_id,origin_chat_id,origin_title,origin_username,origin_message_id,media_group_id,kind,text,file_id,file_size,state,note,received_at,origin_date';
 
 export type Made = { product_id: string; outcome: 'created' | 'done' } | { outcome: 'busy' } | { product_id: string; outcome: 'retry'; error: string };
 
@@ -64,6 +66,7 @@ export async function makeProduct(g: GProduct, rows: Map<number, MsgRow>, token:
     vendor_id: await vendorFor({ chat: g.chat, username: meta?.origin_username ?? null, title: meta?.origin_title ?? null }),
     less_amount: g.less, intake_notes: notes0,
     source_url: meta?.origin_username ? `https://t.me/${meta.origin_username}/${g.first}` : null,
+    source_posted_at: g.postedAt !== null ? new Date(g.postedAt).toISOString() : null, // when the vendor posted it, not when it was copied
   }));
   if (h === 'busy') return { outcome: 'busy' };
   if (h === 'done') {
