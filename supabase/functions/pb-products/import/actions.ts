@@ -65,6 +65,7 @@ export async function importCheck(b: Body) {
     estimate: shown(d.estimate.total), estimate_in_stock: shown(d.estimate.in_stock),
     sample: d.sample.slice(0, 3).map(f => ({ name: f.name, price: f.price, currency: f.currency, image: f.images[0] ?? null, url: f.url, in_stock: f.in_stock })),
     warnings: d.warnings, vendor_suggestion: d.vendor_suggestion, already_here: before.count, last_vendor: before.vendor,
+    maker: d.maker ?? null, // do the products name who makes them? (import/maker.ts)
   };
 }
 

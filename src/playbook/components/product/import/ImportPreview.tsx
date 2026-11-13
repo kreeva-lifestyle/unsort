@@ -1,7 +1,7 @@
 // What "Check website" found, inside the import sheet: the platform in plain
 // words (dot + label), the estimate, what Playbook already has from this
-// website (a repeat import), 3 sample products and any warnings in
-// the review tint. Boxes use the control fill (a sheet is not a tile, so
+// website (a repeat import), 3 sample products, whether the products name
+// their manufacturer (MakerNote) and any warnings in the review tint. Boxes use the control fill (a sheet is not a tile, so
 // nothing here is a tile on a tile).
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type { ImportCheck } from '../../../data/imports';
@@ -10,6 +10,7 @@ import { PB, pbBody, pbMeta, pbName, pbNum } from '../../../pbTheme';
 import PbIcon from '../../ui/PbIcon';
 import PbTag from '../../ui/PbTag';
 import { Dot, rupees } from '../status';
+import MakerNote from './MakerNote';
 import { PLATFORM, alreadyLine, estimateLine, nothingFound } from './importText';
 
 const box: CSSProperties = { display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 16px', borderRadius: PB.r.input, background: PB.ctl, border: `1px solid ${PB.tileBd}`, minWidth: 0 };
@@ -64,6 +65,7 @@ export default function ImportPreview({ check, inStockOnly = true }: { check: Im
           </ul>
         )}
       </div>
+      {!empty && <MakerNote m={check.maker} />}
       {check.warnings.length > 0 && (
         <div role="status" style={{ ...box, background: PB.reviewBg, borderColor: PB.reviewBd, gap: 8 }}>
           <Dot color={PB.review} label={check.warnings.length === 1 ? 'One thing to know' : `${check.warnings.length} things to know`} style={{ fontSize: 13, color: PB.tx, fontWeight: 600 }} />
