@@ -82,17 +82,6 @@ are tagged.
   functions load their code from GitHub. Making it private first needs
   another way to deploy them; say if you want that.
 
-## Playbook — approved, being built
-
-- **Put the 13 Nov tag work live on the server:** the three tag fixes, the
-  better word rules and the remembered category choices (the AI follows how
-  you filed earlier products from the same website or vendor; no word cards,
-  owner 13 Nov). All merged, but the database change
-  (`20261113150000_pb_gate_category_list.sql`) and the server update wait:
-  Claude's Supabase connection was down on 13 Nov. Until then the old
-  behaviour stays. Next: Claude applies both as soon as the connection is
-  back, then checks them.
-
 ## Playbook — things only the owner can do
 
 - **Delete the old `program-voice-notes` storage bucket.** Supabase →
