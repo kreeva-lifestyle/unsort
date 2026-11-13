@@ -153,6 +153,11 @@ export async function testConnection(site: WebsiteRow): Promise<{ shop_name: str
   }
 }
 
+/** Is this sales-channel catalog the Online Store's? Shopify named it "Online Store"; stores now show
+ *  "Channel Catalog 371789562016 for Online Store" (live store, 13 Nov 2026: the old exact match said "no Online Store
+ *  channel" for a store that has one). Either form, any case; nothing else ends that way. */
+export const isOnlineStore = (title: unknown) => /(^|\bfor\s+)online store$/i.test(String(title ?? '').replace(/\s+/g, ' ').trim());
+
 /** The "Online Store" publication id (cached in pb_website_secrets). null when the store has none. */
 export async function onlineStoreId(site: WebsiteRow, ms = TIMEOUT): Promise<string | null> {
   const s = await secretsOf(site.id);
@@ -162,7 +167,7 @@ export async function onlineStoreId(site: WebsiteRow, ms = TIMEOUT): Promise<str
   for (const only of ['first: 100, catalogType: APP', 'first: 100']) {
     const d = await gql<{ publications: { nodes: { id: string; catalog: { title: string } | null }[] } }>(site,
       `{ publications(${only}) { nodes { id catalog { title } } } }`, {}, ms);
-    hit = (d.publications?.nodes || []).find(n => /^online store$/i.test(String(n.catalog?.title || '').trim()));
+    hit = (d.publications?.nodes || []).find(n => isOnlineStore(n.catalog?.title));
     if (hit) break;
   }
   if (!hit) return null;

@@ -45,7 +45,7 @@ function world(o = {}) {
         if (w.other !== null && w.product.sku_colour === null) { w.product.sku_colour = w.other; w.other = null; }
         return ok({ data: { productSet: { product: { id: GID, status: 'ACTIVE', handle: input.handle, media: { nodes: [] } }, userErrors: [] } } });
       }
-      if (q.includes('publications')) return ok({ data: { publications: { nodes: [{ id: 'gid://shopify/Publication/1', catalog: { title: 'Online Store' } }] } } });
+      if (q.includes('publications')) return ok({ data: { publications: { nodes: [{ id: 'gid://shopify/Publication/2', catalog: { title: 'Channel Catalog 2 for Point of Sale' } }, { id: 'gid://shopify/Publication/1', catalog: { title: 'Channel Catalog 1 for Online Store' } }] } } });
       if (q.includes('publishablePublish')) return w.channelDown ? ok({}, 500) : ok({ data: { publishablePublish: { userErrors: [] } } });
       return ok({ data: {} });
     }
