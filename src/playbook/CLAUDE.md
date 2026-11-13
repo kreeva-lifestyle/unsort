@@ -70,6 +70,14 @@ mobile". Playbook instead:
   `npm run test:server` (their unit tests) — a missing import there is a
   runtime 500. The deploy workflow runs both before the build. A merge does
   not deploy the functions: see `docs/playbook/DEPLOY.md`.
+- Rules that live in the database (which product is a copy, what the Ready
+  gate holds, what a bulk change may take back) are tried on a throwaway
+  PostgreSQL, never the live one: `bash supabase/tests/sql/run.sh`. It ends
+  with status 1 when a check in `t_dups.sql` fails. The workflow **Playbook
+  SQL tests** runs it on every change under `supabase/migrations/`,
+  `supabase/tests/sql/` or `docs/playbook/sql-to-run/`. Changing one of those
+  functions: add the case to the test in the same PR, and add a new migration
+  it needs to the list in `run.sh`.
 
 ## Design — load the `playbook-design` skill before any Playbook UI work
 - The skill (`.claude/skills/playbook-design/SKILL.md`) has you read

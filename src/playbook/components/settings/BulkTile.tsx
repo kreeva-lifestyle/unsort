@@ -53,7 +53,7 @@ export default function BulkTile({ addToast, canEdit }: { addToast: AddToast; ca
   return (
     <PbTile as="section" variant={err && !runs ? 'failed' : 'default'}>
       <PbSection title="Bulk changes" id="pbs-bulk" right={runs ? <PbButton icon="refresh" onClick={() => void load()} busy={busy} busyLabel="Refreshing…">Refresh</PbButton> : null}
-        hint={`Every change made to many products or listings at once in the last ${BULK_DAYS} days: imports, Send matching products, Re-price, Retry all, Read again. A revert puts back only what is still as that change left it; anything changed by hand since is left alone.${canEdit ? '' : ' An admin or manager can revert.'}`}>
+        hint={`Every change made to many products or listings at once in the last ${BULK_DAYS} days: imports, Send matching products, Re-price, Retry all, Read again, Archive the copies. A revert puts back only what is still as that change left it; anything changed by hand since is left alone.${canEdit ? '' : ' An admin or manager can revert.'}`}>
         {!runs && !err && (
           <div aria-busy="true" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <span className="pb-sr" role="status">Loading bulk changes</span>

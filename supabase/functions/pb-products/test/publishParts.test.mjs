@@ -83,3 +83,48 @@ test('Shopify being busy is tried again without using up the attempts, but not f
   assert.equal(busyStreak([{ created_at: 'x', details: null }], null), 0);
   assert.ok(FREE_RETRIES >= 5 && FREE_RETRIES <= 12); // the listing's failures are read 12 at a time (publish.ts)
 });
+
+test('D19: the colour part of the codes is decided by the first send a store takes, and shared by every website', async () => {
+  const { keepColour, skuColour } = await import('../publishParts.ts');
+  /** `onStore`: a listing of the product is on a store already; `taken`: another send decided first and saved this. */
+  const world = (o = {}) => {
+    const calls = [];
+    globalThis.fetch = async (url, init = {}) => {
+      const u = decodeURIComponent(String(url)), method = init.method || 'GET', ok = (b) => new Response(JSON.stringify(b), { status: 200 });
+      calls.push({ method, u, body: init.body ? JSON.parse(init.body) : null });
+      if (u.includes('/pb_listings?')) return ok(o.onStore ? [{ id: 'l1' }] : []);
+      if (method === 'PATCH') return ok(o.taken === undefined ? [{ id: 'p1' }] : []);
+      return ok([{ sku_colour: o.taken ?? null }]);
+    };
+    return calls;
+  };
+  const P = { id: 'p1', color: 'Wine', source: 'telegram', sku_colour: null };
+  let calls = world();
+  assert.equal(await skuColour({ ...P, sku_colour: 'MAROON' }), 'MAROON', 'decided before: kept, whatever the colour is called now');
+  assert.equal(await skuColour({ ...P, sku_colour: '' }), '', 'decided as none: stays none');
+  assert.deepEqual(calls, [], 'nothing is asked or saved again');
+  // a new product: worked out from its colour as it is now — and NOT saved yet (third review, 6: a send the store
+  // refuses must decide nothing, or a colour corrected afterwards would leave the old word in the codes)
+  assert.equal(await skuColour(P), 'WINE');
+  assert.match(calls[0].u, /pb_listings\?product_id=eq\.p1&shopify_product_id=not\.is\.null/);
+  assert.ok(!calls.some(c => c.method === 'PATCH'), 'nothing is decided before a store has the product');
+  // a product that is on a store from before codes carried a colour keeps its codes exactly as they are
+  world({ onStore: true });
+  assert.equal(await skuColour(P), '');
+  // copied from another store: its own codes
+  world();
+  assert.equal(await skuColour({ ...P, source: 'import' }), '');
+  // the store took it: decided now, only where nothing is decided yet
+  calls = world();
+  assert.equal(await keepColour(P, 'WINE'), 'WINE');
+  const save = calls.find(c => c.method === 'PATCH');
+  assert.match(save.u, /pb_products\?id=eq\.p1&sku_colour=is\.null/);
+  assert.deepEqual(save.body, { sku_colour: 'WINE' });
+  calls = world();
+  assert.equal(await keepColour({ ...P, sku_colour: 'MAROON' }, 'MAROON'), 'MAROON');
+  assert.deepEqual(calls, [], 'decided before: nothing to save');
+  // two websites send it for the first time at once, and the colour was re-worded in between: the one that got to
+  // the store first decides for both — the other is told, and sends again with it (publishRetry.test.mjs)
+  world({ taken: 'MAROON' });
+  assert.equal(await keepColour(P, 'WINE'), 'MAROON');
+});

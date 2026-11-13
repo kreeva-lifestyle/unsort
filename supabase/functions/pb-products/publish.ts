@@ -24,7 +24,7 @@ import { compareAt } from './pricing.ts';
 import { galleryOf } from './photos.ts';
 import { profileOf } from './profile.ts';
 import { buildProductInput, PRODUCT_SET, STOCK_WARNING } from './productInput.ts';
-import { busyStreak, filesFor, FREE_RETRIES, type Gallery, knownPhotos, leaveGallery, mergeTags, photoRecord, sendFields, temporary, toOnlineStore } from './publishParts.ts';
+import { busyStreak, filesFor, FREE_RETRIES, type Gallery, keepColour, knownPhotos, leaveGallery, mergeTags, photoRecord, sendFields, skuColour, temporary, toOnlineStore } from './publishParts.ts';
 import { seoGet } from './seoStore.ts';
 import { CURRENCY, gql, shopCurrency, wrongCurrency } from './shopify.ts';
 import { adoptable, type Existing, existingProduct } from './shopifyProduct.ts';
@@ -109,6 +109,7 @@ export async function publishOne(l: ListingRow, o: { manual: boolean; putBack?: 
       return r[0] ?? l;
     }
 
+    const coded = { ...p, sku_colour: await skuColour(p) }; // the colour part of its codes: the decided one, else as the colour is now
     // Status goes out on a create (and a recovered lost create) and on Put back; a plain update leaves
     // whatever people set in Shopify (e.g. a draft site's product made visible there).
     let sendStatus = false, gallery: Gallery = { files: null, fresh: [] }, known = knownPhotos(was, null, false);
@@ -120,7 +121,7 @@ export async function publishOne(l: ListingRow, o: { manual: boolean; putBack?: 
       gallery = noFiles || leaveGallery(was, paths, known, !!existing, !!adopted) ? { files: null, fresh: [] }
         : filesFor({ paths, alts: l.image_alts || [], known, store: existing?.media ?? null });
       const tags = existing ? mergeTags(existing.tags, adopted ? null : was?.tags ?? null, l.tags || []) : l.tags || [];
-      const input = buildProductInput({ l: { ...l, handle, tags, compare_at_price: compare }, p, site, vendor: profile.brand, files: gallery.files, live, sendStatus, existing, tail: profile.faq_in_description ? faqHtml(faq) : '', noCategory });
+      const input = buildProductInput({ l: { ...l, handle, tags, compare_at_price: compare }, p: coded, site, vendor: profile.brand, files: gallery.files, live, sendStatus, existing, tail: profile.faq_in_description ? faqHtml(faq) : '', noCategory });
       sent.push(handle);
       return gql<SetReply>(site, PRODUCT_SET, { input, identifier: existing ? { id: existing.id } : null }, ms(SET_MS));
     };
@@ -139,6 +140,7 @@ export async function publishOne(l: ListingRow, o: { manual: boolean; putBack?: 
     if (errs.length || !res.productSet.product) throw new HttpError(400, `${site.name}: Shopify said "${errs.map(e => e.message).join('; ').slice(0, 250) || 'the product was not saved'}".`);
     const prod = res.productSet.product;
     onStore = true;
+    const kept = await keepColour(p, coded.sku_colour); // decided by the first send a store takes, before anything else can fail
     // The Online Store step: on a create (a draft site's product too, so it shows the moment someone makes it
     // Active in Shopify), on Put back, and while an earlier run still owes it — not on every update, which would
     // undo a channel choice made in Shopify.
@@ -148,6 +150,7 @@ export async function publishOne(l: ListingRow, o: { manual: boolean; putBack?: 
     // Only while this run still holds the listing (a store move or takeover re-queued it meanwhile).
     const held = await patch('pb_listings', mine, { shopify_product_id: prod.id, shopify_status: prod.status, handle: prod.handle || handle, compare_at_price: compare });
     if (!held.length) throw new HttpError(409, 'The listing changed while it was being published — open it again.');
+    if (kept !== coded.sku_colour) throw new HttpError(503, `${site.name}: another website got this product at the same moment and settled its size codes — it will be sent again with those.`);
 
     const warnings: string[] = [];
     if (site.track_inventory && !existing) warnings.push(STOCK_WARNING);

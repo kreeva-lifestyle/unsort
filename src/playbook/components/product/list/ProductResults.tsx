@@ -2,16 +2,17 @@
 // load, a load error in the tile (with Try again), the two empties, or the
 // rows — cards 3 per row on desktop (4 of 12), glass rows on phone. While a
 // refresh runs the old results stay, dimmed to .6 (states-and-feedback §2).
+import type { ListHints } from '../../../data/duplicates';
 import type { ProductRow, WebsiteLite } from '../../../data/products';
 import { useIsPhone } from '../../../hooks/useIsPhone';
 import ProductCard from '../ProductCard';
 import ProductRowItem from './ProductRowItem';
 import { FilteredEmpty, FirstRunEmpty, ListSkeleton, LoadError } from './ListStates';
 
-export default function ProductResults({ rows, sites, held, loading, loadErr, filtered, search, onOpen, onAdd, onClear, onRetry }: {
+export default function ProductResults({ rows, sites, hints, loading, loadErr, filtered, search, onOpen, onAdd, onClear, onRetry }: {
   rows: ProductRow[]; sites: WebsiteLite[]; loading: boolean; loadErr: string; filtered: boolean; search: string;
-  /** Products held as a copy of one added earlier: id → what they copy ("KB 264 WINE XS"). */
-  held: Record<string, string>;
+  /** Products held as a copy of one added earlier (id → what they copy), and the ones that only look like another. */
+  hints: ListHints;
   onOpen: (id: string) => void; onAdd: () => void; onClear: () => void; onRetry: () => void;
 }) {
   const phone = useIsPhone();
@@ -26,11 +27,11 @@ export default function ProductResults({ rows, sites, held, loading, loadErr, fi
       {loadErr && !loading && <LoadError inline message={loadErr} onRetry={onRetry} />}
       {phone ? (
         <div className="pb-span-12" aria-busy={loading || undefined} style={{ display: 'flex', flexDirection: 'column', gap: 8, ...dim }}>
-          {rows.map(p => <ProductRowItem key={p.id} p={p} sites={sites} copyOf={held[p.id]} onOpen={() => onOpen(p.id)} />)}
+          {rows.map(p => <ProductRowItem key={p.id} p={p} sites={sites} copyOf={hints.held[p.id]} mayBe={hints.maybe[p.id]} onOpen={() => onOpen(p.id)} />)}
         </div>
       ) : rows.map(p => (
         <div key={p.id} className="pb-span-4" style={{ ...dim, minWidth: 0 }}>
-          <ProductCard p={p} sites={sites} copyOf={held[p.id]} onOpen={() => onOpen(p.id)} />
+          <ProductCard p={p} sites={sites} copyOf={hints.held[p.id]} mayBe={hints.maybe[p.id]} onOpen={() => onOpen(p.id)} />
         </div>
       ))}
     </>

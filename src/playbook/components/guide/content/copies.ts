@@ -1,6 +1,7 @@
 // Guide: "Already added?" — how Playbook notices a product that is already
 // here (design code + colour, and the same photo saved again), what the three
-// answers do, and the source label / Source filter on Products.
+// answers do, clearing many copies together, and the source label / Source
+// filter on Products.
 import { type GuideSection, h, list, p, table, tip } from '../types';
 
 export const COPIES: GuideSection[] = [
@@ -15,8 +16,9 @@ export const COPIES: GuideSection[] = [
         ['The very same post or page again (the same Telegram message, the same page of a website, typed with or without "www")', 'It is not added a second time. An import counts it as **already here**', 'Nothing'],
         ['The same design code from the **same vendor**, in the same colour or with no colour given (`KB 302` and `KB 302 XS Blue`)', 'The later one waits in **Needs info · Already here as KB 302 XS Blue**. Nothing is written for the websites', 'Open it and answer (below)'],
         ['The same code from the same vendor in a **different colour** (`KB 264 Wine` and `KB 264 Royal Blue`)', 'Nothing waits: each colour is its own product. The product page lists the other colours under **Same design**', 'Nothing'],
-        ['A near match: the same code at **another vendor**, or the same number with other letters (`KB 25` and `NKB 25`)', 'Nothing waits. The product page asks **Could this be already added?**', 'Answer when you see it'],
-        ['The **same photo** on two products — saved again at another size or quality — when their codes say nothing (no code, or different codes)', 'Nothing waits. The product page asks **Could this be already added?** and shows the photo that matched, marked **Same photo**', 'Answer when you see it'],
+        ['A near match: the same code at **another vendor**, the same number with other letters (`KB 25` and `NKB 25`), or a code that is only a number (`D no 5081` twice)', 'Nothing waits. The product page asks **Could this be already added?**, and its row in Products says **May be a copy of …**', 'Answer when you see it'],
+        ['The **same photo** on two products — saved again at another size or quality — when their codes say nothing (no code, or different codes)', 'Nothing waits. The product page asks **Could this be already added?** and shows the photo that matched, marked **Same photo**; its row in Products says **May be a copy of … · same photo**', 'Answer when you see it'],
+        ['A vendor\'s new post that brings a **sold-out product back in stock** (also when the code is only a number)', 'The earlier product is on sale again, and the new post waits in **Needs info · Already here as …** like any copy', 'Open it and answer (below)'],
       ),
       h('How the code is read'),
       list(
@@ -42,6 +44,13 @@ export const COPIES: GuideSection[] = [
         'An answer is remembered: the same two products are never asked about again.',
         'Nothing is merged or deleted, on either product.',
         'Tapped the wrong answer? **Archive** the copy yourself.',
+      ),
+      h('Many copies at once'),
+      list(
+        '**Products → Needs info** says how many products are waiting as copies. **Show only these** lists them alone (also under **More statuses → Waiting as copies**).',
+        '**Archive the copies** first tells you what it would do, and does nothing until you confirm. It then does exactly that: it archives the copies that have nothing of their own.',
+        'It leaves four kinds for you to open: a copy that came with a **different price** from the product you have (the vendor may have changed the rate — type the new cost on the earlier product first), a copy that is **already on a website**, a copy whose earlier product has **no colour** (it may be another colour — give the earlier product its colour, and the rest sorts itself out), and copies that are **tied to another waiting copy** (one waits as a copy of the other; open the earlier of the two and answer it first).',
+        'Nothing is deleted and nothing changes on your websites. **Settings → Bulk changes → Revert** brings them back to Needs info for 7 days, where they wait as copies again; **Restore** on one product reads it again and treats it as its own product.',
       ),
       h('Where a product came from'),
       list(

@@ -16,7 +16,7 @@ export type ProductRow = Pick<PbProduct, 'id' | 'name' | 'sku' | 'cost_price' | 
   pb_product_images: { path: string; position: number }[];
   pb_listings: { id: string; website_id: string; status: PbListingStatus }[];
 };
-/** status: '' = everything but archived · a product status · 'l:failed' / 'l:queued,generating,publishing' = has a listing in that state (one or a comma list) · 'l:warn' = has a published listing that carries a note · 'stock:out' = out of stock · 'stock:temp' = a vendor called it temporarily out (a note only).
+/** status: '' = everything but archived · a product status · 'l:failed' / 'l:queued,generating,publishing' = has a listing in that state (one or a comma list) · 'l:warn' = has a published listing that carries a note · 'stock:out' = out of stock · 'stock:temp' = a vendor called it temporarily out (a note only) · 'copy' = waiting in Needs info as a copy of a product added earlier.
  *  source: '' = any · 'telegram' · 'manual' (typed in) · 'import:<host>' (copied from that website, with or without "www."). */
 export type ProductFilter = { search: string; status: string; vendorId: string; websiteId: string; source: string };
 export const EMPTY_FILTER: ProductFilter = { search: '', status: '', vendorId: '', websiteId: '', source: '' };
@@ -29,7 +29,8 @@ export async function listProducts(f: ProductFilter, page: number): Promise<{ ro
   const hit = f.websiteId || lStatus ? ',hit:pb_listings!inner(website_id,status,error)' : '';
   let q = supabase.from('pb_products').select(LIST_COLS + hit, { count: 'exact' });
   const stock = f.status.startsWith('stock:') ? f.status.slice(6) : '';
-  if (!f.status || lStatus || stock) q = q.neq('status', 'archived'); else q = q.eq('status', f.status);
+  if (f.status === 'copy') q = q.eq('status', 'needs_info').not('copy_of', 'is', null);
+  else if (!f.status || lStatus || stock) q = q.neq('status', 'archived'); else q = q.eq('status', f.status);
   if (stock === 'out') q = q.eq('in_stock', false); else if (stock === 'temp') q = q.not('temp_out_at', 'is', null);
   const lList = lStatus.split(',').filter(Boolean);
   if (lStatus === 'warn') q = q.eq('hit.status', 'published').not('hit.error', 'is', null); // published, but with a note (a photo Shopify could not take, a field it refused…)

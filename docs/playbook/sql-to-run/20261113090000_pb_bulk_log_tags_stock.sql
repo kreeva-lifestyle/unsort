@@ -237,7 +237,7 @@ begin
 end $$;
 
 -- ── 5. the entry point knows the new kinds ────────────────────────────────
--- As 20261113060000, plus: the tag kinds and stock_notice; and "a later bulk
+-- As 20261113060000 and 20261113120000 (held copies), plus: the tag kinds and stock_notice; and "a later bulk
 -- change of the same family on the same rows goes first" now also holds among
 -- the tag kinds and among stock notices.
 create or replace function public.pb_bulk_revert(p_run uuid, p_apply boolean default false, p_user uuid default null, p_note text default null)
@@ -252,7 +252,7 @@ begin
   if r.status = 'running' then raise exception 'This is still running. Wait until it has finished.'; end if;
   if r.status = 'reverted' then raise exception 'This was already reverted.'; end if;
   if r.created_at < now() - interval '7 days' then raise exception 'This is more than 7 days old, so it can no longer be reverted.'; end if;
-  family := case when r.kind = any(tags) then tags when r.kind in ('reprice_site', 'reread', 'stock_notice') then array[r.kind] end;
+  family := case when r.kind = any(tags) then tags when r.kind in ('reprice_site', 'reread', 'stock_notice', 'copies') then array[r.kind] end;
   if family is not null then
     select x.label, x.created_at into b from pb_bulk_runs x
     where x.kind = any(family) and x.created_at > r.created_at and x.status in ('done', 'partly_reverted')
@@ -271,6 +271,7 @@ begin
       when 'retry_failed' then res := pb_bulk_revert_retry(p_run, p_apply);
       when 'reread_failed' then res := pb_bulk_revert_unread(p_run, p_apply);
       when 'reread' then res := pb_bulk_revert_fields(p_run, p_apply);
+      when 'copies' then res := pb_bulk_revert_copies(p_run, p_apply); -- 20261113120000_pb_copies.sql
       when 'stock_notice' then res := pb_bulk_revert_stock(p_run, p_apply, coalesce(p_note, ''));
       when 'import' then
         select coalesce(jsonb_object_agg(t.verdict, t.n), '{}'::jsonb) into res from (select verdict, count(*) n from pb_bulk_import_targets(p_run) group by verdict) t;

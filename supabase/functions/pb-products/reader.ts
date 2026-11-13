@@ -35,7 +35,8 @@ import { aiPhotos } from './photos.ts';
 import { readChanges } from './readChanges.ts';
 import { nameWithColour } from './readName.ts';
 import { READ_PHOTOS, readerPrompt, readerSchema, type ReadOut } from './readerPrompt.ts';
-import { backInStock, stockNotice } from './stockNotice.ts';
+import { afterRead } from './restock.ts';
+import { stockNotice } from './stockNotice.ts';
 import { routeProduct } from './route.ts';
 import { stripLess } from '../pb-telegram/group.ts';
 import { mergeReadAttrs } from './import/meta.ts';
@@ -127,8 +128,7 @@ export async function readOne(p: ProductRow, o: { manual: boolean; prevStatus?: 
     const saved = await patch<ProductRow>('pb_products', `id=eq.${enc(p.id)}&status=eq.reading`,
       { ...set, status, ai_read_at: nowIso(), ai_error: null, claimed_at: null }, PRODUCT_COLS);
     if (!saved[0]) throw Object.assign(new HttpError(409, 'The product changed while it was being read — open it again.'), { usd: ai.usd }); // paid for: counted with the failure
-    product = await tagAfterRead(saved[0], tax, spec, ai.data, o.userId);
-    await backInStock(product, o.userId); // posted again: a design the vendor had called temporarily out is back
+    product = await afterRead(await tagAfterRead(saved[0], tax, spec, ai.data, o.userId), o.userId, !p.ai_read_at && !ai.data.stock_notice?.items?.length); // posted again → back in stock; a later twin is held (restock.ts)
     await logActivity({ product_id: p.id, action: 'read', details: { model: ai.model, effort: ai.effort, usd: ai.usd, status: product.status, filled: Object.keys(set), ...(product.missing_attrs?.length ? { missing: product.missing_attrs } : {}), ...(used < imgs.length ? { photos_skipped: imgs.length - used } : {}), ...(Object.keys(changed).length ? { changed } : {}) }, user_id: o.userId });
   } catch (e) {
     const msg = plain(e);

@@ -8,10 +8,10 @@ import { PB, pbNum } from '../../../pbTheme';
 import PbRow from '../../ui/PbRow';
 import { Dot, PRODUCT_STATUS, rupees } from '../status';
 import ProductPhoto from './ProductPhoto';
-import { listingSummary, productTitle, productTone, siteNamer, statusLabel } from './productListUtil';
+import { listingSummary, mayBeLabel, productTitle, productTone, siteNamer, statusLabel } from './productListUtil';
 import { sourceText } from '../../../data/duplicates';
 
-export default function ProductRowItem({ p, sites, onOpen, copyOf }: { p: ProductRow; sites: WebsiteLite[]; onOpen: () => void; copyOf?: string }) {
+export default function ProductRowItem({ p, sites, onOpen, copyOf, mayBe }: { p: ProductRow; sites: WebsiteLite[]; onOpen: () => void; copyOf?: string; mayBe?: string }) {
   const st = PRODUCT_STATUS[p.status];
   const vendor = p.pb_vendors?.name;
   const from = sourceText(p.source, p.source_ref);
@@ -35,6 +35,7 @@ export default function ProductRowItem({ p, sites, onOpen, copyOf }: { p: Produc
       status={
         <span style={{ display: 'flex', flexWrap: 'wrap', columnGap: 12, rowGap: 4, minWidth: 0 }}>
           <Dot color={st.color} label={statusLabel(p, copyOf)} style={{ whiteSpace: 'normal', overflowWrap: 'anywhere', minWidth: 0 }} />
+          {mayBe && <Dot color={PB.review} label={mayBeLabel(mayBe)} style={{ whiteSpace: 'normal', overflowWrap: 'anywhere', minWidth: 0 }} />}
           {shown.map((g, i) => (
             <Dot key={g.label} color={g.color} label={i === shown.length - 1 && more ? `${g.label} · ${more} more website${more === 1 ? '' : 's'}` : g.label} style={{ whiteSpace: 'normal', overflowWrap: 'anywhere', minWidth: 0 }} />
           ))}

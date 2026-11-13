@@ -5,7 +5,7 @@ import type { BulkCounts, PbBulkRun } from '../../data/bulk';
 import { count } from '../../format';
 
 type Kind = PbBulkRun['kind'];
-const PRODUCTS: Kind[] = ['import', 'reread_failed', 'reread'];
+const PRODUCTS: Kind[] = ['import', 'reread_failed', 'reread', 'copies'];
 /** "1 product" / "136 products". */
 const n = (k: number, one: string, many = `${one}s`) => `${count(k)} ${k === 1 ? one : many}`;
 /** Pick the singular or the plural wording. */
@@ -54,6 +54,13 @@ export function plan(run: Pick<PbBulkRun, 'kind' | 'details'>, c: BulkCounts): P
     add(v('went'), `${n(v('went'), unit)} ${s(v('went'), 'was', 'were')} already ${again} and ${s(v('went'), 'stays as it is', 'stay as they are')}.`);
     note = 'This only repeated a step that had failed, so there is nothing else to take back.';
     confirm = `Stop ${n(todo, unit)}`;
+  } else if (run.kind === 'copies') {
+    todo = v('restored');
+    add(todo, `${n(todo, 'product')} ${s(todo, 'comes', 'come')} out of Archived and ${s(todo, 'waits', 'wait')} in Needs info as ${s(todo, 'a copy', 'copies')} again.`);
+    add(v('not_copies'), `${n(v('not_copies'), 'product')} ${s(v('not_copies'), 'is no longer a copy of anything (what it copied was archived or changed) and stays', 'are no longer copies of anything (what they copied was archived or changed) and stay')} in Archived. Open ${s(v('not_copies'), 'it', 'one')} and tap Restore to bring it back.`);
+    add(v('changed'), `${n(v('changed'), 'product')} ${s(v('changed'), 'was restored or changed since and stays as it is', 'were restored or changed since and stay as they are')}.`);
+    note = 'Nothing is sent to a website by this: the products wait for your answer again.';
+    confirm = `Put back ${n(todo, 'product')}`;
   } else {
     todo = v('restored');
     const cut = Number(run.details?.notes_cut) || 0;
@@ -77,6 +84,7 @@ export function done(kind: Kind, c: BulkCounts | null): string {
   else if (kind === 'route_site') parts.push(`Took back ${n(v('aside') + v('live'), 'listing')}`, ...(v('live') ? [`${count(v('live'))} of them ${s(v('live'), 'comes', 'come')} off the store in the next minutes`] : []));
   else if (kind === 'reprice_site') parts.push(`Put back ${n(v('restored'), 'price')}`, ...(v('resend') ? [`${count(v('resend'))} sent to the store again`] : []), ...(v('changed') ? [`${count(v('changed'))} changed since left as ${s(v('changed'), 'it is', 'they are')}`] : []));
   else if (onlyStops(kind)) parts.push(`Stopped ${n(v('stopped'), unit)}`, ...(v('went') ? [`${count(v('went'))} had already gone ahead`] : []));
+  else if (kind === 'copies') parts.push(`Put back ${n(v('restored'), 'copy', 'copies')}`, ...(v('not_copies') ? [`${count(v('not_copies'))} no longer ${s(v('not_copies'), 'a copy', 'copies')}, left in Archived`] : []), ...(v('changed') ? [`${count(v('changed'))} changed since left as ${s(v('changed'), 'it is', 'they are')}`] : []));
   else parts.push(`Put back ${n(v('restored'), 'product')}`, ...(v('changed') ? [`${count(v('changed'))} edited since left as ${s(v('changed'), 'it is', 'they are')}`] : []));
   if (v('busy')) parts.push(`${count(v('busy'))} busy right now: tap Revert again in a few minutes`);
   return parts.join(' · ');

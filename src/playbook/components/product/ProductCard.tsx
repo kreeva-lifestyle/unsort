@@ -7,10 +7,10 @@ import { PB, pbMeta, pbName, pbNum } from '../../pbTheme';
 import PbTile from '../ui/PbTile';
 import { Dot, LISTING_STATUS, PRODUCT_STATUS, rupees } from './status';
 import ProductPhoto from './list/ProductPhoto';
-import { productTitle, productTone, siteNamer, statusLabel } from './list/productListUtil';
+import { mayBeLabel, productTitle, productTone, siteNamer, statusLabel } from './list/productListUtil';
 import { sourceText } from '../../data/duplicates';
 
-export default function ProductCard({ p, sites, onOpen, copyOf }: { p: ProductRow; sites: WebsiteLite[]; onOpen: () => void; copyOf?: string }) {
+export default function ProductCard({ p, sites, onOpen, copyOf, mayBe }: { p: ProductRow; sites: WebsiteLite[]; onOpen: () => void; copyOf?: string; mayBe?: string }) {
   const st = PRODUCT_STATUS[p.status];
   const siteName = siteNamer(sites);
   const from = sourceText(p.source, p.source_ref);
@@ -32,6 +32,7 @@ export default function ProductCard({ p, sites, onOpen, copyOf }: { p: ProductRo
               : <span style={pbMeta}>No price</span>}
           <Dot color={st.color} label={statusLabel(p, copyOf)} style={{ whiteSpace: 'normal', overflowWrap: 'anywhere', minWidth: 0 }} />
         </span>
+        {mayBe && <Dot color={PB.review} label={mayBeLabel(mayBe)} style={{ whiteSpace: 'normal', overflowWrap: 'anywhere', minWidth: 0 }} />}
         {p.pb_listings.length > 0 && (
           <span style={{ display: 'flex', flexWrap: 'wrap', columnGap: 12, rowGap: 4, borderTop: `1px solid ${PB.tileBd}`, paddingTop: 8, marginTop: 'auto' }}>
             {p.pb_listings.map(l => {

@@ -23,6 +23,12 @@ export interface PbProduct {
   temp_out_at: string | null;
   /** When a vendor's notice said PERMANENT stock out: with in_stock false the product is archived here and on Shopify. */
   perm_out_at: string | null;
+  /** The earlier product this one waits as a copy of ("Already here as …"); the Ready gate keeps it. Null when it is not held. */
+  copy_of: string | null;
+  /** When the latest word that decided its stock was said (the vendor's notice or new post, or a person switching Stock off): an older word is refused. */
+  stock_said_at: string | null;
+  /** The colour part its sizes' SKUs and barcodes carry on the stores ('' = none, null = not decided yet); kept once decided. */
+  sku_colour: string | null;
   /** tags: its chosen values' names (cache; pb_product_values, tagTypes.ts) · missing_attrs: required attributes still empty → Needs info. */
   tags: string[]; missing_attrs: string[];
   /** Anything else the AI read: work, occasion, pattern, set_contents, wash_care, notes… (string values). */
@@ -150,40 +156,8 @@ export const PB_EFFORTS: { id: PbEffort; label: string }[] = [
 ];
 export const PB_BUCKET = 'playbook-products';
 
-// ── Telegram intake (20261107090000_pb_telegram_intake.sql) ──
-export type PbTgMessageKind = 'photo' | 'video' | 'text' | 'other';
-export type PbTgMessageState = 'pending' | 'used' | 'ignored' | 'failed';
-
-/** One forwarded message in the admin group, until it becomes (part of) a product. Staff read only. */
-export interface PbTgMessage {
-  id: number; update_id: number | null; chat_id: number; message_id: number;
-  origin_chat_id: number | null; origin_title: string | null; origin_username: string | null; origin_message_id: number | null;
-  media_group_id: string | null; kind: PbTgMessageKind | null; text: string | null;
-  file_id: string | null; file_unique_id: string | null; file_size: number | null; mime: string | null;
-  state: PbTgMessageState; product_id: string | null; note: string | null; received_at: string;
-}
-
-/** What the crawler last reported for one vendor channel. */
-export interface PbTgChannel {
-  username: string | null; channel_id: number | null; title: string | null; last_id: number | null; error: string | null;
-  /** How many messages its last finished daily check copied (null: none reported yet). */
-  sent?: number | null;
-}
-
-/** Single row (id = 1): bot, admin group and crawler status. Staff read; only pb-telegram writes. */
-export interface PbTgConfig {
-  bot_username: string | null;
-  group_chat_id: number | null; group_title: string | null;
-  link_code: string | null; link_code_expires_at: string | null; link_attempts: number;
-  webhook_ok: boolean | null; webhook_error: string | null;
-  crawler_seen_at: string | null; crawler_version: string | null; crawler_error: string | null;
-  crawler_channels: PbTgChannel[];
-  /** The overnight window the channels are checked in, IST minutes of day (may cross midnight; default 23:00–07:00). */
-  crawl_window_start: number; crawl_window_end: number;
-  last_message_at: string | null; updated_at: string;
-  /** Is the bot in the admin group and able to read it? null: not checked yet. */
-  group_ok: boolean | null; group_error: string | null; group_checked_at: string | null;
-}
+// ── Telegram intake: ./tgTypes ──
+export type { PbTgChannel, PbTgConfig, PbTgMessage, PbTgMessageKind, PbTgMessageState } from './tgTypes';
 
 // ── Import from website (20261108090000_pb_website_import.sql) ──
 export type PbImportPlatform = 'shopify' | 'woocommerce' | 'generic' | 'unknown';

@@ -1,0 +1,73 @@
+name: Playbook SQL tests
+
+# Playbook keeps some of its rules in the database: which product is a copy of
+# which, what the Ready gate holds, what a bulk change may take back. They are
+# not part of `npm run build` or `npm run test:server` (those need no
+# database), so before 2026-11-13 nothing checked them automatically. This
+# workflow tries them on a throwaway PostgreSQL — never the live database —
+# whenever the SQL changes: supabase/tests/sql/run.sh builds a small copy of
+# the Playbook tables, loads the repository's real migration files and runs
+# the scenarios. It fails when a check fails.
+#
+# It is separate from the deploy workflow on purpose: a problem here shows as a
+# red run in the Actions tab and never blocks or delays a deploy of the app.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/**'
+      - 'supabase/tests/sql/**'
+      - 'docs/playbook/sql-to-run/**'
+      - '.github/workflows/sql-tests.yml'
+  pull_request:
+    paths:
+      - 'supabase/migrations/**'
+      - 'supabase/tests/sql/**'
+      - 'docs/playbook/sql-to-run/**'
+      - '.github/workflows/sql-tests.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sql:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17 # the live database runs PostgreSQL 17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: psql
+        run: psql --version || (sudo apt-get update && sudo apt-get install -y postgresql-client)
+
+      # The database as it is live: every migration in supabase/migrations.
+      - name: Rules as they are live
+        run: bash supabase/tests/sql/run.sh
+
+      # The same again with the SQL that is written but still waits to be run
+      # by hand (docs/playbook/sql-to-run/), so running it later breaks nothing.
+      - name: Rules with the SQL that is waiting to be run
+        run: |
+          shopt -s nullglob
+          waiting=(docs/playbook/sql-to-run/*.sql)
+          if [ ${#waiting[@]} -eq 0 ]; then echo "Nothing is waiting."; exit 0; fi
+          bash supabase/tests/sql/run.sh "${waiting[@]}"

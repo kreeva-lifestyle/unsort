@@ -1,0 +1,21 @@
+-- Playbook: a product remembers the colour part of its sizes' codes (pre-launch fix D19).
+--
+-- WHY: a vendor's design code is shared by every colour of the design, so two
+-- colours kept as two products sent the same SKU and barcode for each size.
+-- The colour now goes into the code ("KA-5070" in Wine, size M →
+-- "KA-5070-WINE-M"; pb-products skuCode.ts). But a product's colour is text
+-- that the AI or a person can re-word later ("Maroon" → "Wine"), and a code
+-- that is on a store must not follow that: orders, labels and stock sheets
+-- carry it. So the colour part is decided ONCE and kept:
+--   null = not decided yet (decided by the first send a store accepts);
+--   ''   = its codes carry no colour part.
+-- It is kept on the PRODUCT, and saved right after the first store took the
+-- product (second and third reviews): a send that fails half-way must find the
+-- same code on its next try, a send the store refuses decides nothing, and the
+-- same goods must carry one code on every website.
+-- A product that is already on a store when this arrives is decided as '':
+-- its codes stay exactly as they are (publish.ts).
+--
+-- Additive: one column.
+alter table public.pb_products add column if not exists sku_colour text;
+comment on column public.pb_products.sku_colour is 'The colour part this product''s sizes carry in their SKUs and barcodes on the stores (pb-products skuCode.ts); '''' = none, null = not decided yet (decided by the first send a store accepts). Kept, so codes on a store do not follow a re-worded colour.';
