@@ -54,9 +54,9 @@ export default function SuggestionsTile({ attrs, api, addToast, version, onChang
   const add = (s: PbSuggestion, force = false) => {
     const close = s.matches.filter(m => m.reason !== 'same' || m.other_attribute);
     if (!force && close.length) { setGuard({ s, matches: close }); return; }
-    void act({ ids: [s.id], action: 'add', force }, `add:${s.id}`, () => `Added “${s.phrase}” to ${nameOf(s.attribute_id)}`).then(r => { if (r === true) setGuard(null); });
+    void act({ ids: [s.id], act: 'add', force }, `add:${s.id}`, () => `Added “${s.phrase}” to ${nameOf(s.attribute_id)}`).then(r => { if (r === true) setGuard(null); });
   };
-  const aliasTo = (s: PbSuggestion, t: AliasTarget) => void act({ ids: [s.id], action: 'alias', value_id: t.value_id }, `alias:${s.id}`, () => `“${s.phrase}” now means ${t.value} (${t.attribute})`)
+  const aliasTo = (s: PbSuggestion, t: AliasTarget) => void act({ ids: [s.id], act: 'alias', value_id: t.value_id }, `alias:${s.id}`, () => `“${s.phrase}” now means ${t.value} (${t.attribute})`)
     .then(ok => { if (ok === true) { setAlias(null); setGuard(null); } });
 
   const ids = [...sel];
@@ -87,8 +87,8 @@ export default function SuggestionsTile({ attrs, api, addToast, version, onChang
                   <TagCheck checked={rows.every(r => sel.has(r.id))} onChange={on => setSel(on ? new Set(rows.map(r => r.id)) : new Set())} label="Select every suggestion on this page"
                     text={ids.length ? <><span style={pbNum}>{ids.length}</span> selected</> : 'Select all'} />
                 </span>
-                {ids.length > 0 && oneAttr && <PbButton icon="plus" onClick={() => void act({ ids, action: 'add' }, 'bulk:add', n => `Added ${plural(n, 'value')} to ${nameOf(oneAttr)}`)} busy={busy === 'bulk:add'} busyLabel="Adding…" dim={!!busy && busy !== 'bulk:add'}>Add {ids.length} to {nameOf(oneAttr)}</PbButton>}
-                {ids.length > 0 && <PbButton icon="eyeOff" onClick={() => void act({ ids, action: 'ignore' }, 'bulk:ignore', n => `Ignored ${plural(n, 'suggestion')}`)} busy={busy === 'bulk:ignore'} busyLabel="Ignoring…" dim={!!busy && busy !== 'bulk:ignore'}>Ignore {ids.length}</PbButton>}
+                {ids.length > 0 && oneAttr && <PbButton icon="plus" onClick={() => void act({ ids, act: 'add' }, 'bulk:add', n => `Added ${plural(n, 'value')} to ${nameOf(oneAttr)}`)} busy={busy === 'bulk:add'} busyLabel="Adding…" dim={!!busy && busy !== 'bulk:add'}>Add {ids.length} to {nameOf(oneAttr)}</PbButton>}
+                {ids.length > 0 && <PbButton icon="eyeOff" onClick={() => void act({ ids, act: 'ignore' }, 'bulk:ignore', n => `Ignored ${plural(n, 'suggestion')}`)} busy={busy === 'bulk:ignore'} busyLabel="Ignoring…" dim={!!busy && busy !== 'bulk:ignore'}>Ignore {ids.length}</PbButton>}
               </div>
             )}
             <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 300px), 1fr))', gap: 12 }}>
@@ -96,8 +96,8 @@ export default function SuggestionsTile({ attrs, api, addToast, version, onChang
                 <SuggestionCard key={s.id} s={s} attrs={attrs} selected={sel.has(s.id)} busy={busy} canEdit={canEdit}
                   onSelect={on => setSel(x => { const n = new Set(x); if (on) n.add(s.id); else n.delete(s.id); return n; })}
                   onAdd={() => add(s)} onAlias={() => setAlias(s)}
-                  onIgnore={() => void act({ ids: [s.id], action: 'ignore' }, `ignore:${s.id}`, () => `Ignored “${s.phrase}” — it will not be suggested again`)}
-                  onMove={to => void act({ ids: [s.id], action: 'move', attribute_id: to }, `move:${s.id}`, () => `Moved “${s.phrase}”${to ? ` to ${nameOf(to)}` : ''}`)} />
+                  onIgnore={() => void act({ ids: [s.id], act: 'ignore' }, `ignore:${s.id}`, () => `Ignored “${s.phrase}” — it will not be suggested again`)}
+                  onMove={to => void act({ ids: [s.id], act: 'move', attribute_id: to }, `move:${s.id}`, () => `Moved “${s.phrase}”${to ? ` to ${nameOf(to)}` : ''}`)} />
               ))}
             </ul>
             {pages > 1 && (
