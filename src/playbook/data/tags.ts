@@ -37,6 +37,12 @@ export const saveValue = (v: { attribute_id: string; id?: string; name: string; 
   pbCall<{ value: PbAttrValue }>('value_save', v).then(r => r.value).catch(lookAlike);
 export const deleteValue = (id: string) => pbCall<{ regated: number }>('value_delete', { id });
 export const mergeValue = (from: string, into: string) => pbCall<{ moved: number }>('value_merge', { from, into });
+/** A new name everywhere: the list, its must-have tags, its products, the Product Type ticks and the website rules. */
+export const renameCategory = (from: string, to: string) => pbCall<{ renamed: number; run_id: string | null }>('category_rename', { from, to });
+/** Every product of `from` goes to `to` (on the list); `remove` takes `from` off the list too. Then "Let AI decide"
+ *  for the ones missing a must-have tag of `to` (`queued`). */
+export const moveCategory = (from: string, to: string, remove = false) =>
+  pbCall<{ moved: number; to_ready: number; queued: number; removed: boolean; run_id: string | null }>('category_move', { from, to, remove });
 export const linkCheck = (category: string, attributeId: string) => pbCall<{ lacking: number }>('category_link_check', { category, attribute_id: attributeId }).then(r => r.lacking ?? 0);
 export const saveLinks = (category: string, attributeIds: string[]) =>
   pbCall<{ to_needs_info: number; to_ready: number }>('category_link_save', { category, attribute_ids: attributeIds });
@@ -115,6 +121,6 @@ export async function countSuggestions(): Promise<number> {
 /** Everything the Tags page calls, as one object so the screenshot harness can pass fakes. */
 export const TAGS_API = {
   taxonomy: getTaxonomy, saveCategories, saveAttribute, deleteAttribute, orderAttributes, checkValue, saveValue, deleteValue, mergeValue,
-  linkCheck, saveLinks, listSuggestions, nearestSuggestions, actSuggestions, retag, aiFill, fillStatus,
+  linkCheck, saveLinks, listSuggestions, nearestSuggestions, actSuggestions, retag, aiFill, fillStatus, renameCategory, moveCategory,
 };
 export type TagsApi = typeof TAGS_API;

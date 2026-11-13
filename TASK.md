@@ -20,9 +20,9 @@ are tagged.
 
 - **121 products wait for a category** ("Missing: Category"): Anarkali 96,
   Kurta Set 23, Gown 1, Indo-Western 1 — categories taken off the list.
-  Claude is building **Rename** and **Move products to…** for categories
-  next; then move them (Anarkali → Salwar Suit) and the rules and the AI
-  pick their Product Type there.
+  Settings → Tags → Categories → **Waiting for a category**: tap each and
+  move its products (Anarkali → Salwar Suit). Set up Product Type for the
+  new category first, so the rules and the AI can choose it.
 - **Product Type values.** Product Type exists (Settings → Tags) but has no
   values yet. Add the types and tick their categories (Salwar Suit:
   Anarkali, Sharara…; Lehenga: Bridal Lehenga…), then link Product Type to
@@ -82,10 +82,6 @@ are tagged.
 
 ## Playbook — being built next
 
-- **Categories: Rename, and Move products to….** Removing a category will
-  ask where its products go; they move there and the rules, then the AI,
-  pick their Product Type. A "Move to…" also comes for products already in
-  removed categories. Asked by the owner on 13 Nov; next after Product Type.
 - **acriine.in's tags.** Its product types become Product Type values,
   ticked for the matching categories; its other tags go to Tags →
   Suggestions for review. After Product Type is live.

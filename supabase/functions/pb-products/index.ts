@@ -50,6 +50,8 @@
 //   value_merge        admin|manager  { from, into }                      → { ok, moved }
 //   category_link_check staff         { category, attribute_id }          → { ok, lacking }
 //   category_link_save admin|manager  { category, attribute_ids[] }       → { ok, to_needs_info, to_ready }
+//   category_rename    admin|manager  { from, to }                        → { ok, renamed, run_id }  list, links, products, ticks, website rules (categoryMove.ts)
+//   category_move      admin|manager  { from, to, remove? }               → { ok, moved, to_ready, queued, removed, run_id }  then "Let AI decide" for them
 //   suggestions_list   staff          { status?, attribute_id?, page? }   → { ok, rows[{…, example_names, matches}], count, page, per }
 //   suggestion_act     admin|manager  { ids, act:add|alias|ignore|move|nearest, attribute_id?, value_id?, name?, force? } → { ok, done, conflicts{id: matches[]}, retagged, skipped? (nearest) }
 //   suggestions_nearest admin|manager { ids[≤20] } → { ok, nearest{id: {value_id, value, attribute_id, attribute, why, by}} } (rules, else one AI call, kept)
@@ -77,6 +79,7 @@ import { routeWebsite } from './routeSite.ts';
 import { setStock } from './stock.ts';
 import { previewPrice, saveCredentials, testSite } from './siteActions.ts';
 import * as T from './tagsActions.ts';
+import { categoryMove, categoryRename } from './categoryMove.ts';
 import { fillStatus, suggestionsList, tagsAiFill } from './tagsQueue.ts';
 import { suggestionAct } from './tagsSuggestAct.ts';
 import { suggestionsNearest } from './tagsNearest.ts';
@@ -121,6 +124,8 @@ const ACTIONS: Record<string, { who: Who; run: (b: A.Body, c: Caller) => Promise
   value_merge: { who: 'admin', run: (b, c) => T.valueMerge(b, userOf(c)) },
   category_link_check: { who: 'staff', run: (b) => T.categoryLinkCheck(b) },
   category_link_save: { who: 'admin', run: (b, c) => T.categoryLinkSave(b, userOf(c)) },
+  category_rename: { who: 'admin', run: (b, c) => categoryRename(b, userOf(c)) },
+  category_move: { who: 'admin', run: (b, c) => categoryMove(b, userOf(c)) },
   suggestions_list: { who: 'staff', run: (b) => suggestionsList(b) },
   suggestion_act: { who: 'admin', run: (b, c) => suggestionAct(b, userOf(c)) },
   suggestions_nearest: { who: 'admin', run: (b, c) => suggestionsNearest(b, userOf(c)) },

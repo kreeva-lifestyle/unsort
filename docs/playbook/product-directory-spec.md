@@ -595,13 +595,37 @@ category sheet says how many values a category has; the product page offers
 only the category's values. Tests: `test/tagByCategory`, `tagFill`,
 `t_dups.sql` part 10.
 
+**Rename and move a category** (owner, 2026-11-13: "If deleted than it has to
+be moved to correct category and let ai decide which product type is it for
+that category", "unable to rename the category"). Migration
+`20261113220000_pb_category_rename_move.sql`; server `categoryMove.ts`,
+revert `categoryRevert.ts`. A category name lives in the list, its links, its
+products, the Product Type ticks and `pb_routing_rules.conditions.categories`.
+`category_rename { from, to }` → `pb_category_rename` changes all five in one
+transaction (a case-only rename too; `to` already on the list is refused —
+that is a move). `category_move { from, to, remove? }` → `pb_category_move`
+files every product of `from` (on the list or not, any status) under `to`
+(the list's spelling) and checks them again; `remove` then takes `from` off
+the list (`categories_save`, its own bulk change); "Let AI decide" is queued
+for the moved products that miss a must-have tag other than Category. Both
+functions refuse anyone but the server. Both actions are bulk changes when
+they reach 2+ products (`category_rename` / `category_move`); their revert is
+the server's own (the database's `pb_bulk_revert` does not know them): a
+rename is renamed back; a move files back each product still in `to` whose
+category nobody locked (`pb_products` category is now recorded by
+`pb_bulk_capture`), then checks and retags them by the rules. The Tags page:
+a Name field with **Rename** in the category sheet; **Remove category** with
+products opens the move box (Move to … / Remove without moving / Cancel);
+**Waiting for a category** lists names off the list that still have
+products. Tests: `test/categoryMove`, `t_dups.sql` part 11.
+
 **Websites.** `{tags}` = the chosen values in the site's `tag_rules.tag_style`:
 `plain` ("Black", default) or `prefixed` (`${shopify_prefix || attribute}_${name}`);
 `max_tags` (default 30) caps the list. New sites' templates include `{tags}`.
 
 Tests: `test/tagText`, `tagClean`, `tagLook`, `tagMatch` (+ tagAuto),
 `tagGate`, `tagPrompt`, `tagFill` (queue with a fake database and AI),
-`tagByCategory`, `tags`, `runner` (ingest tagging).
+`tagByCategory`, `categoryMove`, `tags`, `runner` (ingest tagging).
 ## One store, one voice (owner, 2026-11-12)
 
 The owner's words: "different content, alt, title, description, meta desc, meta

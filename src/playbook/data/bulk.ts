@@ -15,7 +15,8 @@ import { supabase } from '../../lib/supabase';
 import { pbCall } from './pbFunctions';
 
 export type BulkKind = 'import' | 'route_site' | 'reprice_site' | 'retry_failed' | 'reread_failed' | 'reread' | 'copies'
-  | 'retag' | 'tag_fill' | 'value_delete' | 'value_merge' | 'attribute_delete' | 'categories' | 'category_links' | 'suggestions' | 'stock_notice';
+  | 'retag' | 'tag_fill' | 'value_delete' | 'value_merge' | 'attribute_delete' | 'categories' | 'category_links' | 'suggestions' | 'stock_notice'
+  | 'category_move' | 'category_rename';
 export type BulkStatus = 'running' | 'done' | 'reverted' | 'partly_reverted';
 /** Counts by name (restored, changed, busy…): which ones a kind has is in components/settings/bulkText.ts. */
 export type BulkCounts = Record<string, number>;
