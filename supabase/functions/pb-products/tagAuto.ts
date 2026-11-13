@@ -9,7 +9,7 @@
 // No I/O — tested in test/tagAuto.test.mjs.
 import { cleanStoreTags } from './tagClean.ts';
 import { lookAlikes, type TaxValue } from './tagLook.ts';
-import { matchProduct, type MatchAttr } from './tagMatch.ts';
+import { matchProduct, type MatchAttr, type MatchValue } from './tagMatch.ts';
 import type { ReadTags } from './tagPrompt.ts';
 import { displayName, tagKey } from './tagText.ts';
 
@@ -23,14 +23,14 @@ export interface Suggest { phrase: string; key: string; attribute_id: string | n
 const FACT_ATTRS = ['work', 'occasion', 'pattern', 'type', 'product_type'];
 const TEXT_ATTRS = ['notes', 'seo_description'];
 
-export function autoValues(p: AutoProduct, attrs: MatchAttr[], o: { manualAttrIds?: Set<string>; ai?: ReadTags | null; categories?: string[] } = {}) {
+export function autoValues(p: AutoProduct, attrs: MatchAttr[], o: { manualAttrIds?: Set<string>; ai?: ReadTags | null; categories?: string[]; shades?: MatchValue[] } = {}) {
   const a = p.attributes || {};
   const scope = attrs.filter(x => !o.manualAttrIds?.has(x.id));
   const m = matchProduct({
     name: p.name, storeTags: cleanStoreTags(a.store_tags, o.categories),
     facts: [p.fabric, p.color, ...FACT_ATTRS.map(k => a[k])],
     text: [p.raw_text, ...TEXT_ATTRS.map(k => a[k])].filter(Boolean).join('\n'),
-  }, scope);
+  }, scope, { shades: o.shades });
   const rows: ValueSet[] = [];
   const filled = new Set<string>();
   for (const x of scope) {

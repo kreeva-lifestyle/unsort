@@ -486,7 +486,14 @@ whole-word phrase matching of every value name and alias of the category's
 attributes in: label lines naming the attribute ("COLOUR :- 2 (Pink, Wine)",
 "FABRICS & WORK :- … embroidery-work"; weight 5), the name (4), store tags and
 the reader's facts (3), the text (1). A longer phrase beats a shorter one it
-covers; a one-value attribute keeps the strongest / earliest. At ingest the
+covers; a one-value attribute keeps the strongest / earliest — or a value
+that refines it ("Chanderi Silk" over "Silk"). A two-word value refining
+another value is also found with its words turned round ("Silk Chanderi");
+"digitally" stems to "digital". A word that is part of a colour's name (a
+multi-word Colour value / alias, or a shade word such as mehendi / haldi /
+rani right before a colour) counts for Colour only — "Mehendi Green" is not
+the Mehendi occasion (13 Nov 2026; the Colour values are passed to the
+matcher even when Colour is not looked for). At ingest the
 rules run over every attribute (category unknown); the reader then replaces
 the rules / AI rows of its category's attributes only (`pb_product_values_set`
 gets their ids: before 13 Nov 2026 it got none and cleared every attribute,

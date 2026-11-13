@@ -13,7 +13,7 @@ import { routeProduct } from './route.ts';
 import { autoValues, type ValueSet } from './tagAuto.ts';
 import { categoryGone, gateMoves, gateStatus, missingAttrs } from './tagGate.ts';
 import { type Refreshed, writeValues } from './tagStore.ts';
-import { type Taxonomy, attrsFor, loadTaxonomy, matchAttrs } from './taxonomy.ts';
+import { type Taxonomy, attrsFor, loadTaxonomy, matchAttrs, shadesOf } from './taxonomy.ts';
 import { PRODUCT_COLS, type ProductRow } from './types.ts';
 
 const PAGE = 200;
@@ -57,7 +57,7 @@ function next(p: P, have: Pv[], tax: Taxonomy): { rows: ValueSet[]; missing: str
   const attrs = attrsFor(tax, p.category);
   const attrOf = (pv: Pv) => pv.pb_attribute_values?.attribute_id ?? '';
   const manual = new Set(have.filter(v => v.source === 'manual').map(attrOf));
-  const r = autoValues(p, matchAttrs(attrs), { manualAttrIds: manual, categories: tax.categories });
+  const r = autoValues(p, matchAttrs(attrs), { manualAttrIds: manual, categories: tax.categories, shades: shadesOf(tax) });
   const inScope = new Set(attrs.map(a => a.id));
   const keepAi = have.filter(v => v.source === 'ai' && inScope.has(attrOf(v)) && !manual.has(attrOf(v)) && !r.filled.has(attrOf(v)));
   const rows: ValueSet[] = [...r.rows, ...keepAi.map(v => ({ value_id: v.value_id, source: 'ai' as const }))];

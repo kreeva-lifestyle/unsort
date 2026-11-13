@@ -4,7 +4,7 @@
 // page; Playbook only ever chooses from it. Helpers shape it for the matcher
 // (tagMatch.ts), the look-alike detector (tagLook.ts) and the AI (tagPrompt.ts).
 import { getSettings, sel } from './db.ts';
-import type { MatchAttr } from './tagMatch.ts';
+import { type MatchAttr, type MatchValue, isColour } from './tagMatch.ts';
 import type { TaxValue } from './tagLook.ts';
 import { type TagSpec, tagSpec } from './tagPrompt.ts';
 import { tagKey } from './tagText.ts';
@@ -44,6 +44,13 @@ export const allAttrs = (tax: Taxonomy): AttrWithValues[] => tax.attrs.map(a => 
 
 export const matchAttrs = (list: AttrWithValues[]): MatchAttr[] =>
   list.map(a => ({ id: a.id, name: a.name, multi: a.multi, values: a.values.map(v => ({ id: v.id, name: v.name, key: v.key, aliases: v.aliases })) }));
+
+/** The Colour attribute's values, whatever is being looked for: the matcher keeps a word that is part of a colour's
+ *  name ("Mehendi Green") from counting for another attribute (tagMatch.ts). */
+export function shadesOf(tax: Taxonomy): MatchValue[] {
+  const a = tax.attrs.find(isColour);
+  return a ? tax.values.filter(v => v.attribute_id === a.id).map(v => ({ id: v.id, name: v.name, key: v.key, aliases: v.aliases })) : [];
+}
 
 /** Every value of every attribute, for the look-alike detector. */
 export const taxValues = (tax: Taxonomy): TaxValue[] => {

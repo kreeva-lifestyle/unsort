@@ -6,7 +6,8 @@
 //   stem     a small English stemmer for one Latin word, enough to treat
 //            plurals and -ed / -ing / -ery forms as the same word:
 //            sequins → sequin, printed / printing / prints → print,
-//            embroidered / embroidery / embroideries → embroider, patches → patch.
+//            embroidered / embroidery / embroideries → embroider, patches → patch,
+//            digitally → digital.
 //            Words of 3 letters or fewer and non-Latin words are left alone.
 //   stemKey  tagKey + stem on every word ("Embroidered Sarees" → "embroider saree").
 //   words    stemmed words of a text, in order (the matcher's token stream).
@@ -31,6 +32,7 @@ export function stem(w: string): string {
   if (s.endsWith('ing') && s.length > 5 && VOWEL.test(s.slice(0, -3))) s = undouble(s.slice(0, -3));
   else if (s.endsWith('ed') && s.length > 4 && VOWEL.test(s.slice(0, -2))) s = undouble(s.slice(0, -2));
   if (s.endsWith('ery') && s.length > 5) s = s.slice(0, -1);
+  if (s.endsWith('ally') && s.length > 6) s = s.slice(0, -2); // digitally → digital ("Digitally Printed" is Digital Print)
   return s;
 }
 /** wedd → wed, stopp → stop (but not "dress" / "fill": ss / ll stay). */

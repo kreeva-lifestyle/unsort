@@ -21,6 +21,8 @@ test('stem: plurals, -ed, -ing, -ery share one form', () => {
   assert.equal(stem('evenings'), 'evening');
   assert.equal(stem('leggings'), 'legging');
   assert.equal(stem('even'), 'even');
+  assert.equal(stem('digitally'), 'digital'); // "Digitally Printed" is Digital Print (13 Nov 2026)
+  assert.equal(stemKey('Digitally Printed'), stemKey('Digital Print'));
 });
 
 test('words / stemKey', () => {
