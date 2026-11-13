@@ -66,6 +66,7 @@ function fakeWorld(run, store = null) {
     if (path.startsWith('pb_bulk_items?') && method === 'HEAD') return new Response(null, { status: 200, headers: { 'content-range': `0-0/${calls.inserts.length}` } });
     if (path.startsWith('pb_bulk_runs?') && method === 'PATCH') { calls.bulk.push({ close: JSON.parse(init.body) }); return ok([{ id: run.id }]); }
     if (path.startsWith('pb_bulk_runs?') && method === 'DELETE') { calls.bulk.push({ dropped: true }); return new Response(null, { status: 204 }); }
+    if (path.startsWith('pb_bulk_runs?') && method === 'GET') return ok([{ kind: 'import' }]); // closing asks what kind it is (bulkLog.ts endRun)
     if (method === 'PATCH' || path.startsWith('pb_activity')) return ok([]);
     throw new Error(`unexpected ${method} ${u}`);
   };

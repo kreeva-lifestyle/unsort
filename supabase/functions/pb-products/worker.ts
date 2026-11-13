@@ -37,7 +37,7 @@ import { temporary } from './publishParts.ts';
 import { claimRead, readCandidates, readOne } from './reader.ts';
 import { retireDue, sendStockDue } from './stockSend.ts';
 import { takeOffDue } from './takeOff.ts';
-import { FILL_NEEDS_MS, fillCandidates, fillQueued, routeDue } from './tagFill.ts';
+import { FILL_NEEDS_MS, closeFills, fillCandidates, fillQueued, routeDue } from './tagFill.ts';
 import { loadTaxonomy } from './taxonomy.ts';
 import type { Budget } from './types.ts';
 
@@ -149,5 +149,6 @@ export async function work(userId: string | null, manual = false): Promise<WorkR
       if (await fillQueued(c, tax, userId, budget)) out.tagged = (out.tagged ?? 0) + 1; // false: another run took it
     }
   } catch (e) { failed('tags_fill', 'run', e); }
+  try { await closeFills(); } catch (e) { failed('tags_fill', 'close', e); } // its bulk change, once the queue is over
   return out;
 }

@@ -1,18 +1,21 @@
 // Staff actions on the tag TAXONOMY (index.ts; structure edits are admin /
-// manager): taxonomy_get, categories_save, attribute_save / _delete / _order,
-// value_check (live look-alike check while typing), value_save (refused with
-// the look-alikes unless force), value_delete, value_merge,
-// category_link_check ("12 products will need a Colour") and
-// category_link_save. SQL: 20261110090000_pb_tags.sql. Suggestions, product
-// values, retag and "Let AI decide": tagsQueue.ts.
+// manager): taxonomy_get, attribute_save / _order, value_check (live
+// look-alike check while typing), value_save (refused with the look-alikes
+// unless force) and category_link_check ("12 products will need a Colour").
+// The changes that reach many products at once — categories_save,
+// attribute_delete, value_delete, value_merge, category_link_save — are bulk
+// changes that can be taken back: tagsBulk.ts. SQL: 20261110090000_pb_tags.sql.
+// Suggestions, product values, retag and "Let AI decide": tagsQueue.ts.
 import { uuid, type Body } from './actions.ts';
-import { SB_URL, enc, insert, logActivity, one, patch, remove, rpc, sel, selAll, svcHeaders, uniqueCi } from './db.ts';
+import { SB_URL, enc, insert, logActivity, one, patch, rpc, sel, selAll, svcHeaders } from './db.ts';
 import { HttpError } from './http.ts';
 import { exactIn, lookAlikes } from './tagLook.ts';
 import { displayName, tagKey } from './tagText.ts';
 import { ATTR_COLS, type AttrRow, VALUE_COLS, type ValueRow, loadTaxonomy, taxValues } from './taxonomy.ts';
 import { refresh } from './tagStore.ts';
 import { fillStatus } from './tagsQueue.ts';
+
+export { attributeDelete, categoriesSave, categoryLinkSave, valueDelete, valueMerge } from './tagsBulk.ts';
 
 const MAX_ALIASES = 30;
 
@@ -35,16 +38,6 @@ export async function taxonomyGet() {
 async function fetchCount(path: string): Promise<number> {
   const r = await fetch(`${SB_URL}/rest/v1/${path}`, { method: 'HEAD', headers: { ...svcHeaders, prefer: 'count=exact' } });
   return Number((r.headers.get('content-range') || '').split('/')[1]) || 0;
-}
-
-/** categories_save { categories[] } → the reader's list (pb_settings); removed ones lose their links. */
-export async function categoriesSave(b: Body, userId: string | null) {
-  if (!Array.isArray(b.categories)) throw new HttpError(400, 'categories must be a list.');
-  const cats = uniqueCi(b.categories.map(c => displayName(c).slice(0, 60)).filter(Boolean)).slice(0, 200);
-  await insert('pb_settings', [{ key: 'categories', value: cats }], { onConflict: 'key', mode: 'merge' });
-  const moved = await rpc<number>('pb_categories_prune', { p_keep: cats });
-  await logActivity({ action: 'settings_edited', details: { key: 'categories', count: cats.length }, user_id: userId });
-  return { ok: true, categories: cats, regated: moved };
 }
 
 /** attribute_save { id?, name, multi?, shopify_prefix? } → { ok, attribute }. */
@@ -73,22 +66,6 @@ export async function attributeSave(b: Body, userId: string | null) {
   }
   await logActivity({ action: 'tags_edited', details: { what: 'attribute', name, new: !id }, user_id: userId });
   return { ok: true, attribute: row };
-}
-
-export async function attributeDelete(b: Body, userId: string | null) {
-  const id = uuid(b.id, 'The attribute');
-  // A suggestion filed under this attribute falls back to "no attribute" when the attribute goes. Where the
-  // same word already waits with no attribute that would be a duplicate, and the database then refuses the
-  // whole delete: take the attribute's copy out first (the other one stays in the queue).
-  const mine = await selAll<{ id: string; key: string }>(`pb_tag_suggestions?attribute_id=eq.${enc(id)}&select=id,key&order=id.asc`);
-  if (mine.length) {
-    const free = new Set((await selAll<{ key: string }>('pb_tag_suggestions?attribute_id=is.null&select=key&order=id.asc')).map(s => s.key));
-    const twins = mine.filter(s => free.has(s.key)).map(s => s.id);
-    for (let i = 0; i < twins.length; i += 100) await remove('pb_tag_suggestions', `id=in.(${twins.slice(i, i + 100).map(enc).join(',')})`);
-  }
-  const regated = await rpc<number>('pb_attribute_delete', { p_id: id });
-  await logActivity({ action: 'tags_edited', details: { what: 'attribute_deleted', id, regated }, user_id: userId });
-  return { ok: true, regated };
 }
 
 /** attribute_order { ids[] } → positions 1..n in that order. */
@@ -146,30 +123,8 @@ export async function valueSave(b: Body, userId: string | null) {
   return { ok: true, value: row };
 }
 
-export async function valueDelete(b: Body, userId: string | null) {
-  const regated = await rpc<number>('pb_value_delete', { p_id: uuid(b.id, 'The value') });
-  await logActivity({ action: 'tags_edited', details: { what: 'value_deleted', regated }, user_id: userId });
-  return { ok: true, regated };
-}
-
-export async function valueMerge(b: Body, userId: string | null) {
-  const moved = await rpc<number>('pb_value_merge', { p_from: uuid(b.from, 'The value to merge'), p_into: uuid(b.into, 'The value to merge into') });
-  await logActivity({ action: 'tags_edited', details: { what: 'value_merged', moved }, user_id: userId });
-  return { ok: true, moved };
-}
-
 export async function categoryLinkCheck(b: Body) {
   const category = displayName(b.category);
   if (!category) throw new HttpError(400, 'Pick a category.');
   return { ok: true, lacking: await rpc<number>('pb_category_lacking', { p_category: category, p_attribute: uuid(b.attribute_id, 'The attribute') }) };
-}
-
-/** category_link_save { category, attribute_ids[] (in order) } → { ok, to_needs_info, to_ready }. */
-export async function categoryLinkSave(b: Body, userId: string | null) {
-  const category = displayName(b.category);
-  if (!category) throw new HttpError(400, 'Pick a category.');
-  const ids = [...new Set((Array.isArray(b.attribute_ids) ? b.attribute_ids : []).map(v => uuid(v, 'An attribute')))].slice(0, 30);
-  const r = (await rpc<{ to_needs_info: number; to_ready: number }[]>('pb_category_links_set', { p_category: category, p_attribute_ids: ids }))[0] ?? { to_needs_info: 0, to_ready: 0 };
-  await logActivity({ action: 'tags_edited', details: { what: 'category_links', category, count: ids.length, ...r }, user_id: userId });
-  return { ok: true, ...r };
 }

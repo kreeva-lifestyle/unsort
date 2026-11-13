@@ -5,6 +5,7 @@
 // lose its values, and categories stop needing it.
 import { useEffect, useState } from 'react';
 import { friendlyError } from '../../../lib/friendlyError';
+import { TAKE_BACK } from '../../data/bulk';
 import type { AddToast } from '../PbToasts';
 import type { TagsApi } from '../../data/tags';
 import type { PbAttribute } from '../../tagTypes';
@@ -40,7 +41,7 @@ export default function AttributeSheet({ open, attr, api, addToast, onClose, onS
   const remove = async () => {
     if (!attr) return;
     const n = attr.values.reduce((s, v) => s + (v.uses ?? 0), 0);
-    if (!await ask({ title: `Delete ${attr.name}?`, message: `Its ${plural(attr.values.length, 'value')} go too${n ? `, and ${plural(n, 'product tag')} with them` : ''}. Categories stop needing it.`, confirmLabel: 'Delete', danger: true })) return;
+    if (!await ask({ title: `Delete ${attr.name}?`, message: `Its ${plural(attr.values.length, 'value')} go${attr.values.length === 1 ? 'es' : ''} too${n ? `, and ${plural(n, 'product tag')} with them` : ''}. Categories stop needing it.${attr.values.length || n >= 2 ? ` ${TAKE_BACK}` : ''}`, confirmLabel: 'Delete', danger: true })) return;
     setBusy('delete');
     try { await api.deleteAttribute(attr.id); addToast(`Deleted ${attr.name}`, 'success'); onSaved(); onClose(); }
     catch (e) { setErr(friendlyError(e)); } finally { setBusy(''); }

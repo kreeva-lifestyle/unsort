@@ -53,7 +53,7 @@ export default function BulkRevertSheet({ run, onClose, onDone, addToast }: { ru
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
             <span style={{ ...pbBody, fontWeight: 600, overflowWrap: 'anywhere' }}>{run.label}</span>
-            <span style={pbMeta}>{rows(run.kind, run.items)} · {istDate(run.created_at)}{run.by?.full_name ? ` · by ${run.by.full_name}` : ''}</span>
+            <span style={pbMeta}>{rows(run.kind, run.items, run.details?.unit)} · {istDate(run.created_at)}{run.by?.full_name ? ` · by ${run.by.full_name}` : ''}</span>
           </div>
           {!counts && !err && (
             <div aria-busy="true" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>

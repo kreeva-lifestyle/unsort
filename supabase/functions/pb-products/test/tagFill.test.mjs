@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 globalThis.Deno = { env: { get: (k) => (k === 'SUPABASE_URL' ? 'https://sb.example' : 'test') } };
-const { fillQueued } = await import('../tagFill.ts');
+const { closeFills, fillQueued } = await import('../tagFill.ts');
 
 const TAX = {
   attrs: [{ id: 'col', name: 'Colour', key: 'colour', multi: true, position: 1, shopify_prefix: null }, { id: 'work', name: 'Work', key: 'work', multi: true, position: 2, shopify_prefix: null }],
@@ -18,8 +18,8 @@ const TAX = {
 };
 const PRODUCT = { id: 'p1', name: 'Lehenga choli', category: 'Lehenga', status: 'needs_info', locked: [], attributes: {}, raw_text: 'Cosmos with beads', source: 'telegram', missing_attrs: ['Colour'] };
 
-function world({ product = PRODUCT, ai = { tags: { colour: { values: ['Pink'], other: [] } } }, aiStatus = 200, taken = false } = {}) {
-  const calls = { ai: [], set: [], ticks: [], patches: [] };
+function world({ product = PRODUCT, ai = { tags: { colour: { values: ['Pink'], other: [] } } }, aiStatus = 200, taken = false, bulk = false, finishedAt = null, waiting = false, reached = 1 } = {}) {
+  const calls = { ai: [], set: [], ticks: [], patches: [], tagged: [], closed: [] };
   globalThis.fetch = async (url, init = {}) => {
     const u = decodeURIComponent(String(url)); const method = init.method || 'GET';
     const ok = (b, s = 200) => new Response(JSON.stringify(b), { status: s });
@@ -28,6 +28,15 @@ function world({ product = PRODUCT, ai = { tags: { colour: { values: ['Pink'], o
       return aiStatus === 200 ? ok({ content: [{ type: 'text', text: JSON.stringify(ai) }], usage: {} }) : ok({ error: { message: 'busy' } }, aiStatus);
     }
     const path = u.replace('https://sb.example/rest/v1/', '');
+    const run = Object.entries(init.headers || {}).find(([k]) => k.toLowerCase() === 'x-pb-bulk')?.[1];
+    if (run) calls.tagged.push([path.split('?')[0], run]);
+    if (path.startsWith('pb_bulk_runs?') && method === 'GET') return ok(bulk ? [{ id: 'run1', kind: 'tag_fill' }] : []); // the queue's bulk change, while open
+    if (path.startsWith('pb_tag_fill_runs?') && method === 'GET') return ok([{ finished_at: finishedAt }]);
+    if (path.startsWith('pb_products?tag_fill_run=eq.run1')) return ok(waiting ? [{ id: 'p9' }] : []);
+    if (path.startsWith('pb_bulk_items?') && method === 'HEAD') return new Response(null, { status: 200, headers: { 'content-range': '0-0/3' } });
+    if (path.startsWith('rpc/pb_bulk_products')) return ok(reached);
+    if (path.startsWith('pb_bulk_items?')) return ok([]);
+    if (path.startsWith('pb_bulk_runs?') && method === 'DELETE') { calls.closed.push('dropped'); return new Response(null, { status: 204 }); }
     if (path.startsWith('app_secrets?')) return ok([{ value: 'sk-test' }]);
     if (path.startsWith('pb_products?id=eq.p1&select=')) return ok([product]);
     if (path.startsWith('pb_product_values?')) return ok([{ value_id: 'emb', source: 'manual', pb_attribute_values: { attribute_id: 'work' } }]);
@@ -97,4 +106,41 @@ test('a value outside the list is never written', async () => {
   const c = world({ ai: { tags: { colour: { values: ['Maroon'], other: ['Maroon'] } } } });
   await fillQueued({ id: 'p1', tag_fill_run: 'run1' }, TAX, null, budget());
   assert.deepEqual(c.set[0].p_rows, []);
+});
+
+const minutesAgo = (m) => new Date(Date.now() - m * 60_000).toISOString();
+
+test('a queued "Let AI decide" is a bulk change: the values and suggestions carry it, and a product never closes it', async () => {
+  const c = world({ bulk: true, finishedAt: minutesAgo(10), reached: 2, ai: { tags: { colour: { values: ['Pink'], other: ['Rose gold'] } } } });
+  await fillQueued({ id: 'p1', tag_fill_run: 'run1' }, TAX, null, budget());
+  assert.deepEqual(c.tagged.map(([p]) => p).filter(p => p.startsWith('rpc/')), ['rpc/pb_product_values_set', 'rpc/pb_tag_suggest']);
+  assert.ok(c.tagged.every(([, r]) => r === 'run1'));
+  assert.ok(!c.tagged.some(([p]) => p === 'rpc/pb_tag_fill_tick'), 'the progress tick is not part of it');
+  // another worker run may still be writing a product it took: closing (or dropping) the change then would refuse that write
+  assert.ok(!c.patches.some(([p]) => p.startsWith('pb_bulk_runs?')) && !c.closed.length);
+});
+
+test('the worker closes it once nothing waits and the last product was taken 5 minutes ago or more', async () => {
+  let c = world({ bulk: true, finishedAt: minutesAgo(6), reached: 2 });
+  assert.equal(await closeFills(), 1);
+  const close = c.patches.find(([p]) => p.startsWith('pb_bulk_runs?'));
+  assert.equal(close[1].status, 'done'); assert.equal(close[1].items, 2); assert.equal(close[1].details.unit, 'products');
+  c = world({ bulk: true, finishedAt: minutesAgo(2), reached: 2 }); // too soon
+  assert.equal(await closeFills(), 0);
+  c = world({ bulk: true, waiting: true }); // products still wait in the queue
+  assert.equal(await closeFills(), 0);
+  assert.ok(!c.patches.length);
+  c = world({ bulk: true, finishedAt: null }); // nothing waits but no tick finished it (its last products were archived): marked, closed later
+  assert.equal(await closeFills(), 0);
+  assert.ok(c.patches.some(([p, b]) => p.startsWith('pb_tag_fill_runs?id=eq.run1&finished_at=is.null&created_at=lt.') && b.finished_at));
+  c = world({ bulk: true, finishedAt: minutesAgo(6), reached: 1 }); // it reached one product in the end: an edit, not a bulk change
+  assert.equal(await closeFills(), 1);
+  assert.deepEqual(c.closed, ['dropped']);
+});
+
+test('a queue with no open bulk change (made before the log knew it) writes untagged: a tag the log does not know is refused', async () => {
+  const c = world({ bulk: false });
+  await fillQueued({ id: 'p1', tag_fill_run: 'run1' }, TAX, null, budget());
+  assert.equal(c.set.length, 1);
+  assert.deepEqual(c.tagged, []);
 });

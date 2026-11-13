@@ -23,7 +23,7 @@ function world(o = {}) {
       generated_at: '2026-11-02T00:00:00Z', shopify_product_id: null, shopify_status: null, published_at: null, first_published_at: null, attempts: 0, ...o.listing },
     site: { id: W, name: 'Kreeva', shop_domain: 'kreeva.myshopify.com', auth_mode: 'token', api_version: '2026-10', active: true, publish_mode: 'live', track_inventory: false, pricing: {}, tag_rules: {},
       content: { profile: { custom_fields: false, faq_in_description: false } } },
-    sets: [], failed: [], channelDown: !!o.channelDown, refuse: !!o.refuse, other: o.other ?? null, store: null,
+    sets: [], statuses: [], failed: [], channelDown: !!o.channelDown, refuse: !!o.refuse, other: o.other ?? null, store: null,
   };
   const node = (handle) => ({ id: GID, handle, tags: [], options: [{ id: 'o1', name: 'Size', optionValues: [{ id: 'ov1', name: 'M' }, { id: 'ov2', name: 'L' }] }],
     variants: { nodes: [{ id: 'v1', selectedOptions: [{ name: 'Size', value: 'M' }] }, { id: 'v2', selectedOptions: [{ name: 'Size', value: 'L' }] }] }, media: { nodes: [] }, metafield: { value: L } });
@@ -40,6 +40,7 @@ function world(o = {}) {
         const input = body.variables.input;
         if (w.refuse) return ok({ data: { productSet: { product: null, userErrors: [{ field: ['input', 'title'], message: 'Title is not allowed' }] } } });
         w.sets.push(input.variants.map(v => v.inventoryItem.sku));
+        w.statuses.push(input.status ?? null);
         w.store = node(input.handle);
         if (w.other !== null && w.product.sku_colour === null) { w.product.sku_colour = w.other; w.other = null; }
         return ok({ data: { productSet: { product: { id: GID, status: 'ACTIVE', handle: input.handle, media: { nodes: [] } }, userErrors: [] } } });
@@ -114,4 +115,15 @@ test('the same goods carry one code on every website: a second website, first se
   const w = world({ product: { sku_colour: 'MAROON', color: 'Wine' } }); // decided when the first website got it
   assert.equal((await send(w)).status, 'published');
   assert.deepEqual(w.sets, [['KA-5070-MAROON-M', 'KA-5070-MAROON-L']]);
+});
+
+test('a listing a revert put back (put_back): the update makes the Shopify product visible again, once', async () => {
+  const live = { shopify_product_id: GID, shopify_status: 'ARCHIVED', handle: 'wine-cotton-kurta', published_at: '2026-11-03T00:00:00Z', first_published_at: '2026-11-03T00:00:00Z' };
+  const w = world({ listing: { ...live, put_back: true } });
+  await send(w);
+  assert.deepEqual(w.statuses, ['ACTIVE']);
+  assert.equal(w.listing.put_back, false); assert.equal(w.listing.status, 'published');
+  const plain = world({ listing: { ...live, shopify_status: 'DRAFT' } }); // a plain update leaves the status people set in Shopify
+  await send(plain);
+  assert.deepEqual(plain.statuses, [null]);
 });

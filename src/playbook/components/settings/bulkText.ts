@@ -5,19 +5,27 @@ import type { BulkCounts, PbBulkRun } from '../../data/bulk';
 import { count } from '../../format';
 
 type Kind = PbBulkRun['kind'];
-const PRODUCTS: Kind[] = ['import', 'reread_failed', 'reread', 'copies'];
+/** Changes that reach products through the tag lists: one revert serves them all (the server's counts are the same). */
+const TAGS: Kind[] = ['retag', 'tag_fill', 'value_delete', 'value_merge', 'attribute_delete', 'categories', 'category_links', 'suggestions'];
+const PRODUCTS: Kind[] = ['import', 'reread_failed', 'reread', 'copies', 'stock_notice', ...TAGS];
 /** "1 product" / "136 products". */
 const n = (k: number, one: string, many = `${one}s`) => `${count(k)} ${k === 1 ? one : many}`;
 /** Pick the singular or the plural wording. */
 const s = (k: number, one: string, many: string) => (k === 1 ? one : many);
 
-/** What the rows of a bulk change are: "136 products", "118 listings". */
-export const rows = (kind: Kind, k: number) => (PRODUCTS.includes(kind) ? n(k, 'product') : n(k, 'listing'));
+/** What the rows of a bulk change are: "136 products", "118 listings"; a tag-list change that reached fewer than two
+ *  products is counted by what it changed in the lists (`unit`, from the server: "4 tag-list entries", "12 suggestions"). */
+export const rows = (kind: Kind, k: number, unit?: unknown) => (unit === 'entries' ? n(k, 'tag-list entry', 'tag-list entries')
+  : unit === 'suggestions' ? n(k, 'suggestion') : PRODUCTS.includes(kind) ? n(k, 'product') : n(k, 'listing'));
 /** Retrying and reading again only repeat a step that failed: there is nothing to put back, only a queue to stop. */
 export const onlyStops = (kind: Kind) => kind === 'retry_failed' || kind === 'reread_failed';
 export const verb = (kind: Kind) => (onlyStops(kind) ? 'Stop the rest' : 'Revert');
 
 export interface Plan { lines: string[]; note: string; confirm: string; danger: boolean; todo: number }
+const TAG_CONFIRM: Partial<Record<Kind, string>> = {
+  value_delete: 'Bring the value back', attribute_delete: 'Bring the attribute back', value_merge: 'Separate them again', categories: 'Put the list back',
+  category_links: 'Put the must-have tags back', suggestions: 'Put the suggestions back', retag: 'Put the tags back', tag_fill: 'Take the AI tags off',
+};
 const busy = (k: number, what: string) => `${what} ${s(k, 'is', 'are')} being worked on right now. Tap Revert again in a few minutes for ${s(k, 'it', 'them')}.`;
 
 /** What a revert would do now, in plain sentences. `todo` = 0: nothing is left to take back. */
@@ -61,6 +69,28 @@ export function plan(run: Pick<PbBulkRun, 'kind' | 'details'>, c: BulkCounts): P
     add(v('changed'), `${n(v('changed'), 'product')} ${s(v('changed'), 'was restored or changed since and stays as it is', 'were restored or changed since and stay as they are')}.`);
     note = 'Nothing is sent to a website by this: the products wait for your answer again.';
     confirm = `Put back ${n(todo, 'product')}`;
+  } else if (TAGS.includes(run.kind)) {
+    const back = v('values_back'), out = v('values_gone'), tin = v('tags_in'), tout = v('tags_out');
+    todo = back + out + tin + tout + v('links') + v('suggestions') + v('list');
+    if (run.kind === 'attribute_delete') add(back, `The attribute comes back to the tag lists${back > 1 ? `, with ${n(back - 1, 'value')}` : ''}.`);
+    else add(back, `${n(back, 'tag value')} ${s(back, 'comes', 'come')} back to the tag lists.`);
+    add(out, `${n(out, 'tag value')} this change added ${s(out, 'is', 'are')} taken out of the lists again.`);
+    add(v('list'), 'The category list goes back to how it was.');
+    add(v('links'), `The must-have tags of the categories go back to how they were (${n(v('links'), 'change')}).`);
+    add(v('suggestions'), `${n(v('suggestions'), 'suggestion')} ${s(v('suggestions'), 'goes', 'go')} back to how ${s(v('suggestions'), 'it was', 'they were')}.`);
+    add(tin + tout, `The tags of ${n(v('products'), 'product')} go back to how they were: ${[tin ? `${n(tin, 'tag')} put back` : '', tout ? `${n(tout, 'tag')} taken off` : ''].filter(Boolean).join(', ')}.`);
+    add(v('kept'), `${n(v('kept'), 'product')} had ${s(v('kept'), 'its', 'their')} tags set by hand since and ${s(v('kept'), 'stays as it is', 'stay as they are')}.`);
+    add(v('left'), `${n(v('left'), 'tag')} ${s(v('left'), 'stays', 'stay')} off: the product has another value for that by now, or was edited by hand since.`);
+    note = 'Every product it reached is checked again: one missing a must-have tag goes to Needs info, one with all of them goes to Ready and is matched to the websites as usual. The revert itself sends nothing to a store.';
+    confirm = TAG_CONFIRM[run.kind] || 'Revert';
+  } else if (run.kind === 'stock_notice') {
+    todo = v('restored');
+    const word = String(run.details?.notice || '');
+    add(todo, `${n(todo, 'product')} ${s(todo, 'gets', 'get')} back the stock ${s(todo, 'it', 'they')} had before the notice${word === 'permanent' ? `, and ${s(todo, 'comes', 'come')} out of Archived` : ''}.${word === 'temporary' ? ' Nothing changes on the websites.' : ` ${s(todo, 'Its', 'Their')} websites are told.`}`);
+    add(v('back'), `${n(v('back'), 'listing')} the notice took off a website ${s(v('back'), 'goes', 'go')} back: one archived in Shopify is sent again and made visible, one that never reached its store waits where it was.`);
+    add(v('changed'), `${n(v('changed'), 'product')} had ${s(v('changed'), 'its', 'their')} stock changed since (by hand or by a later post) and ${s(v('changed'), 'stays as it is', 'stay as they are')}.`);
+    note = 'The notice itself stays in Products as it is. If the vendor really is out of stock, switch Stock off on the product, or the next notice marks it again.';
+    confirm = `Put back ${n(todo, 'product')}`;
   } else {
     todo = v('restored');
     const cut = Number(run.details?.notes_cut) || 0;
@@ -84,6 +114,12 @@ export function done(kind: Kind, c: BulkCounts | null): string {
   else if (kind === 'route_site') parts.push(`Took back ${n(v('aside') + v('live'), 'listing')}`, ...(v('live') ? [`${count(v('live'))} of them ${s(v('live'), 'comes', 'come')} off the store in the next minutes`] : []));
   else if (kind === 'reprice_site') parts.push(`Put back ${n(v('restored'), 'price')}`, ...(v('resend') ? [`${count(v('resend'))} sent to the store again`] : []), ...(v('changed') ? [`${count(v('changed'))} changed since left as ${s(v('changed'), 'it is', 'they are')}`] : []));
   else if (onlyStops(kind)) parts.push(`Stopped ${n(v('stopped'), unit)}`, ...(v('went') ? [`${count(v('went'))} had already gone ahead`] : []));
+  else if (TAGS.includes(kind)) {
+    parts.push(...[v('products') ? `Put back the tags of ${n(v('products'), 'product')}` : '', v('values_back') ? `${n(v('values_back'), 'value')} back in the lists` : '',
+      v('values_gone') ? `${n(v('values_gone'), 'added value')} taken out` : '', v('list') ? 'the category list as it was' : '', v('links') ? `${n(v('links'), 'must-have tag')} as before` : '',
+      v('suggestions') ? `${n(v('suggestions'), 'suggestion')} as before` : '', v('kept') ? `${count(v('kept'))} edited by hand left as ${s(v('kept'), 'it is', 'they are')}` : ''].filter(Boolean));
+    if (!parts.length) parts.push('Nothing was left to put back');
+  } else if (kind === 'stock_notice') parts.push(`Put back the stock of ${n(v('restored'), 'product')}`, ...(v('back') ? [`${n(v('back'), 'listing')} back on ${s(v('back'), 'its website', 'their websites')}`] : []), ...(v('changed') ? [`${count(v('changed'))} changed since left as ${s(v('changed'), 'it is', 'they are')}`] : []));
   else if (kind === 'copies') parts.push(`Put back ${n(v('restored'), 'copy', 'copies')}`, ...(v('not_copies') ? [`${count(v('not_copies'))} no longer ${s(v('not_copies'), 'a copy', 'copies')}, left in Archived`] : []), ...(v('changed') ? [`${count(v('changed'))} changed since left as ${s(v('changed'), 'it is', 'they are')}`] : []));
   else parts.push(`Put back ${n(v('restored'), 'product')}`, ...(v('changed') ? [`${count(v('changed'))} edited since left as ${s(v('changed'), 'it is', 'they are')}`] : []));
   if (v('busy')) parts.push(`${count(v('busy'))} busy right now: tap Revert again in a few minutes`);
