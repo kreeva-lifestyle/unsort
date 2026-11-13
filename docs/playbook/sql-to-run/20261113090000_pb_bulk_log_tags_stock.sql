@@ -252,7 +252,7 @@ begin
   if r.status = 'running' then raise exception 'This is still running. Wait until it has finished.'; end if;
   if r.status = 'reverted' then raise exception 'This was already reverted.'; end if;
   if r.created_at < now() - interval '7 days' then raise exception 'This is more than 7 days old, so it can no longer be reverted.'; end if;
-  family := case when r.kind = any(tags) then tags when r.kind in ('reprice_site', 'reread', 'stock_notice') then array[r.kind] end;
+  family := case when r.kind = any(tags) then tags when r.kind in ('reprice_site', 'reread', 'stock_notice', 'copies') then array[r.kind] end;
   if family is not null then
     select x.label, x.created_at into b from pb_bulk_runs x
     where x.kind = any(family) and x.created_at > r.created_at and x.status in ('done', 'partly_reverted')

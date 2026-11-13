@@ -232,12 +232,16 @@ costs one read. What follows the read (`pb-products/restock.ts`; the full rules
 are in `product-directory-spec.md`, "Batch 6"):
 - **It brings the earlier product back.** The vendor's earlier product of the
   same design and colour goes back In stock (or loses its "temporarily out"
-  note) — by the gate's copy rule for a lettered code, and by the design number
-  inside the vendor for a number-only code. The re-post then waits in Needs
-  info as a copy and says what it brought back.
-- **The later word wins.** A stock-out that is newer than the post is not
-  undone, and a notice read late leaves alone what the vendor posted again
-  after it.
+  note), found by the design number inside the vendor, so a number-only code
+  counts. The re-post then waits in Needs info as a copy and says what it
+  brought back.
+- **The later word wins, by the vendor's own clock.** Every stock change
+  carries the time the vendor made the post (`source_posted_at`), and the
+  database refuses it when a newer word about that product's stock is on
+  record. The order in which the posts are read does not matter: a stock-out
+  that is newer than the re-post is not undone, a notice read late leaves
+  alone what the vendor posted again after it, and a re-post that matched a
+  product a newer notice switched off waits as a copy instead of going live.
 - **Copies do not pile up unseen.** Products → Needs info counts them, shows
   them alone and archives them together (a bulk change, revertible for 7 days).
 - **Two posts of one product in the same minute.** The one read second is held
@@ -246,7 +250,9 @@ are in `product-directory-spec.md`, "Batch 6"):
 Not changed: a re-post of a product that is in stock and known by a number
 alone is still only a suggestion, a changed rate on a re-post is not applied to
 the earlier product, and a product archived by a permanent stock-out is not
-brought back (owner decisions Q7, Q8 and Q9 are open).
+brought back (owner decisions Q7, Q8 and Q9 are open). A post the reader
+takes for a product although its picture also says "stock out" (it names a
+rate) is still a product, but it brings nothing back.
 
 ## Failures and retries
 - A group that fails (database, network, Telegram busy) → its messages

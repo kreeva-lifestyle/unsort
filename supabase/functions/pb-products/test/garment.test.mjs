@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { expectedFacts, FACT_ORDER, garmentKind, shopCategory } from '../garment.ts';
 globalThis.Deno ??= { env: { get: () => '' } }; // productInput.ts → db.ts reads Deno.env
-const { buildProductInput, codeBase, skuBase, skuParts, weightOf } = await import('../productInput.ts');
+const { buildProductInput, codeBase, keptColour, skuBase, skuParts, weightOf } = await import('../productInput.ts');
 
 const gid = (id) => `gid://shopify/TaxonomyCategory/${id}`;
 
@@ -154,7 +154,31 @@ test('D19: two colours of one design do not share their SKUs and barcodes on the
   assert.deepEqual(skus({ sku: 'KB 302 WINE', color: 'Wine', source: 'telegram' }), ['KB 302 WINE-M', 'KB 302 WINE-L']);
   assert.deepEqual(skus({ sku: 'KA-5070', color: '', source: 'telegram' }), ['KA-5070-M', 'KA-5070-L']);
   assert.deepEqual(skus({ sku: 'NKB 47 PURPLE XS', color: 'Violet', source: 'import', sizes: ['XS (34)', 'S (36)'] }), ['NKB 47 PURPLE XS', 'NKB 47 PURPLE S']);
-  assert.equal(codeBase({ color: 'Pink and White', source: 'telegram' }, 'KA-1', '-'), 'KA-1-PINKANDWHITE');
-  assert.equal(codeBase({ color: 'Light Mehendi Green Shade', source: 'telegram' }, 'KA-1', '-'), 'KA-1-LIGHTMEHENDIGR', 'a long colour is cut');
-  assert.equal(codeBase({ color: 'Pink', source: 'telegram' }, '', '-'), '', 'no code, nothing made up');
+  assert.equal(codeBase({}, { color: 'Pink and White', source: 'telegram' }, 'KA-1', '-'), 'KA-1-PINKANDWHITE');
+  assert.equal(codeBase({}, { color: 'Pink', source: 'telegram' }, '', '-'), '', 'no code, nothing made up');
+  // Long names are kept whole: cut short, "Bottle Green and Gold" and "Bottle Green and Pink" would share a code again.
+  assert.notEqual(codeBase({}, { color: 'Bottle Green and Gold', source: 'telegram' }, 'KA-1', '-'), codeBase({}, { color: 'Bottle Green and Pink', source: 'telegram' }, 'KA-1', '-'));
+  assert.equal(codeBase({}, { color: 'Light Mehendi Green Shade', source: 'telegram' }, 'KA-1', '-'), 'KA-1-LIGHTMEHENDIGREENSHADE');
+  // A code that carries words after its design code names its colour in the vendor's own words: no second colour.
+  assert.deepEqual(skus({ sku: 'KB 264 RAMA', color: 'Teal Blue', source: 'telegram' }), ['KB 264 RAMA-M', 'KB 264 RAMA-L'], 'a trade name');
+  assert.deepEqual(skus({ sku: '5073 Pur', color: 'Purple', source: 'telegram' }), ['5073 Pur-M', '5073 Pur-L'], 'an abbreviation');
+  assert.deepEqual(skus({ sku: 'D.No 5081', color: 'Pink', source: 'telegram' }), ['D.No 5081-PINK-M', 'D.No 5081-PINK-L'], 'a label before the number is not a colour');
 });
+
+test('D19: the colour part of a code is kept once it is on a store (codes do not follow a re-worded colour)', () => {
+  const skus = (l, p) => ask({ l: { ...L, ...l }, p: { ...P, sku: 'KA-5070', source: 'telegram', ...p } }).variants.map(v => v.inventoryItem.sku);
+  assert.equal(keptColour({}, { color: 'Maroon', source: 'telegram' }), 'MAROON', 'the first send: the colour as it is then (publish.ts saves it on the listing)');
+  assert.equal(keptColour({ sku_colour: null }, { color: 'Teal Blue', source: 'manual' }), 'TEALBLUE');
+  assert.equal(keptColour({}, { color: 'Maroon', source: 'import' }), '', 'a product copied from a store has its own codes');
+  assert.equal(keptColour({}, { color: '', source: 'telegram' }), '', 'no colour yet: sent without one, and it stays that way');
+  // sent as Maroon; the AI or a person later calls it Wine: the codes on the store stay
+  assert.deepEqual(skus({ sku_colour: 'MAROON', shopify_product_id: 'gid://1' }, { color: 'Wine' }), ['KA-5070-MAROON-M', 'KA-5070-MAROON-L']);
+  assert.deepEqual(skus({ sku_colour: '', shopify_product_id: 'gid://1' }, { color: 'Wine' }), ['KA-5070-M', 'KA-5070-L'], 'sent without a colour part: stays without');
+  // on a store from before codes carried a colour: exactly as they are
+  assert.deepEqual(skus({ shopify_product_id: 'gid://1' }, { color: 'Wine' }), ['KA-5070-M', 'KA-5070-L']);
+  assert.equal(keptColour({ shopify_product_id: 'gid://1' }, { color: 'Wine', source: 'telegram' }), '', '… and that is what is remembered for it');
+  // the product's own code is changed by a person: the new code goes out, with the kept colour unless it names one itself
+  assert.deepEqual(skus({ sku_colour: 'MAROON', shopify_product_id: 'gid://1' }, { sku: 'KA-5071', color: 'Wine' }), ['KA-5071-MAROON-M', 'KA-5071-MAROON-L']);
+  assert.deepEqual(skus({ sku_colour: 'MAROON', shopify_product_id: 'gid://1' }, { sku: 'KA-5070 WINE', color: 'Wine' }), ['KA-5070 WINE-M', 'KA-5070 WINE-L']);
+});
+

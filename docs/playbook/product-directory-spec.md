@@ -1206,66 +1206,94 @@ fixes". In short:
 
 ### Batch 6 — repeats, copies and codes (D17, D18, D19, D21)
 - **D17 a new broadcast brings a product back** (`restock.ts`, called by the
-  reader after the gate). Only on a product's FIRST read (a late description
-  makes the next read a first read again), never for an imported product,
-  never for a stock notice. Which earlier products the post means:
-  - the product the gate holds it as a copy of (`pb_dup_held`), and
-  - the vendor's earlier products of the same design in the same colour, found
-    as a stock notice finds them (`pb_stock_candidates`: the design NUMBER at
-    this vendor, so "D no 5081" counts; "D no 5081", "D-5081" and "5081" are
-    one design, KB 5081 and NKB 5081 are two and nothing is guessed). The
-    colour must match in full or by its trade name (Rama = Teal Blue); with no
-    colour on one side, only when the design has a single earlier product.
-  For each: out of stock → `pb_stock_save { in_stock: true }` (the stores are
-  sent the change); a "temporarily out" note → cleared. Archived or
-  permanently out → left alone (the post is its own product).
-  The post is then the same product posted again: when the gate does not hold
-  it already (a number alone never holds by itself) the pair is stored as
-  "same" and the gate is re-applied, so it waits in Needs info · Already here
-  as … and never becomes a second listing; its Notes from Telegram say "This
-  post brought back in stock: …". A number-only re-post of a product that is
-  IN stock stays a suggestion, as before (owner decision Q7 is open).
-- **The later word wins**, whichever post was read first (a read can be
-  retried minutes later): a product is not brought back when its last stock
-  change is newer than the post (the notice that made it arrived after the
-  post; a person's switch was made after it), and a stock notice leaves alone
-  the products a vendor post made after the notice speaks for
-  (`stockNotice.ts postedAgain`; its line says "posted again after this
-  notice, left as it is: …").
+  reader after the gate). Only on the FIRST read of a vendor's Telegram post
+  that is a product: not when the reader saw a stock notice in it, not for a
+  product copied from a store or typed in (a person has the Stock switch). A
+  late description makes the next read a first read again. The products the
+  post means are the vendor's EARLIER products of the same design in the same
+  colour, found as a stock notice finds them (`pb_stock_candidates`: the
+  design NUMBER at this vendor, so "D no 5081" counts). "D no 5081", "D-5081"
+  and "5081" are one design; KB 5081 and NKB 5081 are two and nothing is
+  guessed. The colour must match in full or by its trade name, either way
+  round (Rama = Teal Blue); with no colour on one side, only when the design
+  has a single earlier product — also when the gate holds the post as a copy
+  of the earliest one.
+  For each: out of stock → in stock again (the stores are sent the change); a
+  "temporarily out" note → cleared. Archived or permanently out → left alone
+  (the post is its own product).
+  A post that matched a sold-out product is that product posted again: when
+  the gate does not hold it already (a number alone never holds by itself) the
+  pair is stored as "same" and the gate is re-applied BEFORE any stock is
+  touched, so it waits in Needs info · Already here as … and never becomes a
+  second listing. Its Notes from Telegram say "This post brought back in
+  stock: …" or "Not brought back, a newer stock-out stands: …". A number-only
+  re-post of a product that is IN stock stays a suggestion, as before (owner
+  decision Q7 is open).
+- **The later word wins — in the database, by the vendor's own clock.**
+  `pb_products.stock_said_at` is the time of the latest word about a product's
+  stock: when the vendor MADE the notice or the post (`source_posted_at`, else
+  when it reached Playbook; `stock.ts saidAt`), or when a person flipped the
+  Stock switch. Every stock change from a notice or a re-post carries its time
+  (`said_at`), and `pb_stock_save` applies it only when no newer word is on
+  record, in the same statement; it answers -2 otherwise (`NEWER`). So the
+  order in which posts happen to be READ (a failed read is retried minutes
+  later; a post waits for its "Less") does not matter:
+  - a re-post never brings back a product a newer notice switched off;
+  - a notice read late never switches off a product the vendor posted again
+    since: the re-post stamps its own time on itself and on the earlier
+    products it stands for, also when they are simply in stock;
+  - a notice for a product that is out already still records its time;
+  - the Stock switch always applies (`force`) and records its time, so an
+    older post read afterwards does not undo it.
+  A stock notice's line says "left as it is, a newer post or change stands:
+  …" for what it did not touch. Found by the independent review of this batch
+  (2026-11-13): the first version judged by a timeline row that a notice did
+  not always write, and an older re-post read last put a sold-out product
+  back on sale.
 - **D18 copies can be found and cleared together.**
   `pb_products.copy_of` = what the gate holds a product as a copy of, written
-  by the gate with the status. Products → More statuses → **Waiting as
-  copies** filters on it; on Needs info a bar counts them, with **Show only
-  these** and **Archive the copies**. Archiving (`copies_preview` /
-  `copies_archive` → `pb_copies_archive`) judges each copy again at that
-  moment and leaves two kinds for a person, counted: `on_site` (a listing of
-  it is on a store) and `priced` (it came with a vendor cost the earlier
-  product contradicts, or lacks while having no price at all; an earlier
-  product copied from a store sells at that store's price, so a cost on the
-  copy is nothing it lacks). A product that stops being a copy because what it
-  copied was archived in the same run is judged again by the gate. No answer
-  is stored for the pairs. It is a bulk change (kind `copies`).
-  Weaker matches (kind `maybe`: a number-only code, another vendor's code,
-  the same number under other letters, the same photo) now show on the list
-  row as "May be a copy of … · same photo" (`listHints`, one read per page).
-- **D19 two colours never share a store code** (`productInput.ts codeBase`).
-  For a product from Telegram or typed in, the colour goes into each size's
-  SKU and barcode: `KA-5070` + Wine + M → `KA-5070-WINE-M`. Unchanged: a code
-  that names its colour already, a product with no colour, and a product
-  copied from a store (its own per-colour code).
+  by the gate with the status; when that product is archived the note follows
+  (`pb_copies_follow`: the next earlier product, or none — the waiting product
+  itself is not touched). Products → More statuses → **Waiting as copies**
+  filters on it; on Needs info a bar counts them, with **Show only these** and
+  **Archive the copies**. Looking first is `pb_copies_archive(false)` (the app
+  calls it itself); archiving is `copies_archive` on the server, a bulk change
+  (kind `copies`). Every copy is judged once, as things stand before anything
+  is archived, so what the confirmation showed is what is done. Left for a
+  person, and counted: `on_site` (a listing of the copy is on a store) and
+  `priced` (it came with a vendor cost the earlier product contradicts, or
+  lacks while having no price at all; an earlier product copied from a store
+  sells at that store's price, so a cost on the copy is nothing it lacks).
+  Nothing is let go to the websites by it, and no answer is stored for the
+  pairs. Weaker matches (kind `maybe`: a number-only code, another vendor's
+  code, the same number under other letters, the same photo) now show on the
+  list row as "May be a copy of … · same photo" (`listHints`, one read per
+  page).
+- **D19 two colours never share a store code** (`skuCode.ts codeBase`). For a
+  product from Telegram or typed in, the colour goes into each size's SKU and
+  barcode: `KA-5070` + Wine + M → `KA-5070-WINE-M`. Unchanged: a code that
+  carries words after its design code (it names its colour in the vendor's
+  own words: `KB 302 WINE`, `KB 264 RAMA`), a product with no colour, and a
+  product copied from a store. The colour part is remembered on the listing
+  from its first send (`pb_listings.sku_colour`; '' = none) and used for
+  every later send, so codes that are on a store do not follow a colour that
+  is re-worded later. A listing that was on a store before this is treated
+  as '' (its codes stay as they are).
 - **D21 the copy rules are tested, and two posts read in the same minute are
   caught.** `supabase/tests/sql/t_dups.sql` checks `pb_code_key`,
   `pb_colour_keys`, the scan, the gate's hold and note, the answers, the
-  products a notice or a re-post means, and clearing copies with its revert,
-  against the real migration files; `run.sh` fails on a failed check and the
-  workflow "Playbook SQL tests" runs it on every change to the SQL. After a
-  read is saved the reader asks for the product's matches and has the gate
-  judge again any LATER post that still stands as Ready
-  (`restock.ts regateLater`): it had been judged before this one's code was
-  saved.
-- Migration `20261113120000_pb_copies.sql` (additive: one column, one index,
-  `pb_copies_archive`, `pb_bulk_revert_copies`, the gate and the revert entry
-  point replaced with the same signatures).
+  products a notice or a re-post means, clearing copies with its revert, and
+  the "later word" rule of `pb_stock_save`, against the real migration files;
+  it counts its own checks, `run.sh` fails on a failed check, and the workflow
+  "Playbook SQL tests" runs it on every change to the SQL. After a read is
+  saved the reader asks for the product's matches and has the gate judge again
+  any LATER post that still stands as Ready (`restock.ts regateLater`): it had
+  been judged before this one's code was saved.
+- Migrations, all additive: `20261113120000_pb_copies.sql` (column, index,
+  trigger, `pb_copies_archive`, `pb_bulk_revert_copies`, the gate and the
+  revert entry point with the same signatures),
+  `20261113130000_pb_stock_word.sql` (`stock_said_at`, `pb_stock_save` with
+  the same signature) and `20261113140000_pb_listing_sku_colour.sql`.
 
 ## Bulk changes: the log and Revert (owner, 2026-11-12)
 
@@ -1311,7 +1339,7 @@ Revert can be tapped again for the rest.
 | `reprice_site` | Update prices on Shopify | price and compare-at price back; a published listing is sent again. The website's pricing rule is not touched |
 | `retry_failed` | Retry all | the listings nothing has picked up yet go back to Failed with their old message; what was already tried again stays |
 | `reread_failed` | Read again (unread products) | the products not read again yet go back to Needs info |
-| `copies` | Archive the copies (Products → Needs info) | the products still archived go back to Needs info and the gate judges them again (still a copy → it waits as before); a product the change let go is judged again too; one somebody restored or changed since is left alone (`pb_bulk_revert_copies`) |
+| `copies` | Archive the copies (Products → Needs info) | earliest first, a product that is still archived AND would wait as a copy again goes back to Needs info; one that is no longer a copy of anything stays archived and is counted (`not_copies`), so a revert sends nothing to a website; one somebody restored or changed since is left alone. Looking first runs the same steps and undoes them (`pb_bulk_revert_copies`) |
 | `reread` | only from the log: the re-read of all products on 12 Nov 2026 | each field that read changed goes back where the product still holds what the read wrote and the field is not locked; the gate runs and the tag rules run again. The reader's log kept the first 200 characters of each old value, so the long notes of 105 products are not put back |
 
 The two bulk changes of the week before the log existed were written into it

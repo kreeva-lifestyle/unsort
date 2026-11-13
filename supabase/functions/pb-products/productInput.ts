@@ -43,6 +43,7 @@ import { shopCategory } from './garment.ts';
 import { HttpError } from './http.ts';
 import { apiVersion } from './shopify.ts';
 import { type Existing, MF_KEY, MF_NAMESPACE, variantKey } from './shopifyProduct.ts';
+import { codeBase, sizeCore, skuParts } from './skuCode.ts';
 import { permOut, type ListingRow, type ProductRow, type WebsiteRow } from './types.ts';
 
 export const PRODUCT_SET = `mutation PbProductSet($input: ProductSetInput!, $identifier: ProductSetIdentifiers) {
@@ -61,42 +62,7 @@ export const UNPUBLISH = `mutation PbUnpublish($product: ProductUpdateInput!) {
 /** Stock tracking is on, but Playbook sends no quantities: new variants start at 0 and stop selling at 0. */
 export const STOCK_WARNING = 'Stock tracking is on for this website: the product starts with 0 in stock and cannot be bought until you set the quantities in Shopify.';
 
-/** A size label without its measurement: "XS (34)" → "XS". */
-const sizeCore = (s: string) => s.replace(/\(.*?\)/g, ' ').replace(/\s+/g, ' ').trim();
-
-/** Size words a code can end in when the product's own sizes are of the same kind: the size in its code may
- *  have sold out ("KB 302 XL" with S and M on sale). Never across kinds: "-M" on a free-size product is not a size. */
-const SIZE_KINDS = [['xxs', 'xs', 's', 'm', 'l', 'xl', 'xxl', 'xxxl', '2xl', '3xl', '4xl', '5xl', '6xl'], ['free size', 'freesize', 'fs']];
-
-/** The product's SKU without a size at its end, and what joined the two ("NKB 47 PURPLE XS" → "NKB 47 PURPLE" and
- *  " "). A product copied from another store carries one size's own SKU; each size on Shopify gets the base, the
- *  same joiner and its own size, which gives back the store's own code for every size ("NKB 47 PURPLE S"). The
- *  ending counts as a size when it is one of the product's sizes or a size word of their kind, and only after
- *  a joiner. A SKU with no size at its end is the base, joined with "-" ("RG-1042" → "RG-1042-M"). */
-export function skuParts(sku: string, sizes: string[]): { base: string; join: string } {
-  const s = String(sku || '').trim(), low = s.toLowerCase();
-  if (!sizes.length) return { base: s, join: '-' }; // a product with no sizes keeps its code whole
-  const own = sizes.map(x => sizeCore(x).toLowerCase()).filter(Boolean);
-  const ends = [...new Set([...own, ...SIZE_KINDS.filter(k => own.some(c => k.includes(c))).flat()])].sort((a, b) => b.length - a.length);
-  for (const size of ends) {
-    if (!low.endsWith(size)) continue;
-    const head = s.slice(0, s.length - size.length), join = /[\s\-_/]+$/.exec(head);
-    if (join && join.index > 0) return { base: head.slice(0, join.index), join: join[0] };
-  }
-  return { base: s, join: '-' };
-}
-export const skuBase = (sku: string, sizes: string[]) => skuParts(sku, sizes).base;
-
-/** The code each size's SKU and barcode start with. A vendor's design code (Telegram, typed by hand) is shared by
- *  every colour of the design, so two colours kept as two products sent the same SKU and barcode for each size
- *  (pre-launch fix D19): the colour goes into the code — "KA-5070" in Teal Blue → "KA-5070-TEALBLUE" — unless the
- *  code names it already ("KB 302 WINE"). A product copied from a store keeps that store's own per-colour code. */
-export function codeBase(p: { sku?: string | null; color?: string | null; source?: string | null }, base: string, join: string): string {
-  const flat = (v: unknown) => String(v ?? '').toUpperCase().replace(/[^A-Z0-9]+/g, '');
-  const colour = flat(p.color).slice(0, 14);
-  if (!base || !colour || p.source === 'import' || flat(base).includes(colour)) return base;
-  return `${base}${join}${colour}`;
-}
+export { codeBase, keptColour, skuBase, skuParts } from './skuCode.ts';
 
 const money = (n: number | null) => (n === null || n === undefined || !(Number(n) > 0) ? null : Number(n).toFixed(2));
 
@@ -116,7 +82,7 @@ export function buildProductInput(a: { l: ListingRow; p: ProductRow; site: Websi
   const compareAtPrice = l.compare_at_price !== null && Number(l.compare_at_price) > Number(l.price) ? money(l.compare_at_price) : null;
   const sizes = uniqueCi((p.sizes || []).map(s => String(s).replace(/\s+/g, ' ').trim()).filter(Boolean)); // "S" and "s" are one size
   const parts = skuParts(String(p.sku || ''), sizes), join = parts.join;
-  const sku = codeBase(p, parts.base, join);
+  const sku = codeBase(l, p, parts.base, join);
   const optName = sizes.length ? 'Size' : 'Title';
   const values = sizes.length ? sizes : ['Default Title'];
   // A choice the store has that Playbook did not make (someone added "Colour" in Shopify): productSet would delete it.

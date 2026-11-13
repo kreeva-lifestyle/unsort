@@ -16,3 +16,8 @@ by hand once:
 
 Until it is run, those two kinds of change are simply not in the log;
 nothing that is live depends on it.
+
+The file also carries the full "take it back" entry point (`pb_bulk_revert`),
+including the `copies` kind that `20261113120000_pb_copies.sql` added later.
+That migration leaves the entry point alone when this file has already been
+run, so the two can be applied in either order.

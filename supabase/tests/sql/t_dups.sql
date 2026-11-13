@@ -1,16 +1,19 @@
 -- "Was this product already added?" — the rules in the database, checked (pre-launch fix D21: they had no test).
 -- The real SQL is loaded by run.sh: 20261112150000_pb_duplicates.sql, 20261112170000_pb_photo_prints.sql,
--- 20261113040000_pb_stock_save.sql and 20261113120000_pb_copies.sql. Every check prints "ok …" or "FAIL …";
+-- 20261113040000_pb_stock_save.sql, 20261113120000_pb_copies.sql and 20261113130000_pb_stock_word.sql. Every check prints "ok …" or "FAIL …";
 -- run.sh fails when a FAIL is printed. Nothing is kept: each part rolls back.
 \set ON_ERROR_STOP 1
 \pset format unaligned
 \pset tuples_only on
+create sequence if not exists public.t_checks; -- counts the checks (a sequence is not rolled back with the parts)
 create or replace function public.t_is(p_what text, p_got text, p_want text) returns text language sql as $$
   select case when p_got is not distinct from p_want then 'ok   ' || p_what
-              else 'FAIL ' || p_what || ' — got ' || coalesce(p_got, 'null') || ', wanted ' || coalesce(p_want, 'null') end $$;
+              else 'FAIL ' || p_what || ' — got ' || coalesce(p_got, 'null') || ', wanted ' || coalesce(p_want, 'null') end
+  from (select nextval('public.t_checks')) n $$;
 -- something that must be refused: ok when it raises (what it had done is undone), FAIL when it goes through
 create or replace function public.t_refused(p_what text, p_sql text) returns text language plpgsql as $$
 begin
+  perform nextval('public.t_checks');
   execute p_sql;
   return 'FAIL ' || p_what || ' — it was not refused';
 exception when others then
@@ -111,7 +114,7 @@ insert into pb_listings (product_id, website_id, status, shopify_product_id, sho
 select t_is('… then it is found', (select count(*)::text from public.pb_stock_candidates(:V1, '5081') c where c.id = t_id(17)), '1');
 rollback;
 
--- ── 6. "They are copies": archive the held copies together, and take it back ──
+-- ── 6. "Archive the copies": the held copies together, and taking it back ──
 begin;
 \set V3 '''a1000000-0000-4000-8000-000000000003'''
 \set R1 '''d0000000-0000-4000-8000-000000000001'''
@@ -119,35 +122,83 @@ select t_product(20, :V3, 'ZX-100', 'Red', 1, 500) is not null, t_product(21, :V
        t_product(23, :V3, 'ZX-100', 'Red', 4, null) is not null, t_product(24, :V3, 'ZX-100', 'Red', 5, 500) is not null,
        t_product(30, :V3, 'ZY-200', 'Blue', 1, null) is not null, t_product(31, :V3, 'ZY-200', 'Blue', 2, 700) is not null,
        t_product(40, :V3, 'ZW-300', 'Green', 1, null) is not null, t_product(41, :V3, 'ZW-300', 'Green', 2, 800) is not null,
-       t_product(50, :V3, 'ZV-400', 'Black', 1, 500) is not null, t_product(51, :V3, 'ZV-400', null, 2, 500) is not null, t_product(52, :V3, 'ZV-400', 'Grey', 3, 500) is not null;
+       t_product(50, :V3, 'ZV-400', 'Black', 1, 500) is not null, t_product(51, :V3, 'ZV-400', null, 2, 500) is not null, t_product(52, :V3, 'ZV-400', 'Grey', 3, 500) is not null,
+       t_product(60, :V3, 'ZU-500', 'Blue', 1, 500) is not null, t_product(61, :V3, 'ZU-500', 'Blue', 2, 500) is not null,
+       t_product(65, :V3, 'ZT-600', 'Pink', 1, 500) is not null, t_product(66, :V3, 'ZT-600', 'Pink', 2, 900) is not null;
 update pb_products set source = 'import', sell_price = 1999 where id = t_id(30); -- copied from a store: it sells at that store's price
 insert into pb_websites (id, name, shop_domain) values ('e0000000-0000-4000-8000-000000000001', 'S', 's.myshopify.com');
 insert into pb_listings (product_id, website_id, status, shopify_product_id, shopify_status) values (t_id(24), 'e0000000-0000-4000-8000-000000000001', 'published', 'gid://24', 'ACTIVE');
 select count(*) from public.pb_products_refresh(array(select id from pb_products));
-select t_is('held: ', (select string_agg(right(id::text, 2) || '>' || right(copy_of::text, 2), ' ' order by id) from pb_products where status = 'needs_info' and copy_of is not null), '21>20 22>20 23>20 24>20 31>30 41>40 51>50 52>51');
+select t_is('held', (select string_agg(right(id::text, 2) || '>' || right(copy_of::text, 2), ' ' order by id) from pb_products where status = 'needs_info' and copy_of is not null),
+  '21>20 22>20 23>20 24>20 31>30 41>40 51>50 52>51 61>60 66>65');
+-- the product a copy points at is archived by hand: the note follows (here: to nothing), the copy itself is left as it is
+update pb_products set status = 'archived' where id = t_id(65);
+select t_is('the note follows when what it points at is archived; nothing is let go', (select status || '/' || coalesce(copy_of::text, 'null') || '/' || route_due::text from pb_products where id = t_id(66)), 'needs_info/null/false');
+-- what a copy points at gets another code: the note follows at once, here too
+update pb_products set sku = 'ZU-501' where id = t_id(60);
+select t_is('… and when its code is changed', (select status || '/' || coalesce(copy_of::text, 'null') from pb_products where id = t_id(61)), 'needs_info/null');
+update pb_products set sku = 'ZU-500' where id = t_id(60);
+select t_is('… the gate holds it again once the code is back', (select g.status from public.pb_products_refresh(array[t_id(61)]) g) || '', 'needs_info');
+-- a note can still be out of date: here the pair is answered without the gate being asked. The count leaves it out; the action clears it.
+select public.pb_dup_verdict_set(t_id(61), t_id(60), 'different');
+-- 51 (no colour) is held as a copy of 50 (Black); 52 (Grey) only as a copy of 51. Both wait as copies when the button is tapped, so both are archived.
 select t_is('looking only: what would be archived, and what is left', public.pb_copies_archive(false)::text, '{"priced": 2, "on_site": 1, "archived": 5}');
-select t_is('… nothing changed', (select count(*)::text from pb_products where status = 'archived'), '0');
+select t_is('… nothing changed', (select count(*)::text from pb_products where status = 'archived'), '1');
 select t_refused('a signed-in person cannot run it', 'select public.pb_copies_archive(true)');
-select t_is('… nothing changed', (select count(*)::text from pb_products where status = 'archived'), '0');
+select t_is('… nothing changed', (select count(*)::text from pb_products where status = 'archived'), '1');
 select set_config('request.jwt.claims', '{"role":"service_role"}', false);
-insert into pb_bulk_runs (id, kind, label, status) values (:R1, 'copies', 'Archived products held as copies', 'running');
+insert into pb_bulk_runs (id, kind, label, status) values (:R1, 'copies', 'Archived the products waiting as copies', 'running');
 select set_config('request.headers', json_build_object('x-pb-bulk', :R1)::text, false);
--- 51 (no colour) is held as a copy of 50 (Black); 52 (Grey) only as a copy of 51. Once 51 is archived, 52 is another colour of the design: not a copy, so it is let go.
-select t_is('done: copies with nothing of their own are archived', public.pb_copies_archive(true)::text, '{"priced": 2, "on_site": 1, "archived": 4}');
+select t_is('done: exactly what was shown', public.pb_copies_archive(true)::text, '{"priced": 2, "on_site": 1, "archived": 5}');
 select set_config('request.headers', '{}', false);
 update pb_bulk_runs set status = 'done', items = (select count(*) from pb_bulk_items where run_id = :R1), finished_at = now() where id = :R1;
-select t_is('products now', (select string_agg(right(id::text, 2) || ':' || status, ' ' order by id) from pb_products where id <> all (array[t_id(20), t_id(30), t_id(40), t_id(50)])),
-  '21:archived 22:needs_info 23:archived 24:needs_info 31:archived 41:needs_info 51:archived 52:ready');
-select t_is('a timeline line for each', (select count(*)::text from pb_activity where action = 'archived' and details ->> 'bulk' = 'true'), '4');
+select t_is('products now', (select string_agg(right(id::text, 2) || ':' || status, ' ' order by id) from pb_products where id <> all (array[t_id(20), t_id(30), t_id(40), t_id(50), t_id(60), t_id(65)])),
+  '21:archived 22:needs_info 23:archived 24:needs_info 31:archived 41:needs_info 51:archived 52:archived 61:needs_info 66:needs_info');
+select t_is('nothing was let go to the websites', (select count(*)::text from pb_products where route_due or (status = 'ready' and id not in (t_id(20), t_id(30), t_id(50), t_id(60)))), '0');
+select t_is('a note that was out of date is cleared, its product left as it is', (select status || '/' || coalesce(copy_of::text, 'null') from pb_products where id = t_id(61)), 'needs_info/null');
+select t_is('a timeline line for each', (select count(*)::text from pb_activity where action = 'archived' and details ->> 'bulk' = 'true'), '5');
+select t_is('… that says what it copied', (select right(details ->> 'copy_of', 2) from pb_activity where product_id = t_id(52) and action = 'archived'), '51');
 select t_is('the log has every row it changed', (select count(*)::text from pb_bulk_items where run_id = :R1 and tbl = 'pb_products'), '5');
--- meanwhile a person restores one of them (Restore → read again)
+select t_is('a second tap finds nothing more to archive', public.pb_copies_archive(false)::text, '{"priced": 2, "on_site": 1, "archived": 0}');
+-- meanwhile a person restores one of them (Restore → read again), and the product another one copied is archived
 update pb_products set status = 'new' where id = t_id(23);
-select t_is('revert, looking only', (public.pb_bulk_revert(:R1, false) - 'label')::text, '{"gone": 0, "kind": "copies", "changed": 1, "rejudged": 1, "restored": 3}');
-select t_is('… nothing changed', (select count(*)::text from pb_products where status = 'archived'), '3');
-select t_is('revert', (public.pb_bulk_revert(:R1, true) - 'label')::text, '{"gone": 0, "kind": "copies", "changed": 1, "rejudged": 1, "restored": 3}');
-select t_is('back as they were: held again, the one a person restored left alone', (select string_agg(right(id::text, 2) || ':' || status || coalesce('>' || right(copy_of::text, 2), ''), ' ' order by id) from pb_products where id = any (array[t_id(21), t_id(23), t_id(31), t_id(51), t_id(52)])),
-  '21:needs_info>20 23:new>20 31:needs_info>30 51:needs_info>50 52:needs_info>51');
+update pb_products set status = 'archived' where id = t_id(30);
+select t_is('revert, looking only', (public.pb_bulk_revert(:R1, false) - 'label')::text, '{"gone": 0, "kind": "copies", "changed": 1, "restored": 3, "not_copies": 1}');
+select t_is('… nothing changed', (select string_agg(right(id::text, 2) || ':' || status, ' ' order by id) from pb_products where id = any (array[t_id(21), t_id(23), t_id(31), t_id(51), t_id(52)])), '21:archived 23:new 31:archived 51:archived 52:archived');
+select t_is('… and it can still be reverted', (select status from pb_bulk_runs where id = :R1), 'done');
+select t_is('revert: the same numbers', (public.pb_bulk_revert(:R1, true) - 'label')::text, '{"gone": 0, "kind": "copies", "changed": 1, "restored": 3, "not_copies": 1}');
+-- 52 comes back because 51, which it copies, came back before it; 31 is no longer a copy of anything (30 is archived): it stays archived
+select t_is('back as they were: waiting as copies again', (select string_agg(right(id::text, 2) || ':' || status || coalesce('>' || right(copy_of::text, 2), ''), ' ' order by id) from pb_products where id = any (array[t_id(21), t_id(23), t_id(31), t_id(51), t_id(52)])),
+  '21:needs_info>20 23:new>20 31:archived>30 51:needs_info>50 52:needs_info>51');
+select t_is('a revert sends nothing to the websites either', (select count(*)::text from pb_products where route_due), '0');
 select t_is('the run says reverted', (select status from pb_bulk_runs where id = :R1), 'reverted');
 select t_refused('a second revert is refused', format('select public.pb_bulk_revert(%L, true)', :R1));
 rollback;
+
+-- ── 7. the later word about a product's stock wins (pb_stock_save with said_at) ──
+begin;
+set local timezone = 'UTC';
+select t_product(70, :V1, 'D no 7000', 'Pink', 1) is not null;
+insert into pb_websites (id, name, shop_domain) values ('e0000000-0000-4000-8000-000000000001', 'S', 's.myshopify.com');
+insert into pb_listings (product_id, website_id, status, shopify_product_id, shopify_status) values (t_id(70), 'e0000000-0000-4000-8000-000000000001', 'published', 'gid://70', 'ACTIVE');
+select t_is('a change with no time works as before: its listing is owed to the store', public.pb_stock_save(t_id(70), '{"in_stock": false}')::text, '1');
+select t_is('… saved, and no time is put on record', (select in_stock::text || '/' || coalesce(stock_said_at::text, 'null') from pb_products where id = t_id(70)), 'false/null');
+select t_is('a word with a time applies when none is on record', public.pb_stock_save(t_id(70), '{"in_stock": true, "temp_out_at": null, "said_at": "2026-11-10T09:00:00Z"}')::text, '1');
+select t_is('an OLDER word is refused', public.pb_stock_save(t_id(70), '{"in_stock": false, "said_at": "2026-11-10T08:00:00Z"}')::text, '-2');
+select t_is('… and nothing changed', (select in_stock::text || ' ' || stock_said_at::text from pb_products where id = t_id(70)), 'true 2026-11-10 09:00:00+00');
+select t_is('a NEWER word applies', public.pb_stock_save(t_id(70), '{"in_stock": false, "said_at": "2026-11-10T15:00:00Z"}')::text, '1');
+select t_is('the same word again applies (a read that is tried again)', public.pb_stock_save(t_id(70), '{"in_stock": false, "said_at": "2026-11-10T15:00:00Z"}')::text, '1');
+select t_is('the re-post from the morning cannot bring it back', public.pb_stock_save(t_id(70), '{"in_stock": true, "temp_out_at": null, "said_at": "2026-11-10T09:00:00Z"}')::text, '-2');
+select t_is('… it stays out of stock', (select in_stock::text from pb_products where id = t_id(70)), 'false');
+update pb_listings set stock_due = false;
+select t_is('a note or a time alone owes the stores nothing', public.pb_stock_save(t_id(70), '{"temp_out_at": "2026-11-10T16:00:00Z", "said_at": "2026-11-10T16:00:00Z"}')::text, '0');
+select t_is('… it is saved, and the listing is not marked', (select (p.temp_out_at is not null)::text || '/' || l.stock_due::text from pb_products p join pb_listings l on l.product_id = p.id where p.id = t_id(70)), 'true/false');
+select t_is('a person''s switch always applies', public.pb_stock_save(t_id(70), '{"in_stock": true, "said_at": "2026-11-10T10:00:00Z", "force": true}')::text, '1');
+select t_is('… and the newest time stays on record', (select in_stock::text || ' ' || stock_said_at::text from pb_products where id = t_id(70)), 'true 2026-11-10 16:00:00+00');
+select t_is('a product that does not exist', public.pb_stock_save(gen_random_uuid(), '{"in_stock": false, "said_at": "2026-11-10T09:00:00Z"}')::text, '-1');
+rollback;
+
+-- Every check above printed a line: a part that silently printed nothing would be a failure too.
+select case when last_value = 106 then 'ok   every check ran (106)' else 'FAIL the number of checks is ' || last_value || ', not 106: a part printed fewer lines than it has, or this number was not updated' end from public.t_checks;
 drop function public.t_refused(text, text); drop function public.t_is(text, text, text); drop function public.t_rel(uuid, uuid); drop function public.t_product(int, uuid, text, text, int, numeric, text); drop function public.t_id(int);
+drop sequence public.t_checks;

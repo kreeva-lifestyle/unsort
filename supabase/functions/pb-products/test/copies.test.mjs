@@ -1,12 +1,13 @@
 // node --test --experimental-strip-types supabase/functions/pb-products/test/
-// "They are copies" (copies.ts; pre-launch fix D18): the held copies archived in one go, as a bulk change that the log
-// keeps and can take back. What is archived and what is left is decided in the database (pb_copies_archive) and
-// checked there: supabase/tests/sql/t_dups.sql part 6. Here: that the server asks it the right way.
+// "Archive the copies" (copies.ts; pre-launch fix D18): the held copies archived in one go, as a bulk change that the
+// log keeps and can take back. What is archived and what is left is decided in the database (pb_copies_archive) and
+// checked there: supabase/tests/sql/t_dups.sql part 6. Here: that the server asks it the right way. (Looking first is
+// a plain database read the app makes itself, with apply = false.)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 globalThis.Deno = { env: { get: (k) => (k === 'SUPABASE_URL' ? 'https://sb.example' : 'test') } };
-const { copiesArchive, copiesPreview } = await import('../copies.ts');
+const { copiesArchive } = await import('../copies.ts');
 
 const RUN = '11111111-2222-4333-8444-555555555555';
 /** A fake database: `answer` is what pb_copies_archive returns (a Response to fail), `items` how many rows the run recorded. */
@@ -24,14 +25,6 @@ function world(answer, items = 0) {
   };
   return calls;
 }
-
-test('looking first changes nothing: no bulk change is opened', async () => {
-  const calls = world({ archived: 9, priced: 2, on_site: 1 });
-  assert.deepEqual(await copiesPreview(), { ok: true, archived: 9, priced: 2, on_site: 1 });
-  assert.equal(calls.length, 1);
-  assert.deepEqual(calls[0].body, { p_apply: false });
-  assert.equal(calls[0].run, null);
-});
 
 test('archiving is a bulk change: opened, marked on the database call, closed with its counts', async () => {
   const calls = world({ archived: 9, priced: 2, on_site: 1 }, 9);

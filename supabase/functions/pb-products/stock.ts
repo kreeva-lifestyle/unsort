@@ -26,21 +26,30 @@ import { HttpError } from './http.ts';
 import { PERM_NOTE, retire, sendNow } from './stockSend.ts';
 
 export { PERM_NOTE, retire };
-export interface StockChange { in_stock?: boolean; temp_out_at?: string | null; perm_out_at?: string | null }
+/** `said_at`: when this word about the product's stock was said (saidAt). The database applies the change only when no
+ *  newer word is on record, and answers NEWER otherwise (pb_stock_save, 20261113130000_pb_stock_word.sql). `force`
+ *  (a person's own switch) always applies. */
+export interface StockChange { in_stock?: boolean; temp_out_at?: string | null; perm_out_at?: string | null; said_at?: string; force?: boolean }
+/** A newer word about this product's stock stands: nothing was changed. */
+export const NEWER = -2;
+/** When a post said what it says: the time the vendor made it, else when it reached Playbook. */
+export const saidAt = (p: { source_posted_at?: string | null; created_at: string }) => new Date(p.source_posted_at || p.created_at).toISOString();
 
 /** Save the change and mark the listings on sale on Shopify (one transaction). Returns how many stores are owed it
- *  (with `now`: how many of them it reached at once), or -1 when the product is gone. */
+ *  (with `now`: how many of them it reached at once), -1 when the product is gone, or NEWER when a newer word stands. */
 export async function saveStock(p: { id: string }, ch: StockChange, note: Record<string, unknown>, userId: string | null, now = false): Promise<number> {
   const owed = Number(await rpc<number>('pb_stock_save', { p_product: p.id, p_change: ch }));
-  if (!(owed >= 0)) return -1;
-  await logActivity({ product_id: p.id, action: 'stock', details: { ...ch, ...note, resent: owed }, user_id: userId });
+  if (!(owed >= 0)) return owed === NEWER ? NEWER : -1;
+  const { force: _force, ...shown } = ch;
+  await logActivity({ product_id: p.id, action: 'stock', details: { ...shown, ...note, resent: owed }, user_id: userId });
   return now && owed ? await sendNow(p.id, userId) : owed;
 }
 
-/** A permanent stock-out. Returns how many listings are to be archived on Shopify, or -1 when the product is gone. */
-export async function takeOffSale(p: { id: string }, note: Record<string, unknown>, userId: string | null): Promise<number> {
-  const owed = Number(await rpc<number>('pb_stock_save', { p_product: p.id, p_change: { in_stock: false, temp_out_at: null, perm_out_at: nowIso() } }));
-  if (!(owed >= 0)) return -1;
+/** A permanent stock-out, said at `said`. Returns how many listings are to be archived on Shopify, -1 when the product
+ *  is gone, or NEWER when a newer word about its stock stands (nothing is done then). */
+export async function takeOffSale(p: { id: string }, note: Record<string, unknown>, userId: string | null, said?: string): Promise<number> {
+  const owed = Number(await rpc<number>('pb_stock_save', { p_product: p.id, p_change: { in_stock: false, temp_out_at: null, perm_out_at: nowIso(), ...(said ? { said_at: said } : {}) } }));
+  if (!(owed >= 0)) return owed === NEWER ? NEWER : -1;
   await patch('pb_listings', `product_id=eq.${enc(p.id)}&shopify_product_id=is.null&or=(status.in.(queued,review,failed),and(status.eq.publishing,claimed_at.is.null))`, { status: 'skipped', error: PERM_NOTE, attempts: 0, claimed_at: null });
   await logActivity({ product_id: p.id, action: 'stock', details: { in_stock: false, permanent: true, ...note, resent: owed }, user_id: userId });
   await retire(p.id);
@@ -55,8 +64,9 @@ export async function setStock(b: Body, userId: string | null) {
   const p = await one<{ id: string; in_stock: boolean }>(`pb_products?id=eq.${enc(id)}&select=id,in_stock`);
   if (!p) throw new HttpError(404, 'That product no longer exists.');
   if (p.in_stock === b.in_stock) return { ok: true, resent: 0, waiting: 0 };
-  // Back in stock by hand also ends a vendor's "permanent stock out".
-  const resent = await saveStock(p, { in_stock: b.in_stock, ...(b.in_stock ? { perm_out_at: null } : {}) }, { by: 'staff' }, userId, true);
+  // Back in stock by hand also ends a vendor's "permanent stock out". A person's switch is the latest word as of now:
+  // an older post that is read afterwards does not undo it.
+  const resent = await saveStock(p, { in_stock: b.in_stock, ...(b.in_stock ? { perm_out_at: null } : {}), said_at: nowIso(), force: true }, { by: 'staff' }, userId, true);
   if (resent < 0) throw new HttpError(404, 'That product no longer exists.');
   const waiting = (await sel<{ id: string }>(`pb_listings?product_id=eq.${enc(id)}&stock_due=eq.true&select=id&limit=50`)).length;
   return { ok: true, resent, waiting };

@@ -14,7 +14,7 @@ import { friendlyError } from '../../../../lib/friendlyError';
 import { logSwallowed } from '../../../../lib/errorLogger';
 import { useConfirm } from '../../../../components/ui/ConfirmModal';
 import type { AddToast } from '../../PbToasts';
-import { archiveCopies, copiesCount, previewCopies, type CopyCounts } from '../../../data/copies';
+import { archiveCopies, previewCopies, type CopyCounts } from '../../../data/copies';
 import { count } from '../../../format';
 import { PB, pbNum } from '../../../pbTheme';
 import { PbButton, PbConfirm, PbTile } from '../../ui';
@@ -41,7 +41,7 @@ export default function CopiesBar({ only, reload, addToast, onShow, onDone }: {
   const { ask, modalProps } = useConfirm();
   useEffect(() => {
     let live = true;
-    copiesCount().then(c => { if (live) setN(c); }).catch(e => logSwallowed('count copies', e));
+    previewCopies().then(c => { if (live) setN(c.archived + c.priced + c.on_site); }).catch(e => logSwallowed('count copies', e));
     return () => { live = false; };
   }, [reload]);
   if (!n) return null;
@@ -52,9 +52,10 @@ export default function CopiesBar({ only, reload, addToast, onShow, onDone }: {
     try {
       const p = await previewCopies();
       const left = leftText(p);
+      setN(p.archived + p.priced + p.on_site);
       if (!p.archived) {
         addToast(left ? `None can be archived together: ${left}. Open them one by one.` : 'No product is waiting as a copy any more', 'info');
-        if (!left) { setN(0); onDone(); }
+        if (!left) onDone();
         return;
       }
       const ok = await ask({
