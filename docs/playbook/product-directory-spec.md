@@ -528,8 +528,14 @@ empty required attributes, the rules first (free, the same every time), then
 does not offer counts as empty and that value is replaced; a person's stale
 value is cleared first) — an AI failure still writes what the rules found;
 queued by `tags_ai_fill`, run by the worker after
-read / write / publish (≤ 5 a run, 35 s needed), or at once from the
-product page.
+read / write / publish (5 at a time while 35 s are left, up to 60 a run —
+most are settled by the word rules in a fraction of a second; the day's AI
+limit is asked before each 5), or at once from the product page. Progress
+(`tags_fill_status`, `fillProgress.ts`): the newest batch of requests (those
+started within 30 minutes of the newest, plus any still open) together —
+done of total, left, the pace of the last 5 minutes (`tags_filled` rows) and
+the minutes that leaves, or `blocked` (paused / limit) while nothing can
+move; once nothing waits, filled, still-need-you and the finish time.
 
 **Suggestions and the look-alike guard.** Candidates: store tags matching
 nothing (after the junk filter `tagClean.ts`: `_…`, SIZE_CHART, label_…,

@@ -37,7 +37,12 @@ export const offeredFor = (a: Pick<PbAttribute, 'by_category'>, v: Pick<PbAttrVa
 export interface PbCategoryLink { category: string; attribute_id: string; position: number }
 export interface PbLinkStat { category: string; attribute_id: string; products: number; lacking: number }
 
-export interface PbFillRun { id: string; total: number; done: number; waiting: number; filled: number; left_empty: number; created_at: string; finished_at: string | null }
+/** "Let AI decide" progress: the newest batch of requests together (pb-products fillProgress.ts). `per_min` / `eta_min`: the
+ *  pace of the last 5 minutes and the minutes it leaves; `blocked`: why nothing moves while products wait. */
+export interface PbFillRun {
+  id: string; total: number; done: number; waiting: number; filled: number; left_empty: number; created_at: string; finished_at: string | null;
+  runs?: number; per_min?: number | null; eta_min?: number | null; blocked?: 'paused' | 'limit' | null;
+}
 
 export interface PbTaxonomy {
   categories: string[]; attributes: PbAttribute[]; links: PbCategoryLink[]; stats: PbLinkStat[];
