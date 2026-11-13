@@ -35,7 +35,8 @@ export async function categoriesSave(b: Body, userId: string | null) {
   const gone = before.filter(c => !has(cats).has(c.toLowerCase())), added = cats.filter(c => !has(before).has(c.toLowerCase()));
   const label = `Category list: ${[gone.length ? `removed ${few(gone)}` : '', added.length ? `added ${few(added)}` : ''].filter(Boolean).join('; ') || 'new order'}`;
   const r = await asBulk('categories', label, userId, async (run) => {
-    await insert('pb_settings', [{ key: 'categories', value: cats }], { onConflict: 'key', mode: 'merge', run });
+    // pb_settings is keyed by `key` and has no id column: ask for `key` back, or the database refuses the save.
+    await insert('pb_settings', [{ key: 'categories', value: cats }], { onConflict: 'key', mode: 'merge', select: 'key', run });
     return { regated: await rpc<number>('pb_categories_prune', { p_keep: cats }, run) };
   });
   await logActivity({ action: 'settings_edited', details: { key: 'categories', count: cats.length, run_id: r.run_id }, user_id: userId });
