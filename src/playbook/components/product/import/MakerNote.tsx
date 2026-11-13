@@ -2,7 +2,8 @@
 // we check whether the website has manufacturer or vendor name mentioned. And show alert whether its there or not.")
 // Counted by the server on the products the check reads (pb-products import/maker.ts). Named on most products →
 // a plain note with the names (live dot); named on few or none → the review tint, saying what the products show
-// instead (often the website's own name) and that the vendor below is then the owner's to fill in.
+// instead (often the website's own name) and that the vendor below is then the owner's to fill in, if known (it is
+// optional: owner, 2026-11-13).
 import type { CSSProperties, ReactNode } from 'react';
 import type { ImportMaker } from '../../../data/imports';
 import { PB, pbBody, pbNum } from '../../../pbTheme';
@@ -27,10 +28,10 @@ export default function MakerNote({ m }: { m: ImportMaker | null | undefined }) 
     body = <>Only {n(m.named)} of {products(m.checked)} checked {m.named === 1 ? 'names' : 'name'} a manufacturer: {list}. {own ? <>The others show only {own}.</> : 'The others name none.'} Enter the vendor below yourself if you know it.</>;
   } else if (own) {
     title = 'Manufacturer not named';
-    body = <>{m.checked === 1 ? 'The product checked shows' : <>All {products(m.checked)} checked show</>} only {own}. If this website makes its own clothes, that is the maker; if it resells, enter the real vendor below.</>;
+    body = <>{m.checked === 1 ? 'The product checked shows' : <>All {products(m.checked)} checked show</>} only {own}. If this website makes its own clothes, that is the maker; if it resells, enter the real vendor below if you know it.</>;
   } else {
     title = 'Manufacturer not named';
-    body = <>None of the {products(m.checked)} checked names a manufacturer or vendor. Enter the vendor below yourself.</>;
+    body = <>None of the {products(m.checked)} checked names a manufacturer or vendor. Enter the vendor below if you know it, or leave it empty.</>;
   }
   return (
     <div role="status" style={{ ...box, background: most ? PB.ctl : PB.reviewBg, border: `1px solid ${most ? PB.tileBd : PB.reviewBd}` }}>

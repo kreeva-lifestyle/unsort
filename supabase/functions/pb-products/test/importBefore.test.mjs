@@ -1,5 +1,6 @@
 // node --test --experimental-strip-types supabase/functions/pb-products/test/
-// A repeat import: what Playbook already holds from a website (www. or not), and the vendor it was filed under.
+// A repeat import: what Playbook already holds from a website (www. or not), and what its latest import was given
+// (the vendor, or none — it is optional — and the manufacturers it left out).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -23,11 +24,16 @@ test('a website imported before: its product count, the vendor of its last impor
   assert.deepEqual(await importedBefore('www.bahu.example'), { count: 136, vendor: 'Kashtbhanjan', skip: ['Shayam Creation'] });
   const head = asked.find(a => a.startsWith('HEAD'));
   assert.ok(head.includes('source=eq.import') && head.includes('source_ref.like."www.bahu.example:*"') && head.includes('source_ref.like."bahu.example:*"'), head);
-  const runs = asked.find(a => a.includes('pb_import_runs'));
-  assert.ok(runs.includes('host=in.(www.bahu.example,bahu.example)') && runs.includes('vendor_id=not.is.null') && runs.includes('order=created_at.desc') && runs.includes('limit=1'), runs);
-  // the manufacturers left out come from the website's latest import, with or without a vendor
-  const skip = asked.find(a => a.includes('select=skip_makers'));
-  assert.ok(skip.includes('host=in.(www.bahu.example,bahu.example)') && !skip.includes('vendor_id') && skip.includes('order=created_at.desc') && skip.includes('limit=1'), skip);
+  // one look at the website's latest import, with or without a vendor: its vendor and the manufacturers it left out
+  const runs = asked.filter(a => a.includes('pb_import_runs'));
+  assert.equal(runs.length, 1, runs.join('\n'));
+  assert.ok(runs[0].includes('host=in.(www.bahu.example,bahu.example)') && runs[0].includes('select=skip_makers,pb_vendors(name)') && !runs[0].includes('vendor_id')
+    && runs[0].includes('order=created_at.desc') && runs[0].includes('limit=1'), runs[0]);
+});
+
+test('the latest import had no vendor (it is optional): none is offered next time, even if an earlier one had one', async () => {
+  world({ count: 40, runs: [{ pb_vendors: null, skip_makers: [] }] }); // the database answers the latest run only
+  assert.deepEqual(await importedBefore('bahu.example'), { count: 40, vendor: null, skip: [] });
 });
 
 test('a first import: nothing here and no vendor; a count that fails reads as none', async () => {

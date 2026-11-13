@@ -1,10 +1,12 @@
 // Staff actions for "Import from website" (index.ts action table):
 //   import_check  { url }  → the preview: platform, estimate (+ in stock), 3 samples, warnings, vendor name,
 //                 and what Playbook already has from this website: already_here (products) and
-//                 last_vendor (the vendor its last import was filed under), so a repeat import
-//                 says "nothing new" up front and does not ask for the vendor again
+//                 last_vendor (the vendor its latest import was filed under, null when that one had none),
+//                 so a repeat import says "nothing new" up front and does not ask for the vendor again
 //   import_start  { url, in_stock_only?, use_their_price?, vendor_name?, estimate? } → a queued run
-//                 (estimate = the number the check showed, kept in cursor.estimate for the progress tile)
+//                 (estimate = the number the check showed, kept in cursor.estimate for the progress tile).
+//                 The vendor is optional (owner, 2026-11-13: "vendor not mandatory while scrapping from
+//                 website"): with none, the products come in without a vendor and one can be set later.
 //   import_cancel { run_id } → cancelled (unless already done / failed)
 //   import_list   → the last 20 runs
 // The URL is validated here (urlCheck.ts) and the platform detected again on
@@ -38,18 +40,17 @@ async function refuseOpen(host: string) {
   if (open[0]) throw new HttpError(409, busySentence(host, open[0].status));
 }
 
-/** What Playbook already holds from this website (www. or not): how many products were copied from it,
- *  and the vendor its last import was filed under. */
+/** What Playbook already holds from this website (www. or not): how many products were copied from it, and
+ *  what its latest import was given — the vendor (null when it had none: the vendor is optional, so leaving it
+ *  empty is remembered too) and the manufacturers it left out. */
 export async function importedBefore(host: string): Promise<{ count: number; vendor: string | null; skip: string[] }> {
   const like = variants(host).map(h => `source_ref.like."${h}:*"`).join(',');
   const r = await fetch(`${SB_URL}/rest/v1/pb_products?source=eq.import&or=(${enc(like)})&select=id`, { method: 'HEAD', headers: { ...svcHeaders, prefer: 'count=exact' } });
   const count = r.ok ? Number((r.headers.get('content-range') || '').split('/')[1]) || 0 : 0;
   const hosts = variants(host).map(enc).join(',');
-  const [last, lastRun] = await Promise.all([
-    sel<{ pb_vendors: { name: string } | null }>(`pb_import_runs?host=in.(${hosts})&vendor_id=not.is.null&select=pb_vendors(name)&order=created_at.desc&limit=1`),
-    sel<{ skip_makers: string[] | null }>(`pb_import_runs?host=in.(${hosts})&select=skip_makers&order=created_at.desc&limit=1`),
-  ]);
-  return { count, vendor: last[0]?.pb_vendors?.name ?? null, skip: lastRun[0]?.skip_makers ?? [] };
+  const last = await sel<{ skip_makers: string[] | null; pb_vendors: { name: string } | null }>(
+    `pb_import_runs?host=in.(${hosts})&select=skip_makers,pb_vendors(name)&order=created_at.desc&limit=1`);
+  return { count, vendor: last[0]?.pb_vendors?.name ?? null, skip: last[0]?.skip_makers ?? [] };
 }
 
 export async function importCheck(b: Body) {
@@ -81,8 +82,8 @@ export async function importStart(b: Body, userId: string | null) {
   const d = await detect(site, { estimate: false });
   if (d.host !== site.host) await refuseOpen(d.host);
   if (d.platform === 'unknown') throw new HttpError(400, `Playbook could not find a product list on ${site.host}, so there is nothing to import.`);
-  const vendorName = String(b.vendor_name ?? d.vendor_suggestion).replace(/\s+/g, ' ').trim().slice(0, 120);
-  if (!vendorName) throw new HttpError(400, 'Give the vendor a name — the imported products are filed under it.');
+  // Optional: no name → no vendor (vendorId('') is null); the products can be given one later.
+  const vendorName = String(b.vendor_name ?? '').replace(/\s+/g, ' ').trim().slice(0, 120);
   const vendor_id = await vendorId(vendorName);
   const cursor: Record<string, unknown> = d.platform === 'generic' && d.sitemaps.length ? { sitemaps: d.sitemaps, si: 0, off: 0 } : {};
   const est = Number(b.estimate); // display only ("480 of ~980"): the check's count, as the app saw it
@@ -97,7 +98,7 @@ export async function importStart(b: Body, userId: string | null) {
     if (e instanceof HttpError && e.status === 409) throw new HttpError(409, busySentence(d.host, 'queued')); // pb_import_runs_one_open
     throw e;
   }
-  await logActivity({ action: 'import_started', user_id: userId, details: { run_id: made[0].id, host: d.host, platform: d.platform, in_stock_only: row.in_stock_only, use_their_price: row.use_their_price, vendor: vendorName, ...(row.skip_makers.length ? { skip_makers: row.skip_makers } : {}) } });
+  await logActivity({ action: 'import_started', user_id: userId, details: { run_id: made[0].id, host: d.host, platform: d.platform, in_stock_only: row.in_stock_only, use_their_price: row.use_their_price, vendor: vendorName || null, ...(row.skip_makers.length ? { skip_makers: row.skip_makers } : {}) } });
   return { ok: true, run_id: made[0].id, platform: d.platform, host: d.host, warnings: d.warnings };
 }
 
