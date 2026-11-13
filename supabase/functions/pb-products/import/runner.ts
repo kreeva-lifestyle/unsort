@@ -30,9 +30,11 @@ import { robotsRefusal, setOwnDomains } from './urlCheck.ts';
 export interface RunRow {
   id: string; url: string; host: string; platform: string | null; status: string; in_stock_only: boolean; use_their_price: boolean;
   vendor_id: string | null; cursor: Record<string, unknown>; found: number; added: number; skipped: number; out_of_stock: number; failed: number;
+  /** Manufacturers left out (import/maker.ts) and how many products that skipped. */
+  skip_makers: string[]; maker_skipped: number;
   sample: unknown; error: string | null; started_at: string | null; created_by: string | null; created_at?: string;
 }
-export const RUN_COLS = 'id,url,host,platform,status,in_stock_only,use_their_price,vendor_id,cursor,found,added,skipped,out_of_stock,failed,sample,error,started_at,created_by,claimed_at,finished_at,created_at,updated_at';
+export const RUN_COLS = 'id,url,host,platform,status,in_stock_only,use_their_price,vendor_id,cursor,found,added,skipped,out_of_stock,failed,skip_makers,maker_skipped,sample,error,started_at,created_by,claimed_at,finished_at,created_at,updated_at';
 /** Generic sites: product pages are fetched only while this much of the import clock is left, for adding them. */
 const GENERIC_INGEST_MS = 20_000;
 const CAP_NOTE = `Stopped at ${MAX_PRODUCTS.toLocaleString('en-IN')} new products — run the import again later for the rest (products already here are skipped).`;
@@ -125,7 +127,7 @@ export async function advanceImport(until: number, userId: string | null): Promi
         robots, () => Date.now() < until - GENERIC_INGEST_MS);
     } catch (e) { return failed(e); }
     // A product page that could not be read (a timeout, a 5xx, a 403) is passed over for good: it counts as failed.
-    const counts: Counts = { found: cur.found + (page.known ?? 0), added: cur.added, skipped: cur.skipped + (page.known ?? 0), out_of_stock: cur.out_of_stock, failed: cur.failed + Number(page.pageErrors || 0) };
+    const counts: Counts = { found: cur.found + (page.known ?? 0), added: cur.added, skipped: cur.skipped + (page.known ?? 0), out_of_stock: cur.out_of_stock, failed: cur.failed + Number(page.pageErrors || 0), maker_skipped: cur.maker_skipped ?? 0 };
     const { next: i, taken } = await addProducts(page.items, resumeAt(page.items, cur.cursor), counts, ctx);
     const partial = i < page.items.length && !capped(counts);
     const stop = capped(counts);
@@ -161,5 +163,5 @@ async function finish(run: RunRow, save: (b: Record<string, unknown>) => Promise
 /** The run is over: its timeline line, and its entry in the bulk-change log is closed (taken out when it added nothing). */
 const logRun = async (run: RunRow, status: string, error: string | null, userId: string | null) => {
   await endRun(run.id, { host: run.host, added: run.added, found: run.found, skipped: run.skipped, status });
-  await logActivity({ action: 'import_run', user_id: userId ?? run.created_by, details: { run_id: run.id, host: run.host, platform: run.platform, status, found: run.found, added: run.added, skipped: run.skipped, out_of_stock: run.out_of_stock, failed: run.failed, ...(error ? { error } : {}) } });
+  await logActivity({ action: 'import_run', user_id: userId ?? run.created_by, details: { run_id: run.id, host: run.host, platform: run.platform, status, found: run.found, added: run.added, skipped: run.skipped, out_of_stock: run.out_of_stock, failed: run.failed, ...(run.maker_skipped ? { maker_skipped: run.maker_skipped } : {}), ...(error ? { error } : {}) } });
 };

@@ -173,6 +173,8 @@ export interface PbImportRun {
   /** Where the next page starts (per platform) plus `errors` = consecutive page errors. */
   cursor: Record<string, unknown>;
   found: number; added: number; skipped: number; out_of_stock: number; failed: number;
+  /** Manufacturers this import leaves out, and how many products that passed over. */
+  skip_makers: string[]; maker_skipped: number;
   sample: PbImportSample[] | null;
   /** A plain sentence when failed; a note on done ("Stopped at 5000 products"). */
   error: string | null;

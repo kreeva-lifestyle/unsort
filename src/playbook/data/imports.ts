@@ -28,6 +28,8 @@ export type ImportCheck = {
   last_vendor?: string | null;
   /** Do the products name who makes them? (pb-products import/maker.ts) */
   maker?: ImportMaker | null;
+  /** The manufacturers the last import from this website left out (the sheet starts with them). */
+  last_skip_makers?: string[];
 };
 /** Products looked at, how many name a maker other than the website, those makers, and the website's own name when products give it. */
 export type ImportMaker = { checked: number; named: number; names: { name: string; products: number }[]; own: string | null };
@@ -35,14 +37,14 @@ export type ImportMaker = { checked: number; named: number; names: { name: strin
 export const checkWebsite = (url: string) => pbCall<ImportCheck>('import_check', { url });
 
 /** `estimate` is display only: the run tile shows "480 of ~980" from it. */
-export type ImportStart = { url: string; in_stock_only: boolean; use_their_price: boolean; vendor_name: string; estimate: number | string | null };
+export type ImportStart = { url: string; in_stock_only: boolean; use_their_price: boolean; vendor_name: string; estimate: number | string | null; skip_makers: string[] };
 export const startImport = (o: ImportStart) => pbCall<{ ok: boolean; run_id: string }>('import_start', { ...o });
 /** Status → cancelled unless the run is already done. */
 export const cancelImport = (run_id: string) => pbCall<{ ok: boolean }>('import_cancel', { run_id });
 
 /** A run as the app shows it (no claimed_at / created_by). */
 export type ImportRunRow = Omit<PbImportRun, 'claimed_at' | 'created_by'> & { pb_vendors: { name: string } | null };
-const RUN_COLS = 'id,url,host,platform,status,in_stock_only,use_their_price,vendor_id,cursor,found,added,skipped,out_of_stock,failed,sample,error,'
+const RUN_COLS = 'id,url,host,platform,status,in_stock_only,use_their_price,vendor_id,cursor,found,added,skipped,out_of_stock,failed,skip_makers,maker_skipped,sample,error,'
   + 'created_at,started_at,finished_at,updated_at,pb_vendors(name)';
 export const HISTORY_SIZE = 20;
 

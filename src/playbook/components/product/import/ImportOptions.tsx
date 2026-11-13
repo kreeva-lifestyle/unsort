@@ -14,7 +14,8 @@ import PbButton from '../../ui/PbButton';
 import { PbChip, PbChipRow } from '../../ui/PbChip';
 import PbSwitch from '../../ui/PbSwitch';
 
-export type ImportChoices = { vendor: string; inStockOnly: boolean; theirPrice: boolean };
+/** `skip`: manufacturers to leave out (MakerSkip). */
+export type ImportChoices = { vendor: string; inStockOnly: boolean; theirPrice: boolean; skip: string[] };
 
 function SwitchRow({ title, hint, on, onToggle, label }: { title: string; hint: ReactNode; on: boolean; onToggle: () => void; label: string }) {
   return (

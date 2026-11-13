@@ -8,6 +8,9 @@
 //   - or a brand / vendor field (meta.brand) that is NOT the website's own name.
 // The website's own name (its host's first part or its site name, spaces and case aside) is kept apart as `own`:
 // acriine.in puts "ACRIINE" on all 391 products, and names "Shayam Creation" in one description only.
+// Skipping (owner, 2026-11-13: "ability to ignore those manufacturer which we want to while scrapping products"):
+// an import may name manufacturers to leave out; skipsMaker() says whether a product names one of them (the same
+// names, spaces and case aside). A product that names no manufacturer is never skipped.
 // No I/O; tested in test/importMaker.test.mjs.
 import { tagKey } from '../tagText.ts';
 
@@ -16,7 +19,7 @@ export interface MakerCheck {
   checked: number;
   /** Products that name a maker other than the website itself. */
   named: number;
-  /** Those makers, most products first (at most 5). */
+  /** Those makers, most products first (at most 30: the import sheet offers each to skip). */
   names: { name: string; products: number }[];
   /** The website's own name, when products give it as their brand / vendor (the most used spelling). */
   own: string | null;
@@ -63,7 +66,21 @@ export function makerTally() {
         list.filter(isOwn).forEach(s => count(owns, s));
       }
       const top = (m: Map<string, { name: string; products: number }>) => [...m.values()].sort((a, b) => b.products - a.products || a.name.localeCompare(b.name));
-      return { checked: per.length, named, names: top(makers).slice(0, 5), own: top(owns)[0]?.name ?? null };
+      return { checked: per.length, named, names: top(makers).slice(0, 30), own: top(owns)[0]?.name ?? null };
     },
   };
+}
+
+/** The manufacturers an import leaves out, as clean names (at most 50, each at most 60 characters, no repeats). */
+export const skipList = (v: unknown): string[] => {
+  const seen = new Set<string>();
+  return (Array.isArray(v) ? v : []).map(x => String(x ?? '').replace(/\s+/g, ' ').trim().slice(0, 60))
+    .filter(x => x.length >= 2 && !seen.has(squash(x)) && !!seen.add(squash(x))).slice(0, 50);
+};
+
+/** Does this product name one of the manufacturers the import leaves out? */
+export function skipsMaker(f: { description?: string | null; meta?: Record<string, string> }, skip: string[]): boolean {
+  if (!skip.length) return false;
+  const keys = new Set(skip.map(squash));
+  return makersOf(f).some(n => keys.has(squash(n)));
 }
