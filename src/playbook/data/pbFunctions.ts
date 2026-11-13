@@ -7,14 +7,15 @@ import { plainError } from './plainError';
 
 export type PbFunction = 'pb-products' | 'pb-telegram';
 
-/** POST {action, ...body} to a Playbook edge function as the signed-in user. */
+/** POST {...body, action} to a Playbook edge function as the signed-in user. `action` goes last so no field of
+ *  the body can replace it: a body field once named `action` sent every suggestion button to "Unknown action". */
 export async function pbFnCall<T = Record<string, unknown>>(fn: PbFunction, action: string, body: Record<string, unknown> = {}): Promise<T> {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.access_token) throw plainError('Sign in again to continue');
   const r = await fetch(`${SUPABASE_URL}/functions/v1/${fn}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: `Bearer ${session.access_token}`, apikey: SUPABASE_ANON_KEY },
-    body: JSON.stringify({ action, ...body }),
+    body: JSON.stringify({ ...body, action }),
   });
   const out = await r.json().catch(() => ({ error: `The Playbook server answered ${r.status}` }));
   // The reply rides on the error (`data`), e.g. a 409's look-alike matches (data/tags.ts). The server's own

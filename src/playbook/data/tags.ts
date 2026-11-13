@@ -43,7 +43,7 @@ export const saveLinks = (category: string, attributeIds: string[]) =>
 export type SuggestionPage = { rows: PbSuggestion[]; count: number };
 export const listSuggestions = (status: PbSuggestionStatus, page: number, attributeId = '') =>
   pbCall<SuggestionPage>('suggestions_list', { status, page, attribute_id: attributeId || undefined }).then(r => ({ rows: r.rows ?? [], count: r.count ?? 0 }));
-export type SuggestionAct = { ids: string[]; action: 'add' | 'alias' | 'ignore' | 'move'; attribute_id?: string | null; value_id?: string; name?: string; force?: boolean };
+export type SuggestionAct = { ids: string[]; act: 'add' | 'alias' | 'ignore' | 'move'; attribute_id?: string | null; value_id?: string; name?: string; force?: boolean };
 export const actSuggestions = (a: SuggestionAct) =>
   pbCall<{ done: number; conflicts: Record<string, PbLookAlike[]>; retagged: number }>('suggestion_act', a)
     .then(r => ({ done: r.done ?? 0, conflicts: r.conflicts ?? {}, retagged: r.retagged ?? 0 }));

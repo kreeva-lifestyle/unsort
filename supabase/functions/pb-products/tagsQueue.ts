@@ -66,7 +66,7 @@ async function labelOf(b: Body, action: string, rows: SugRow[]): Promise<string>
 export async function suggestionAct(b: Body, userId: string | null) {
   const ids = (Array.isArray(b.ids) ? b.ids : [b.id]).map(v => uuid(v, 'A suggestion')).slice(0, 100);
   if (!ids.length) throw new HttpError(400, 'Pick at least one suggestion.');
-  const action = String(b.action || '');
+  const action = String(b.act || ''); // not `action`: that field names the request itself (index.ts)
   if (!ACTIONS.includes(action)) throw new HttpError(400, 'Unknown suggestion action.');
   const rows = await sel<SugRow>(`pb_tag_suggestions?id=in.(${ids.map(enc).join(',')})&select=${SUG_COLS}`);
   if (!rows.length) throw new HttpError(404, 'Those suggestions are gone — reload the list.');

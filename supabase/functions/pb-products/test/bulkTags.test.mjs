@@ -130,24 +130,27 @@ test('the category list and a category\'s must-have tags: named by what changed,
 test('suggestions: one is an edit (no change opened); two or more at once are one bulk change', async () => {
   const sug = (n, phrase) => ({ id: uid(n), phrase, key: phrase.toLowerCase(), attribute_id: null, status: 'pending', uses: 1, examples: [], source: 'store', first_seen_at: '', last_seen_at: '' });
   let calls = world((m, u) => (m === 'GET' && u.startsWith('/rest/v1/pb_tag_suggestions?id=in.') ? [sug(1, 'Georgette')] : undefined));
-  assert.deepEqual(await suggestionAct({ ids: [uid(1)], action: 'ignore' }, null), { ok: true, done: 1, conflicts: {}, retagged: 0, run_id: null });
+  // The body as the app sends it: `action` names the request, `act` the choice. With the choice in `action` the
+  // app's request helper used to overwrite the request's name, so every suggestion button got "Unknown action".
+  assert.deepEqual(await suggestionAct({ action: 'suggestion_act', ids: [uid(1)], act: 'ignore' }, null), { ok: true, done: 1, conflicts: {}, retagged: 0, run_id: null });
+  await assert.rejects(() => suggestionAct({ ids: [uid(1)], action: 'ignore' }, null), /Unknown suggestion action/);
   assert.equal(opened(calls), undefined);
   assert.ok(calls.filter(c => c.method === 'PATCH').every(c => c.run === null));
 
   calls = world(recorded({ kind: 'suggestions', rows: [row('pb_tag_suggestions', { id: uid(1) }, { status: 'pending' }, { status: 'ignored' }), row('pb_tag_suggestions', { id: uid(2) }, { status: 'pending' }, { status: 'ignored' })] }),
     (m, u) => (m === 'GET' && u.startsWith('/rest/v1/pb_tag_suggestions?id=in.') ? [sug(1, 'Georgette'), sug(2, 'Wine')] : m === 'PATCH' ? [{ id: uid(1) }, { id: uid(2) }] : undefined));
-  const r = await suggestionAct({ ids: [uid(1), uid(2)], action: 'ignore' }, 'u1');
+  const r = await suggestionAct({ ids: [uid(1), uid(2)], act: 'ignore' }, 'u1');
   assert.equal(r.done, 2); assert.equal(r.run_id, RUN);
   assert.equal(opened(calls).label, 'Ignored 2 suggestions (Georgette, Wine)');
   assert.equal(calls.find(c => c.method === 'PATCH' && c.u.startsWith('/rest/v1/pb_tag_suggestions')).run, RUN);
-  await assert.rejects(() => suggestionAct({ ids: [uid(1), uid(2)], action: 'shred' }, null), /Unknown suggestion action/);
+  await assert.rejects(() => suggestionAct({ ids: [uid(1), uid(2)], act: 'shred' }, null), /Unknown suggestion action/);
   const sugs4 = [sug(1, 'Georgette'), sug(2, 'Wine'), sug(3, 'Net'), sug(4, 'Rama')];
   calls = world((m, u) => (m === 'GET' && u.startsWith('/rest/v1/pb_tag_suggestions?id=in.') ? sugs4 : m === 'GET' && u.startsWith('/rest/v1/pb_attribute_values?id=eq.') ? [{ name: 'Pink' }]
     : m === 'GET' && u.startsWith('/rest/v1/pb_attributes?id=eq.') ? [{ name: 'Fabric' }] : undefined));
-  await suggestionAct({ ids: sugs4.map(x => x.id), action: 'move', attribute_id: uid(9) }, null).catch(() => null);
+  await suggestionAct({ ids: sugs4.map(x => x.id), act: 'move', attribute_id: uid(9) }, null).catch(() => null);
   assert.equal(opened(calls).label, 'Moved 4 suggestions (Georgette, Wine, Net and 1 more) to Fabric');
   calls = world((m, u) => (m === 'GET' && u.startsWith('/rest/v1/pb_tag_suggestions?id=in.') ? sugs4 : m === 'GET' && u.startsWith('/rest/v1/pb_attribute_values?id=eq.') ? [{ name: 'Pink' }] : undefined));
-  await suggestionAct({ ids: sugs4.map(x => x.id), action: 'alias', value_id: uid(8) }, null).catch(() => null);
+  await suggestionAct({ ids: sugs4.map(x => x.id), act: 'alias', value_id: uid(8) }, null).catch(() => null);
   assert.equal(opened(calls).label, 'Made 4 suggestions (Georgette, Wine, Net and 1 more) also known as Pink');
 });
 
