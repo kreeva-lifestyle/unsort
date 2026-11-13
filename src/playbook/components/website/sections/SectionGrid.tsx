@@ -25,3 +25,9 @@ export function Quad({ children }: { children: [ReactNode, ReactNode, ReactNode,
     </div>
   );
 }
+
+/** Three fields: one row when each gets 180px (3 × 180 + 2 gaps = 572px), else one per row — never 2 + 1.
+ *  Below 572px the column minimum jumps past 100% ((572px − 100%) × 999), so only one column fits. */
+export function Trio({ children }: { children: [ReactNode, ReactNode, ReactNode] }) {
+  return <div style={{ ...grid(180), gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, max((100% - 32px) / 3, (572px - 100%) * 999)), 1fr))' }}>{children}</div>;
+}

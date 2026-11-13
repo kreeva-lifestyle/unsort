@@ -51,8 +51,9 @@ are tagged.
 - **Q4 · Who may start large actions.** Today any staff member can import
   up to 5,000 products, send or re-price a whole website, retry everything
   and read everything again. Recommended: admins and managers only.
-- **Q5 · The crossed-out "was" price.** Recommended: use it only for the
-  true MRP, or leave it off, and keep a log of price changes (new rules from
+- **Q5 · The crossed-out "was" price.** Each website can now show one % or
+  a random % per product (13 Nov). Recommended: use it only for the true
+  MRP, or leave it off, and keep a log of price changes (new rules from
   1 Jan 2027).
 - **Q7 · A vendor posts a product again.** Today the earlier product gets
   its stock back and the new post waits in Needs info as a copy.

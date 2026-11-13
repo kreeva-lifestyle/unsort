@@ -11,7 +11,7 @@ import type { AddToast } from '../PbToasts';
 import { shopifyAdminUrl } from '../../data/pbFunctions';
 import type { WebsiteLite } from '../../data/products';
 import { getListing, listingBusy, updateListing, type ListingFull } from '../../data/listings';
-import { compareAtPrice } from '../../data/websites';
+import { compareAtPrice } from '../../data/pricing';
 import { PB, pbBtnSecondary, pbErrorBox, pbNum, pbTileReview } from '../../pbTheme';
 import PbModal from './PbModal';
 import ListingActions, { listingPrimary } from './ListingActions';
@@ -75,7 +75,7 @@ export default function ListingEditor({ listing, site, onClose, onChanged, addTo
     for (const k of changed.filter((x): x is keyof Form => x in f)) {
       if (k === 'price') { // compare-at follows the typed price, as the server works it out
         patch.price = price;
-        patch.compare_at_price = price != null && site?.pricing ? compareAtPrice(price, site.pricing) : null;
+        patch.compare_at_price = price != null && site?.pricing ? compareAtPrice(price, site.pricing, l.product_id) : null;
       }
       else if (k === 'tags') patch.tags = splitList(f.tags).map(t => t.slice(0, 255));
       else if (k === 'handle') patch.handle = handle || null;

@@ -12,7 +12,7 @@ import { DEFAULT_PROFILE } from '../seoTypes';
 
 // Same values as the column defaults in 20261105090000_pb_product_directory.sql —
 // only used to fill a key missing from an older jsonb value.
-export const DEFAULT_PRICING: PbPricing = { markup_pct: 100, add_flat: 0, rounding: 'end_99', compare_at_pct: 0, min_price: null };
+export const DEFAULT_PRICING: PbPricing = { markup_pct: 100, add_flat: 0, rounding: 'end_99', compare_at_pct: 0, compare_at_max_pct: null, min_price: null };
 export const DEFAULT_TAGS: PbTagRules = { templates: ['{category}', '{fabric}', '{color}', 'Vendor_{vendor_code}', '{tags}'], static: [], case: 'as_is', ai_extra: true, ai_extra_max: 5, max_tags: 30, tag_style: 'plain', ai_allowed: [] };
 export const DEFAULT_CONTENT: PbContent = {
   model: 'claude-haiku-5-5', effort: '', language: 'English', brand_voice: '', title_template: '{ai_title}',
@@ -111,40 +111,6 @@ export const repriceWebsite = (websiteId: string) => pbCall<RepriceResult>('repr
 export const repricedMessage = (r: RepriceResult) =>
   `${r.repriced ? `${r.repriced.toLocaleString('en-IN')} listing${r.repriced > 1 ? 's' : ''} re-priced — the ones on Shopify are updated about ten a minute` : 'Every listing already has this price'}`
   + `${r.kept ? `. ${r.kept.toLocaleString('en-IN')} keep${r.kept > 1 ? '' : 's'} a price typed by hand` : ''}${r.more ? ' — there are more: tap "Update prices on Shopify" again' : ''}${r.repriced ? `. ${UNDO_HINT}` : ''}`;
-
-// ── price preview: the SAME formula as supabase/functions/pb-products/pricing.ts ──
-const r2 = (n: number) => Math.round(n * 100) / 100;
-const num = (v: unknown, d: number) => {
-  const n = typeof v === 'number' ? v : v === null || v === undefined || v === '' ? NaN : Number(v);
-  return Number.isFinite(n) ? n : d;
-};
-export function roundPrice(p: number, rounding: string): number {
-  const x = r2(p);
-  switch (rounding) {
-    case 'nearest_10': return Math.round(x / 10) * 10;
-    case 'end_99': return Math.ceil((x + 1) / 100) * 100 - 1;
-    case 'end_49_99': return Math.ceil((x + 1) / 50) * 50 - 1;
-    default: return x;
-  }
-}
-/** The "was" price for a final selling price, or null when compare-at is off (= compareAt in pricing.ts). */
-export function compareAtPrice(price: number, pricing: Partial<PbPricing>): number | null {
-  const pct = num(pricing.compare_at_pct, 0);
-  if (pct <= 0 || !(price > 0)) return null;
-  const c = roundPrice(price * (1 + pct / 100), String(pricing.rounding || 'none'));
-  return c > price ? c : null;
-}
-/** p = cost × (1 + markup/100) + add, rounded, then at least min_price; compare-at = p × (1 + pct/100), same rounding. */
-export function previewPrice(cost: number, pricing: Partial<PbPricing>, override?: PbRoutingRule['price_override']): { price: number; compare_at: number | null } {
-  const markup = num(override?.markup_pct, num(pricing.markup_pct, 0));
-  const add = num(override?.add_flat, num(pricing.add_flat, 0));
-  const rounding = String(pricing.rounding || 'none');
-  let p = roundPrice(cost * (1 + markup / 100) + add, rounding);
-  const min = pricing.min_price === null || pricing.min_price === undefined ? NaN : num(pricing.min_price, NaN);
-  if (Number.isFinite(min)) p = Math.max(p, min);
-  p = r2(p);
-  return { price: p, compare_at: compareAtPrice(p, pricing) };
-}
 
 // ── routing rules ──
 const RULE_COLS = 'id,website_id,position,name,enabled,action,conditions,price_override,created_at,updated_at';
