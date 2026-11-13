@@ -14,6 +14,16 @@ Most come from the launch research report sent on 13 Nov 2026 (questions
 Q1 to Q20; the report itself is not in this repository). Each entry gives
 the recommendation; once decided, Claude builds it.
 
+- **Review the tag lists copied from ethnicplus.in (13 Nov).** Added: 10
+  categories (Dress, Palazzo Suit, Sharara Suit, Pant Salwar Suit, Straight
+  Suit, Crop Top Lehenga, Half Saree Lehenga, Pre-Stitched Saree, Men's
+  Kurta, Men's Kurta Set), the attributes Colour, Fabric, Work and Occasion
+  with 95 values, and 2 suggestions (Men, Plus Size). Delete what you don't
+  want in Settings → Tags, then choose which attributes each category must
+  have: until then no product gets these tags. After that, "Retag all" and
+  "Let AI decide" fill them in (a product missing a must-have tag waits in
+  Needs info meanwhile). Settings → Bulk changes takes the whole import back
+  until 20 Nov.
 - **Photo previews are over the monthly free quota.** Supabase "Storage
   Image Transformations" shows 125 of 100 for this billing month. Choose:
   switch the spend cap off in Supabase (about $5 for each extra 1,000
