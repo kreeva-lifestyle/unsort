@@ -2,13 +2,14 @@
 // you type (debounced value_check; the closest match shows under the field),
 // then Add. A close match opens the guard (LookAlikeModal): "same thing" files
 // the word as "also known as" of that value, "it's different" adds it anyway.
-// Enter adds. Two signals: "Adding…" on the button, then a toast.
+// Enter adds. Two signals: "Adding…" on the button, then a toast. `onAdded`: the new value, for an attribute whose
+// values depend on the category (its sheet opens at once, to tick the categories).
 import { useEffect, useState } from 'react';
 import { friendlyError } from '../../../lib/friendlyError';
 import { logSwallowed } from '../../../lib/errorLogger';
 import type { AddToast } from '../PbToasts';
 import { LookAlikeError, type TagsApi } from '../../data/tags';
-import type { PbAttribute, PbLookAlike } from '../../tagTypes';
+import type { PbAttrValue, PbAttribute, PbLookAlike } from '../../tagTypes';
 import { PB, pbInput, pbMeta } from '../../pbTheme';
 import { PbButton } from '../ui';
 import { Dot } from '../product/status';
@@ -16,8 +17,8 @@ import LookAlikeModal from './LookAlikeModal';
 import { lookSentence } from './tagText';
 import { useAliasInto } from './useAliasInto';
 
-export default function AddValueField({ attr, attrs, api, addToast, onSaved, disabled }: {
-  attr: PbAttribute; attrs: PbAttribute[]; api: TagsApi; addToast: AddToast; onSaved: () => void; disabled?: boolean;
+export default function AddValueField({ attr, attrs, api, addToast, onSaved, onAdded, disabled }: {
+  attr: PbAttribute; attrs: PbAttribute[]; api: TagsApi; addToast: AddToast; onSaved: () => void; onAdded?: (v: PbAttrValue) => void; disabled?: boolean;
 }) {
   const [text, setText] = useState('');
   const [hint, setHint] = useState<{ matches: PbLookAlike[]; exists: { name: string } | null } | null>(null);
@@ -37,7 +38,11 @@ export default function AddValueField({ attr, attrs, api, addToast, onSaved, dis
   const done = (msg: string) => { addToast(msg, 'success'); setText(''); setHint(null); setGuard(null); onSaved(); };
   const save = async (force: boolean) => {
     setBusy(force ? 'new' : 'add');
-    try { await api.saveValue({ attribute_id: attr.id, name, force }); done(`Added “${name}” to ${attr.name}`); }
+    try {
+      const v = await api.saveValue({ attribute_id: attr.id, name, force });
+      done(`Added “${name}” to ${attr.name}${onAdded ? ' — now tick its categories' : ''}`);
+      onAdded?.({ ...v, uses: 0 });
+    }
     catch (e) { if (e instanceof LookAlikeError) setGuard(e.matches); else addToast(friendlyError(e), 'error'); }
     finally { setBusy(''); }
   };

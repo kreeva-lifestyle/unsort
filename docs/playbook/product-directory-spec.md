@@ -523,8 +523,11 @@ evidence reasonably supports it, never invent one". 'manual' attributes and
 locked `tags` are never touched. (3) "Let AI decide" (`tagFill.ts`): for the
 empty required attributes, the rules first (free, the same every time), then
 — only for what they left empty — a values-only AI pass (reader model, text +
-1 photo); 'add' mode, rows 'rules' / 'ai' (an AI failure still writes what
-the rules found); queued by `tags_ai_fill`, run by the worker after
+1 photo); rows 'rules' / 'ai' written for exactly the attributes it filled
+('auto' mode with their ids: an attribute holding only a value its category
+does not offer counts as empty and that value is replaced; a person's stale
+value is cleared first) — an AI failure still writes what the rules found;
+queued by `tags_ai_fill`, run by the worker after
 read / write / publish (≤ 5 a run, 35 s needed), or at once from the
 product page.
 
@@ -557,13 +560,48 @@ since → asked again). Asked only from the Tags page by an admin / manager,
 so not held by the daily AI limit; the cost is a `tags_matched` activity
 row that `pb_ai_cost_since` counts (20261113190000_pb_tag_nearest.sql).
 
+**Values that depend on the category — Product Type** (owner, 2026-11-13: "the
+values are to be mapped against the category, so no mistake can happen";
+answers: "You create it", a value with no category ticked is offered
+"nowhere", the Shopify Product type field keeps the category). Migration
+`20261113210000_pb_tag_value_categories.sql`. `pb_attributes.by_category`
+("Values depend on the category") and `pb_attribute_values.categories[]`
+(the categories a value is ticked for, names from the list). With the switch
+on, a value is offered only for a product whose category is ticked on it;
+none ticked = nowhere; no category = none. One rule, two copies:
+`pb_tag_offered()` (SQL) and `taxonomy.ts offered()` (the app mirrors it in
+`tagTypes.ts offeredFor`). Where it holds: `attrsFor` / `allAttrs` hand out
+only offered values, so the word rules, the "Let AI decide" enum and
+`product_values_set` (staff) follow it; the reader's single call gets every
+ticked value grouped by category ("Product Type (one value; depends on the
+category …): Lehenga: Bridal Lehenga; Salwar Suit: Anarkali") and
+`autoValues` drops an AI pick the settled category does not offer; "Retag
+all" neither keeps nor counts one; the Ready check, the tags cache and
+`{tags}` (`siteValueTags`) count / send only offered values; the "N products
+will need" counts likewise. `attribute_save { by_category }`: turned on, each
+value with no category gets the categories that use the attribute now (no
+product moves at that moment); off, every value counts everywhere again and
+the ticks are kept. `value_save { categories }` keeps only names on the list
+and re-checks the products carrying the value. `value_merge` adds `from`'s
+categories to `into` (a revert brings `from` back but leaves the addition).
+The bulk-change log records both columns; a revert that re-inserts a deleted
+attribute or value gets them back through `pb_tag_scope_back` (BEFORE INSERT,
+reads the row's last recorded delete). The migration creates **Product Type**
+(one value, switch on, linked to no category). Screens: the Tags page groups
+such an attribute's values under their categories, marks values ticked for no
+category and categories that use it with none ticked (ScopedValues); the
+value sheet has **Offered for** chips; the attribute sheet the switch; the
+category sheet says how many values a category has; the product page offers
+only the category's values. Tests: `test/tagByCategory`, `tagFill`,
+`t_dups.sql` part 10.
+
 **Websites.** `{tags}` = the chosen values in the site's `tag_rules.tag_style`:
 `plain` ("Black", default) or `prefixed` (`${shopify_prefix || attribute}_${name}`);
 `max_tags` (default 30) caps the list. New sites' templates include `{tags}`.
 
 Tests: `test/tagText`, `tagClean`, `tagLook`, `tagMatch` (+ tagAuto),
 `tagGate`, `tagPrompt`, `tagFill` (queue with a fake database and AI),
-`tags`, `runner` (ingest tagging).
+`tagByCategory`, `tags`, `runner` (ingest tagging).
 ## One store, one voice (owner, 2026-11-12)
 
 The owner's words: "different content, alt, title, description, meta desc, meta

@@ -4,7 +4,9 @@
 //                      must-have tags (pb_categories_prune) and its products are checked again
 //   attribute_delete   { id } → the attribute goes with its values, its links and the products' values of it
 //   value_delete       { id } → the value goes, from every product that has it
-//   value_merge        { from, into } → the products move to `into`, which keeps `from`'s name as also known as
+//   value_merge        { from, into } → the products move to `into`, which keeps `from`'s name as also known as (and,
+//                      for a value that depends on the category, `from`'s ticked categories too: its products stay
+//                      counted; a revert brings `from` back but leaves `into` with the added categories)
 //   category_link_save { category, attribute_ids[] (in order) } → the category's must-have tags
 // Each one is a bulk change (bulkLog.ts): Settings → Bulk changes takes it back for 7 days — the rows it deleted
 // come back, the rows it added go, and the products are checked again (pb_bulk_revert_tags). One that reaches
@@ -13,9 +15,9 @@
 // SQL: 20261110090000_pb_tags.sql (the changes), 20261113090000_pb_bulk_log_tags_stock.sql (recording, revert).
 import { uuid, type Body } from './actions.ts';
 import { asBulk } from './bulkLog.ts';
-import { enc, insert, logActivity, one, remove, rpc, sel, selAll, uniqueCi } from './db.ts';
+import { enc, insert, logActivity, one, patch, remove, rpc, sel, selAll, uniqueCi } from './db.ts';
 import { HttpError } from './http.ts';
-import { displayName } from './tagText.ts';
+import { displayName, tagKey } from './tagText.ts';
 
 /** "Silk, Chiffon and 3 more". */
 const few = (names: string[]) => (names.length > 4 ? `${names.slice(0, 4).join(', ')} and ${names.length - 4} more` : names.join(', '));
@@ -83,8 +85,13 @@ export async function valueDelete(b: Body, userId: string | null) {
 export async function valueMerge(b: Body, userId: string | null) {
   const from = uuid(b.from, 'The value to merge'), into = uuid(b.into, 'The value to merge into');
   const [f, i] = await Promise.all([valueOf(from), valueOf(into)]);
-  const r = await asBulk('value_merge', `Merged ${f.name} into ${i.name}${i.attr ? ` (${i.attr})` : ''}`, userId,
-    async (run) => ({ moved: await rpc<number>('pb_value_merge', { p_from: from, p_into: into }, run) }));
+  const r = await asBulk('value_merge', `Merged ${f.name} into ${i.name}${i.attr ? ` (${i.attr})` : ''}`, userId, async (run) => {
+    const two = await sel<{ id: string; categories: string[] | null }>(`pb_attribute_values?id=in.(${enc(from)},${enc(into)})&select=id,categories`);
+    const cf = two.find(x => x.id === from)?.categories ?? [], ci = two.find(x => x.id === into)?.categories ?? [];
+    const both = [...ci, ...cf.filter(c => !ci.some(x => tagKey(x) === tagKey(c)))];
+    if (both.length > ci.length) await patch('pb_attribute_values', `id=eq.${enc(into)}`, { categories: both }, 'id', run);
+    return { moved: await rpc<number>('pb_value_merge', { p_from: from, p_into: into }, run) };
+  });
   await logActivity({ action: 'tags_edited', details: { what: 'value_merged', from: f.name, into: i.name, moved: r.moved, run_id: r.run_id }, user_id: userId });
   return { ok: true, moved: r.moved, run_id: r.run_id };
 }

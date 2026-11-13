@@ -56,14 +56,16 @@ export async function productValuesSet(b: Body, userId: string | null) {
 function next(p: P, have: Pv[], tax: Taxonomy): { rows: ValueSet[]; missing: string[]; before: Set<string>; attributes: string[] } {
   const attrs = attrsFor(tax, p.category);
   const attrOf = (pv: Pv) => pv.pb_attribute_values?.attribute_id ?? '';
+  // Only values the category offers count or stay (a Product Type ticked for another category does neither).
+  const ok = new Set(attrs.flatMap(a => a.values.map(v => v.id)));
   const manual = new Set(have.filter(v => v.source === 'manual').map(attrOf));
   const r = autoValues(p, matchAttrs(attrs), { manualAttrIds: manual, categories: tax.categories, shades: shadesOf(tax) });
   const inScope = new Set(attrs.map(a => a.id));
-  const keepAi = have.filter(v => v.source === 'ai' && inScope.has(attrOf(v)) && !manual.has(attrOf(v)) && !r.filled.has(attrOf(v)));
+  const keepAi = have.filter(v => v.source === 'ai' && ok.has(v.value_id) && !manual.has(attrOf(v)) && !r.filled.has(attrOf(v)));
   const rows: ValueSet[] = [...r.rows, ...keepAi.map(v => ({ value_id: v.value_id, source: 'ai' as const }))];
   const before = new Set(have.filter(v => v.source !== 'manual' && inScope.has(attrOf(v))).map(v => `${v.value_id}:${v.source}`));
   const after = new Set(rows.map(v => `${v.value_id}:${v.source}`));
-  const filledAttrs = new Set([...manual, ...r.filled, ...keepAi.map(attrOf)]);
+  const filledAttrs = new Set([...have.filter(v => v.source === 'manual' && ok.has(v.value_id)).map(attrOf), ...r.filled, ...keepAi.map(attrOf)]);
   const missing = [...(categoryGone(p.category, tax.categories) ? ['Category'] : []), ...missingAttrs(attrs, filledAttrs)];
   const attributes = [...inScope];
   if (before.size === after.size && [...before].every(x => after.has(x))) return { rows: [], missing, before: new Set(), attributes };

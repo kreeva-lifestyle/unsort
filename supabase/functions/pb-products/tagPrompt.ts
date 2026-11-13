@@ -7,7 +7,9 @@
 // invent one". No I/O — tested in test/tagPrompt.test.mjs.
 import { tagKey } from './tagText.ts';
 
-export interface PromptAttr { id: string; name: string; multi: boolean; values: { id: string; name: string }[] }
+/** `byCategory`: the attribute's values depend on the category (Product Type) — each value carries the categories it is
+ *  ticked for, and the prompt lists them per category (the reader settles the category in the same call). */
+export interface PromptAttr { id: string; name: string; multi: boolean; byCategory?: boolean; values: { id: string; name: string; categories?: string[] }[] }
 export interface TagSpec { attrs: (PromptAttr & { pk: string })[]; byCategory: Record<string, string[]> }
 export interface TagOut { tags?: Record<string, { values?: unknown; other?: unknown }>; tag_other?: unknown }
 export interface ReadTags { chosen: Record<string, string[]>; other: { attribute_id: string | null; phrase: string }[] }
@@ -39,8 +41,17 @@ export function tagPromptLines(spec: TagSpec, o: { fillOnly?: boolean } = {}): s
     'Every attribute of the product\'s category needs at least one value: when the photos or text reasonably support one, pick the CLOSEST value in the list (e.g. "rani pink" → Pink, "embroidered" → Embroidery). Never invent a value that is not in the list. If truly nothing fits, leave values [] and put the word you saw in "other".',
     'An attribute marked "one value" takes at most one. other: up to 3 short phrases (1–3 words) for that attribute that are not in its list, or [].',
     ...(o.fillOnly ? [] : ['tag_other: up to 5 short phrases (1–3 words) that describe the product but fit no attribute, or [].']),
-    ...spec.attrs.map(a => `${a.name} (${a.multi ? 'one or several' : 'one value'}): ${a.values.map(v => v.name).join(', ')}`),
+    ...spec.attrs.map(a => (a.byCategory ? scopedLine(a) : `${a.name} (${a.multi ? 'one or several' : 'one value'}): ${a.values.map(v => v.name).join(', ')}`)),
   ];
+}
+
+/** "Product Type (one value; depends on the category — choose only from the product's category): Lehenga: Bridal
+ *  Lehenga, Lehenga Choli; Salwar Suit: Anarkali" — a value ticked for several categories is listed under each. */
+function scopedLine(a: PromptAttr): string {
+  const by = new Map<string, string[]>();
+  for (const v of a.values) for (const c of v.categories ?? []) by.set(c, [...(by.get(c) ?? []), v.name]);
+  const groups = [...by].map(([c, names]) => `${c}: ${names.join(', ')}`).join('; ');
+  return `${a.name} (${a.multi ? 'one or several' : 'one value'}; depends on the category — choose only from the product's category, none if it has none): ${groups}`;
 }
 
 /** The schema's "tags" property (+ "tag_other" unless fillOnly); null when there is nothing to choose. */

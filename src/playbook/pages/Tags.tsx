@@ -60,7 +60,7 @@ export default function Tags({ addToast, onBack, api = TAGS_API, canEdit = false
         {/* First run (no attributes yet): building the lists comes first, the (empty) suggestions last. */}
         {tax.attributes.length > 0 && sug}
         <div className={bentoClass(8)} style={{ display: 'grid', minWidth: 0, alignSelf: 'start' }}>
-          <AttributesTile attrs={tax.attributes} api={api} addToast={addToast} onChanged={changed} canEdit={canEdit}
+          <AttributesTile attrs={tax.attributes} categories={tax.categories} links={tax.links} api={api} addToast={addToast} onChanged={changed} canEdit={canEdit}
             onNew={() => setSheet({ attr: null })} onEdit={a => setSheet({ attr: a })} />
         </div>
         <div className={bentoClass(4)} style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0, alignSelf: 'start' }}>
@@ -69,7 +69,8 @@ export default function Tags({ addToast, onBack, api = TAGS_API, canEdit = false
         </div>
         {!tax.attributes.length && sug}
       </div>
-      <AttributeSheet open={!!sheet} attr={sheet?.attr ?? null} api={api} addToast={addToast} onClose={() => setSheet(null)} onSaved={changed} />
+      <AttributeSheet open={!!sheet} attr={sheet?.attr ?? null} uses={sheet?.attr ? tax.categories.filter(c => tax.links.some(l => l.attribute_id === sheet.attr!.id && l.category.toLowerCase() === c.toLowerCase())) : []}
+        api={api} addToast={addToast} onClose={() => setSheet(null)} onSaved={changed} />
     </>
   );
 }

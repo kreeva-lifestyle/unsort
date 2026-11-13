@@ -4,12 +4,14 @@
 // must"), so linking first counts the products that lack it and asks:
 // "12 products will need a Colour" → Link and let AI decide (the sheet's one
 // gradient: links, then queues those products for the AI) / Link only /
-// Cancel. Removing the category from the list lives at the bottom.
+// Cancel. Removing the category from the list lives at the bottom. An attribute
+// whose values depend on the category (Product Type) says how many of its values
+// are ticked for this category — none means its products cannot be finished.
 import { useEffect, useState } from 'react';
 import { friendlyError } from '../../../lib/friendlyError';
 import type { AddToast } from '../PbToasts';
 import type { TagsApi } from '../../data/tags';
-import type { PbAttribute, PbCategoryLink, PbLinkStat } from '../../tagTypes';
+import { offeredFor, type PbAttribute, type PbCategoryLink, type PbLinkStat } from '../../tagTypes';
 import { PB, pbBody, pbMeta, pbName, pbTileReview } from '../../pbTheme';
 import { useConfirm } from '../../../components/ui/ConfirmModal';
 import PbModal from '../product/PbModal';
@@ -34,6 +36,8 @@ export default function CategorySheet({ category, attrs, links, stats, api, addT
   const linked = ids.map(id => attrs.find(a => a.id === id)).filter((a): a is PbAttribute => !!a);
   const free = attrs.filter(a => !ids.includes(a.id));
   const lacking = (id: string) => stats.find(s => s.category.toLowerCase() === cat.toLowerCase() && s.attribute_id === id)?.lacking ?? 0;
+  /** An attribute whose values depend on the category: how many are ticked for this one (null for the others). */
+  const here = (a: PbAttribute) => (a.by_category ? a.values.filter(v => offeredFor(a, v, cat)).length : null);
 
   const save = async (next: string[], key: string, ok: (r: { to_needs_info: number; to_ready: number }) => string) => {
     setBusy(key);
@@ -81,6 +85,8 @@ export default function CategorySheet({ category, attrs, links, stats, api, addT
               <span style={{ flex: 1, minWidth: 0 }}>
                 <span style={{ ...pbName, display: 'block' }}>{a.name}</span>
                 <span style={pbMeta}>{lacking(a.id) ? `${plural(lacking(a.id), 'product')} still need one` : 'Every product has one'}</span>
+                {here(a) === 0 && <Dot color={PB.review} label={`No ${a.name} value is ticked for ${category} yet: open one under Attributes and tick ${category}`} style={{ ...pbMeta, color: PB.tx, whiteSpace: 'normal', display: 'flex' }} />}
+                {!!here(a) && <span style={{ ...pbMeta, display: 'block' }}>{plural(here(a) ?? 0, `${a.name} value`)} for {category}</span>}
               </span>
               {canEdit && <>
                 <PbButton iconOnly icon="chevronUp" aria-label={`Move ${a.name} up`} onClick={() => move(i, -1)} disabled={i === 0} dim={!!busy} />
@@ -94,7 +100,8 @@ export default function CategorySheet({ category, attrs, links, stats, api, addT
         {ask0 && (
           <div role="alertdialog" aria-labelledby="pbc-warn" style={{ ...pbTileReview, backdropFilter: 'none', WebkitBackdropFilter: 'none', borderRadius: PB.r.input, padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
             <Dot color={PB.review} label={<span id="pbc-warn">{plural(ask0.lacking, 'product')} will need a {ask0.attr.name}</span>} style={{ color: PB.tx, fontWeight: 600, fontSize: 13, whiteSpace: 'normal' }} />
-            <span style={pbBody}>Until they have one they wait in Needs info and are not sent to websites. The AI can choose one from your {ask0.attr.name} list for each.</span>
+            <span style={pbBody}>Until they have one they wait in Needs info and are not sent to websites. The AI can choose one from your {ask0.attr.name} list for each.
+              {here(ask0.attr) === 0 && <> But no {ask0.attr.name} value is ticked for {category} yet: tick some first, or nothing can be chosen.</>}</span>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <PbButton kind="primary" icon="sparkles" onClick={() => void link(true)} busy={busy === 'link-ai'} busyLabel="Linking…" dim={busy === 'link'}>Link and let AI decide</PbButton>
               <PbButton onClick={() => void link(false)} busy={busy === 'link'} busyLabel="Linking…" dim={busy === 'link-ai'}>Link only</PbButton>

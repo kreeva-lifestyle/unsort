@@ -8,7 +8,7 @@
 // LookAlikeError with the matches, so the UI can ask "same thing or new?".
 import { supabase } from '../../lib/supabase';
 import { pbCall } from './pbFunctions';
-import type { PbAttrValue, PbAttribute, PbFillRun, PbLookAlike, PbNearest, PbProductValue, PbRetagResult, PbSuggestion, PbSuggestionStatus, PbTaxonomy } from '../tagTypes';
+import { offeredFor, type PbAttrValue, type PbAttribute, type PbFillRun, type PbLookAlike, type PbNearest, type PbProductValue, type PbRetagResult, type PbSuggestion, type PbSuggestionStatus, type PbTaxonomy } from '../tagTypes';
 
 export class LookAlikeError extends Error {
   matches: PbLookAlike[];
@@ -25,14 +25,15 @@ export const getTaxonomy = () => pbCall<PbTaxonomy>('taxonomy_get').then(r => ({
   category_products: r.category_products ?? [], suggestions_pending: r.suggestions_pending ?? 0, fill: r.fill ?? null,
 }));
 export const saveCategories = (categories: string[]) => pbCall<{ categories: string[] }>('categories_save', { categories }).then(r => r.categories ?? categories);
-export const saveAttribute = (a: { id?: string; name: string; multi: boolean; shopify_prefix: string }) =>
+export const saveAttribute = (a: { id?: string; name: string; multi: boolean; shopify_prefix: string; by_category: boolean }) =>
   pbCall<{ attribute: PbAttribute }>('attribute_save', a).then(r => r.attribute);
 export const deleteAttribute = (id: string) => pbCall<{ regated: number }>('attribute_delete', { id });
 export const orderAttributes = (ids: string[]) => pbCall('attribute_order', { ids });
 export const checkValue = (attributeId: string, name: string, excludeId?: string) =>
   pbCall<{ matches: PbLookAlike[]; exists: { id: string; name: string } | null }>('value_check', { attribute_id: attributeId, name, exclude_id: excludeId })
     .then(r => ({ matches: r.matches ?? [], exists: r.exists ?? null }));
-export const saveValue = (v: { attribute_id: string; id?: string; name: string; aliases?: string[]; force?: boolean }) =>
+/** `categories`: where the value is offered while its attribute's values depend on the category (left out = unchanged). */
+export const saveValue = (v: { attribute_id: string; id?: string; name: string; aliases?: string[]; categories?: string[]; force?: boolean }) =>
   pbCall<{ value: PbAttrValue }>('value_save', v).then(r => r.value).catch(lookAlike);
 export const deleteValue = (id: string) => pbCall<{ regated: number }>('value_delete', { id });
 export const mergeValue = (from: string, into: string) => pbCall<{ moved: number }>('value_merge', { from, into });
@@ -59,7 +60,8 @@ export const aiFillNow = (productId: string) =>
   pbCall<{ filled: string[]; left: string[]; status: string; missing: string[]; routed: number }>('tags_ai_fill', { product_ids: [productId], now: true });
 export const fillStatus = () => pbCall<{ fill: PbFillRun | null }>('tags_fill_status').then(r => r.fill ?? null);
 
-/** What the product page needs: its category's attributes (in order, with their values) and its chosen values. */
+/** What the product page needs: its category's attributes (in order, with the values offered for the category) and its
+ *  chosen values. A value ticked only for other categories (Product Type) is not offered, and does not count. */
 export async function productTaxonomy(productId: string, category: string | null): Promise<{ attributes: PbAttribute[]; values: PbProductValue[] }> {
   const [vals, links] = await Promise.all([
     supabase.from('pb_product_values').select('value_id,source').eq('product_id', productId).limit(500),
@@ -70,14 +72,15 @@ export async function productTaxonomy(productId: string, category: string | null
   const ids = (links.data ?? []).map(l => l.attribute_id as string);
   if (!ids.length) return { attributes: [], values: (vals.data ?? []) as PbProductValue[] };
   const [attrs, values] = await Promise.all([
-    supabase.from('pb_attributes').select('id,name,key,multi,position,shopify_prefix').in('id', ids),
-    supabase.from('pb_attribute_values').select('id,attribute_id,name,key,aliases,position').in('attribute_id', ids).order('position').order('name').limit(5000),
+    supabase.from('pb_attributes').select('id,name,key,multi,position,shopify_prefix,by_category').in('id', ids),
+    supabase.from('pb_attribute_values').select('id,attribute_id,name,key,aliases,position,categories').in('attribute_id', ids).order('position').order('name').limit(5000),
   ]);
   if (attrs.error) throw attrs.error;
   if (values.error) throw values.error;
   const byId = new Map((attrs.data ?? []).map(a => [a.id as string, a]));
   return {
-    attributes: ids.map(id => byId.get(id)).filter(Boolean).map(a => ({ ...(a as Omit<PbAttribute, 'values'>), values: (values.data ?? []).filter(v => v.attribute_id === a!.id) as PbAttrValue[] })),
+    attributes: ids.map(id => byId.get(id)).filter(Boolean).map(a => ({ ...(a as Omit<PbAttribute, 'values'>),
+      values: ((values.data ?? []) as PbAttrValue[]).filter(v => v.attribute_id === a!.id && offeredFor(a as PbAttribute, v, category)) })),
     values: (vals.data ?? []) as PbProductValue[],
   };
 }

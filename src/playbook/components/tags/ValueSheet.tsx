@@ -3,49 +3,61 @@
 // "also known as" (kala, kaala… — one word can mean only one value), "Merge
 // into…" another value of the same attribute (products move over, its names
 // become also-known-as) and Delete (asks first; products lose the value and
-// may go back to Needs info). Save is the sheet's one gradient.
+// may go back to Needs info). Save is the sheet's one gradient. For an attribute whose values depend on the category
+// (Product Type, owner 13 Nov 2026) a row of category chips says where the value is offered: ticked = offered for
+// that category's products; none ticked = offered nowhere.
 import { useEffect, useState } from 'react';
 import { friendlyError } from '../../../lib/friendlyError';
 import { TAKE_BACK } from '../../data/bulk';
 import type { AddToast } from '../PbToasts';
 import { LookAlikeError, type TagsApi } from '../../data/tags';
-import type { PbAttrValue, PbAttribute, PbLookAlike } from '../../tagTypes';
-import { PB, pbBody, pbErrorBox, pbInput } from '../../pbTheme';
+import { catKey, type PbAttrValue, type PbAttribute, type PbLookAlike } from '../../tagTypes';
+import { PB, pbActive, pbBody, pbErrorBox, pbInput } from '../../pbTheme';
 import { useIsPhone } from '../../hooks/useIsPhone';
 import { useConfirm } from '../../../components/ui/ConfirmModal';
 import PbModal from '../product/PbModal';
-import { PbButton, PbConfirm } from '../ui';
+import { PbButton, PbConfirm, PbIcon } from '../ui';
+import { CHIP } from './ValueChip';
 import { ChipsInput, Field } from '../website/ui';
-import { lookSentence, plural } from './tagText';
+import { andList, lookSentence, plural } from './tagText';
 
-export default function ValueSheet({ value, attr, api, addToast, onClose, onSaved }: {
-  value: PbAttrValue | null; attr: PbAttribute | null; api: TagsApi; addToast: AddToast; onClose: () => void; onSaved: () => void;
+export default function ValueSheet({ value, attr, categories, api, addToast, onClose, onSaved }: {
+  value: PbAttrValue | null; attr: PbAttribute | null; categories: string[]; api: TagsApi; addToast: AddToast; onClose: () => void; onSaved: () => void;
 }) {
   const phone = useIsPhone();
   const [name, setName] = useState('');
   const [aliases, setAliases] = useState<string[]>([]);
+  const [cats, setCats] = useState<string[]>([]);
   const [into, setInto] = useState('');
   const [busy, setBusy] = useState<'' | 'save' | 'merge' | 'delete'>('');
   const [err, setErr] = useState('');
   const [warn, setWarn] = useState<PbLookAlike[] | null>(null);
   const { ask, modalProps } = useConfirm();
-  useEffect(() => { if (value) { setName(value.name); setAliases(value.aliases); setInto(''); setErr(''); setWarn(null); } }, [value]);
+  useEffect(() => { if (value) { setName(value.name); setAliases(value.aliases); setCats(value.categories ?? []); setInto(''); setErr(''); setWarn(null); } }, [value]);
   if (!value || !attr) return null;
   const nm = name.trim().replace(/\s+/g, ' ');
-  const dirty = nm !== value.name || aliases.join('|') !== value.aliases.join('|');
+  // Ticks for categories no longer on the list are dropped on save (the server keeps only the list's names).
+  const ticked = categories.filter(c => cats.some(x => catKey(x) === catKey(c)));
+  const was = categories.filter(c => (value.categories ?? []).some(x => catKey(x) === catKey(c)));
+  const dirty = nm !== value.name || aliases.join('|') !== value.aliases.join('|') || (attr.by_category && ticked.join('|') !== was.join('|'));
+  const tick = (c: string) => setCats(l => (l.some(x => catKey(x) === catKey(c)) ? l.filter(x => catKey(x) !== catKey(c)) : [...l, c]));
   const others = attr.values.filter(v => v.id !== value.id);
 
   const save = async (force = false) => {
     if (!nm) { setErr('Give the value a name.'); return; }
     setBusy('save'); setErr('');
-    try { await api.saveValue({ attribute_id: attr.id, id: value.id, name: nm, aliases, force }); addToast(`Saved ${nm}`, 'success'); onSaved(); onClose(); }
+    try {
+      await api.saveValue({ attribute_id: attr.id, id: value.id, name: nm, aliases, force, ...(attr.by_category ? { categories: ticked } : {}) });
+      addToast(`Saved ${nm}`, 'success'); onSaved(); onClose();
+    }
     catch (e) { if (e instanceof LookAlikeError) setWarn(e.matches); else setErr(friendlyError(e)); }
     finally { setBusy(''); }
   };
   const merge = async () => {
     const to = others.find(v => v.id === into);
     if (!to) return;
-    const ok = await ask({ title: `Merge ${value.name} into ${to.name}?`, message: `Products with ${value.name} get ${to.name}, and “${value.name}” becomes another name for ${to.name}. ${(value.uses ?? 0) >= 2 ? TAKE_BACK : 'This cannot be undone.'}`, confirmLabel: `Merge into ${to.name}` });
+    const more = attr.by_category ? was.filter(c => !(to.categories ?? []).some(x => catKey(x) === catKey(c))) : [];
+    const ok = await ask({ title: `Merge ${value.name} into ${to.name}?`, message: `Products with ${value.name} get ${to.name}, and “${value.name}” becomes another name for ${to.name}.${more.length ? ` ${to.name} is then also ticked for ${andList(more)}.` : ''} ${(value.uses ?? 0) >= 2 ? TAKE_BACK : 'This cannot be undone.'}`, confirmLabel: `Merge into ${to.name}` });
     if (!ok) return;
     setBusy('merge');
     try { const r = await api.mergeValue(value.id, to.id); addToast(`Merged — ${plural(r.moved ?? 0, 'product')} moved to ${to.name}`, 'success'); onSaved(); onClose(); }
@@ -77,6 +89,20 @@ export default function ValueSheet({ value, attr, api, addToast, onClose, onSave
         <Field label="Also known as" htmlFor="pbv-aka" hint="Other words that mean this value — Hindi or shop words such as kala, kaala. Products that say them get this value.">
           <ChipsInput id="pbv-aka" values={aliases} onChange={setAliases} placeholder="e.g. kaala — Enter adds it" maxLen={80} />
         </Field>
+        {attr.by_category && (
+          <Field label="Offered for" hint={ticked.length ? `Only products in ${andList(ticked)} can get ${nm || value.name} — by the word rules, the AI or a person.` : 'No category ticked: no product can get it until you tick one.'}>
+            <div role="group" aria-label={`Categories ${nm || value.name} is offered for`} style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {categories.map(c => {
+                const on = ticked.includes(c);
+                return (
+                  <button key={c} type="button" aria-pressed={on} onClick={() => tick(c)} disabled={!!busy} className="pb-pill" style={{ ...CHIP, ...(on ? pbActive : null) }}>
+                    {on && <PbIcon name="check" size={16} />}<span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{c}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </Field>
+        )}
         {others.length > 0 && (
           <Field label="Merge into…" htmlFor="pbv-into" hint="Two values that mean the same thing? Keep one.">
             <div style={{ display: 'flex', gap: 8, flexWrap: phone ? 'wrap' : 'nowrap' }}>

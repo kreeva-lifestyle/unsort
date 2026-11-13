@@ -121,7 +121,7 @@ export async function generateOne(l: ListingRow, o: { manual: boolean; prevStatu
     const g = w.g, hard = hardOf(w.problems);
     const ok = new Set(allowed.map(t => t.toLowerCase()));
     const extra = g.extra_tags.filter(t => !allowed.length || ok.has(String(t).trim().toLowerCase())).slice(0, extraMax);
-    const valueTags = locked.has('tags') ? [] : await siteValueTags(p.id, tr.tag_style);
+    const valueTags = locked.has('tags') ? [] : await siteValueTags(p.id, tr.tag_style, p.category);
     const keepHandle = locked.has('handle') || (!!l.shopify_product_id && !!l.handle); // a live URL never moves
     let handle = keepHandle && l.handle ? l.handle : cleanHandle(g.handle, keyword || g.title, p.sku) || `product-${p.id.replace(/[^a-z0-9]/gi, '').slice(0, 6).toLowerCase()}`;
     // Taken by another product on this website: a short suffix (the store itself is checked again at publish).

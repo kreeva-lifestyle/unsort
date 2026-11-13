@@ -40,7 +40,18 @@ async function fetchCount(path: string): Promise<number> {
   return Number((r.headers.get('content-range') || '').split('/')[1]) || 0;
 }
 
-/** attribute_save { id?, name, multi?, shopify_prefix? } → { ok, attribute }. */
+/** Check again the products an attribute's switch reaches: those of the categories that use it and those carrying one
+ *  of its values (the tags cache counts only offered values). */
+async function regateAttr(attributeId: string) {
+  const cats = (await sel<{ category: string }>(`pb_category_attributes?attribute_id=eq.${enc(attributeId)}&select=category`)).map(c => `"${c.category.replace(/"/g, '')}"`);
+  const inCats = cats.length ? (await selAll<{ id: string }>(`pb_products?category=in.(${enc(cats.join(','))})&status=neq.archived&select=id&order=id.asc`)).map(p => p.id) : [];
+  const carrying = (await selAll<{ product_id: string }>(`pb_product_values?select=product_id,pb_attribute_values!inner(attribute_id)&pb_attribute_values.attribute_id=eq.${enc(attributeId)}&order=product_id.asc,value_id.asc`)).map(r => r.product_id);
+  await refresh([...new Set([...inCats, ...carrying])]);
+}
+
+/** attribute_save { id?, name, multi?, shopify_prefix?, by_category? } → { ok, attribute }. by_category: "Values depend on
+ *  the category" (Product Type, owner 13 Nov 2026). Turned on, each value with no category ticked gets the categories
+ *  that use the attribute now, so no product loses a value at that moment; the owner unticks what does not belong. */
 export async function attributeSave(b: Body, userId: string | null) {
   const name = displayName(b.name).slice(0, 60);
   const key = tagKey(name);
@@ -49,17 +60,20 @@ export async function attributeSave(b: Body, userId: string | null) {
   const id = b.id ? uuid(b.id, 'The attribute') : null;
   const clash = await one<{ id: string; name: string }>(`pb_attributes?key=eq.${enc(key)}&select=id,name`);
   if (clash && clash.id !== id) throw new HttpError(409, `There is already an attribute called “${clash.name}”.`);
-  const body: Record<string, unknown> = { name, key, shopify_prefix: prefix, ...(typeof b.multi === 'boolean' ? { multi: b.multi } : {}) };
+  const body: Record<string, unknown> = { name, key, shopify_prefix: prefix, ...(typeof b.multi === 'boolean' ? { multi: b.multi } : {}),
+    ...(typeof b.by_category === 'boolean' ? { by_category: b.by_category } : {}) };
   let row: AttrRow;
   if (id) {
     const before = await one<AttrRow>(`pb_attributes?id=eq.${enc(id)}&select=${ATTR_COLS}`);
     if (!before) throw new HttpError(404, 'That attribute no longer exists.');
-    row = (await patch<AttrRow>('pb_attributes', `id=eq.${enc(id)}`, body, ATTR_COLS))[0];
-    if (before.name !== name) { // "Missing: Colour" holds the name: re-gate the products of its categories
-      const cats = (await sel<{ category: string }>(`pb_category_attributes?attribute_id=eq.${enc(id)}&select=category`)).map(c => `"${c.category.replace(/"/g, '')}"`);
-      const ids = cats.length ? (await selAll<{ id: string }>(`pb_products?category=in.(${enc(cats.join(','))})&status=neq.archived&select=id&order=id.asc`)).map(p => p.id) : [];
-      await refresh(ids);
+    const switched = typeof b.by_category === 'boolean' && b.by_category !== before.by_category;
+    if (switched && b.by_category) {
+      const cats = (await sel<{ category: string }>(`pb_category_attributes?attribute_id=eq.${enc(id)}&select=category&order=position.asc`)).map(c => c.category);
+      if (cats.length) await patch('pb_attribute_values', `attribute_id=eq.${enc(id)}&categories=eq.${enc('{}')}`, { categories: cats });
     }
+    row = (await patch<AttrRow>('pb_attributes', `id=eq.${enc(id)}`, body, ATTR_COLS))[0];
+    // "Missing: Colour" holds the name, and the switch changes which values count: check the products again.
+    if (before.name !== name || switched) await regateAttr(id);
   } else {
     const last = await one<{ position: number }>('pb_attributes?select=position&order=position.desc&limit=1');
     row = (await insert<AttrRow>('pb_attributes', [{ ...body, position: (last?.position ?? 0) + 1 }], { select: ATTR_COLS }))[0];
@@ -91,7 +105,9 @@ export async function valueCheck(b: Body) {
   return { ok: true, matches: r.matches, exists: r.same ? { id: r.same.id, name: r.same.name } : null };
 }
 
-/** value_save { attribute_id, id?, name, aliases?, force? } → { ok, value } or 409 { matches } (look-alikes). */
+/** value_save { attribute_id, id?, name, aliases?, categories?, force? } → { ok, value } or 409 { matches } (look-alikes).
+ *  categories: the categories the value is offered for while its attribute's values depend on the category — names on
+ *  the owner's list only, spelled and ordered as there; others are dropped. Left out = kept as they are. */
 export async function valueSave(b: Body, userId: string | null) {
   const attributeId = uuid(b.attribute_id, 'The attribute');
   const id = b.id ? uuid(b.id, 'The value') : undefined;
@@ -107,19 +123,23 @@ export async function valueSave(b: Body, userId: string | null) {
     const used = r.tax.values.find(v => v.attribute_id === attributeId && v.id !== id && (v.key === a || v.aliases.includes(a)));
     if (used) throw new HttpError(409, `“${a}” is already used by “${used.name}” — one word can mean only one value.`);
   }
+  const want = Array.isArray(b.categories) ? new Set(b.categories.map(tagKey)) : null;
+  const categories = want ? r.tax.categories.filter(c => want.has(tagKey(c))) : before?.categories ?? [];
+  const reticked = !!before && categories.join('|') !== before.categories.join('|');
   const renamed = !before || before.key !== key;
   const matches = r.matches.filter(m => m.reason !== 'same' || m.other_attribute);
   if (renamed && matches.length && b.force !== true) {
     throw new HttpError(409, `“${name}” looks like “${matches[0].value}” (${matches[0].attribute}).`, { matches });
   }
   let row: ValueRow;
-  if (id) row = (await patch<ValueRow>('pb_attribute_values', `id=eq.${enc(id)}`, { name, key, aliases }, VALUE_COLS))[0];
+  if (id) row = (await patch<ValueRow>('pb_attribute_values', `id=eq.${enc(id)}`, { name, key, aliases, categories }, VALUE_COLS))[0];
   else {
     const last = r.tax.values.filter(v => v.attribute_id === attributeId).reduce((m, v) => Math.max(m, v.position), 0);
-    row = (await insert<ValueRow>('pb_attribute_values', [{ attribute_id: attributeId, name, key, aliases, position: last + 1 }], { select: VALUE_COLS }))[0];
+    row = (await insert<ValueRow>('pb_attribute_values', [{ attribute_id: attributeId, name, key, aliases, categories, position: last + 1 }], { select: VALUE_COLS }))[0];
   }
-  if (id && before && before.name !== name) await refresh((await selAll<{ product_id: string }>(`pb_product_values?value_id=eq.${enc(id)}&select=product_id&order=product_id.asc`)).map(x => x.product_id));
-  await logActivity({ action: 'tags_edited', details: { what: 'value', name, new: !id, forced: b.force === true && matches.length > 0 }, user_id: userId });
+  // The products carrying it show the new name, and count it only where it is offered now.
+  if (id && before && (before.name !== name || reticked)) await refresh((await selAll<{ product_id: string }>(`pb_product_values?value_id=eq.${enc(id)}&select=product_id&order=product_id.asc`)).map(x => x.product_id));
+  await logActivity({ action: 'tags_edited', details: { what: 'value', name, new: !id, forced: b.force === true && matches.length > 0, ...(reticked || (!id && categories.length) ? { categories } : {}) }, user_id: userId });
   return { ok: true, value: row };
 }
 

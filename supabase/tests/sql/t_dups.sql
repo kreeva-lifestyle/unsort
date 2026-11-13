@@ -1,6 +1,6 @@
 -- "Was this product already added?" — the rules in the database, checked (pre-launch fix D21: they had no test).
 -- The real SQL is loaded by run.sh: 20261112150000_pb_duplicates.sql, 20261112170000_pb_photo_prints.sql,
--- 20261113040000_pb_stock_save.sql, 20261113120000_pb_copies.sql, 20261113130000_pb_stock_word.sql and 20261113150000_pb_gate_category_list.sql. Every check prints "ok …" or "FAIL …";
+-- 20261113040000_pb_stock_save.sql, 20261113120000_pb_copies.sql, 20261113130000_pb_stock_word.sql, 20261113150000_pb_gate_category_list.sql and 20261113210000_pb_tag_value_categories.sql. Every check prints "ok …" or "FAIL …";
 -- run.sh fails when a FAIL is printed. Nothing is kept: each part rolls back.
 \set ON_ERROR_STOP 1
 \pset format unaligned
@@ -318,7 +318,51 @@ insert into public.pb_tag_suggestions (phrase, key) values ('Plus Size', 'plus s
 select t_is('… and a new one starts without one (not asked yet)', (select coalesce(nearest::text, 'null') from public.pb_tag_suggestions where key = 'plus size'), 'null');
 rollback;
 
+-- ── 10. values that depend on the category: Product Type (20261113210000_pb_tag_value_categories.sql) ──
+begin;
+\set A_T '''e0000000-0000-4000-8000-000000000003'''
+\set V_BL '''e1000000-0000-4000-8000-000000000003'''
+\set V_BS '''e1000000-0000-4000-8000-000000000004'''
+\set R9 '''d9000000-0000-4000-8000-000000000001'''
+insert into public.pb_settings (key, value) values ('categories', '["Saree", "Lehenga"]');
+select t_product(95, :V1, 'KX 9501', 'Pink', 1) is not null; -- filed under 'Saree'
+insert into public.pb_attributes (id, name, key, multi, position, by_category) values (:A_T, 'Type', 'type', false, 9, true);
+insert into public.pb_attribute_values (id, attribute_id, name, key, aliases, position, categories) values
+  (:V_BL, :A_T, 'Bridal Lehenga', 'bridal lehenga', '{}', 1, '{Lehenga}'), (:V_BS, :A_T, 'Banarasi Saree', 'banarasi saree', '{}', 2, '{" saree "}');
+insert into public.pb_category_attributes (category, attribute_id, position) values ('Saree', :A_T, 1);
+insert into public.pb_product_values (product_id, value_id, source) values (t_id(95), :V_BL, 'manual');
+select t_is('a value ticked only for another category does not finish the attribute', (select g.status || '/' || array_to_string(g.missing, ',') from public.pb_products_refresh(array[t_id(95)]) g), 'needs_info/Type');
+select t_is('… it is not in the tags cache either ({tags}, filters)', (select array_to_string(tags, ',') from pb_products where id = t_id(95)), '');
+select t_is('… "products that will need it" counts the product', public.pb_category_lacking('saree', :A_T)::text, '1');
+select t_is('… and so does the link', (select lacking::text from public.pb_tag_link_stats() where attribute_id = :A_T), '1');
+insert into public.pb_product_values (product_id, value_id, source) values (t_id(95), :V_BS, 'rules');
+select t_is('a value ticked for its category (case and spaces aside): Ready', (select g.status || '/' || array_to_string(g.missing, ',') from public.pb_products_refresh(array[t_id(95)]) g), 'ready/');
+select t_is('… only that value in the tags cache', (select array_to_string(tags, ',') from pb_products where id = t_id(95)), 'Banarasi Saree');
+select t_is('… nothing lacking now', public.pb_category_lacking('Saree', :A_T)::text, '0');
+update public.pb_attributes set by_category = false where id = :A_T;
+select count(*) from public.pb_products_refresh(array[t_id(95)]);
+select t_is('the switch off: every value counts again (in the values'' order)', (select array_to_string(tags, ',') from pb_products where id = t_id(95)), 'Bridal Lehenga,Banarasi Saree');
+update public.pb_attributes set by_category = true where id = :A_T;
+update public.pb_attribute_values set categories = '{}' where id = :V_BS;
+select t_is('a value with no category ticked is offered nowhere', (select g.status || '/' || array_to_string(g.missing, ',') from public.pb_products_refresh(array[t_id(95)]) g), 'needs_info/Type');
+select t_is('a product with no category is offered none of them', public.pb_tag_offered(true, '{Saree}', '  ')::text, 'false');
+select t_is('an attribute without the switch offers every value, category or not', public.pb_tag_offered(false, '{}', null)::text, 'true');
+update public.pb_attribute_values set categories = '{Saree}' where id = :V_BS;
+select set_config('request.jwt.claims', '{"role":"service_role"}', false);
+insert into pb_bulk_runs (id, kind, label, status) values (:R9, 'attribute_delete', 'Deleted the attribute Type', 'running');
+select set_config('request.headers', json_build_object('x-pb-bulk', :R9)::text, false);
+select public.pb_attribute_delete(:A_T) >= 0;
+select set_config('request.headers', '{}', false);
+update pb_bulk_runs set status = 'done', items = pb_bulk_products(:R9) where id = :R9;
+select t_is('deleted in a bulk change: the attribute goes with its values', (select count(*)::text from pb_attribute_values where attribute_id = :A_T), '0');
+select public.pb_bulk_revert(:R9, true) is not null;
+select t_is('reverted: the attribute is back with its switch on', (select by_category::text from pb_attributes where id = :A_T), 'true');
+select t_is('… its values with their ticks', (select string_agg(name || ':' || array_to_string(categories, '+'), ',' order by name) from pb_attribute_values where attribute_id = :A_T), 'Banarasi Saree:Saree,Bridal Lehenga:Lehenga');
+select t_is('… and the product is Ready again', (select status from pb_products where id = t_id(95)), 'ready');
+select set_config('request.jwt.claims', '{}', false);
+rollback;
+
 -- Every check above printed a line: a part that silently printed nothing would be a failure too.
-select case when last_value = 157 then 'ok   every check ran (157)' else 'FAIL the number of checks is ' || last_value || ', not 157: a part printed fewer lines than it has, or this number was not updated' end from public.t_checks;
+select case when last_value = 172 then 'ok   every check ran (172)' else 'FAIL the number of checks is ' || last_value || ', not 172: a part printed fewer lines than it has, or this number was not updated' end from public.t_checks;
 drop function public.t_refused(text, text); drop function public.t_is(text, text, text); drop function public.t_rel(uuid, uuid); drop function public.t_product(int, uuid, text, text, int, numeric, text); drop function public.t_id(int);
 drop sequence public.t_checks;

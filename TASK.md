@@ -18,15 +18,16 @@ The first six come from the tags research report of 13 Nov ("Scrape
 mapping to Playbook taxonomy"). All are small; each changes how products
 are tagged.
 
-- **Salwar Suit and Gown have no tags linked.** Their 12 products show
-  Ready with no tags. In Settings → Tags, link the attributes they need, or
-  tell Claude they need none.
-- **One product is still filed as Indo-Western**, a category you removed.
-  It now waits in Needs info ("Missing: Category"): choose its category.
-- **What makes Anarkali, Kurta Set, Salwar Suit and Co-ord Set different?**
-  One line each (the cut of the top, the kind of bottom). Similar sets were
-  filed three different ways; with these lines the rules and the AI file
-  them the same way every time.
+- **121 products wait for a category** ("Missing: Category"): Anarkali 96,
+  Kurta Set 23, Gown 1, Indo-Western 1 — categories taken off the list.
+  Claude is building **Rename** and **Move products to…** for categories
+  next; then move them (Anarkali → Salwar Suit) and the rules and the AI
+  pick their Product Type there.
+- **Product Type values.** Product Type exists (Settings → Tags) but has no
+  values yet. Add the types and tick their categories (Salwar Suit:
+  Anarkali, Sharara…; Lehenga: Bridal Lehenga…), then link Product Type to
+  the categories that need it. Claude will first add acriine.in's types as
+  a start ("Being built next").
 - **Two colours ("Pink and White"):** Multicolour, or the main colour?
   Colour takes one value.
 - **"Wedding":** add it back as another name for Marriage? A deleted word
@@ -78,6 +79,16 @@ are tagged.
 - **Q20 · Public repository.** It has to stay public while the server
   functions load their code from GitHub. Making it private first needs
   another way to deploy them; say if you want that.
+
+## Playbook — being built next
+
+- **Categories: Rename, and Move products to….** Removing a category will
+  ask where its products go; they move there and the rules, then the AI,
+  pick their Product Type. A "Move to…" also comes for products already in
+  removed categories. Asked by the owner on 13 Nov; next after Product Type.
+- **acriine.in's tags.** Its product types become Product Type values,
+  ticked for the matching categories; its other tags go to Tags →
+  Suggestions for review. After Product Type is live.
 
 ## Playbook — things only the owner can do
 

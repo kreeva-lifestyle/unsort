@@ -14,7 +14,7 @@ import { plain } from './http.ts';
 import { type Suggest, type ValueSet, autoValues, suggestable } from './tagAuto.ts';
 import type { ReadTags } from './tagPrompt.ts';
 import { type ChosenTag, valueTags } from './tags.ts';
-import { type Taxonomy, allAttrs, attrsFor, matchAttrs, shadesOf, taxValues } from './taxonomy.ts';
+import { type Taxonomy, allAttrs, attrsFor, matchAttrs, offered, shadesOf, taxValues } from './taxonomy.ts';
 import type { ProductRow } from './types.ts';
 
 export interface Refreshed { id: string; status: string; was: string; missing: string[] }
@@ -55,7 +55,7 @@ type Facts = Pick<ProductRow, 'id' | 'name' | 'raw_text' | 'fabric' | 'color' | 
 /** The rules (+ the AI's choices) for a product, written; null when its tags are locked. */
 export async function autoTag(p: Facts, tax: Taxonomy, o: { ai?: ReadTags | null; byCategory: boolean }): Promise<{ refreshed: Refreshed | null; rows: ValueSet[] } | null> {
   if (tagsLocked(p)) return null;
-  const attrs = o.byCategory ? attrsFor(tax, p.category) : allAttrs(tax);
+  const attrs = o.byCategory ? attrsFor(tax, p.category) : allAttrs(tax, p.category);
   const have = await productValues(p.id);
   const manual = new Set(have.filter(v => v.source === 'manual').map(v => v.attribute_id));
   const r = autoValues(p, matchAttrs(attrs), { manualAttrIds: manual, ai: o.ai, categories: tax.categories, shades: shadesOf(tax) });
@@ -67,11 +67,13 @@ export async function autoTag(p: Facts, tax: Taxonomy, o: { ai?: ReadTags | null
   return { refreshed, rows: r.rows };
 }
 
-/** {tags} for one website: the product's values in the taxonomy's order, in the site's style. */
-export async function siteValueTags(productId: string, style: unknown): Promise<string[]> {
-  const rows = await sel<{ pb_attribute_values: { name: string; position: number; pb_attributes: { name: string; shopify_prefix: string | null; position: number } | null } | null }>(
-    `pb_product_values?product_id=eq.${enc(productId)}&select=pb_attribute_values(name,position,pb_attributes(name,shopify_prefix,position))`);
+/** {tags} for one website: the product's values in the taxonomy's order, in the site's style — only the ones offered for
+ *  its category (a Product Type value ticked for another category is not sent; the Ready check does not count it). */
+export async function siteValueTags(productId: string, style: unknown, category: string | null): Promise<string[]> {
+  const rows = await sel<{ pb_attribute_values: { name: string; position: number; categories: string[] | null; pb_attributes: { name: string; shopify_prefix: string | null; position: number; by_category: boolean | null } | null } | null }>(
+    `pb_product_values?product_id=eq.${enc(productId)}&select=pb_attribute_values(name,position,categories,pb_attributes(name,shopify_prefix,position,by_category))`);
   const vals = rows.map(r => r.pb_attribute_values).filter((v): v is NonNullable<typeof v> => !!v && !!v.pb_attributes)
+    .filter(v => offered({ by_category: v.pb_attributes!.by_category === true }, { categories: v.categories || [] }, category))
     .sort((a, b) => (a.pb_attributes!.position - b.pb_attributes!.position) || (a.position - b.position) || a.name.localeCompare(b.name));
   const chosen: ChosenTag[] = vals.map(v => ({ name: v.name, attribute: v.pb_attributes!.name, prefix: v.pb_attributes!.shopify_prefix }));
   return valueTags(chosen, style);
