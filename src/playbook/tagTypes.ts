@@ -40,10 +40,15 @@ export interface PbLookAlike {
 }
 
 export type PbSuggestionStatus = 'pending' | 'added' | 'aliased' | 'ignored';
+/** The nearest value already in the lists (pb-products tagNearest.ts), by the word rules or the AI; value_id null = the AI found none close. */
+export interface PbNearest { value_id: string | null; value: string | null; attribute_id: string | null; attribute: string | null; why: string; by: 'rules' | 'ai' }
+
 export interface PbSuggestion {
   id: string; phrase: string; key: string; attribute_id: string | null; status: PbSuggestionStatus;
   uses: number; examples: string[]; example_names: string[]; source: 'store' | 'ai' | 'text';
   first_seen_at: string; last_seen_at: string; matches: PbLookAlike[];
+  /** null = not looked at yet: the Tags page asks the AI (nearestSuggestions). */
+  nearest: PbNearest | null;
 }
 
 export type PbValueSource = 'rules' | 'ai' | 'manual';

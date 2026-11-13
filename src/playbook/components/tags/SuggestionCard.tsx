@@ -1,23 +1,27 @@
 // One suggestion (a phrase Playbook saw that is not a value yet): the phrase,
-// where it came from, on how many products, three example products, the
-// attribute it probably belongs to (changeable), its closest look-alike, and
-// the three answers: "+ Add to <Attribute>", "Also known as…", Ignore (an
-// ignored phrase is never suggested again). Selectable for bulk actions.
+// where it came from, on how many products, three example products, its
+// nearest value already in the lists with "Same as <value>" (NearestBox: the
+// word rules or the AI), the attribute it probably belongs to (changeable),
+// and the three other answers: "+ Add to <Attribute>", "Also known as…",
+// Ignore (an ignored phrase is never suggested again). Selectable for bulk actions.
 import type { PbAttribute, PbSuggestion } from '../../tagTypes';
 import { PB, pbInput, pbMeta, pbName, pbNum, pbRow } from '../../pbTheme';
 import { PbButton, PbTag } from '../ui';
-import { Dot } from '../product/status';
+import type { AliasTarget } from './AliasPicker';
+import NearestBox from './NearestBox';
 import TagCheck from './TagCheck';
-import { WRAP, lookSentence, plural } from './tagText';
+import { WRAP, plural } from './tagText';
 
 const FROM: Record<PbSuggestion['source'], string> = { store: 'Store tag', ai: 'Seen by the AI', text: 'In a post' };
 
-export default function SuggestionCard({ s, attrs, selected, onSelect, busy, onAdd, onAlias, onIgnore, onMove, canEdit }: {
+export default function SuggestionCard({ s, attrs, selected, onSelect, busy, asking, onAdd, onAlias, onUse, onIgnore, onMove, canEdit }: {
   s: PbSuggestion; attrs: PbAttribute[]; selected: boolean; onSelect: (on: boolean) => void; busy: string;
-  onAdd: () => void; onAlias: () => void; onIgnore: () => void; onMove: (attributeId: string | null) => void; canEdit: boolean;
+  /** The page is asking the AI for this card's nearest value. */
+  asking: boolean;
+  onAdd: () => void; onAlias: () => void; onUse: (t: AliasTarget) => void; onIgnore: () => void; onMove: (attributeId: string | null) => void; canEdit: boolean;
 }) {
   const attr = attrs.find(a => a.id === s.attribute_id);
-  const top = s.matches[0];
+  const n = s.nearest;
   const mine = (k: string) => busy === `${k}:${s.id}`;
   const any = !!busy;
   return (
@@ -33,7 +37,8 @@ export default function SuggestionCard({ s, attrs, selected, onSelect, busy, onA
         </div>
       </div>
       {s.example_names.length > 0 && <span style={{ ...pbMeta, overflowWrap: 'anywhere' }}>e.g. {s.example_names.join(' · ')}</span>}
-      {top && <Dot color={PB.review} label={lookSentence(s.phrase, top)} style={{ whiteSpace: 'normal', color: PB.tx, fontSize: 13 }} />}
+      <NearestBox near={n} asking={asking && !n} canEdit={canEdit} busy={mine('alias')} dim={any && !mine('alias')}
+        onUse={() => n?.value_id && n.value && n.attribute_id && onUse({ value_id: n.value_id, value: n.value, attribute_id: n.attribute_id, attribute: n.attribute ?? '' })} />
       {canEdit && (
         <>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', minWidth: 0, flexWrap: 'wrap' }}>

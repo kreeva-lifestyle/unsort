@@ -8,7 +8,7 @@
 // LookAlikeError with the matches, so the UI can ask "same thing or new?".
 import { supabase } from '../../lib/supabase';
 import { pbCall } from './pbFunctions';
-import type { PbAttrValue, PbAttribute, PbFillRun, PbLookAlike, PbProductValue, PbRetagResult, PbSuggestion, PbSuggestionStatus, PbTaxonomy } from '../tagTypes';
+import type { PbAttrValue, PbAttribute, PbFillRun, PbLookAlike, PbNearest, PbProductValue, PbRetagResult, PbSuggestion, PbSuggestionStatus, PbTaxonomy } from '../tagTypes';
 
 export class LookAlikeError extends Error {
   matches: PbLookAlike[];
@@ -44,6 +44,9 @@ export type SuggestionPage = { rows: PbSuggestion[]; count: number };
 export const listSuggestions = (status: PbSuggestionStatus, page: number, attributeId = '') =>
   pbCall<SuggestionPage>('suggestions_list', { status, page, attribute_id: attributeId || undefined }).then(r => ({ rows: r.rows ?? [], count: r.count ?? 0 }));
 export type SuggestionAct = { ids: string[]; act: 'add' | 'alias' | 'ignore' | 'move'; attribute_id?: string | null; value_id?: string; name?: string; force?: boolean };
+/** The nearest value for suggestions not looked at yet (up to 20): the word rules, else one AI call; the answer is kept. */
+export const nearestSuggestions = (ids: string[]) =>
+  pbCall<{ nearest: Record<string, PbNearest> }>('suggestions_nearest', { ids }).then(r => r.nearest ?? {});
 export const actSuggestions = (a: SuggestionAct) =>
   pbCall<{ done: number; conflicts: Record<string, PbLookAlike[]>; retagged: number }>('suggestion_act', a)
     .then(r => ({ done: r.done ?? 0, conflicts: r.conflicts ?? {}, retagged: r.retagged ?? 0 }));
@@ -108,6 +111,6 @@ export async function countSuggestions(): Promise<number> {
 /** Everything the Tags page calls, as one object so the screenshot harness can pass fakes. */
 export const TAGS_API = {
   taxonomy: getTaxonomy, saveCategories, saveAttribute, deleteAttribute, orderAttributes, checkValue, saveValue, deleteValue, mergeValue,
-  linkCheck, saveLinks, listSuggestions, actSuggestions, retag, aiFill, fillStatus,
+  linkCheck, saveLinks, listSuggestions, nearestSuggestions, actSuggestions, retag, aiFill, fillStatus,
 };
 export type TagsApi = typeof TAGS_API;

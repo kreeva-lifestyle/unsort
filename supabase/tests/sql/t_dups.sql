@@ -306,7 +306,19 @@ select count(*) from public.pb_product_values_bulk(jsonb_build_array(jsonb_build
 select t_is('… a row without the list replaces every attribute, as before', pg_temp.vals(t_id(93)), '');
 rollback;
 
+-- ── 9. the AI's nearest match for suggestions: its answer is kept, its cost counted (20261113190000_pb_tag_nearest.sql) ──
+begin;
+insert into public.pb_activity (action, details, created_at) values
+  ('tags_matched', '{"usd": 0.02, "phrases": 5}', now()), ('tags_filled', '{"usd": 0.01}', now()),
+  ('tags_matched', '{"usd": 0.5}', now() - interval '2 days'), ('tags_edited', '{"usd": 9}', now());
+select t_is('a nearest-match call counts in the AI cost since a moment (an older one and other actions do not)', (select usd::text from public.pb_ai_cost_since(now() - interval '1 hour')), '0.03');
+insert into public.pb_tag_suggestions (phrase, key, nearest) values ('Kora Silk', 'kora silk', '{"value_id": null, "why": "x", "at": "2026-11-13T19:00:00Z"}');
+select t_is('a suggestion keeps the AI''s answer', (select nearest ->> 'why' from public.pb_tag_suggestions where key = 'kora silk'), 'x');
+insert into public.pb_tag_suggestions (phrase, key) values ('Plus Size', 'plus size');
+select t_is('… and a new one starts without one (not asked yet)', (select coalesce(nearest::text, 'null') from public.pb_tag_suggestions where key = 'plus size'), 'null');
+rollback;
+
 -- Every check above printed a line: a part that silently printed nothing would be a failure too.
-select case when last_value = 154 then 'ok   every check ran (154)' else 'FAIL the number of checks is ' || last_value || ', not 154: a part printed fewer lines than it has, or this number was not updated' end from public.t_checks;
+select case when last_value = 157 then 'ok   every check ran (157)' else 'FAIL the number of checks is ' || last_value || ', not 157: a part printed fewer lines than it has, or this number was not updated' end from public.t_checks;
 drop function public.t_refused(text, text); drop function public.t_is(text, text, text); drop function public.t_rel(uuid, uuid); drop function public.t_product(int, uuid, text, text, int, numeric, text); drop function public.t_id(int);
 drop sequence public.t_checks;

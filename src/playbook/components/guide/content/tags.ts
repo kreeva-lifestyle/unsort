@@ -30,7 +30,8 @@ export const TAGS: GuideSection[] = [
       h('4 · Suggestions and the look-alike guard'),
       list(
         '**Suggestions** collects words seen on products that are not in your lists yet — store tags such as `Kurtas & Suits`, words in posts, things the AI noticed — most seen first, with three example products each. Store codes like `_altnew_KBSUIT25` and `SIZE_CHART` never show up there.',
-        '**+ Add to Colour** makes it a value in one tap; **Also known as…** files it under a value you already have; **Ignore** hides it for good. Tick several to add or ignore them together.',
+        'Each card shows its **Nearest match**: the closest value already in your lists. Shades, Hindi words and other spellings are found by the word rules (`Rani Pink` → Pink, `Jari Work` → Embroidery); for the rest the AI looks once, using what you filed before, and says why (`Kora Silk` → Art Silk, or "No close value: a store collection name"). Tap **Same as Art Silk** to file the word there in one tap.',
+        '**+ Add to Colour** makes it a value in one tap; **Also known as…** files it under a value you choose; **Ignore** hides it for good. Tick several to add or ignore them together.',
         'Whenever a new word looks like an existing value — `Embroided` and `Embroidery`, `Sequin` and `Sequins`, `kala` and Black, `Rani Pink` and Pink — Playbook asks first: **Same thing — add as also known as** or **It\'s different — add as new**. A word that already belongs to another attribute (`Silk` under Work) gets "This looks like a Fabric value".',
         'The same check runs as you type in **Add a value**: the closest match shows under the field.',
       ),
