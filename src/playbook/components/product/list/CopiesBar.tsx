@@ -3,18 +3,20 @@
 // view: "Show all of Needs info") and "Archive the copies" (pre-launch fix
 // D18: a vendor's repeats piled up among the incomplete products and had to
 // be answered one tap each).
-// Archiving asks first, with what the server would do right now
-// (copies_preview): copies with nothing of their own are archived; one that is
-// already on a website, or that came with a price the earlier product lacks or
-// contradicts, is left to be opened. It is a bulk change, so Settings → Bulk
-// changes takes it back for 7 days. Two signals: "Checking…" / "Archiving…" on
-// the button, then a toast. Hidden when no product waits as a copy.
+// The number is one cheap count of the notes the Ready gate keeps (asked on
+// every list load). Archiving asks first, with every copy judged as things
+// stand right then (pb_copies_archive, apply = false — only on the tap): copies
+// with nothing of their own are archived; one that is already on a website,
+// that came with a price the earlier product lacks or contradicts, or that is
+// tied to another waiting copy, is left to be opened. It is a bulk change, so
+// Settings → Bulk changes takes it back for 7 days. Two signals: "Checking…" /
+// "Archiving…" on the button, then a toast. Hidden when no product waits as a copy.
 import { useEffect, useState } from 'react';
 import { friendlyError } from '../../../../lib/friendlyError';
 import { logSwallowed } from '../../../../lib/errorLogger';
 import { useConfirm } from '../../../../components/ui/ConfirmModal';
 import type { AddToast } from '../../PbToasts';
-import { archiveCopies, previewCopies, type CopyCounts } from '../../../data/copies';
+import { archiveCopies, countCopies, leftOver, previewCopies, type CopyCounts } from '../../../data/copies';
 import { count } from '../../../format';
 import { PB, pbNum } from '../../../pbTheme';
 import { PbButton, PbConfirm, PbTile } from '../../ui';
@@ -22,10 +24,11 @@ import { Dot } from '../status';
 
 const copies = (k: number) => `${count(k)} ${k === 1 ? 'copy' : 'copies'}`;
 /** "2 came with a different price, 1 is already on a website" — the copies left for a person. */
-export function leftText(c: Pick<CopyCounts, 'priced' | 'on_site'>): string {
+export function leftText(c: Pick<CopyCounts, 'priced' | 'on_site' | 'linked'>): string {
   return [
     c.priced ? `${count(c.priced)} came with a different price` : '',
     c.on_site ? `${count(c.on_site)} ${c.on_site === 1 ? 'is' : 'are'} already on a website` : '',
+    c.linked ? `${count(c.linked)} ${c.linked === 1 ? 'is' : 'are'} tied to another waiting copy` : '',
   ].filter(Boolean).join(', ');
 }
 
@@ -41,7 +44,7 @@ export default function CopiesBar({ only, reload, addToast, onShow, onDone }: {
   const { ask, modalProps } = useConfirm();
   useEffect(() => {
     let live = true;
-    previewCopies().then(c => { if (live) setN(c.archived + c.priced + c.on_site); }).catch(e => logSwallowed('count copies', e));
+    countCopies().then(c => { if (live) setN(c); }).catch(e => logSwallowed('count copies', e));
     return () => { live = false; };
   }, [reload]);
   if (!n) return null;
@@ -52,8 +55,10 @@ export default function CopiesBar({ only, reload, addToast, onShow, onDone }: {
     try {
       const p = await previewCopies();
       const left = leftText(p);
-      setN(p.archived + p.priced + p.on_site);
+      setN(p.archived + leftOver(p));
       if (!p.archived) {
+        // Nothing left at all: the notes that brought the bar up no longer hold. The server clears them (once).
+        if (!left) await archiveCopies();
         addToast(left ? `None can be archived together: ${left}. Open them one by one.` : 'No product is waiting as a copy any more', 'info');
         if (!left) onDone();
         return;
@@ -68,7 +73,7 @@ export default function CopiesBar({ only, reload, addToast, onShow, onDone }: {
       const r = await archiveCopies();
       const rest = leftText(r);
       addToast(r.archived ? `${copies(r.archived)} archived${rest ? ` · left to open: ${rest}` : ''}. Settings → Bulk changes takes it back` : 'Nothing was left to archive', 'success');
-      setN(r.priced + r.on_site);
+      setN(leftOver(r));
       onDone();
     } catch (e) { addToast(friendlyError(e), 'error'); } finally { setBusy(''); }
   };

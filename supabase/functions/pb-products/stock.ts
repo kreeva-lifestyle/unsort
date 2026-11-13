@@ -27,9 +27,10 @@ import { PERM_NOTE, retire, sendNow } from './stockSend.ts';
 
 export { PERM_NOTE, retire };
 /** `said_at`: when this word about the product's stock was said (saidAt). The database applies the change only when no
- *  newer word is on record, and answers NEWER otherwise (pb_stock_save, 20261113130000_pb_stock_word.sql). `force`
- *  (a person's own switch) always applies. */
-export interface StockChange { in_stock?: boolean; temp_out_at?: string | null; perm_out_at?: string | null; said_at?: string; force?: boolean }
+ *  newer word is on record, and answers NEWER otherwise (pb_stock_save, 20261113130000_pb_stock_word.sql).
+ *  `said_at: null` (the Stock switch on) always applies and forgets the time on record. `as_of`: a note only (a
+ *  temporary stock-out) — judged by its time, not put on record. `force` (the Stock switch off) always applies. */
+export interface StockChange { in_stock?: boolean; temp_out_at?: string | null; perm_out_at?: string | null; said_at?: string | null; as_of?: string; force?: boolean }
 /** A newer word about this product's stock stands: nothing was changed. */
 export const NEWER = -2;
 /** When a post said what it says: the time the vendor made it, else when it reached Playbook. */
@@ -64,9 +65,11 @@ export async function setStock(b: Body, userId: string | null) {
   const p = await one<{ id: string; in_stock: boolean }>(`pb_products?id=eq.${enc(id)}&select=id,in_stock`);
   if (!p) throw new HttpError(404, 'That product no longer exists.');
   if (p.in_stock === b.in_stock) return { ok: true, resent: 0, waiting: 0 };
-  // Back in stock by hand also ends a vendor's "permanent stock out". A person's switch is the latest word as of now:
-  // an older post that is read afterwards does not undo it.
-  const resent = await saveStock(p, { in_stock: b.in_stock, ...(b.in_stock ? { perm_out_at: null } : {}), said_at: nowIso(), force: true }, { by: 'staff' }, userId, true);
+  // OFF is the latest word as of now: an older post that is read afterwards does not bring the product back.
+  // ON also ends a vendor's "permanent stock out", and FORGETS the time on record instead of claiming it: a vendor's
+  // notice posted before the tap that has not reached Playbook yet must still apply (a mis-tap would silence it).
+  const change: StockChange = b.in_stock ? { in_stock: true, perm_out_at: null, said_at: null } : { in_stock: false, said_at: nowIso(), force: true };
+  const resent = await saveStock(p, change, { by: 'staff' }, userId, true);
   if (resent < 0) throw new HttpError(404, 'That product no longer exists.');
   const waiting = (await sel<{ id: string }>(`pb_listings?product_id=eq.${enc(id)}&stock_due=eq.true&select=id&limit=50`)).length;
   return { ok: true, resent, waiting };

@@ -12,14 +12,17 @@
 // guessed: a number that two letter codes share, or a post without a colour
 // when the design has several, brings nothing back.
 // For each of them: out of stock → in stock again, and the stores are sent the
-// change (stock.ts); a "temporarily out" note → the note goes. A product that
-// is archived or permanently out is left alone: the new post is its own product.
+// change (stock.ts); a "temporarily out" note → the note goes, unless a LATER
+// post left it. A product that is archived or permanently out is left alone:
+// the new post is its own product.
 // The later word wins, whichever post was read first (a failed read is tried
 // again minutes later): every change carries the time the vendor MADE the post
-// (stock.ts saidAt) and the database refuses it when a newer word about that
-// product's stock is on record (pb_stock_save, 20261113130000). The post also
-// stamps its own time on itself and on the products it finds in stock, so an
-// older notice that is read afterwards leaves them alone.
+// and the database refuses it when a newer word about that product's stock is
+// on record (pb_stock_save, 20261113130000). The post also stamps its own time
+// on itself and on the products it finds in stock, so an older notice that is
+// read afterwards leaves them alone. A post that arrived without the vendor's
+// time (an old crawler) brings nothing back and stamps nothing: its place in
+// the order is not known, and a stock-out must not lose to a guess.
 // A post that matched a sold-out product is that product posted again, so it
 // must not become a second listing: when the gate does not hold it already (a
 // number alone never holds by itself) the pair is remembered as "same" and the
@@ -57,7 +60,7 @@ export function restockTargets(me: Cand, earlier: Cand[]): Cand[] {
 /** `first`: this is the product's first read and the reader saw no stock notice in it. Returns the product as it now
  *  stands (held as a copy when it matched a sold-out product). */
 export async function backInStock(p: ProductRow, userId: string | null, first: boolean): Promise<ProductRow> {
-  if (!first || p.source !== 'telegram' || (p.status !== 'ready' && p.status !== 'needs_info') || !p.vendor_id || !String(p.sku || '').trim()) return p;
+  if (!first || p.source !== 'telegram' || !p.source_posted_at || (p.status !== 'ready' && p.status !== 'needs_info') || !p.vendor_id || !String(p.sku || '').trim()) return p;
   let out = p;
   try {
     const said = saidAt(p);
@@ -68,7 +71,7 @@ export async function backInStock(p: ProductRow, userId: string | null, first: b
     const ids = restockTargets(cands[at], cands.slice(0, at)).map(c => c.id);
     if (!ids.length) return p;
     const rows = await sel<Target>(`pb_products?id=in.(${ids.join(',')})&status=neq.archived&perm_out_at=is.null&select=id,name,sku,in_stock,temp_out_at&order=created_at.asc`);
-    const act = rows.filter(t => !t.in_stock || t.temp_out_at);
+    const act = rows.filter(t => !t.in_stock || (!!t.temp_out_at && Date.parse(t.temp_out_at) < Date.parse(said))); // a note from a later post stays
     for (const t of rows) if (!act.includes(t)) await rpc('pb_stock_save', { p_product: t.id, p_change: { said_at: said } }); // in stock: confirmed as of this post
     if (!act.length) return p;
     if (!(p.status === 'needs_info' && await rpc<string | null>('pb_dup_held', { p_id: p.id }))) {
@@ -78,7 +81,8 @@ export async function backInStock(p: ProductRow, userId: string | null, first: b
     }
     const back: Target[] = [], stays: Target[] = [];
     for (const t of act) {
-      const res = await saveStock({ id: t.id }, t.in_stock ? { temp_out_at: null, said_at: said } : { in_stock: true, temp_out_at: null, said_at: said }, { posted_again: p.id }, userId);
+      // said in full, whatever the look-up above showed (a notice may have been read meanwhile)
+      const res = await saveStock({ id: t.id }, { in_stock: true, temp_out_at: null, said_at: said }, { posted_again: p.id }, userId);
       if (res >= 0) back.push(t); else if (res === NEWER) stays.push(t);
     }
     const names = (l: Target[]) => l.map(t => t.sku || t.name || 'a product').join(', ');

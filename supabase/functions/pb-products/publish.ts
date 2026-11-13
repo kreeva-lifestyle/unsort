@@ -23,8 +23,8 @@ import { HttpError, plain } from './http.ts';
 import { compareAt } from './pricing.ts';
 import { galleryOf } from './photos.ts';
 import { profileOf } from './profile.ts';
-import { buildProductInput, keptColour, PRODUCT_SET, STOCK_WARNING } from './productInput.ts';
-import { busyStreak, filesFor, FREE_RETRIES, type Gallery, knownPhotos, leaveGallery, mergeTags, photoRecord, sendFields, temporary, toOnlineStore } from './publishParts.ts';
+import { buildProductInput, PRODUCT_SET, STOCK_WARNING } from './productInput.ts';
+import { busyStreak, filesFor, FREE_RETRIES, type Gallery, knownPhotos, leaveGallery, mergeTags, photoRecord, sendFields, skuColour, temporary, toOnlineStore } from './publishParts.ts';
 import { seoGet } from './seoStore.ts';
 import { CURRENCY, gql, shopCurrency, wrongCurrency } from './shopify.ts';
 import { adoptable, type Existing, existingProduct } from './shopifyProduct.ts';
@@ -109,6 +109,7 @@ export async function publishOne(l: ListingRow, o: { manual: boolean; putBack?: 
       return r[0] ?? l;
     }
 
+    const coded = { ...p, sku_colour: await skuColour(p) }; // its codes' colour part: decided and saved before the first send
     // Status goes out on a create (and a recovered lost create) and on Put back; a plain update leaves
     // whatever people set in Shopify (e.g. a draft site's product made visible there).
     let sendStatus = false, gallery: Gallery = { files: null, fresh: [] }, known = knownPhotos(was, null, false);
@@ -120,7 +121,7 @@ export async function publishOne(l: ListingRow, o: { manual: boolean; putBack?: 
       gallery = noFiles || leaveGallery(was, paths, known, !!existing, !!adopted) ? { files: null, fresh: [] }
         : filesFor({ paths, alts: l.image_alts || [], known, store: existing?.media ?? null });
       const tags = existing ? mergeTags(existing.tags, adopted ? null : was?.tags ?? null, l.tags || []) : l.tags || [];
-      const input = buildProductInput({ l: { ...l, handle, tags, compare_at_price: compare }, p, site, vendor: profile.brand, files: gallery.files, live, sendStatus, existing, tail: profile.faq_in_description ? faqHtml(faq) : '', noCategory });
+      const input = buildProductInput({ l: { ...l, handle, tags, compare_at_price: compare }, p: coded, site, vendor: profile.brand, files: gallery.files, live, sendStatus, existing, tail: profile.faq_in_description ? faqHtml(faq) : '', noCategory });
       sent.push(handle);
       return gql<SetReply>(site, PRODUCT_SET, { input, identifier: existing ? { id: existing.id } : null }, ms(SET_MS));
     };
@@ -169,8 +170,7 @@ export async function publishOne(l: ListingRow, o: { manual: boolean; putBack?: 
     const saved = await patch<ListingRow>('pb_listings', mine, gone
       ? { status: 'skipped', shopify_status: prod.status, attempts: 0, error: PERM_NOTE, claimed_at: null } // archived on Shopify: off the website
       : { status: 'published', shopify_status: prod.status, published_at: at, ...(l.first_published_at ? {} : { first_published_at: at }), // the first time only: a re-send does not make it new again
-        attempts: 0, error: warning, claimed_at: null, ...(gallery.fresh.length ? { media_checked_at: null } : {}),
-        ...(typeof l.sku_colour === 'string' ? {} : { sku_colour: keptColour(l, p) }) }, LISTING_COLS); // the colour its codes went out with: kept from now on
+        attempts: 0, error: warning, claimed_at: null, ...(gallery.fresh.length ? { media_checked_at: null } : {}) }, LISTING_COLS);
     await logActivity({ product_id: l.product_id, website_id: l.website_id, listing_id: l.id, action: 'published', details: { shopify_product_id: prod.id, status: prod.status, update: !!existing, ...(adopted ? { adopted: true } : {}), ...photos, tags: l.tags || [], sizes: p.sizes || [], sku: p.sku || '', in_stock: p.in_stock !== false, ...(warning ? { warning } : {}) }, user_id: o.userId });
     if (gone) await retire(l.product_id); else await stockMoved(l.id, p); // the stock changed while this was sent → its own send follows
     if (!saved[0]) throw new HttpError(409, 'Published on Shopify, but the listing changed meanwhile — open it again.');

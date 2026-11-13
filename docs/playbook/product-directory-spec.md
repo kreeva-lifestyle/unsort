@@ -1219,8 +1219,10 @@ fixes". In short:
   has a single earlier product — also when the gate holds the post as a copy
   of the earliest one.
   For each: out of stock → in stock again (the stores are sent the change); a
-  "temporarily out" note → cleared. Archived or permanently out → left alone
-  (the post is its own product).
+  "temporarily out" note → cleared, unless a LATER post left it. Archived or
+  permanently out → left alone (the post is its own product). A post that
+  arrived without the vendor's time (an old crawler) brings nothing back and
+  stamps nothing: its place in the order is not known.
   A post that matched a sold-out product is that product posted again: when
   the gate does not hold it already (a number alone never holds by itself) the
   pair is stored as "same" and the gate is re-applied BEFORE any stock is
@@ -1230,55 +1232,84 @@ fixes". In short:
   re-post of a product that is IN stock stays a suggestion, as before (owner
   decision Q7 is open).
 - **The later word wins — in the database, by the vendor's own clock.**
-  `pb_products.stock_said_at` is the time of the latest word about a product's
-  stock: when the vendor MADE the notice or the post (`source_posted_at`, else
-  when it reached Playbook; `stock.ts saidAt`), or when a person flipped the
-  Stock switch. Every stock change from a notice or a re-post carries its time
-  (`said_at`), and `pb_stock_save` applies it only when no newer word is on
-  record, in the same statement; it answers -2 otherwise (`NEWER`). So the
-  order in which posts happen to be READ (a failed read is retried minutes
-  later; a post waits for its "Less") does not matter:
+  `pb_products.stock_said_at` is the time of the latest word that DECIDED a
+  product's stock: when the vendor MADE the notice or the post
+  (`source_posted_at`, else when it reached Playbook; `stock.ts saidAt`), or
+  when a person switched its Stock off. `pb_stock_save` is told when the word
+  it applies was said, and applies it only when no newer word is on record, in
+  the same statement; it answers -2 otherwise (`NEWER`). In its `p_change`:
+  - `said_at` = a time — a word that decides the stock (a notice, a re-post,
+    the switch OFF): judged and put on record. At the very same time a
+    stock-out stands: a word that puts the product back on sale must be newer;
+  - `said_at` = null — the switch ON: always applies and FORGETS the time on
+    record, so a vendor's notice posted before the tap that has not reached
+    Playbook yet still applies (a mis-tap must not silence it);
+  - `as_of` = a time — a note only (a temporary stock-out): judged by its time
+    but not put on record, so it never outranks a real stock-out read after it;
+  - `force` — the switch OFF: always applies.
+  The "temporarily out" note is dated when the vendor said it; a word clears
+  only a note OLDER than itself, and an older note never replaces a newer one.
+  So the order in which posts happen to be READ (a failed read is retried
+  minutes later; a post waits for its "Less") does not matter:
   - a re-post never brings back a product a newer notice switched off;
   - a notice read late never switches off a product the vendor posted again
     since: the re-post stamps its own time on itself and on the earlier
     products it stands for, also when they are simply in stock;
-  - a notice for a product that is out already still records its time;
-  - the Stock switch always applies (`force`) and records its time, so an
-    older post read afterwards does not undo it.
+  - a notice for a product that is out already still records its time, and
+    says "out" in full whatever its look-up showed;
+  - a temporary and a plain (or permanent) notice end the same in both orders.
   A stock notice's line says "left as it is, a newer post or change stands:
   …" for what it did not touch. Found by the independent review of this batch
   (2026-11-13): the first version judged by a timeline row that a notice did
   not always write, and an older re-post read last put a sold-out product
-  back on sale.
+  back on sale; its second look found the switch, the temporary note, the
+  equal-time and the stale look-up corners above.
+  Known limits: three words with a PERMANENT notice read last — a permanent
+  notice that is older than a stock-out (or a person's switch off) already on
+  record is not applied, so the product stays out of stock but is not
+  archived; and a notice that names a design Playbook has not read yet does
+  nothing, so if that product's own post is read afterwards (a failed read
+  tried again) it comes in as in stock.
 - **D18 copies can be found and cleared together.**
   `pb_products.copy_of` = what the gate holds a product as a copy of, written
-  by the gate with the status; when that product is archived the note follows
-  (`pb_copies_follow`: the next earlier product, or none — the waiting product
-  itself is not touched). Products → More statuses → **Waiting as copies**
-  filters on it; on Needs info a bar counts them, with **Show only these** and
-  **Archive the copies**. Looking first is `pb_copies_archive(false)` (the app
-  calls it itself); archiving is `copies_archive` on the server, a bulk change
-  (kind `copies`). Every copy is judged once, as things stand before anything
-  is archived, so what the confirmation showed is what is done. Left for a
-  person, and counted: `on_site` (a listing of the copy is on a store) and
-  `priced` (it came with a vendor cost the earlier product contradicts, or
-  lacks while having no price at all; an earlier product copied from a store
-  sells at that store's price, so a cost on the copy is nothing it lacks).
-  Nothing is let go to the websites by it, and no answer is stored for the
-  pairs. Weaker matches (kind `maybe`: a number-only code, another vendor's
-  code, the same number under other letters, the same photo) now show on the
-  list row as "May be a copy of … · same photo" (`listHints`, one read per
-  page).
+  by the gate with the status. The note follows what it points at
+  (`pb_copies_follow`): when that product is archived or deleted, or its code,
+  colour or vendor changes, the products pointing at it get the next earlier
+  product, or none; when a product comes back from the archive, the waiting
+  products it holds get their note again. Only the note moves — the waiting
+  product itself is not touched. (No foreign key on the column: "on delete set
+  null" would empty the note before the trigger can look for the next one.)
+  Products → More statuses → **Waiting as copies** filters on it; on Needs
+  info a bar counts them (one cheap count of the notes), with **Show only
+  these** and **Archive the copies**. Looking first is
+  `pb_copies_archive(false)` (the app calls it itself, on the tap); archiving
+  is `copies_archive` on the server, a bulk change (kind `copies`). Every copy
+  is judged once, as things stand before anything is archived, so what the
+  confirmation showed is what is done. Left for a person, and counted:
+  `on_site` (a listing of the copy is on a store), `priced` (it came with a
+  vendor cost the earlier product contradicts, or lacks while having no price
+  at all; an earlier product copied from a store sells at that store's price,
+  so a cost on the copy is nothing it lacks) and `linked` (it is part of a
+  chain: it copies a product that is itself waiting as a copy, or another
+  waiting copy points at it — a chain only forms where colours do not line up,
+  Black ← no colour ← Grey, and archived together no Grey product would be
+  left). Notes that no longer hold are cleared by the same call. Nothing is
+  let go to the websites by it, and no answer is stored for the pairs. Weaker
+  matches (kind `maybe`: a number-only code, another vendor's code, the same
+  number under other letters, the same photo) now show on the list row as
+  "May be a copy of … · same photo" (`listHints`, one read per page).
 - **D19 two colours never share a store code** (`skuCode.ts codeBase`). For a
   product from Telegram or typed in, the colour goes into each size's SKU and
   barcode: `KA-5070` + Wine + M → `KA-5070-WINE-M`. Unchanged: a code that
   carries words after its design code (it names its colour in the vendor's
   own words: `KB 302 WINE`, `KB 264 RAMA`), a product with no colour, and a
-  product copied from a store. The colour part is remembered on the listing
-  from its first send (`pb_listings.sku_colour`; '' = none) and used for
-  every later send, so codes that are on a store do not follow a colour that
-  is re-worded later. A listing that was on a store before this is treated
-  as '' (its codes stay as they are).
+  product copied from a store. The colour part is decided ONCE per product
+  and saved BEFORE its first send (`pb_products.sku_colour`; '' = none;
+  `publishParts.ts skuColour`), then used for every send to every website: a
+  send that fails half-way finds the same codes on its next try, codes that
+  are on a store do not follow a colour that is re-worded later, and the same
+  goods carry one code on every store. A product that was on a store before
+  this is decided as '' (its codes stay as they are).
 - **D21 the copy rules are tested, and two posts read in the same minute are
   caught.** `supabase/tests/sql/t_dups.sql` checks `pb_code_key`,
   `pb_colour_keys`, the scan, the gate's hold and note, the answers, the
@@ -1290,10 +1321,10 @@ fixes". In short:
   any LATER post that still stands as Ready (`restock.ts regateLater`): it had
   been judged before this one's code was saved.
 - Migrations, all additive: `20261113120000_pb_copies.sql` (column, index,
-  trigger, `pb_copies_archive`, `pb_bulk_revert_copies`, the gate and the
-  revert entry point with the same signatures),
+  two triggers, `pb_copies_archive`, `pb_bulk_revert_copies`, the gate and
+  the revert entry point with the same signatures),
   `20261113130000_pb_stock_word.sql` (`stock_said_at`, `pb_stock_save` with
-  the same signature) and `20261113140000_pb_listing_sku_colour.sql`.
+  the same signature) and `20261113140000_pb_product_sku_colour.sql`.
 
 ## Bulk changes: the log and Revert (owner, 2026-11-12)
 

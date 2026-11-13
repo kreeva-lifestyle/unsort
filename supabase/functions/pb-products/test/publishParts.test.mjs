@@ -83,3 +83,42 @@ test('Shopify being busy is tried again without using up the attempts, but not f
   assert.equal(busyStreak([{ created_at: 'x', details: null }], null), 0);
   assert.ok(FREE_RETRIES >= 5 && FREE_RETRIES <= 12); // the listing's failures are read 12 at a time (publish.ts)
 });
+
+test('D19: the colour part of the codes is decided once, saved before anything is sent, and shared by every website', async () => {
+  const { skuColour } = await import('../publishParts.ts');
+  /** `onStore`: a listing of the product is on a store already; `taken`: another send decided first and saved this. */
+  const world = (o = {}) => {
+    const calls = [];
+    globalThis.fetch = async (url, init = {}) => {
+      const u = decodeURIComponent(String(url)), method = init.method || 'GET', ok = (b) => new Response(JSON.stringify(b), { status: 200 });
+      calls.push({ method, u, body: init.body ? JSON.parse(init.body) : null });
+      if (u.includes('/pb_listings?')) return ok(o.onStore ? [{ id: 'l1' }] : []);
+      if (method === 'PATCH') return ok(o.taken === undefined ? [{ id: 'p1' }] : []);
+      return ok([{ sku_colour: o.taken ?? null }]);
+    };
+    return calls;
+  };
+  const P = { id: 'p1', color: 'Wine', source: 'telegram', sku_colour: null };
+  let calls = world();
+  assert.equal(await skuColour({ ...P, sku_colour: 'MAROON' }), 'MAROON', 'decided before: kept, whatever the colour is called now');
+  assert.equal(await skuColour({ ...P, sku_colour: '' }), '', 'decided as none: stays none');
+  assert.deepEqual(calls, [], 'nothing is asked or saved again');
+  // the first send of a new product: saved first, only where nothing is saved yet
+  assert.equal(await skuColour(P), 'WINE');
+  const save = calls.find(c => c.method === 'PATCH');
+  assert.match(save.u, /pb_products\?id=eq\.p1&sku_colour=is\.null/);
+  assert.deepEqual(save.body, { sku_colour: 'WINE' });
+  assert.match(calls[0].u, /pb_listings\?product_id=eq\.p1&shopify_product_id=not\.is\.null/);
+  // a product that is on a store from before codes carried a colour keeps its codes exactly as they are
+  calls = world({ onStore: true });
+  assert.equal(await skuColour(P), '');
+  assert.deepEqual(calls.find(c => c.method === 'PATCH').body, { sku_colour: '' });
+  // copied from another store: its own codes
+  world();
+  assert.equal(await skuColour({ ...P, source: 'import' }), '');
+  // two websites send it for the first time at once, and the colour was re-worded in between: the one that saved first decides for both
+  world({ taken: 'MAROON' });
+  assert.equal(await skuColour(P), 'MAROON');
+  // (second review, 2) a send that failed after the product was saved on Shopify: the retry reads the product with the
+  // colour that was saved before the first try, so the codes cannot change between the two (garment.test.mjs: kept).
+});

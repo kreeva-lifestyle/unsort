@@ -23,6 +23,8 @@ export interface ProductRow {
   ai_read_at: string | null; ai_error: string | null; claimed_at: string | null;
   /** When the vendor made the post (Telegram); null when not known. */
   source_posted_at?: string | null;
+  /** The colour part its sizes' codes carry on the stores ('' = none, null = not decided yet): skuCode.ts. */
+  sku_colour?: string | null;
   created_at: string; updated_at: string;
 }
 
@@ -89,8 +91,6 @@ export interface ListingRow {
   shopify_product_id: string | null; shopify_status: string | null; published_at: string | null;
   /** The day it first went live on this store. published_at moves on every re-send; this one never does. */
   first_published_at: string | null;
-  /** The colour part its sizes' codes were first sent to the store with ('' = none, null = not sent yet): productInput.ts. */
-  sku_colour?: string | null;
   attempts: number; claimed_at: string | null; error: string | null; created_at: string; updated_at: string;
 }
 
@@ -113,8 +113,8 @@ export type Caller = { kind: 'secret' } | { kind: 'staff'; id: string; role: str
 /** Per-call time limits: stop starting new items after `soft`; every outside call ends by `hard`. */
 export interface Budget { soft: number; hard: number }
 
-export const PRODUCT_COLS = 'id,vendor_id,source,source_ref,raw_text,sku,name,category,fabric,color,sizes,in_stock,temp_out_at,perm_out_at,cost_price,less_amount,sell_price,price_note,attributes,tags,missing_attrs,status,locked,ai_read_at,ai_error,claimed_at,source_posted_at,created_at,updated_at';
-export const LISTING_COLS = 'id,product_id,website_id,status,rule_id,price,compare_at_price,title,description_html,seo_title,seo_description,handle,tags,product_type,image_alts,locked,ai_model,ai_effort,ai_cost_usd,generated_at,shopify_product_id,shopify_status,published_at,first_published_at,attempts,claimed_at,error,created_at,updated_at,sku_colour';
+export const PRODUCT_COLS = 'id,vendor_id,source,source_ref,raw_text,sku,name,category,fabric,color,sizes,in_stock,temp_out_at,perm_out_at,cost_price,less_amount,sell_price,price_note,attributes,tags,missing_attrs,status,locked,ai_read_at,ai_error,claimed_at,source_posted_at,sku_colour,created_at,updated_at';
+export const LISTING_COLS = 'id,product_id,website_id,status,rule_id,price,compare_at_price,title,description_html,seo_title,seo_description,handle,tags,product_type,image_alts,locked,ai_model,ai_effort,ai_cost_usd,generated_at,shopify_product_id,shopify_status,published_at,first_published_at,attempts,claimed_at,error,created_at,updated_at';
 export const WEBSITE_COLS = 'id,name,shop_domain,auth_mode,api_version,active,publish_mode,routing_default,track_inventory,pricing,tag_rules,content,connected_at,shop_name,last_error';
 export const RULE_COLS = 'id,website_id,position,name,enabled,action,conditions,price_override';
 

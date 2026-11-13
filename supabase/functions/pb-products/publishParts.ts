@@ -11,13 +11,25 @@
 //   channel the Online Store step: toOnlineStore.
 // A passing failure (Shopify busy: 429, 5xx, THROTTLED → HttpError 503) is
 // tried again and does not use up the listing's attempts: temporary.
-import { enc, patch, publicUrl, uniqueCi } from './db.ts';
+import { enc, one, patch, publicUrl, sel, uniqueCi } from './db.ts';
 import { METAFIELDS_SET, type FieldInput } from './fields.ts';
 import { HttpError, plain } from './http.ts';
-import { PUBLISH } from './productInput.ts';
+import { keptColour, PUBLISH } from './productInput.ts';
 import { gql, onlineStoreId } from './shopify.ts';
 import type { Existing } from './shopifyProduct.ts';
-import type { WebsiteRow } from './types.ts';
+import type { ProductRow, WebsiteRow } from './types.ts';
+
+/** The colour part of the product's codes (skuCode.ts), decided once and saved BEFORE anything is sent: a send that
+ *  fails half-way finds the same codes on its next try, and every website gets the same ones. A product that is on
+ *  a store already keeps its codes as they are (''). Two first sends at once: the one that saves first decides. */
+export async function skuColour(p: ProductRow): Promise<string> {
+  if (typeof p.sku_colour === 'string') return p.sku_colour;
+  const onStore = await sel<{ id: string }>(`pb_listings?product_id=eq.${enc(p.id)}&shopify_product_id=not.is.null&select=id&limit=1`);
+  const want = onStore.length ? '' : keptColour(p);
+  if ((await patch('pb_products', `id=eq.${enc(p.id)}&sku_colour=is.null`, { sku_colour: want })).length) return want;
+  const now = await one<{ sku_colour: string | null }>(`pb_products?id=eq.${enc(p.id)}&select=sku_colour`);
+  return typeof now?.sku_colour === 'string' ? now.sku_colour : want;
+}
 
 /** Shopify was busy, not wrong: the same request can pass a little later. */
 export const temporary = (e: unknown) => e instanceof HttpError && e.status === 503;

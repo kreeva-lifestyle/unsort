@@ -25,8 +25,10 @@ export interface PbProduct {
   perm_out_at: string | null;
   /** The earlier product this one waits as a copy of ("Already here as …"); the Ready gate keeps it. Null when it is not held. */
   copy_of: string | null;
-  /** When the latest word about its stock was said (the vendor's notice or new post, or a person's Stock switch): an older word is refused. */
+  /** When the latest word that decided its stock was said (the vendor's notice or new post, or a person switching Stock off): an older word is refused. */
   stock_said_at: string | null;
+  /** The colour part its sizes' SKUs and barcodes carry on the stores ('' = none, null = not decided yet); kept once decided. */
+  sku_colour: string | null;
   /** tags: its chosen values' names (cache; pb_product_values, tagTypes.ts) · missing_attrs: required attributes still empty → Needs info. */
   tags: string[]; missing_attrs: string[];
   /** Anything else the AI read: work, occasion, pattern, set_contents, wash_care, notes… (string values). */
@@ -126,8 +128,6 @@ export interface PbListing {
   shopify_product_id: string | null; shopify_status: string | null; published_at: string | null;
   /** The day it first went live on this store (published_at moves on every re-send). */
   first_published_at: string | null;
-  /** The colour part its sizes' SKUs and barcodes were first sent to the store with ('' = none, null = not sent yet); kept from then on. */
-  sku_colour: string | null;
   attempts: number; claimed_at: string | null; error: string | null; created_at: string; updated_at: string;
   /** The product's stock is still to be sent to this listing's Shopify product (server: stockSend.ts). */
   stock_due: boolean;

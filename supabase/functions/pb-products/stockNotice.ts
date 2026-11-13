@@ -27,7 +27,8 @@
 // The later word wins, whichever post was read first: every change carries the
 // time the vendor made the notice (stock.ts saidAt), and the database refuses
 // it for a product with a newer word about its stock on record — the vendor
-// posted it again since, or a person flipped its Stock switch (NEWER).
+// posted it again since, or a person switched its Stock off since (NEWER).
+// A person switching Stock ON claims no time: a notice read after it applies.
 //   PERMANENT ("Archive it"): stock.ts takeOffSale — out of stock, archived on
 //     Shopify and archived in Playbook.
 //   neither word: out of stock (shown as Sold out), nothing archived.
@@ -108,12 +109,12 @@ export async function stockNotice(p: ProductRow, n: Notice | null | undefined, p
     const r = pick(it, await rpc<Cand[]>('pb_stock_candidates', { p_vendor: p.vendor_id, p_code: it.code }) || []);
     const again: Cand[] = [];
     for (const c of r.apply) {
-      const res = kind === 'temporary' // a note only: the product stays on sale, Shopify is not touched
-        ? await saveStock({ id: c.id }, { temp_out_at: nowIso(), said_at: said }, { temporary: true, notice: p.id }, userId)
+      const res = kind === 'temporary' // a note only, dated when the vendor said it: the product stays on sale, Shopify is not touched
+        ? await saveStock({ id: c.id }, { temp_out_at: said, as_of: said }, { temporary: true, notice: p.id }, userId)
         : kind === 'permanent' // archived on Shopify and in Playbook
           ? await takeOffSale({ id: c.id }, { notice: p.id }, userId, said)
-          // out of stock; one that is out already only loses its note, and the notice is on record as its latest word
-          : await saveStock({ id: c.id }, c.in_stock ? { in_stock: false, temp_out_at: null, said_at: said } : { temp_out_at: null, said_at: said }, { notice: p.id, kind }, userId);
+          // out of stock — said in full, whatever the look-up above showed (another post may have been read meanwhile)
+          : await saveStock({ id: c.id }, { in_stock: false, temp_out_at: null, said_at: said }, { notice: p.id, kind }, userId);
       if (res === NEWER) again.push(c); else if (res >= 0) marked++;
     }
     r.apply = r.apply.filter(c => !again.includes(c));

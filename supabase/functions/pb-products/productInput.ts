@@ -82,7 +82,7 @@ export function buildProductInput(a: { l: ListingRow; p: ProductRow; site: Websi
   const compareAtPrice = l.compare_at_price !== null && Number(l.compare_at_price) > Number(l.price) ? money(l.compare_at_price) : null;
   const sizes = uniqueCi((p.sizes || []).map(s => String(s).replace(/\s+/g, ' ').trim()).filter(Boolean)); // "S" and "s" are one size
   const parts = skuParts(String(p.sku || ''), sizes), join = parts.join;
-  const sku = codeBase(l, p, parts.base, join);
+  const sku = codeBase(p, parts.base, join);
   const optName = sizes.length ? 'Size' : 'Title';
   const values = sizes.length ? sizes : ['Default Title'];
   // A choice the store has that Playbook did not make (someone added "Colour" in Shopify): productSet would delete it.

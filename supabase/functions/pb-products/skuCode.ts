@@ -37,20 +37,23 @@ const namesColour = (base: string) => {
   return !!m && /[A-Z]/.test(words.slice(m[0].length).replace(SIZE_WORD, ' '));
 };
 
-/** The colour a listing's codes carry, remembered from its first send (pb_listings.sku_colour): codes that are on a
- *  store do not follow a colour that is re-worded later. A listing that reached its store before codes carried a
- *  colour keeps them as they are (''). Not sent yet: the product's colour as it is now. */
-export function keptColour(l: { sku_colour?: string | null; shopify_product_id?: string | null }, p: { color?: string | null; source?: string | null }): string {
-  if (typeof l.sku_colour === 'string') return l.sku_colour;
-  return l.shopify_product_id || p.source === 'import' ? '' : flat(p.color).slice(0, 30);
+/** A product as its codes need it: `sku_colour` is the colour part decided for it once (pb_products.sku_colour). */
+export interface Coded { sku_colour?: string | null; color?: string | null; source?: string | null }
+
+/** The colour part a product's codes carry on the stores, decided once and kept: codes that are on a store do not
+ *  follow a colour that is re-worded later, and the same goods carry one code on every website ('' = none).
+ *  Not decided yet (publishParts.ts skuColour decides and saves it before the first send): the colour as it is now. */
+export function keptColour(p: Coded): string {
+  if (typeof p.sku_colour === 'string') return p.sku_colour;
+  return p.source === 'import' ? '' : flat(p.color).slice(0, 30);
 }
 
 /** The code each size's SKU and barcode start with. A vendor's design code (Telegram, typed by hand) is shared by
  *  every colour of the design, so two colours kept as two products sent the same SKU and barcode for each size
  *  (pre-launch fix D19): the colour goes into the code — "KA-5070" in Teal Blue → "KA-5070-TEALBLUE" — unless the
  *  code names its colour already ("KB 302 WINE"). A product copied from a store keeps that store's own code. */
-export function codeBase(l: { sku_colour?: string | null; shopify_product_id?: string | null }, p: { color?: string | null; source?: string | null }, base: string, join: string): string {
-  const colour = keptColour(l, p);
+export function codeBase(p: Coded, base: string, join: string): string {
+  const colour = keptColour(p);
   if (!base || !colour || p.source === 'import' || namesColour(base) || flat(base).includes(colour)) return base;
   return `${base}${join}${colour}`;
 }

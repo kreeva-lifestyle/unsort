@@ -242,6 +242,12 @@ are in `product-directory-spec.md`, "Batch 6"):
   that is newer than the re-post is not undone, a notice read late leaves
   alone what the vendor posted again after it, and a re-post that matched a
   product a newer notice switched off waits as a copy instead of going live.
+  At the very same time the stock-out stands. A temporary notice is a note
+  dated when the vendor said it: it never outranks a real stock-out, and a
+  re-post only clears a note older than itself. A person switching Stock OFF
+  is the latest word as of the tap; switching it ON claims no time, so a
+  notice posted before the tap that arrives after it still applies. A post
+  without the vendor's time (an old crawler) brings nothing back.
 - **Copies do not pile up unseen.** Products → Needs info counts them, shows
   them alone and archives them together (a bulk change, revertible for 7 days).
 - **Two posts of one product in the same minute.** The one read second is held

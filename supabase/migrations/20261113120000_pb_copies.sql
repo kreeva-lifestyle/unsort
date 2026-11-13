@@ -10,16 +10,20 @@
 -- HOW:
 --   * pb_products.copy_of — WHAT the Ready gate holds a product as a copy of.
 --     The gate (pb_products_refresh) writes it in the same update as the
---     status it explains. When the product it points at is archived, or its
---     code, colour or vendor changes, the note follows (pb_copies_follow): the
---     next earlier product, or none. The list filters on it.
+--     status it explains. When the product it points at is archived, brought
+--     back or deleted, or its code, colour or vendor changes, the note follows
+--     (pb_copies_follow): the next earlier product, or none. The list filters
+--     on it.
 --   * pb_copies_archive(apply, user) — archives the held copies in one go.
 --     Every copy is judged once, as things stand before anything is archived,
 --     so what the confirmation showed is exactly what is done. Only the ones
---     with nothing of their own to lose: a copy that is already on a store, or
---     that came with a vendor price the earlier product lacks or contradicts,
---     is left for a person and counted. Nothing is let go to the websites.
---     apply = false only counts (the app shows the counts before asking).
+--     with nothing of their own to lose, left for a person and counted:
+--     a copy that is already on a store; one that came with a vendor price the
+--     earlier product lacks or contradicts; and one in a chain (a copy OF a
+--     waiting copy, or one another waiting copy points at) — archiving a chain
+--     in one go could remove the only product of a colour. Nothing is let go
+--     to the websites. apply = false only counts (the app shows the counts
+--     before asking).
 --   * The server runs it as a bulk change (x-pb-bulk), so the log keeps every
 --     product it archived and pb_bulk_revert_copies can take it back for 7
 --     days: archived → Needs info, where the product is still archived and is
@@ -27,13 +31,18 @@
 --     product that is no longer a copy stays archived and is counted.
 --     No answer is stored for the pairs, so nothing is left behind.
 --
--- Additive only: one column, one index, one trigger, new functions, and two
+-- Additive only: one column, one index, two triggers, new functions, and two
 -- functions replaced with the same signature. Nothing is dropped. SECURITY
 -- INVOKER; the functions that change data check that the caller is the server.
+-- The one exception is the trigger function pb_copies_follow (see 3).
 
 -- ── 1. what the gate holds a product as a copy of ─────────────────────────
-alter table public.pb_products add column if not exists copy_of uuid references public.pb_products(id) on delete set null;
-comment on column public.pb_products.copy_of is 'The earlier product the Ready gate holds this one as a copy of (pb_products_refresh writes it with the status; pb_copies_follow moves it when that product is archived or its code, colour or vendor changes); null when it is not held.';
+-- No foreign key on purpose: "on delete set null" would empty the note before
+-- pb_copies_follow can look for the next earlier product (the two run in name
+-- order, the built-in one first). The trigger below clears or moves every note
+-- that points at a deleted product, in the same transaction.
+alter table public.pb_products add column if not exists copy_of uuid;
+comment on column public.pb_products.copy_of is 'The earlier product the Ready gate holds this one as a copy of (pb_products_refresh writes it with the status; pb_copies_follow moves it when that product is archived, brought back or deleted, or its code, colour or vendor changes); null when it is not held.';
 create index if not exists pb_products_copy_of_idx on public.pb_products (copy_of) where copy_of is not null;
 
 -- ── 2. the gate keeps it ──────────────────────────────────────────────────
@@ -84,21 +93,47 @@ update public.pb_products p set copy_of = public.pb_dup_held(p.id)
 where p.status = 'needs_info' and p.copy_of is null and public.pb_dup_held(p.id) is not null;
 
 -- ── 3. the note follows when the product it points at changes ─────────────
--- That product is archived, or its code, colour or vendor is changed: the
--- products that point at it are looked at again. Only the note moves: to the
--- next earlier product this one is a copy of, or to none. The waiting
--- product's own status is not touched here (changing one product never sends
--- another one to the websites; its own gate does that when it is next saved).
+-- That product is archived or deleted, or its code, colour or vendor is
+-- changed: the products that point at it are looked at again — the next
+-- earlier product they are a copy of, or none. And the other way round: a
+-- product that comes back from the archive (or whose code, colour or vendor
+-- now matches) is looked at for the waiting products it holds, so their note
+-- is there again (second review, finding 6: a copy whose original was deleted
+-- or archived and restored sat in Needs info with no reason shown).
+-- Only the note moves. The waiting product's own status is not touched here
+-- (changing one product never sends another one to the websites; its own gate
+-- does that when it is next saved).
+-- SECURITY DEFINER, deliberately: it reads the copy rules' own tables (schema
+-- private), which staff cannot read directly. It can only run as a trigger —
+-- PostgreSQL refuses to call a trigger function any other way — and it writes
+-- nothing but copy_of, on products that are tied to the row the caller was
+-- allowed to change. Its own update is outside the triggers' column list, so
+-- it does not call itself; a note that would not change is not written.
 create or replace function public.pb_copies_follow() returns trigger
-language plpgsql security invoker set search_path = public as $$
+language plpgsql security definer set search_path = '' as $$
 begin
-  update pb_products c set copy_of = pb_dup_held(c.id) where c.copy_of = new.id and c.status = 'needs_info';
+  -- the products that point at it: the next earlier product, or none
+  update public.pb_products c set copy_of = h.held
+  from (select x.id, case when x.status = 'needs_info' then public.pb_dup_held(x.id) end as held
+        from public.pb_products x where x.copy_of = old.id) h
+  where c.id = h.id and c.copy_of is distinct from h.held;
+  -- it is (again) a product others can be copies of: the waiting products it holds
+  if tg_op = 'UPDATE' then
+    if new.status <> 'archived' then
+      update public.pb_products c set copy_of = h.held
+      from (select m.other_id, public.pb_dup_held(m.other_id) as held
+            from private.pb_dup_scan(array[new.id]) m where m.kind = 'original') h
+      where c.id = h.other_id and c.status = 'needs_info' and c.copy_of is distinct from h.held;
+    end if;
+  end if;
   return null;
 end $$;
 create or replace trigger pb_copies_follow after update of status, sku, color, vendor_id on public.pb_products
-  for each row when ((new.status = 'archived' and old.status is distinct from 'archived')
+  for each row when ((new.status = 'archived') is distinct from (old.status = 'archived')
                      or new.sku is distinct from old.sku or new.color is distinct from old.color or new.vendor_id is distinct from old.vendor_id)
   execute function public.pb_copies_follow();
+create or replace trigger pb_copies_gone after delete on public.pb_products
+  for each row execute function public.pb_copies_follow();
 
 -- ── 4. "They are copies": archive the held copies in one go ───────────────
 -- Left for a person, and counted:
@@ -107,12 +142,18 @@ create or replace trigger pb_copies_follow after update of status, sku, color, v
 --             different one, or no price at all (the new rate would be lost).
 --             An earlier product copied from a store sells at that store's
 --             price, so a vendor cost on the copy is nothing it lacks.
+--   linked  — it is part of a chain: what it copies is itself waiting as a
+--             copy, or another waiting copy points at it. A chain only forms
+--             where the colours do not line up (Black ← no colour ← Grey):
+--             archiving it in one go would leave no Grey product at all, and
+--             archiving the middle one would leave the last one waiting with
+--             no reason shown (second review, finding 6).
 -- A note that no longer holds all the same (a person answered the pair from
 -- elsewhere) is cleared when applying, and that product is left as it is.
 create or replace function public.pb_copies_archive(p_apply boolean default false, p_user uuid default null)
 returns jsonb
 language plpgsql security invoker set search_path = public as $$
-declare v_ids uuid[]; v_origs uuid[]; v_stale uuid[]; archived int := 0; priced int := 0; on_site int := 0;
+declare v_ids uuid[]; v_origs uuid[]; v_stale uuid[]; archived int := 0; priced int := 0; on_site int := 0; linked int := 0;
 begin
   if p_apply and coalesce(auth.role(), '') <> 'service_role' then raise exception 'Only the server can do this.'; end if;
   with held as materialized (
@@ -123,14 +164,16 @@ begin
         when h.orig is null then 'stale'
         when exists (select 1 from pb_listings l where l.product_id = h.id and pb_listing_on_sale(l.status, l.shopify_product_id, l.shopify_status)) then 'on_site'
         when h.cost_price is not null and (case when o.cost_price is not null then o.cost_price <> h.cost_price else o.sell_price is null end) then 'priced'
+        when exists (select 1 from held x where x.orig = h.id)                          -- another waiting copy points at it
+          or (o.status = 'needs_info' and pb_dup_held(o.id) is not null) then 'linked'  -- what it copies is itself waiting as a copy
         else 'archive' end as verdict
     from held h left join pb_products o on o.id = h.orig
   )
   select coalesce(array_agg(j.id order by j.created_at, j.id) filter (where j.verdict = 'archive'), '{}'),
          coalesce(array_agg(j.orig order by j.created_at, j.id) filter (where j.verdict = 'archive'), '{}'),
          coalesce(array_agg(j.id) filter (where j.verdict = 'stale'), '{}'),
-         count(*) filter (where j.verdict = 'priced'), count(*) filter (where j.verdict = 'on_site')
-    into v_ids, v_origs, v_stale, priced, on_site
+         count(*) filter (where j.verdict = 'priced'), count(*) filter (where j.verdict = 'on_site'), count(*) filter (where j.verdict = 'linked')
+    into v_ids, v_origs, v_stale, priced, on_site, linked
   from judged j;
   archived := cardinality(v_ids);
   if p_apply then
@@ -145,9 +188,9 @@ begin
     select count(*) into archived from logged;
     update pb_products set copy_of = null where id = any(v_stale) and status = 'needs_info';
   end if;
-  return jsonb_build_object('archived', archived, 'priced', priced, 'on_site', on_site);
+  return jsonb_build_object('archived', archived, 'priced', priced, 'on_site', on_site, 'linked', linked);
 end $$;
-comment on function public.pb_copies_archive(boolean, uuid) is 'Archive the products the Ready gate holds as copies (pb-products copies.ts); p_apply = false only counts. Leaves the ones on a store or with a vendor price of their own; lets nothing go to the websites.';
+comment on function public.pb_copies_archive(boolean, uuid) is 'Archive the products the Ready gate holds as copies (pb-products copies.ts); p_apply = false only counts. Leaves the ones on a store, with a vendor price of their own, or in a chain of copies; lets nothing go to the websites.';
 grant execute on function public.pb_copies_archive(boolean, uuid) to authenticated, service_role;
 
 -- ── 5. taking it back ─────────────────────────────────────────────────────
@@ -190,11 +233,19 @@ end $$;
 -- As 20261113060000_pb_bulk_log.sql, plus 'copies' (also in the "a later bulk
 -- change of the same kind on the same rows goes first" rule). Part 2 of the
 -- bulk-change log (the tag lists and stock notices) carries a larger version
--- of this function with 'copies' in it: when that one is already in place it
--- is left alone, so the two files can be run in either order.
+-- of this function with 'copies' in it: when an entry point that knows
+-- 'copies' is already in place it is left alone, so the two files can be run
+-- in either order. An entry point from an OLDER copy of the part-2 file (it
+-- had no 'copies') is not silently kept — a copies run could then never be
+-- taken back (second review, finding 4): this migration stops and says so.
 do $do$
+declare v_have text := coalesce((select pg_get_functiondef(p.oid) from pg_proc p
+                                 where p.oid = to_regprocedure('public.pb_bulk_revert(uuid,boolean,uuid,text)')), '');
 begin
-  if to_regprocedure('public.pb_bulk_revert_tags(uuid,boolean)') is not null then return; end if;
+  if position('pb_bulk_revert_copies' in v_have) > 0 then return; end if;
+  if to_regprocedure('public.pb_bulk_revert_tags(uuid,boolean)') is not null then
+    raise exception 'Part 2 of the bulk-change log is installed from an older copy of its file, which does not know "Archive the copies". Run docs/playbook/sql-to-run/20261113090000_pb_bulk_log_tags_stock.sql from this version first, then this migration again.';
+  end if;
   execute $fn$
 create or replace function public.pb_bulk_revert(p_run uuid, p_apply boolean default false, p_user uuid default null, p_note text default null)
 returns jsonb

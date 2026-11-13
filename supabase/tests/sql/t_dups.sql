@@ -134,6 +134,11 @@ select t_is('held', (select string_agg(right(id::text, 2) || '>' || right(copy_o
 -- the product a copy points at is archived by hand: the note follows (here: to nothing), the copy itself is left as it is
 update pb_products set status = 'archived' where id = t_id(65);
 select t_is('the note follows when what it points at is archived; nothing is let go', (select status || '/' || coalesce(copy_of::text, 'null') || '/' || route_due::text from pb_products where id = t_id(66)), 'needs_info/null/false');
+-- … and it is back when that product is brought back from the archive (second review, 6: the copy sat in Needs info with no reason shown)
+update pb_products set status = 'ready' where id = t_id(65);
+select t_is('the note is back when what it copied is restored', (select status || '>' || coalesce(right(copy_of::text, 2), 'null') from pb_products where id = t_id(66)), 'needs_info>65');
+update pb_products set status = 'archived' where id = t_id(65);
+select t_is('… and gone again with it', (select coalesce(copy_of::text, 'null') from pb_products where id = t_id(66)), 'null');
 -- what a copy points at gets another code: the note follows at once, here too
 update pb_products set sku = 'ZU-501' where id = t_id(60);
 select t_is('… and when its code is changed', (select status || '/' || coalesce(copy_of::text, 'null') from pb_products where id = t_id(61)), 'needs_info/null');
@@ -141,38 +146,51 @@ update pb_products set sku = 'ZU-500' where id = t_id(60);
 select t_is('… the gate holds it again once the code is back', (select g.status from public.pb_products_refresh(array[t_id(61)]) g) || '', 'needs_info');
 -- a note can still be out of date: here the pair is answered without the gate being asked. The count leaves it out; the action clears it.
 select public.pb_dup_verdict_set(t_id(61), t_id(60), 'different');
--- 51 (no colour) is held as a copy of 50 (Black); 52 (Grey) only as a copy of 51. Both wait as copies when the button is tapped, so both are archived.
-select t_is('looking only: what would be archived, and what is left', public.pb_copies_archive(false)::text, '{"priced": 2, "on_site": 1, "archived": 5}');
+-- 51 (no colour) is held as a copy of 50 (Black); 52 (Grey) only as a copy of 51: a chain. Archived together, no Grey product would be left,
+-- and archiving 51 alone would leave 52 waiting for nothing. Both are left for a person ("linked").
+select t_is('looking only: what would be archived, and what is left', public.pb_copies_archive(false)::text, '{"linked": 2, "priced": 2, "on_site": 1, "archived": 3}');
 select t_is('… nothing changed', (select count(*)::text from pb_products where status = 'archived'), '1');
 select t_refused('a signed-in person cannot run it', 'select public.pb_copies_archive(true)');
 select t_is('… nothing changed', (select count(*)::text from pb_products where status = 'archived'), '1');
 select set_config('request.jwt.claims', '{"role":"service_role"}', false);
 insert into pb_bulk_runs (id, kind, label, status) values (:R1, 'copies', 'Archived the products waiting as copies', 'running');
 select set_config('request.headers', json_build_object('x-pb-bulk', :R1)::text, false);
-select t_is('done: exactly what was shown', public.pb_copies_archive(true)::text, '{"priced": 2, "on_site": 1, "archived": 5}');
+select t_is('done: exactly what was shown', public.pb_copies_archive(true)::text, '{"linked": 2, "priced": 2, "on_site": 1, "archived": 3}');
 select set_config('request.headers', '{}', false);
 update pb_bulk_runs set status = 'done', items = (select count(*) from pb_bulk_items where run_id = :R1), finished_at = now() where id = :R1;
 select t_is('products now', (select string_agg(right(id::text, 2) || ':' || status, ' ' order by id) from pb_products where id <> all (array[t_id(20), t_id(30), t_id(40), t_id(50), t_id(60), t_id(65)])),
-  '21:archived 22:needs_info 23:archived 24:needs_info 31:archived 41:needs_info 51:archived 52:archived 61:needs_info 66:needs_info');
+  '21:archived 22:needs_info 23:archived 24:needs_info 31:archived 41:needs_info 51:needs_info 52:needs_info 61:needs_info 66:needs_info');
+select t_is('the chain keeps its notes', (select string_agg(right(id::text, 2) || '>' || right(copy_of::text, 2), ' ' order by id) from pb_products where id in (t_id(51), t_id(52))), '51>50 52>51');
 select t_is('nothing was let go to the websites', (select count(*)::text from pb_products where route_due or (status = 'ready' and id not in (t_id(20), t_id(30), t_id(50), t_id(60)))), '0');
 select t_is('a note that was out of date is cleared, its product left as it is', (select status || '/' || coalesce(copy_of::text, 'null') from pb_products where id = t_id(61)), 'needs_info/null');
-select t_is('a timeline line for each', (select count(*)::text from pb_activity where action = 'archived' and details ->> 'bulk' = 'true'), '5');
-select t_is('… that says what it copied', (select right(details ->> 'copy_of', 2) from pb_activity where product_id = t_id(52) and action = 'archived'), '51');
-select t_is('the log has every row it changed', (select count(*)::text from pb_bulk_items where run_id = :R1 and tbl = 'pb_products'), '5');
-select t_is('a second tap finds nothing more to archive', public.pb_copies_archive(false)::text, '{"priced": 2, "on_site": 1, "archived": 0}');
+select t_is('a timeline line for each', (select count(*)::text from pb_activity where action = 'archived' and details ->> 'bulk' = 'true'), '3');
+select t_is('… that says what it copied', (select right(details ->> 'copy_of', 2) from pb_activity where product_id = t_id(31) and action = 'archived'), '30');
+select t_is('the log has every row it changed', (select count(*)::text from pb_bulk_items where run_id = :R1 and tbl = 'pb_products'), '3');
+select t_is('a second tap finds nothing more to archive', public.pb_copies_archive(false)::text, '{"linked": 2, "priced": 2, "on_site": 1, "archived": 0}');
 -- meanwhile a person restores one of them (Restore → read again), and the product another one copied is archived
 update pb_products set status = 'new' where id = t_id(23);
 update pb_products set status = 'archived' where id = t_id(30);
-select t_is('revert, looking only', (public.pb_bulk_revert(:R1, false) - 'label')::text, '{"gone": 0, "kind": "copies", "changed": 1, "restored": 3, "not_copies": 1}');
-select t_is('… nothing changed', (select string_agg(right(id::text, 2) || ':' || status, ' ' order by id) from pb_products where id = any (array[t_id(21), t_id(23), t_id(31), t_id(51), t_id(52)])), '21:archived 23:new 31:archived 51:archived 52:archived');
+select t_is('revert, looking only', (public.pb_bulk_revert(:R1, false) - 'label')::text, '{"gone": 0, "kind": "copies", "changed": 1, "restored": 1, "not_copies": 1}');
+select t_is('… nothing changed', (select string_agg(right(id::text, 2) || ':' || status, ' ' order by id) from pb_products where id = any (array[t_id(21), t_id(23), t_id(31)])), '21:archived 23:new 31:archived');
 select t_is('… and it can still be reverted', (select status from pb_bulk_runs where id = :R1), 'done');
-select t_is('revert: the same numbers', (public.pb_bulk_revert(:R1, true) - 'label')::text, '{"gone": 0, "kind": "copies", "changed": 1, "restored": 3, "not_copies": 1}');
--- 52 comes back because 51, which it copies, came back before it; 31 is no longer a copy of anything (30 is archived): it stays archived
-select t_is('back as they were: waiting as copies again', (select string_agg(right(id::text, 2) || ':' || status || coalesce('>' || right(copy_of::text, 2), ''), ' ' order by id) from pb_products where id = any (array[t_id(21), t_id(23), t_id(31), t_id(51), t_id(52)])),
-  '21:needs_info>20 23:new>20 31:archived>30 51:needs_info>50 52:needs_info>51');
+select t_is('revert: the same numbers', (public.pb_bulk_revert(:R1, true) - 'label')::text, '{"gone": 0, "kind": "copies", "changed": 1, "restored": 1, "not_copies": 1}');
+-- 21 waits as a copy again; 31 is no longer a copy of anything (30 is archived): it stays archived, and carries no note
+select t_is('back as they were: waiting as copies again', (select string_agg(right(id::text, 2) || ':' || status || coalesce('>' || right(copy_of::text, 2), ''), ' ' order by id) from pb_products where id = any (array[t_id(21), t_id(23), t_id(31)])),
+  '21:needs_info>20 23:new>20 31:archived');
 select t_is('a revert sends nothing to the websites either', (select count(*)::text from pb_products where route_due), '0');
 select t_is('the run says reverted', (select status from pb_bulk_runs where id = :R1), 'reverted');
 select t_refused('a second revert is refused', format('select public.pb_bulk_revert(%L, true)', :R1));
+-- the chain, by hand: the person archives the middle one. The last one is no longer a copy of anything; its own gate lets it go when it is next saved.
+update pb_products set status = 'archived' where id = t_id(51);
+select t_is('a chain answered by hand: the last one loses its note', (select status || '/' || coalesce(copy_of::text, 'null') from pb_products where id = t_id(52)), 'needs_info/null');
+select t_is('… and its own gate lets it go', (select g.status from public.pb_products_refresh(array[t_id(52)]) g) || '', 'ready');
+-- what a copy points at is DELETED (an import taken back): the note moves to the next earlier product, or to none (second review, 6)
+select t_product(80, :V3, 'ZS-700', 'Red', 1) is not null, t_product(81, :V3, 'ZS-700', 'Red', 2) is not null, t_product(82, :V3, 'ZS-700', 'Red', 3) is not null;
+select count(*) from public.pb_products_refresh(array[t_id(80), t_id(81), t_id(82)]);
+select t_is('two copies of one product', (select string_agg(right(id::text, 2) || '>' || right(copy_of::text, 2), ' ' order by id) from pb_products where id in (t_id(81), t_id(82))), '81>80 82>80');
+delete from pb_products where id = t_id(80);
+select t_is('the product they copied is deleted: the note moves on, or goes', (select string_agg(right(id::text, 2) || '>' || coalesce(right(copy_of::text, 2), 'none'), ' ' order by id) from pb_products where id in (t_id(81), t_id(82))), '81>none 82>81');
+select t_is('… and no note points at a product that is gone', (select count(*)::text from pb_products c where c.copy_of is not null and not exists (select 1 from pb_products o where o.id = c.copy_of)), '0');
 rollback;
 
 -- ── 7. the later word about a product's stock wins (pb_stock_save with said_at) ──
@@ -196,9 +214,32 @@ select t_is('… it is saved, and the listing is not marked', (select (p.temp_ou
 select t_is('a person''s switch always applies', public.pb_stock_save(t_id(70), '{"in_stock": true, "said_at": "2026-11-10T10:00:00Z", "force": true}')::text, '1');
 select t_is('… and the newest time stays on record', (select in_stock::text || ' ' || stock_said_at::text from pb_products where id = t_id(70)), 'true 2026-11-10 16:00:00+00');
 select t_is('a product that does not exist', public.pb_stock_save(gen_random_uuid(), '{"in_stock": false, "said_at": "2026-11-10T09:00:00Z"}')::text, '-1');
+-- at the very same time a stock-out stands, whichever of the two is read first (second review, 5)
+select t_is('a stock-out said at the time on record applies', public.pb_stock_save(t_id(70), '{"in_stock": false, "temp_out_at": null, "said_at": "2026-11-10T16:00:00Z"}')::text, '1');
+select t_is('… and the note from that same time stays', (select in_stock::text || '/' || (temp_out_at is not null)::text from pb_products where id = t_id(70)), 'false/true');
+select t_is('a new post of the product from that same time does not bring it back', public.pb_stock_save(t_id(70), '{"in_stock": true, "temp_out_at": null, "said_at": "2026-11-10T16:00:00Z"}')::text, '-2');
+select t_is('a newer one does, and takes the older note with it', public.pb_stock_save(t_id(70), '{"in_stock": true, "temp_out_at": null, "said_at": "2026-11-10T17:00:00Z"}')::text, '1');
+select t_is('… in stock, no note', (select in_stock::text || '/' || coalesce(temp_out_at::text, 'null') from pb_products where id = t_id(70)), 'true/null');
+-- a temporary stock-out is a note: judged by its time, but it does not become the latest word
+update pb_listings set stock_due = false;
+select t_is('a temporary note applies when nothing newer is on record', public.pb_stock_save(t_id(70), '{"temp_out_at": "2026-11-10T18:00:00Z", "as_of": "2026-11-10T18:00:00Z"}')::text, '0');
+select t_is('… dated when the vendor said it, the time on record untouched, the stores owed nothing', (select p.temp_out_at::text || ' ' || p.stock_said_at::text || ' ' || l.stock_due::text from pb_products p join pb_listings l on l.product_id = p.id where p.id = t_id(70)), '2026-11-10 18:00:00+00 2026-11-10 17:00:00+00 false');
+select t_is('a stock-out posted BEFORE that note but read after it still applies', public.pb_stock_save(t_id(70), '{"in_stock": false, "temp_out_at": null, "said_at": "2026-11-10T17:30:00Z"}')::text, '1');
+select t_is('… out of stock, and the later note is kept', (select in_stock::text || ' ' || temp_out_at::text || ' ' || stock_said_at::text from pb_products where id = t_id(70)), 'false 2026-11-10 18:00:00+00 2026-11-10 17:30:00+00');
+select t_is('a temporary note older than the word on record is refused', public.pb_stock_save(t_id(70), '{"temp_out_at": "2026-11-10T12:00:00Z", "as_of": "2026-11-10T12:00:00Z"}')::text, '-2');
+select t_is('an older note never replaces a newer one', public.pb_stock_save(t_id(70), '{"temp_out_at": "2026-11-10T17:45:00Z", "as_of": "2026-11-10T17:45:00Z"}')::text || ' ' || (select temp_out_at::text from pb_products where id = t_id(70)), '0 2026-11-10 18:00:00+00');
+select t_is('a new post older than the note brings the product back and leaves the note', public.pb_stock_save(t_id(70), '{"in_stock": true, "temp_out_at": null, "said_at": "2026-11-10T17:40:00Z"}')::text, '1');
+select t_is('… in stock, note kept', (select in_stock::text || ' ' || temp_out_at::text from pb_products where id = t_id(70)), 'true 2026-11-10 18:00:00+00');
+-- the Stock switch. OFF is the latest word as of the tap; ON claims no time (second review, 1: a tap silenced a notice that had not arrived yet)
+select t_is('switched OFF by a person: always applies', public.pb_stock_save(t_id(70), '{"in_stock": false, "said_at": "2026-11-10T20:00:00Z", "force": true}')::text, '1');
+select t_is('… a new post from before the tap does not bring it back', public.pb_stock_save(t_id(70), '{"in_stock": true, "temp_out_at": null, "said_at": "2026-11-10T19:00:00Z"}')::text, '-2');
+select t_is('switched ON by a person: always applies', public.pb_stock_save(t_id(70), '{"in_stock": true, "perm_out_at": null, "said_at": null}')::text, '1');
+select t_is('… and the time on record is forgotten', (select in_stock::text || '/' || coalesce(stock_said_at::text, 'null') from pb_products where id = t_id(70)), 'true/null');
+select t_is('a notice posted before the tap, read after it, still applies', public.pb_stock_save(t_id(70), '{"in_stock": false, "temp_out_at": null, "said_at": "2026-11-10T11:00:00Z"}')::text, '1');
+select t_is('… out of stock, with the notice''s time on record', (select in_stock::text || ' ' || stock_said_at::text from pb_products where id = t_id(70)), 'false 2026-11-10 11:00:00+00');
 rollback;
 
 -- Every check above printed a line: a part that silently printed nothing would be a failure too.
-select case when last_value = 106 then 'ok   every check ran (106)' else 'FAIL the number of checks is ' || last_value || ', not 106: a part printed fewer lines than it has, or this number was not updated' end from public.t_checks;
+select case when last_value = 133 then 'ok   every check ran (133)' else 'FAIL the number of checks is ' || last_value || ', not 133: a part printed fewer lines than it has, or this number was not updated' end from public.t_checks;
 drop function public.t_refused(text, text); drop function public.t_is(text, text, text); drop function public.t_rel(uuid, uuid); drop function public.t_product(int, uuid, text, text, int, numeric, text); drop function public.t_id(int);
 drop sequence public.t_checks;
