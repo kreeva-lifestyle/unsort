@@ -46,16 +46,17 @@ type Stock = { id: string; in_stock: boolean; perm_out_at: string | null };
 export const offSale = (l: Pick<Due, 'status' | 'shopify_product_id' | 'shopify_status'>) =>
   !l.shopify_product_id || (l.status === 'skipped' && ['DRAFT', 'ARCHIVED'].includes(l.shopify_status || ''));
 /** The same as a PostgREST filter (pb_stock_save marks by this rule too). */
-const ON_SALE = 'shopify_product_id=not.is.null&or=(status.neq.skipped,shopify_status.is.null,shopify_status.not.in.(DRAFT,ARCHIVED))';
+export const ON_SALE = 'shopify_product_id=not.is.null&or=(status.neq.skipped,shopify_status.is.null,shopify_status.not.in.(DRAFT,ARCHIVED))';
 
 /** What each size of the Shopify product is set to: counted, and sellable at a count of zero only while in stock. */
 export const stockVariants = (ids: string[], inStock: boolean) =>
   ids.map(id => ({ id, inventoryPolicy: inStock ? 'CONTINUE' : 'DENY', inventoryItem: { tracked: true } }));
 
-/** Archive a permanently sold-out product once none of its listings is still on sale on Shopify. */
-export async function retire(productId: string): Promise<void> {
+/** Archive a permanently sold-out product once none of its listings is still on sale on Shopify. `run`: the vendor's
+ *  notice this is part of, as a bulk change (bulkLog.ts). */
+export async function retire(productId: string, run?: string | null): Promise<void> {
   const left = await sel<{ id: string }>(`pb_listings?product_id=eq.${enc(productId)}&${ON_SALE}&select=id&limit=1`);
-  if (!left.length) await patch('pb_products', `id=eq.${enc(productId)}&status=in.(ready,needs_info,new)&in_stock=eq.false&perm_out_at=not.is.null`, { status: 'archived' });
+  if (!left.length) await patch('pb_products', `id=eq.${enc(productId)}&status=in.(ready,needs_info,new)&in_stock=eq.false&perm_out_at=not.is.null`, { status: 'archived' }, 'id', run);
 }
 
 /** The worker's sweep: a permanent stock-out whose archive did not happen when its last listing left Shopify (that

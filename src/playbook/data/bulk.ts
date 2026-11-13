@@ -1,7 +1,11 @@
 // The log of bulk changes (Settings → Bulk changes; owner, 2026-11-12). A
 // bulk change is one tap that changes many products or listings: an import,
 // "Send matching products now", "Re-price", "Retry all", "Read again",
-// "Archive the copies". The
+// "Archive the copies"; a change to the tag lists that reaches two or more
+// products (delete or merge a value, delete an attribute, a category's
+// must-have tags, the category list, suggestions handled together, "Retag
+// all", "Let AI decide"); and a vendor's stock notice that marks two or more
+// products (pb-products bulkLog.ts). The
 // server records each one with the rows it changed (pb_bulk_runs /
 // pb_bulk_items) and can take it back for 7 days: only the rows that are
 // still as the change left them; what somebody changed since is left alone.
@@ -10,7 +14,8 @@
 import { supabase } from '../../lib/supabase';
 import { pbCall } from './pbFunctions';
 
-export type BulkKind = 'import' | 'route_site' | 'reprice_site' | 'retry_failed' | 'reread_failed' | 'reread' | 'copies';
+export type BulkKind = 'import' | 'route_site' | 'reprice_site' | 'retry_failed' | 'reread_failed' | 'reread' | 'copies'
+  | 'retag' | 'tag_fill' | 'value_delete' | 'value_merge' | 'attribute_delete' | 'categories' | 'category_links' | 'suggestions' | 'stock_notice';
 export type BulkStatus = 'running' | 'done' | 'reverted' | 'partly_reverted';
 /** Counts by name (restored, changed, busy…): which ones a kind has is in components/settings/bulkText.ts. */
 export type BulkCounts = Record<string, number>;
@@ -23,6 +28,8 @@ export interface PbBulkRun {
 
 /** A bulk change can be taken back for this many days, and is listed that long. */
 export const BULK_DAYS = 7;
+/** Said before a change that will be listed (a confirmation's last sentence). */
+export const TAKE_BACK = `If it was a mistake, Settings → Bulk changes takes it back for ${BULK_DAYS} days.`;
 const COLS = 'id,kind,label,items,status,details,created_at,finished_at,reverted_at,revert_result,'
   + 'by:profiles!pb_bulk_runs_created_by_fkey(full_name),reverter:profiles!pb_bulk_runs_reverted_by_fkey(full_name)';
 

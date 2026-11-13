@@ -28,9 +28,10 @@ export async function productValues(productId: string): Promise<PvRow[]> {
   return rows.map(r => ({ value_id: r.value_id, source: r.source, attribute_id: r.pb_attribute_values?.attribute_id ?? '' }));
 }
 
-/** Write values in one transaction and re-apply the gate; returns the product's new status. */
-export async function writeValues(productId: string, rows: { value_id: string; source: string }[], mode: 'auto' | 'manual' | 'add', attributeIds?: string[]): Promise<Refreshed | null> {
-  const r = await rpc<Refreshed[]>('pb_product_values_set', { p_product: productId, p_rows: rows, p_mode: mode, p_attributes: attributeIds ?? null });
+/** Write values in one transaction and re-apply the gate; returns the product's new status. `run`: the bulk change this
+ *  write belongs to (bulkLog.ts), so it can be taken back. */
+export async function writeValues(productId: string, rows: { value_id: string; source: string }[], mode: 'auto' | 'manual' | 'add', attributeIds?: string[], run?: string | null): Promise<Refreshed | null> {
+  const r = await rpc<Refreshed[]>('pb_product_values_set', { p_product: productId, p_rows: rows, p_mode: mode, p_attributes: attributeIds ?? null }, run);
   return r?.[0] ?? null;
 }
 
@@ -41,11 +42,11 @@ export async function refresh(ids: string[]): Promise<Refreshed[]> {
   return out;
 }
 
-/** Best effort: a failed suggestion write is logged, never fails the read / ingest it rides on. */
-export async function suggestFor(productId: string | null, list: Suggest[], tax: Taxonomy): Promise<void> {
+/** Best effort: a failed suggestion write is logged, never fails the read / ingest it rides on. `run`: as writeValues. */
+export async function suggestFor(productId: string | null, list: Suggest[], tax: Taxonomy, run?: string | null): Promise<void> {
   const rows = suggestable(list, taxValues(tax)).map(s => ({ ...s, product_id: productId }));
   if (!rows.length) return;
-  try { await rpc('pb_tag_suggest', { p_rows: rows }); } catch (e) { console.error(`pb-products pb_tag_suggest ${productId}: ${plain(e)}`); }
+  try { await rpc('pb_tag_suggest', { p_rows: rows }, run); } catch (e) { console.error(`pb-products pb_tag_suggest ${productId}: ${plain(e)}`); }
 }
 
 type Facts = Pick<ProductRow, 'id' | 'name' | 'raw_text' | 'fabric' | 'color' | 'attributes' | 'category' | 'locked'>;

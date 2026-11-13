@@ -112,7 +112,7 @@ test('preview asks the database without changing anything; revert passes who and
   const run = { id: RUN, kind: 'route_site', label: 'Sent matching products to Arya Store', status: 'done', website_id: SITE, created_at: new Date().toISOString(), details: {} };
   let calls = world((m, u) => (m === 'GET' && u.startsWith('/rest/v1/pb_bulk_runs') ? [run] : u === '/rest/v1/rpc/pb_bulk_revert' ? { kind: 'route_site', label: run.label, aside: 40, live: 12, off: 1, gone: 0, busy: 0 } : undefined));
   assert.deepEqual(await bulkPreview({ run_id: RUN }), { ok: true, kind: 'route_site', aside: 40, live: 12, off: 1, gone: 0, busy: 0 });
-  assert.deepEqual(calls.find(c => c.u === '/rest/v1/rpc/pb_bulk_revert').body, { p_run: RUN, p_apply: false });
+  assert.deepEqual(calls.find(c => c.u === '/rest/v1/rpc/pb_bulk_revert').body, { p_run: RUN, p_apply: false, p_note: REVERTED }); // the same note as the revert: the counts find listings by it
   calls = world((m, u) => (m === 'GET' && u.startsWith('/rest/v1/pb_bulk_runs') ? [run] : u === '/rest/v1/rpc/pb_bulk_revert' ? { kind: 'route_site', label: run.label, aside: 40, live: 12, off: 1, gone: 0, busy: 0 } : undefined));
   assert.deepEqual(await bulkRevert({ run_id: RUN }, 'u1'), { ok: true, kind: 'route_site', aside: 40, live: 12, off: 1, gone: 0, busy: 0 });
   assert.deepEqual(calls.find(c => c.u === '/rest/v1/rpc/pb_bulk_revert').body, { p_run: RUN, p_apply: true, p_user: 'u1', p_note: REVERTED });

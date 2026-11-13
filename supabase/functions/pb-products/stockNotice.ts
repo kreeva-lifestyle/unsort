@@ -35,6 +35,12 @@
 // A product is only ever taken for a notice on its FIRST read, when nobody has
 // typed anything into it and the reader found no price in it: a product that
 // is already in use is never renamed or archived by a later read.
+// A notice that marks two or more products is a bulk change (bulkLog.ts):
+// Settings → Bulk changes takes it back for 7 days — each product gets back
+// the stock it had where its stock is still as the notice left it, and the
+// listings a permanent notice took off the websites go back (the notice's own
+// row is not part of it: it stays as it is).
+import { endRun, startRun } from './bulkLog.ts';
 import { enc, logActivity, nowIso, patch, rpc } from './db.ts';
 import { HttpError } from './http.ts';
 import { NEWER, saidAt, saveStock, takeOffSale } from './stock.ts';
@@ -104,24 +110,29 @@ export async function stockNotice(p: ProductRow, n: Notice | null | undefined, p
   if (!n || !items.length || p.source === 'import' || p.ai_read_at || (p.locked || []).length || Number(price) > 0) return null;
   const lines: string[] = [], kind: Notice['kind'] = n.kind === 'temporary' || n.kind === 'permanent' ? n.kind : 'unknown';
   const said = saidAt(p);
-  let marked = 0, left = 0;
-  for (const it of items) {
-    const r = pick(it, await rpc<Cand[]>('pb_stock_candidates', { p_vendor: p.vendor_id, p_code: it.code }) || []);
-    const again: Cand[] = [];
-    for (const c of r.apply) {
-      const res = kind === 'temporary' // a note only, dated when the vendor said it: the product stays on sale, Shopify is not touched
-        ? await saveStock({ id: c.id }, { temp_out_at: said, as_of: said }, { temporary: true, notice: p.id }, userId)
-        : kind === 'permanent' // archived on Shopify and in Playbook
-          ? await takeOffSale({ id: c.id }, { notice: p.id }, userId, said)
-          // out of stock — said in full, whatever the look-up above showed (another post may have been read meanwhile)
-          : await saveStock({ id: c.id }, { in_stock: false, temp_out_at: null, said_at: said }, { notice: p.id, kind }, userId);
-      if (res === NEWER) again.push(c); else if (res >= 0) marked++;
-    }
-    r.apply = r.apply.filter(c => !again.includes(c));
-    if (r.left) left++;
-    lines.push(noticeLine(it, r, kind, again));
-  }
   const name = `Stock notice${kind === 'unknown' ? '' : ` (${kind})`}: ${items.map(i => `${i.code}${i.colours?.length ? ` ${i.colours.join(', ')}` : ''}`).join('; ')}`.replace(/\s+/g, ' ').slice(0, 200);
+  const run = await startRun('stock_notice', name, { userId });
+  let marked = 0, left = 0;
+  try {
+    for (const it of items) {
+      const r = pick(it, await rpc<Cand[]>('pb_stock_candidates', { p_vendor: p.vendor_id, p_code: it.code }) || []);
+      const again: Cand[] = [];
+      for (const c of r.apply) {
+        const res = kind === 'temporary' // a note only, dated when the vendor said it: the product stays on sale, Shopify is not touched
+          ? await saveStock({ id: c.id }, { temp_out_at: said, as_of: said }, { temporary: true, notice: p.id }, userId, false, run)
+          : kind === 'permanent' // archived on Shopify and in Playbook
+            ? await takeOffSale({ id: c.id }, { notice: p.id }, userId, said, run)
+            // out of stock — said in full, whatever the look-up above showed (another post may have been read meanwhile)
+            : await saveStock({ id: c.id }, { in_stock: false, temp_out_at: null, said_at: said }, { notice: p.id, kind }, userId, false, run);
+        if (res === NEWER) again.push(c); else if (res >= 0) marked++;
+      }
+      r.apply = r.apply.filter(c => !again.includes(c));
+      if (r.left) left++;
+      lines.push(noticeLine(it, r, kind, again));
+    }
+  } finally {
+    await endRun(run, { notice: kind, notice_id: p.id, codes: items.length, marked, left });
+  }
   const saved = await patch<ProductRow>('pb_products', `id=eq.${enc(p.id)}&status=eq.reading`,
     { name, status: left ? 'needs_info' : 'archived', intake_notes: lines.slice(0, 20), ai_read_at: nowIso(), ai_error: null, claimed_at: null }, PRODUCT_COLS);
   if (!saved[0]) throw Object.assign(new HttpError(409, 'The product changed while it was being read — open it again.'), { usd: ai.usd }); // paid for: counted with the failure

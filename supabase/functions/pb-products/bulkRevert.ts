@@ -12,12 +12,15 @@
 //     Kept and said: products on a store, products somebody typed into.
 //   reread — after the fields are back, the tag rules run again for them.
 // A listing that is live on its store is not hidden here: it is marked, and
-// the worker takes it off (takeOff.ts).
+// the worker takes it off (takeOff.ts). A vendor's stock notice: the database
+// finds the listings it took off the websites by their note (PERM_NOTE); one
+// archived on Shopify is sent again and made visible (publish.ts put_back).
 import { type Body, uuid } from './actions.ts';
-import { REVERTED, settledRun, type RunRow } from './bulkLog.ts';
+import { REVERTED, TAG_KINDS, netRows, settledRun, type RunRow, type TagKind } from './bulkLog.ts';
 import { enc, logActivity, remove, rpc, sel } from './db.ts';
 import { HttpError } from './http.ts';
 import { removeFiles } from './productDelete.ts';
+import { PERM_NOTE } from './stockSend.ts';
 import { retagProducts } from './tagsProduct.ts';
 
 type Counts = Record<string, number>;
@@ -36,17 +39,37 @@ async function runOf(b: Body): Promise<RunRow> {
   return r;
 }
 
+/** The note on the listings the change took off a website, by which the database finds them. */
+const noteOf = (r: RunRow) => (r.kind === 'stock_notice' ? PERM_NOTE : REVERTED);
+
+/** What a tag change did to the lists that the database's counts leave out: the category links and the category list it
+ *  changed, and the suggestions it changed that were there before it (one it added stays in the queue). Read before a
+ *  revert, which marks the record settled. */
+async function listCounts(r: RunRow): Promise<Counts> {
+  if (!TAG_KINDS.includes(r.kind as TagKind)) return {};
+  let links = 0, suggestions = 0, list = 0;
+  for (const n of await netRows(r.id, ['pb_category_attributes', 'pb_tag_suggestions', 'pb_settings'], true)) {
+    if (!n.changed) continue;
+    if (n.tbl === 'pb_category_attributes') links++;
+    else if (n.tbl === 'pb_tag_suggestions') { if (n.before) suggestions++; }
+    else list = 1;
+  }
+  return { links, suggestions, list };
+}
+
 export async function bulkPreview(b: Body) {
   const r = await runOf(b);
-  const res = await rpc<Record<string, unknown>>('pb_bulk_revert', { p_run: r.id, p_apply: false });
-  return { ok: true, kind: r.kind, ...counts(res) };
+  const extra = await listCounts(r);
+  const res = await rpc<Record<string, unknown>>('pb_bulk_revert', { p_run: r.id, p_apply: false, p_note: noteOf(r) });
+  return { ok: true, kind: r.kind, ...counts(res), ...extra };
 }
 
 export async function bulkRevert(b: Body, userId: string | null) {
   const r = await runOf(b);
   if (r.kind === 'import') return revertImport(r, userId);
-  const res = await rpc<Record<string, unknown>>('pb_bulk_revert', { p_run: r.id, p_apply: true, p_user: userId, p_note: REVERTED });
-  const done = counts(res);
+  const extra = await listCounts(r);
+  const res = await rpc<Record<string, unknown>>('pb_bulk_revert', { p_run: r.id, p_apply: true, p_user: userId, p_note: noteOf(r) });
+  const done = { ...counts(res), ...extra };
   if (r.kind === 'reread') { // the tags the rules read off the name, colour and details follow the text that is back
     const ids = Array.isArray(res.ids) ? res.ids.map(String) : [];
     for (let i = 0; i < ids.length; i += 50) await retagProducts(ids.slice(i, i + 50));

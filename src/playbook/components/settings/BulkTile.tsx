@@ -25,7 +25,7 @@ function Row({ r, canEdit, onRevert }: { r: PbBulkRun; canEdit: boolean; onRever
     <li style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', padding: '12px 0', borderTop: `1px solid ${PB.tileBd}`, minWidth: 0 }}>
       <div style={{ flex: '1 1 240px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
         <span style={{ ...pbBody, fontWeight: 600, overflowWrap: 'anywhere' }}>{r.label}</span>
-        <span style={pbMeta}>{rows(r.kind, r.items)} · {istDate(r.created_at)}{r.by?.full_name ? ` · by ${r.by.full_name}` : ''}</span>
+        <span style={pbMeta}>{r.status === 'running' && !r.items ? '' : `${rows(r.kind, r.items, r.details?.unit)} · `}{istDate(r.created_at)}{r.by?.full_name ? ` · by ${r.by.full_name}` : ''}</span>
         {r.status === 'running' && <Dot color={PB.review} label="Still running" />}
         {r.status === 'done' && <span style={pbMeta}>Can be taken back until {istDate(until(r))}</span>}
         {r.status !== 'running' && r.status !== 'done' && (
@@ -53,7 +53,7 @@ export default function BulkTile({ addToast, canEdit }: { addToast: AddToast; ca
   return (
     <PbTile as="section" variant={err && !runs ? 'failed' : 'default'}>
       <PbSection title="Bulk changes" id="pbs-bulk" right={runs ? <PbButton icon="refresh" onClick={() => void load()} busy={busy} busyLabel="Refreshing…">Refresh</PbButton> : null}
-        hint={`Every change made to many products or listings at once in the last ${BULK_DAYS} days: imports, Send matching products, Re-price, Retry all, Read again, Archive the copies. A revert puts back only what is still as that change left it; anything changed by hand since is left alone.${canEdit ? '' : ' An admin or manager can revert.'}`}>
+        hint={`Every change made to many products or listings at once in the last ${BULK_DAYS} days: imports, Send matching products, Re-price, Retry all, Read again, Archive the copies, changes to the tag lists, Retag all, Let AI decide, and vendors' stock notices. A revert puts back only what is still as that change left it; anything changed by hand since is left alone.${canEdit ? '' : ' An admin or manager can revert.'}`}>
         {!runs && !err && (
           <div aria-busy="true" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <span className="pb-sr" role="status">Loading bulk changes</span>

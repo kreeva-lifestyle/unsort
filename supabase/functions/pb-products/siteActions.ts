@@ -2,10 +2,11 @@
 // preview_price. Credentials are write-only: stored in pb_website_secrets
 // (service role only) and never sent back to the app.
 import { type Body, uuid } from './actions.ts';
-import { enc, insert, logActivity, one, patch } from './db.ts';
+import { countRows, enc, insert, logActivity, one, patch } from './db.ts';
 import { HttpError, plain } from './http.ts';
 import { computePrice } from './pricing.ts';
 import { secretsOf, testConnection } from './shopify.ts';
+import { ON_SALE } from './stockSend.ts';
 import { WEBSITE_COLS, type WebsiteRow } from './types.ts';
 
 async function site(b: Body): Promise<WebsiteRow> {
@@ -19,13 +20,19 @@ export async function saveCredentials(b: Body, userId: string | null) {
   const mode = String(b.auth_mode || '');
   if (!['token', 'client_credentials'].includes(mode)) throw new HttpError(400, "auth_mode must be 'token' or 'client_credentials'.");
   const val = (v: unknown) => String(v ?? '').trim();
+  const count = (k: number, word: string) => `${k} ${k === 1 ? word : `${word}s`}`;
   const tok = val(b.access_token), cid = val(b.client_id), csec = val(b.client_secret);
   if ([tok, cid, csec].some(x => x.length > 500)) throw new HttpError(400, 'One of the credentials is too long — paste just the value.');
   // Moving the website to another store: new credentials only, nothing of the
   // old store may follow it (secrets, Online Store id, product ids).
+  // Not while products of it are on the old store (bulk-change log, part 2): they would stay there, out of Playbook's
+  // reach — no stock, price or "sold out" would reach them again — and the move cannot be taken back. A new store is
+  // added as a new website instead; this one keeps serving the old store.
   const newDomain = val(b.shop_domain).toLowerCase();
   if (newDomain && newDomain !== w.shop_domain.toLowerCase()) {
     if (!/^[a-z0-9][a-z0-9-]*\.myshopify\.com$/.test(newDomain)) throw new HttpError(400, 'Use the store\'s myshopify address, like your-store.myshopify.com.');
+    const onStore = await countRows(`pb_listings?select=id&website_id=eq.${enc(w.id)}&${ON_SALE}`);
+    if (onStore) throw new HttpError(409, `${count(onStore, 'product')} of this website ${onStore === 1 ? 'is' : 'are'} on ${w.shop_domain}. Moved to another store, ${onStore === 1 ? 'it' : 'they'} would stay there, and Playbook could no longer change ${onStore === 1 ? 'its' : 'their'} stock or price. Add the new store as a new website instead, or take ${onStore === 1 ? 'it' : 'them'} off this website first (Remove from site).`);
     if (mode === 'token' ? !tok : !(cid && csec)) throw new HttpError(400, 'A new store needs its own credentials — paste them for the new store.');
     if (await one(`pb_websites?shop_domain=ilike.${enc(newDomain)}&id=neq.${enc(w.id)}&select=id`)) throw new HttpError(409, 'Another website already uses that store.');
     await patch('pb_websites', `id=eq.${enc(w.id)}`, { shop_domain: newDomain, active: false, connected_at: null, shop_name: null, last_error: null });

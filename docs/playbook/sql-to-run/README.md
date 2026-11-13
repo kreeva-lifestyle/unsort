@@ -10,17 +10,9 @@ by hand once:
 3. Tell Claude it is done. Claude checks it, moves the file to
    `supabase/migrations/` and ships the code that uses it.
 
-| File | What it adds | Tested |
-|---|---|---|
-| `20261113090000_pb_bulk_log_tags_stock.sql` | Bulk-change log, part 2: changes to the tag lists and a vendor's stock notice are recorded and can be reverted | On a local PostgreSQL 16 with `supabase/tests/sql/run.sh`: every scenario returns the data exactly to its start |
+Nothing is waiting right now.
 
-Until it is run, those two kinds of change are simply not in the log;
-nothing that is live depends on it.
-
-The file also carries the full "take it back" entry point (`pb_bulk_revert`),
-including the `copies` kind that `20261113120000_pb_copies.sql` added later.
-That migration leaves the entry point alone when this file has already been
-run, so the two can be applied in either order. Always paste the file as it
-is on `main` now: a copy saved before 13 Nov 2026 has no `copies` kind in it,
-and "Archive the copies" could then not be reverted (the copies migration
-refuses to install over such a copy and says so).
+The last file here, `20261113090000_pb_bulk_log_tags_stock.sql` (bulk-change
+log, part 2: changes to the tag lists and a vendor's stock notice are
+recorded and can be reverted), was run on the live database on 13 Nov 2026
+and moved to `supabase/migrations/` with the code that uses it.

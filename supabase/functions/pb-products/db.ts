@@ -64,9 +64,9 @@ export async function patch<T>(table: string, filter: string, body: Record<strin
   return await r.json() as T[];
 }
 
-/** DELETE the rows matching `filter` (always pass one). */
-export async function remove(table: string, filter: string): Promise<void> {
-  const r = await fetch(`${SB_URL}/rest/v1/${table}?${filter}`, { method: 'DELETE', headers: svcHeaders });
+/** DELETE the rows matching `filter` (always pass one). `run`: the bulk change this belongs to (bulkLog.ts). */
+export async function remove(table: string, filter: string, run?: string | null): Promise<void> {
+  const r = await fetch(`${SB_URL}/rest/v1/${table}?${filter}`, { method: 'DELETE', headers: { ...svcHeaders, ...tagged(run) } });
   if (!r.ok) await dbFail(r, 'refused the delete');
 }
 

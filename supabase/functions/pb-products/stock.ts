@@ -37,9 +37,10 @@ export const NEWER = -2;
 export const saidAt = (p: { source_posted_at?: string | null; created_at: string }) => new Date(p.source_posted_at || p.created_at).toISOString();
 
 /** Save the change and mark the listings on sale on Shopify (one transaction). Returns how many stores are owed it
- *  (with `now`: how many of them it reached at once), -1 when the product is gone, or NEWER when a newer word stands. */
-export async function saveStock(p: { id: string }, ch: StockChange, note: Record<string, unknown>, userId: string | null, now = false): Promise<number> {
-  const owed = Number(await rpc<number>('pb_stock_save', { p_product: p.id, p_change: ch }));
+ *  (with `now`: how many of them it reached at once), -1 when the product is gone, or NEWER when a newer word stands.
+ *  `run`: the vendor's notice this is part of, as a bulk change that can be taken back (bulkLog.ts). */
+export async function saveStock(p: { id: string }, ch: StockChange, note: Record<string, unknown>, userId: string | null, now = false, run?: string | null): Promise<number> {
+  const owed = Number(await rpc<number>('pb_stock_save', { p_product: p.id, p_change: ch }, run));
   if (!(owed >= 0)) return owed === NEWER ? NEWER : -1;
   const { force: _force, ...shown } = ch;
   await logActivity({ product_id: p.id, action: 'stock', details: { ...shown, ...note, resent: owed }, user_id: userId });
@@ -47,13 +48,13 @@ export async function saveStock(p: { id: string }, ch: StockChange, note: Record
 }
 
 /** A permanent stock-out, said at `said`. Returns how many listings are to be archived on Shopify, -1 when the product
- *  is gone, or NEWER when a newer word about its stock stands (nothing is done then). */
-export async function takeOffSale(p: { id: string }, note: Record<string, unknown>, userId: string | null, said?: string): Promise<number> {
-  const owed = Number(await rpc<number>('pb_stock_save', { p_product: p.id, p_change: { in_stock: false, temp_out_at: null, perm_out_at: nowIso(), ...(said ? { said_at: said } : {}) } }));
+ *  is gone, or NEWER when a newer word about its stock stands (nothing is done then). `run`: as saveStock. */
+export async function takeOffSale(p: { id: string }, note: Record<string, unknown>, userId: string | null, said?: string, run?: string | null): Promise<number> {
+  const owed = Number(await rpc<number>('pb_stock_save', { p_product: p.id, p_change: { in_stock: false, temp_out_at: null, perm_out_at: nowIso(), ...(said ? { said_at: said } : {}) } }, run));
   if (!(owed >= 0)) return owed === NEWER ? NEWER : -1;
-  await patch('pb_listings', `product_id=eq.${enc(p.id)}&shopify_product_id=is.null&or=(status.in.(queued,review,failed),and(status.eq.publishing,claimed_at.is.null))`, { status: 'skipped', error: PERM_NOTE, attempts: 0, claimed_at: null });
+  await patch('pb_listings', `product_id=eq.${enc(p.id)}&shopify_product_id=is.null&or=(status.in.(queued,review,failed),and(status.eq.publishing,claimed_at.is.null))`, { status: 'skipped', error: PERM_NOTE, attempts: 0, claimed_at: null }, 'id', run);
   await logActivity({ product_id: p.id, action: 'stock', details: { in_stock: false, permanent: true, ...note, resent: owed }, user_id: userId });
-  await retire(p.id);
+  await retire(p.id, run);
   return owed;
 }
 

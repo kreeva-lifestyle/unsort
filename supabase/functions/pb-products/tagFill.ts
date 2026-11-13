@@ -11,7 +11,8 @@
 // (pb_products_refresh); a product that becomes Ready is routed (now on the
 // product page, by the worker's route_due step otherwise).
 import { askClaude } from './ai.ts';
-import { enc, getSettings, logActivity, one, patch, rpc, sel } from './db.ts';
+import { endRun, fillOver } from './bulkLog.ts';
+import { ago, enc, getSettings, logActivity, nowIso, one, patch, rpc, sel } from './db.ts';
 import { plain, usdOf } from './http.ts';
 import { aiPhotos } from './photos.ts';
 import { IMPORTED_TEXT } from './readerPrompt.ts';
@@ -38,8 +39,9 @@ function fillText(p: ProductRow, categories: string[]): string {
 
 export interface FillResult { filled: string[]; left: string[]; refreshed: Refreshed | null; usd: number }
 
-/** Fill one product's empty required attributes. `manual` = a person asked on the product page. */
-export async function fillOne(p: ProductRow, tax: Taxonomy, o: { manual: boolean; userId: string | null; budget: Budget }): Promise<FillResult> {
+/** Fill one product's empty required attributes. `manual` = a person asked on the product page. `run`: the queued
+ *  "Let AI decide" this belongs to, as a bulk change (its id is the fill run's: tagsQueue.ts). */
+export async function fillOne(p: ProductRow, tax: Taxonomy, o: { manual: boolean; userId: string | null; budget: Budget; run?: string | null }): Promise<FillResult> {
   const have = new Set((await productValues(p.id)).map(v => v.attribute_id));
   const target = attrsFor(tax, p.category).filter(a => !have.has(a.id) && a.values.length);
   if (!target.length) return { filled: [], left: [], refreshed: (await rpc<Refreshed[]>('pb_products_refresh', { p_ids: [p.id] }))[0] ?? null, usd: 0 };
@@ -56,9 +58,9 @@ export async function fillOne(p: ProductRow, tax: Taxonomy, o: { manual: boolean
   });
   const r = readTags(spec, ai.data);
   const rows = target.flatMap(a => (r.chosen[a.id] ?? []).map(value_id => ({ value_id, source: 'ai' })));
-  const refreshed = await writeValues(p.id, rows, 'add');
+  const refreshed = await writeValues(p.id, rows, 'add', undefined, o.run);
   const filled = target.filter(a => r.chosen[a.id]?.length).map(a => a.name);
-  await suggestFor(p.id, r.other.map(x => ({ phrase: x.phrase, key: tagKey(x.phrase), attribute_id: x.attribute_id, source: 'ai' as const })), tax);
+  await suggestFor(p.id, r.other.map(x => ({ phrase: x.phrase, key: tagKey(x.phrase), attribute_id: x.attribute_id, source: 'ai' as const })), tax, o.run);
   const left = refreshed?.missing ?? target.filter(a => !r.chosen[a.id]?.length).map(a => a.name);
   await logActivity({ product_id: p.id, action: 'tags_filled', details: { model: ai.model, usd: ai.usd, filled, left, manual: o.manual }, user_id: o.userId });
   return { filled, left, refreshed, usd: ai.usd };
@@ -67,15 +69,18 @@ export async function fillOne(p: ProductRow, tax: Taxonomy, o: { manual: boolean
 /** Worker step: one queued product. It leaves the queue FIRST, and that is the claim: worker runs can
  *  overlap (one starts every minute, each may take over two), and only the run whose patch returns the row
  *  fills the product and ticks the run. Returns false when another run had taken it. Once taken it is
- *  always ticked (an AI error counts as "left empty"). */
+ *  always ticked (an AI error counts as "left empty"). The values are written as part of the queue's bulk
+ *  change — only while that is open: a write tagged with a change that is not in the log is refused. The change is
+ *  closed by the worker once the queue is over (closeFills). */
 export async function fillQueued(c: { id: string; tag_fill_run: string }, tax: Taxonomy, userId: string | null, budget: Budget): Promise<boolean> {
   const mine = await patch('pb_products', `id=eq.${enc(c.id)}&tag_fill_run=eq.${enc(c.tag_fill_run)}`, { tag_fill_run: null });
   if (!mine.length) return false;
-  let filled = 0, left = 0;
+  let filled = 0, left = 0, run: string | null = null;
   try {
+    run = (await one(`pb_bulk_runs?id=eq.${enc(c.tag_fill_run)}&status=eq.running&select=id`)) ? c.tag_fill_run : null;
     const p = await one<ProductRow>(`pb_products?id=eq.${enc(c.id)}&select=${PRODUCT_COLS}`);
     if (p && !(p.locked || []).includes('tags')) {
-      const r = await fillOne(p, tax, { manual: false, userId, budget });
+      const r = await fillOne(p, tax, { manual: false, userId, budget, run });
       filled = r.filled.length ? 1 : 0; left = r.left.length ? 1 : 0;
     }
   } catch (e) {
@@ -86,6 +91,20 @@ export async function fillQueued(c: { id: string; tag_fill_run: string }, tax: T
     await rpc('pb_tag_fill_tick', { p_run: c.tag_fill_run, p_filled: filled, p_left: left });
   }
   return true;
+}
+
+/** Worker step: close the queued "Let AI decide" runs that are over as bulk changes (bulkLog.ts fillOver: nothing waits,
+ *  and the last product was taken 5 minutes ago or more — never sooner, because a product another worker run took may
+ *  still be on its way, and a write tagged with a change that has left the log is refused). A run whose last products
+ *  were archived meanwhile is marked finished here, as fillStatus does. Returns how many it closed. */
+export async function closeFills(): Promise<number> {
+  let n = 0;
+  for (const r of await sel<{ id: string }>('pb_bulk_runs?kind=eq.tag_fill&status=eq.running&select=id&order=created_at.asc&limit=5')) {
+    if (await one(`pb_products?tag_fill_run=eq.${enc(r.id)}&status=in.(ready,needs_info)&select=id`)) continue; // still filling
+    await patch('pb_tag_fill_runs', `id=eq.${enc(r.id)}&finished_at=is.null&created_at=lt.${ago(2 * 60_000)}`, { finished_at: nowIso() });
+    if (await fillOver(r.id)) { await endRun(r.id); n++; }
+  }
+  return n;
 }
 
 /** Worker step: route products a tag change made Ready (route_due, set by pb_products_refresh), and those whose

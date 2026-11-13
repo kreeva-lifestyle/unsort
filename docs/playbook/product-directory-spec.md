@@ -951,7 +951,9 @@ paid service, no library.
   with no product at all is nothing to do. The notice row is renamed "Stock
   notice (kind): …", gets one line per item in `intake_notes`, and becomes
   `archived` when nothing is left, else `needs_info`. Guards: first read
-  only, nothing kept by hand, no price read, not an import.
+  only, nothing kept by hand, no price read, not an import. A notice that
+  marks two or more products is a bulk change (`stock_notice`, see "Bulk
+  changes" below): Settings → Bulk changes takes it back for 7 days.
   **Temporary is a note only (owner, same day: "If temporary word mentioned
   then ignore it. And just note that product as temporary which can be
   filterable; nothing is to be done")**: with `kind = temporary` the matched
@@ -1368,14 +1370,25 @@ A **bulk change** is one tap that changes many products or listings.
   running / done / reverted / partly_reverted, who, when, `revert_result`).
 - `pb_bulk_items`: every row the change touched, as it was (`before`) and as
   it became (`after`), with `done` once a revert has settled it.
-- The server opens a run (`bulkLog.ts startRun`) and passes its id to the
-  database calls that belong to it (`db.ts`: `patch(…, run)`,
-  `insert(…, { run })`), which sends the header `x-pb-bulk`. The trigger
-  `pb_bulk_capture` on `pb_listings` and `pb_products` writes the item in the
-  same transaction, and only for a call from the server that carries the
-  header (`pb_bulk_run()`), so a bulk change cannot go unrecorded and an
-  ordinary save costs one settings lookup. `endRun` closes the run; one that
-  touched nothing leaves the log.
+- The server opens a run (`bulkLog.ts startRun`, or `asBulk` around the
+  whole action) and passes its id to the database calls that belong to it
+  (`db.ts`: `patch(…, run)`, `insert(…, { run })`, `remove(…, run)`,
+  `rpc(…, run)`), which sends the header `x-pb-bulk`. The trigger
+  `pb_bulk_capture` on `pb_listings`, `pb_products` (including its stock
+  fields) and the six tag tables (`pb_attributes`, `pb_attribute_values`,
+  `pb_category_attributes`, `pb_product_values`, `pb_tag_suggestions`,
+  `pb_settings`) writes the item in the same transaction — also for the rows
+  a database function or a cascade changes — and only for a call from the
+  server that carries the header (`pb_bulk_run()`), so a bulk change cannot
+  go unrecorded and an ordinary save costs one settings lookup. `endRun`
+  closes the run; one that touched nothing leaves the log.
+- "Only those which are done in bulk": a tag-list change or a stock notice
+  stays in the log only when it reached **two or more products**, or (tag
+  lists) took two or more entries out of the lists at once (an attribute goes
+  with its values and links) or handled two or more suggestions at once
+  (`endRun` → `sizeOf`; `details.unit` says what `items` counts). Below that
+  it is an ordinary edit and leaves the log; one suggestion handled alone
+  opens no run at all.
 - An import's run has the import's own id; the runner asks for it on every
   tick, and every product it adds is recorded under it (`ingest(body, run)`).
 
@@ -1383,49 +1396,50 @@ A **bulk change** is one tap that changes many products or listings.
 Row by row, and **only where the row is still as the change left it**; what
 somebody changed since is left alone and counted. `apply = false` only counts
 (the sheet shows the counts before anyone confirms). Refused in plain words:
-still running, already reverted, older than 7 days, and (re-price, re-read) a
-later bulk change of the same kind that touched the same rows: that one is
-reverted first, so prices never end up as a mix that never existed. A row a
+still running, already reverted, older than 7 days, and (re-price, re-read,
+copies, stock notices, and all tag-list kinds together) a later bulk change of
+the same family that touched the same rows: that one is reverted first, so
+prices or tags never end up as a mix that never existed. A row a
 worker run holds right now is "busy": the run becomes `partly_reverted` and
 Revert can be tapped again for the rest.
 
 | kind | made by | revert |
 |---|---|---|
 | `import` | Import from website | the server deletes, 25 at a time with their photo files, the products it added that are on no store and that nobody typed into; products on a store or edited by hand are kept and said (`pb_bulk_import_targets`, `bulkRevert.ts`) |
-| `route_site` | Send matching products now, switching a website on | a listing not on the store is set aside with the note `REVERTED`; one that is live gets `unpublish_due` and the worker hides it on Shopify (DRAFT) within minutes (`takeOff.ts`, also while paused), then it carries the same note. Routing leaves such listings alone. "Send matching products now" queues the ones that never reached the store again; one that was hidden on the store is put back from its own page ("Put back on site", the only send that makes a hidden Shopify product visible), and the send says how many those are (`hidden`). A bulk put-back comes with part 2 (`put_back`) |
+| `route_site` | Send matching products now, switching a website on | a listing not on the store is set aside with the note `REVERTED`; one that is live gets `unpublish_due` and the worker hides it on Shopify (DRAFT) within minutes (`takeOff.ts`, also while paused), then it carries the same note. Routing leaves such listings alone. "Send matching products now" queues the ones that never reached the store again; one that was hidden on the store is put back from its own page ("Put back on site", the only send that makes a hidden Shopify product visible), and the send says how many those are (`hidden`). (`pb_listings.put_back`, "the next send also makes it visible", is used by a stock notice's revert only) |
 | `reprice_site` | Update prices on Shopify | price and compare-at price back; a published listing is sent again. The website's pricing rule is not touched |
 | `retry_failed` | Retry all | the listings nothing has picked up yet go back to Failed with their old message; what was already tried again stays |
 | `reread_failed` | Read again (unread products) | the products not read again yet go back to Needs info |
 | `copies` | Archive the copies (Products → Needs info) | earliest first, a product that is still archived AND would wait as a copy again goes back to Needs info; one that is no longer a copy of anything stays archived and is counted (`not_copies`), so a revert sends nothing to a website; one somebody restored or changed since is left alone. Looking first runs the same steps and undoes them (`pb_bulk_revert_copies`) |
 | `reread` | only from the log: the re-read of all products on 12 Nov 2026 | each field that read changed goes back where the product still holds what the read wrote and the field is not locked; the gate runs and the tag rules run again. The reader's log kept the first 200 characters of each old value, so the long notes of 105 products are not put back |
+| `value_delete`, `value_merge`, `attribute_delete`, `categories`, `category_links` | Settings → Tags: delete a value, merge two values, delete an attribute, save the category list, save a category's must-have tags (`tagsBulk.ts`) | one revert for every tag kind (`pb_bulk_revert_tags`): what the change deleted comes back and what it added goes, in the order the tables depend on each other (attributes → values and their "also known as" words → category links → products' values → suggestions → the category list); a value whose name is taken again, or a single-choice attribute that has another value on the product by now, is left and counted (`left`); a product whose tags a person set (or asked the AI to fill) since is left alone (`kept`). Every product it reached is checked again (Ready / Needs info). A preview runs the same code and is rolled back. The server adds what the database's counts leave out: links, the category list, suggestions (`listCounts`) |
+| `suggestions` | Settings → Tags → Suggestions, two or more handled at once (`tagsQueue.ts`) | as above: the suggestions as they were, a value made from one out again (unless a product uses it by now), the example products' tags as before. A suggestion the change added stays in the queue |
+| `retag` | Retag all (`tagsProduct.ts`) | as above: the products' tags as before |
+| `tag_fill` | Let AI decide, queued (`tagsQueue.ts`; the run has the fill run's id; the worker writes each product as part of it and closes it 5 minutes after the queue is over, never sooner: overlapping worker runs may still be writing a product they took, `tagFill.ts closeFills`) | as above: the AI's tags come off, the suggestions it counted as before |
+| `stock_notice` | a vendor's stock notice that marks two or more products (`stockNotice.ts`) | each product gets back the stock it had, where its stock is still as the notice left it (`changed` otherwise); after a PERMANENT notice it also comes out of the archive, and the listings the notice took off are put back: one archived on Shopify is sent again and made visible (`pb_listings.put_back`, cleared by that publish), one that only waited goes back to where it waited (`pb_bulk_revert_stock`; found by their note, `PERM_NOTE`). The notice's own row is not part of it |
 
 The two bulk changes of the week before the log existed were written into it
 from what was on record (`20261113070000_pb_bulk_log_backfill.sql`).
 
-### Not in the log yet
-Changes to the tag lists that reach many products (merge / delete a value or
-an attribute, category links, suggestions in bulk, "Retag all", "Let AI
-decide"), a vendor's stock notice, and moving a website to another store.
+### Not in the log
+- **Moving a website to another store** (Websites → Store connection, a new
+  myshopify address). It cannot be taken back in bulk, and the products on
+  the old store would stay there out of Playbook's reach. So it is refused
+  while any product of that website is on the old store (`siteActions.ts`,
+  the rule of `stockSend.ts ON_SALE`); the answer suggests adding the new
+  store as a new website. With nothing on the old store it works as before.
+- A change that reaches one product (see above) is an ordinary edit.
+- The tags a listing already carries on Shopify come from when it was
+  written: a tag change (or its revert) reaches the store when the listing is
+  written again.
 
-**Part 2, written and tested, waiting to be run** (2026-11-13). The database
-side for the tag lists and the stock notice is in
-`docs/playbook/sql-to-run/20261113090000_pb_bulk_log_tags_stock.sql`: the
-recording trigger on the six tag tables, one revert for every tag change
-(`pb_bulk_revert_tags`: what the change deleted comes back, what it added
-goes, in the order the tables depend on each other; a product tagged by hand
-since is left alone; a preview runs the same code and is rolled back), the
-stock-notice revert (`pb_bulk_revert_stock`) and `pb_listings.put_back`
-("this send also makes the product visible again"). It could not be applied
-from here: the automated path holds SQL that contains a `delete` for a
-confirmation that does not reach the owner. It was proven on a local
-PostgreSQL instead (`supabase/tests/sql/run.sh`): delete a value, merge
-two values, delete an attribute, change a category's tags and the category
-list, retag, a suggestion made into a value, a stock notice with out of
-stock / permanent / temporary lines. Every scenario returns the data exactly
-to its start, and a preview changes nothing. Once the owner has run the file,
-the server side follows (the tag actions and the notice open a run and mark
-their calls; a change that reaches fewer than two products is not bulk and
-leaves the log).
+Part 2 of the database side (`20261113090000_pb_bulk_log_tags_stock.sql`)
+was run by hand on the live database on 13 Nov 2026 (the automated path
+holds SQL that contains a `delete` for a confirmation that does not reach
+the owner) and is replayed in order like any migration. Its scenarios run on
+PostgreSQL with every change (`supabase/tests/sql/t_tags.sql`, `t_stock.sql`):
+every one returns the data exactly to its start, and a preview changes
+nothing.
 
 ### UI
 Settings → **Bulk changes** (`BulkTile`): the last 7 days, newest first:
@@ -1436,4 +1450,6 @@ change (`bulkText.ts plan`) and has one button; the server's refusal is shown
 instead of a button. "Retry all" and "Read again" only repeat a step that
 failed, so their button is "Stop the rest". The success messages of
 "Send matching products now" and "Update prices on Shopify" say where the
-change can be taken back.
+change can be taken back, and so do the confirmations of Delete and Merge on
+the Tags page when the change will be listed (two or more products, or an
+attribute with values: `TAKE_BACK`).

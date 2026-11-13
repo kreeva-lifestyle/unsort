@@ -6,6 +6,7 @@
 // may go back to Needs info). Save is the sheet's one gradient.
 import { useEffect, useState } from 'react';
 import { friendlyError } from '../../../lib/friendlyError';
+import { TAKE_BACK } from '../../data/bulk';
 import type { AddToast } from '../PbToasts';
 import { LookAlikeError, type TagsApi } from '../../data/tags';
 import type { PbAttrValue, PbAttribute, PbLookAlike } from '../../tagTypes';
@@ -44,7 +45,7 @@ export default function ValueSheet({ value, attr, api, addToast, onClose, onSave
   const merge = async () => {
     const to = others.find(v => v.id === into);
     if (!to) return;
-    const ok = await ask({ title: `Merge ${value.name} into ${to.name}?`, message: `Products with ${value.name} get ${to.name}, and “${value.name}” becomes another name for ${to.name}. This cannot be undone.`, confirmLabel: `Merge into ${to.name}` });
+    const ok = await ask({ title: `Merge ${value.name} into ${to.name}?`, message: `Products with ${value.name} get ${to.name}, and “${value.name}” becomes another name for ${to.name}. ${(value.uses ?? 0) >= 2 ? TAKE_BACK : 'This cannot be undone.'}`, confirmLabel: `Merge into ${to.name}` });
     if (!ok) return;
     setBusy('merge');
     try { const r = await api.mergeValue(value.id, to.id); addToast(`Merged — ${plural(r.moved ?? 0, 'product')} moved to ${to.name}`, 'success'); onSaved(); onClose(); }
@@ -52,7 +53,7 @@ export default function ValueSheet({ value, attr, api, addToast, onClose, onSave
   };
   const remove = async () => {
     const n = value.uses ?? 0;
-    const ok = await ask({ title: `Delete ${value.name}?`, message: n ? `${plural(n, 'product')} lose it; any that then have no ${attr.name} go back to Needs info.` : 'No product uses it yet.', confirmLabel: 'Delete', danger: true });
+    const ok = await ask({ title: `Delete ${value.name}?`, message: n ? `${plural(n, 'product')} lose${n === 1 ? 's' : ''} it; any that then have no ${attr.name} go back to Needs info.${n >= 2 ? ` ${TAKE_BACK}` : ''}` : 'No product uses it yet.', confirmLabel: 'Delete', danger: true });
     if (!ok) return;
     setBusy('delete');
     try { await api.deleteValue(value.id); addToast(`Deleted ${value.name}`, 'success'); onSaved(); onClose(); }

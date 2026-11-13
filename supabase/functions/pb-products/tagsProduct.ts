@@ -6,6 +6,7 @@
 //                      projected gate moves; apply writes in batches of 100 (pb_product_values_bulk)
 // retagProducts(ids): the same rules for a few products (after a suggestion became a value).
 import { uuid, type Body } from './actions.ts';
+import { asBulk } from './bulkLog.ts';
 import { enc, logActivity, one, patch, rpc, sel, selAll } from './db.ts';
 import { HttpError } from './http.ts';
 import { routeProduct } from './route.ts';
@@ -100,17 +101,21 @@ export async function retag(b: Body, userId: string | null) {
   }
   const sample = changes.filter(c => c.added.length || c.removed.length).slice(0, 10).map(({ name: n, added, removed }) => ({ name: n, added, removed }));
   if (dry) return { ok: true, dry_run: true, products, locked, changed: changes.length, ...gateMoves(moves), sample };
-  const done: Refreshed[] = [];
-  for (let i = 0; i < changes.length; i += 100) {
-    done.push(...await rpc<Refreshed[]>('pb_product_values_bulk', { p_rows: changes.slice(i, i + 100).map(c => ({ product_id: c.product_id, rows: c.rows })) }));
-  }
-  const real = gateMoves(done.map(r => ({ before: r.was, after: r.status })));
-  await logActivity({ action: 'tags_retagged', details: { products, changed: changes.length, locked, ...real }, user_id: userId });
-  return { ok: true, dry_run: false, products, locked, changed: changes.length, ...real, sample };
+  // A bulk change (Settings → Bulk changes takes it back for 7 days): every batch carries the run.
+  const out = await asBulk('retag', 'Retagged every product by the rules', userId, async (run) => {
+    const done: Refreshed[] = [];
+    for (let i = 0; i < changes.length; i += 100) {
+      done.push(...await rpc<Refreshed[]>('pb_product_values_bulk', { p_rows: changes.slice(i, i + 100).map(c => ({ product_id: c.product_id, rows: c.rows })) }, run));
+    }
+    return gateMoves(done.map(r => ({ before: r.was, after: r.status })));
+  }, (r) => ({ changed: changes.length, ...r }));
+  const { run_id, ...real } = out;
+  await logActivity({ action: 'tags_retagged', details: { products, changed: changes.length, locked, ...real, run_id }, user_id: userId });
+  return { ok: true, dry_run: false, products, locked, changed: changes.length, ...real, sample, run_id };
 }
 
-/** The rules again for a few products (unlocked ones); returns how many changed. */
-export async function retagProducts(ids: string[]): Promise<number> {
+/** The rules again for a few products (unlocked ones); returns how many changed. `run`: the bulk change this is part of. */
+export async function retagProducts(ids: string[], run?: string | null): Promise<number> {
   if (!ids.length) return 0;
   const tax = await loadTaxonomy();
   const { ps, pvs } = await pageOf(0, ids.slice(0, PAGE));
@@ -119,7 +124,7 @@ export async function retagProducts(ids: string[]): Promise<number> {
     if ((p.locked || []).includes('tags')) continue;
     const r = next(p, pvs.filter(v => v.product_id === p.id), tax);
     if (!r || (!r.rows.length && !r.before.size)) continue;
-    await writeValues(p.id, r.rows, 'auto'); n++;
+    await writeValues(p.id, r.rows, 'auto', undefined, run); n++;
   }
   return n;
 }
