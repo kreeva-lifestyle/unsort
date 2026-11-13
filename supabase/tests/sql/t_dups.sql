@@ -1,6 +1,6 @@
 -- "Was this product already added?" — the rules in the database, checked (pre-launch fix D21: they had no test).
 -- The real SQL is loaded by run.sh: 20261112150000_pb_duplicates.sql, 20261112170000_pb_photo_prints.sql,
--- 20261113040000_pb_stock_save.sql, 20261113120000_pb_copies.sql and 20261113130000_pb_stock_word.sql. Every check prints "ok …" or "FAIL …";
+-- 20261113040000_pb_stock_save.sql, 20261113120000_pb_copies.sql, 20261113130000_pb_stock_word.sql and 20261113150000_pb_gate_category_list.sql. Every check prints "ok …" or "FAIL …";
 -- run.sh fails when a FAIL is printed. Nothing is kept: each part rolls back.
 \set ON_ERROR_STOP 1
 \pset format unaligned
@@ -274,7 +274,39 @@ select public.pb_stock_save(t_id(74), '{"in_stock": false, "temp_out_at": null, 
 select t_is('a product that is only out of stock (not for good) is not one of them', (select string_agg(right(g.id::text, 2), ' ') from public.pb_stock_gone(:V1, '7300', '2026-11-10T10:00:00Z') g), '73');
 rollback;
 
+-- ── 8. a category the list no longer has; "Retag all" by attribute (20261113150000_pb_gate_category_list.sql) ──
+begin;
+\set A_C '''e0000000-0000-4000-8000-000000000001'''
+\set A_O '''e0000000-0000-4000-8000-000000000002'''
+\set V_PK '''e1000000-0000-4000-8000-000000000001'''
+\set V_PT '''e1000000-0000-4000-8000-000000000002'''
+select t_product(90, :V1, 'KX 9001', 'Pink', 1) is not null, t_product(93, :V1, 'KX 9003', 'Blue', 2) is not null; -- both filed under 'Saree'
+select t_is('no category list saved: Ready, as before', (select g.status || '/' || array_to_string(g.missing, ',') from public.pb_products_refresh(array[t_id(90)]) g), 'ready/');
+insert into public.pb_settings (key, value) values ('categories', '["Lehenga", " saree "]');
+select t_is('on the list (case and spaces aside): Ready', (select g.status from public.pb_products_refresh(array[t_id(90)]) g), 'ready');
+update public.pb_settings set value = '["Lehenga"]' where key = 'categories';
+select t_is('taken off the list: held, missing its category', (select g.status || '/' || array_to_string(g.missing, ',') from public.pb_products_refresh(array[t_id(90)]) g), 'needs_info/Category');
+select t_is('… and the product says so', (select status || '/' || array_to_string(missing_attrs, ',') from pb_products where id = t_id(90)), 'needs_info/Category');
+update public.pb_products set category = 'lehenga' where id = t_id(90);
+select t_is('a category from the list again: Ready', (select g.status || '/' || array_to_string(g.missing, ',') from public.pb_products_refresh(array[t_id(90)]) g), 'ready/');
+update public.pb_settings set value = '[]' where key = 'categories';
+select t_is('an empty list holds nothing', (select g.status from public.pb_products_refresh(array[t_id(93)]) g), 'ready');
+update public.pb_settings set value = '{"x": 1}' where key = 'categories';
+select t_is('a list that is not a list holds nothing', (select g.status from public.pb_products_refresh(array[t_id(93)]) g), 'ready');
+insert into public.pb_attributes (id, name, key, multi, position) values (:A_C, 'Colour', 'colour', false, 1), (:A_O, 'Occasion', 'occasion', true, 2);
+insert into public.pb_attribute_values (id, attribute_id, name, key, aliases, position) values (:V_PK, :A_C, 'Pink', 'pink', '{}', 1), (:V_PT, :A_O, 'Party', 'party', '{}', 1);
+insert into public.pb_product_values (product_id, value_id, source) values (t_id(93), :V_PK, 'rules'), (t_id(93), :V_PT, 'rules');
+create or replace function pg_temp.vals(p uuid) returns text language sql as $$
+  select coalesce(string_agg(v.name, ',' order by v.name), '') from public.pb_product_values pv join public.pb_attribute_values v on v.id = pv.value_id where pv.product_id = p $$;
+select count(*) from public.pb_product_values_bulk(jsonb_build_array(jsonb_build_object('product_id', t_id(93), 'rows', '[]'::jsonb, 'attributes', '[]'::jsonb)));
+select t_is('Retag all with no attribute checked replaces nothing', pg_temp.vals(t_id(93)), 'Party,Pink');
+select count(*) from public.pb_product_values_bulk(jsonb_build_array(jsonb_build_object('product_id', t_id(93), 'rows', '[]'::jsonb, 'attributes', jsonb_build_array(:A_C))));
+select t_is('… it replaces only the attributes it checked (Colour): the Occasion found earlier stays', pg_temp.vals(t_id(93)), 'Party');
+select count(*) from public.pb_product_values_bulk(jsonb_build_array(jsonb_build_object('product_id', t_id(93), 'rows', '[]'::jsonb)));
+select t_is('… a row without the list replaces every attribute, as before', pg_temp.vals(t_id(93)), '');
+rollback;
+
 -- Every check above printed a line: a part that silently printed nothing would be a failure too.
-select case when last_value = 144 then 'ok   every check ran (144)' else 'FAIL the number of checks is ' || last_value || ', not 144: a part printed fewer lines than it has, or this number was not updated' end from public.t_checks;
+select case when last_value = 154 then 'ok   every check ran (154)' else 'FAIL the number of checks is ' || last_value || ', not 154: a part printed fewer lines than it has, or this number was not updated' end from public.t_checks;
 drop function public.t_refused(text, text); drop function public.t_is(text, text, text); drop function public.t_rel(uuid, uuid); drop function public.t_product(int, uuid, text, text, int, numeric, text); drop function public.t_id(int);
 drop sequence public.t_checks;

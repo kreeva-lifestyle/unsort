@@ -1,7 +1,8 @@
 // Product values in the database (pb_product_values) around the pure steps:
 // the rules + AI choice (tagAuto.ts) written in ONE SQL call
-// (pb_product_values_set: 'auto' replaces the rules / AI rows and never
-// touches a 'manual' one, 'manual' replaces what staff edited, 'add' only
+// (pb_product_values_set: 'auto' replaces the rules / AI rows of the
+// attributes it was given and never touches a 'manual' one, 'manual'
+// replaces what staff edited, 'add' only
 // fills attributes that have nothing), then pb_products_refresh re-applies
 // the ready gate (tagGate.ts) and the tags cache. Suggestions go to
 // pb_tag_suggest (ignored phrases are never suggested again). Where it runs:
@@ -58,7 +59,10 @@ export async function autoTag(p: Facts, tax: Taxonomy, o: { ai?: ReadTags | null
   const have = await productValues(p.id);
   const manual = new Set(have.filter(v => v.source === 'manual').map(v => v.attribute_id));
   const r = autoValues(p, matchAttrs(attrs), { manualAttrIds: manual, ai: o.ai, categories: tax.categories });
-  const refreshed = await writeValues(p.id, r.rows, 'auto');
+  // Only the attributes checked here are replaced. Without the list the database cleared every attribute, so the
+  // read (its category's attributes only) deleted what the import had found for the others — with nothing linked,
+  // everything (owner, 13 Nov 2026).
+  const refreshed = await writeValues(p.id, r.rows, 'auto', attrs.map(a => a.id));
   await suggestFor(p.id, r.suggest, tax);
   return { refreshed, rows: r.rows };
 }

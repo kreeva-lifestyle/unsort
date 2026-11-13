@@ -155,7 +155,8 @@ export async function tagsAiFill(b: Body, userId: string | null) {
     }
     return { ok: true, filled: r.filled, left: r.left, status: r.refreshed?.status ?? p.status, missing: r.refreshed?.missing ?? p.missing_attrs, routed };
   }
-  const f = ['status=in.(ready,needs_info)', 'tag_fill_run=is.null', 'locked=not.cs.{tags}', b.missing_only === false ? '' : 'missing_attrs=neq.{}'];
+  // Waiting only for a category the list no longer has ("Missing: Category"): the AI chooses tags, not categories.
+  const f = ['status=in.(ready,needs_info)', 'tag_fill_run=is.null', 'locked=not.cs.{tags}', b.missing_only === false ? '' : 'missing_attrs=neq.{}', 'missing_attrs=neq.{Category}'];
   let aim = '';
   if (ids.length) { f.push(`id=in.(${ids.map(enc).join(',')})`); aim = `${ids.length} chosen ${ids.length === 1 ? 'product' : 'products'}`; }
   else if (b.attribute_id) {

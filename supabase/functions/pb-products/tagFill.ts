@@ -2,9 +2,11 @@
 // whose required attributes are empty. tags_ai_fill queues products
 // (pb_products.tag_fill_run → a pb_tag_fill_runs row that counts progress);
 // the per-minute worker runs a few per call AFTER read / write / publish, so
-// it never starves them (worker.ts). One product = one cheap call with the
-// reader's model, text + one photo, choosing ONLY from the allowed values of
-// the attributes still empty (tagPrompt.ts); rows are added as 'ai' and never
+// it never starves them (worker.ts). One product = the word rules first
+// (tagAuto.ts, free and the same every time), then — only for what they left
+// empty — one cheap call with the reader's model, text + one photo, choosing
+// ONLY from the allowed values of those attributes (tagPrompt.ts); rows are
+// added as 'rules' / 'ai' and never
 // touch an attribute that has a value, so 'manual' choices stay; a product
 // whose 'tags' are locked is skipped by the queue (a person asking on the
 // product page itself may still fill its empty attributes). Then the gate
@@ -21,7 +23,8 @@ import { cleanStoreTags } from './tagClean.ts';
 import { readTags, tagPromptLines, tagSchema, tagSpec } from './tagPrompt.ts';
 import { type Refreshed, productValues, suggestFor, writeValues } from './tagStore.ts';
 import { tagKey } from './tagText.ts';
-import { type Taxonomy, attrsFor } from './taxonomy.ts';
+import { autoValues } from './tagAuto.ts';
+import { type AttrWithValues, type Taxonomy, attrsFor, matchAttrs } from './taxonomy.ts';
 import { PRODUCT_COLS, type Budget, type ProductRow } from './types.ts';
 
 export const FILL_NEEDS_MS = 35_000;
@@ -45,8 +48,28 @@ export async function fillOne(p: ProductRow, tax: Taxonomy, o: { manual: boolean
   const have = new Set((await productValues(p.id)).map(v => v.attribute_id));
   const target = attrsFor(tax, p.category).filter(a => !have.has(a.id) && a.values.length);
   if (!target.length) return { filled: [], left: [], refreshed: (await rpc<Refreshed[]>('pb_products_refresh', { p_ids: [p.id] }))[0] ?? null, usd: 0 };
+  // The word rules first (owner, 13 Nov 2026: rules, then AI, then a person): what the product's own words settle
+  // costs nothing and comes out the same every time. The AI is asked only for the attributes still empty.
+  const byRules = autoValues(p, matchAttrs(target), { categories: tax.categories });
+  const rest = target.filter(a => !byRules.filled.has(a.id));
+  let ai: Awaited<ReturnType<typeof askFor>> | null = null;
+  try { if (rest.length) ai = await askFor(p, tax, rest, o.budget); }
+  catch (e) { if (byRules.rows.length) await writeValues(p.id, byRules.rows, 'add', undefined, o.run); throw e; } // the words' values are kept
+  const rows = [...byRules.rows, ...rest.flatMap(a => (ai?.chosen[a.id] ?? []).map(value_id => ({ value_id, source: 'ai' as const })))];
+  const refreshed = await writeValues(p.id, rows, 'add', undefined, o.run);
+  const byWords = target.filter(a => byRules.filled.has(a.id)).map(a => a.name);
+  const filled = [...byWords, ...rest.filter(a => ai?.chosen[a.id]?.length).map(a => a.name)];
+  if (ai) await suggestFor(p.id, ai.other.map(x => ({ phrase: x.phrase, key: tagKey(x.phrase), attribute_id: x.attribute_id, source: 'ai' as const })), tax, o.run);
+  const left = refreshed?.missing ?? target.filter(a => !filled.includes(a.name)).map(a => a.name);
+  const usd = ai?.usd ?? 0;
+  await logActivity({ product_id: p.id, action: 'tags_filled', details: { ...(ai ? { model: ai.model, usd } : {}), filled, by_rules: byWords, left, manual: o.manual }, user_id: o.userId });
+  return { filled, left, refreshed, usd };
+}
+
+/** One cheap AI call for the attributes the rules left empty: text + the first photo, choosing only from their values. */
+async function askFor(p: ProductRow, tax: Taxonomy, attrs: AttrWithValues[], budget: Budget) {
   const s = await getSettings();
-  const spec = tagSpec(target);
+  const spec = tagSpec(attrs);
   const imgs = await sel<{ path: string }>(`pb_product_images?product_id=eq.${enc(p.id)}&kind=eq.image&select=path&order=position.asc&limit=1`);
   const photos = await aiPhotos(imgs.map(i => i.path));
   const ai = await askClaude<{ tags: Record<string, { values: string[]; other: string[] }> }>({
@@ -54,16 +77,9 @@ export async function fillOne(p: ProductRow, tax: Taxonomy, o: { manual: boolean
     system: ['You tag an Indian ethnic-wear product for an online store.', ...tagPromptLines(spec, { fillOnly: true }), ...(p.source === 'import' ? [IMPORTED_TEXT] : [])].join('\n'),
     content: [...photos.blocks, { type: 'text', text: fillText(p, tax.categories) }],
     schema: { type: 'object', properties: tagSchema(spec, { fillOnly: true }) ?? {}, required: ['tags'], additionalProperties: false },
-    maxTokens: 3000, timeoutMs: o.budget.hard - Date.now(),
+    maxTokens: 3000, timeoutMs: budget.hard - Date.now(),
   });
-  const r = readTags(spec, ai.data);
-  const rows = target.flatMap(a => (r.chosen[a.id] ?? []).map(value_id => ({ value_id, source: 'ai' })));
-  const refreshed = await writeValues(p.id, rows, 'add', undefined, o.run);
-  const filled = target.filter(a => r.chosen[a.id]?.length).map(a => a.name);
-  await suggestFor(p.id, r.other.map(x => ({ phrase: x.phrase, key: tagKey(x.phrase), attribute_id: x.attribute_id, source: 'ai' as const })), tax, o.run);
-  const left = refreshed?.missing ?? target.filter(a => !r.chosen[a.id]?.length).map(a => a.name);
-  await logActivity({ product_id: p.id, action: 'tags_filled', details: { model: ai.model, usd: ai.usd, filled, left, manual: o.manual }, user_id: o.userId });
-  return { filled, left, refreshed, usd: ai.usd };
+  return { ...readTags(spec, ai.data), model: ai.model, usd: ai.usd };
 }
 
 /** Worker step: one queued product. It leaves the queue FIRST, and that is the claim: worker runs can

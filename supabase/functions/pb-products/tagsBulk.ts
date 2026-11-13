@@ -37,7 +37,15 @@ export async function categoriesSave(b: Body, userId: string | null) {
   const r = await asBulk('categories', label, userId, async (run) => {
     // pb_settings is keyed by `key` and has no id column: ask for `key` back, or the database refuses the save.
     await insert('pb_settings', [{ key: 'categories', value: cats }], { onConflict: 'key', mode: 'merge', select: 'key', run });
-    return { regated: await rpc<number>('pb_categories_prune', { p_keep: cats }, run) };
+    const linked = has((await sel<{ category: string }>('pb_category_attributes?select=category')).map(l => l.category));
+    const pruned = await rpc<number>('pb_categories_prune', { p_keep: cats }, run);
+    // The prune checks again only the products of removed categories that had must-have tags. The others off the list
+    // are checked here, so the Ready check holds them too ("Missing: Category") — and a revert puts them back.
+    const keep = has(cats);
+    const off = (await selAll<{ id: string; category: string }>('pb_products?status=in.(ready,needs_info)&category=not.is.null&select=id,category&order=id.asc'))
+      .filter(p => p.category.trim() && !keep.has(p.category.toLowerCase()) && !linked.has(p.category.toLowerCase())).map(p => p.id);
+    for (let i = 0; i < off.length; i += 500) await rpc('pb_products_refresh', { p_ids: off.slice(i, i + 500) }, run);
+    return { regated: pruned + off.length };
   });
   await logActivity({ action: 'settings_edited', details: { key: 'categories', count: cats.length, run_id: r.run_id }, user_id: userId });
   return { ok: true, categories: cats, regated: r.regated, run_id: r.run_id };

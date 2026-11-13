@@ -93,7 +93,7 @@ export async function refreshGate(productId: string): Promise<{ status: string; 
  *  for N products"). A product whose tags a person chose is left to that person (tags_ai_fill skips it too). */
 export async function countMissingTags(): Promise<number> {
   const { count, error } = await supabase.from('pb_products').select('id', { count: 'exact', head: true })
-    .eq('status', 'needs_info').neq('missing_attrs', '{}').not('locked', 'cs', '{tags}');
+    .eq('status', 'needs_info').neq('missing_attrs', '{}').neq('missing_attrs', '{Category}').not('locked', 'cs', '{tags}');
   if (error) throw error;
   return count ?? 0;
 }

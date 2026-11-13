@@ -179,7 +179,7 @@ is_active). Service role for all DB writes. CORS like listing-ai.
 | `test_connection` | staff | `{ website_id }` | `{ ok, shop_name, scopes[] , missing_scopes[] }`, sets connected_at / last_error |
 | `preview_price` | staff | `{ website_id, cost, rule_id? }` | `{ price, compare_at }` |
 | `taxonomy_get` | staff | – | categories (pb_settings), attributes with values (+ `uses`), links, per-link `stats {products, lacking}`, `category_products`, `suggestions_pending`, `fill` (latest "Let AI decide" run) |
-| `categories_save` | admin/manager | `{ categories[] }` | the reader's category list; links of removed categories are dropped and their products re-gated → `{ ok, categories, regated }` |
+| `categories_save` | admin/manager | `{ categories[] }` | the reader's category list; links of removed categories are dropped and every product left off the list is re-gated (held: "Missing: Category") → `{ ok, categories, regated }` |
 | `attribute_save` / `attribute_delete` / `attribute_order` | admin/manager | `{ id?, name, multi?, shopify_prefix? }` / `{ id }` / `{ ids[] }` | create / rename (products of its categories re-gated: "Missing: …" holds the name) / delete (values, links and product values cascade; products re-gated) / order |
 | `value_check` | staff | `{ attribute_id, name, exclude_id? }` | live look-alike check → `{ ok, matches[LookAlike], exists }` |
 | `value_save` | admin/manager | `{ attribute_id, id?, name, aliases?, force? }` | a new name (or rename) with look-alikes → **409** `{ error, matches }` unless `force`; an alias another value of the same attribute uses → 409 → `{ ok, value }` |
@@ -188,8 +188,8 @@ is_active). Service role for all DB writes. CORS like listing-ai.
 | `suggestions_list` | staff | `{ status?, attribute_id? ('none'), page? }` | 20 a page by uses → rows `{ …, example_names[≤3], matches[≤3] }`, `count` |
 | `suggestion_act` | admin/manager | `{ ids[≤100], act: add/alias/ignore/move, attribute_id?, value_id?, name?, force? }` | add runs the look-alike check first: rows with look-alikes come back in `conflicts {id: matches}` (not added) unless `force`; add / alias re-run the rules for the example products → `{ done, conflicts, retagged }` |
 | `product_values_set` | staff | `{ product_id, value_ids[], attribute_id? }` | staff's choice ('manual') for one attribute or all; checked against the category's allowed values and one-value attributes; locks `tags`; gate; routes it when it became Ready → `{ status, missing, locked, routed }` |
-| `retag` | admin/manager | `{ dry_run (default true) }` | the rules again for every unlocked product (AI rows kept where the rules find nothing; 'manual' never touched) → `{ products, locked, changed, to_needs_info, to_ready, sample[≤10] }`; apply in batches of 100 (`pb_product_values_bulk`) |
-| `tags_ai_fill` | staff | `{ product_ids? / category? / attribute_id? / needs_info?, missing_only?, now? }` | queue (status ready/needs_info, not locked, missing ≠ {}) → `{ run_id, queued }`; `now` + one product: fill it at once → `{ filled, left, status, missing, routed }` |
+| `retag` | admin/manager | `{ dry_run (default true) }` | the rules again for every unlocked product, for its category's attributes only (AI rows kept where the rules find nothing; 'manual' never touched; other attributes' values stay) → `{ products, locked, changed, to_needs_info, to_ready, sample[≤10] }`; apply in batches of 100 (`pb_product_values_bulk`, each row with its `attributes`) |
+| `tags_ai_fill` | staff | `{ product_ids? / category? / attribute_id? / needs_info?, missing_only?, now? }` | queue (status ready/needs_info, not locked, missing ≠ {} and ≠ {Category}) → `{ run_id, queued }`; `now` + one product: fill it at once → `{ filled, left, status, missing, routed }` |
 | `tags_fill_status` | staff | – | latest run `{ total, done, waiting, filled, left_empty, finished_at }` |
 Errors: HTTP 4xx/5xx with `{ error: '<plain sentence>' }`. A SQL `raise exception` from a `pb_tag_*` function reaches the app as its own sentence (SQLSTATE P0001).
 
@@ -466,8 +466,12 @@ category list (it moved from Settings).
 
 **Required attributes — the gate.** `pb_products_refresh(ids)` (SQL; twin
 `tagGate.ts`): Ready needs a price (cost or copied selling price), a category
-and a value for every attribute linked to the category; else Needs info with
-`missing_attrs` ("Missing: Colour" on the product page and the list rows).
+that is on the list (pb_settings `categories`, case and spaces aside; no list
+saved → not checked) and a value for every attribute linked to the category;
+else Needs info with `missing_attrs` ("Missing: Colour" on the product page and
+the list rows; a category the list no longer has puts 'Category' first:
+"Missing: Category" — 20261113150000_pb_gate_category_list.sql). Saving the
+category list checks again every product left off it (`categories_save`).
 new / reading / archived never move; a never-read Needs-info product (photos
 uploading) is not made Ready. It runs after every value write, link change,
 attribute / value delete or merge, category prune, and after a facts save on
@@ -484,14 +488,20 @@ attributes in: label lines naming the attribute ("COLOUR :- 2 (Pink, Wine)",
 the reader's facts (3), the text (1). A longer phrase beats a shorter one it
 covers; a one-value attribute keeps the strongest / earliest. At ingest the
 rules run over every attribute (category unknown); the reader then replaces
-the rules / AI rows for its category. (2) AI (`tagPrompt.ts`): the reader's
+the rules / AI rows of its category's attributes only (`pb_product_values_set`
+gets their ids: before 13 Nov 2026 it got none and cleared every attribute,
+so what the import found for the others was lost — with nothing linked,
+everything). "Retag all" and the retag after a suggestion do the same
+(`pb_product_values_bulk` rows carry `attributes`). (2) AI (`tagPrompt.ts`): the reader's
 ONE call gets, per attribute linked to any category, an enum of allowed names
 + `other` phrases, and the category → attributes map; only attributes the
 rules left empty take the AI's choice; "pick the closest value when the
 evidence reasonably supports it, never invent one". 'manual' attributes and
-locked `tags` are never touched. (3) "Let AI decide" (`tagFill.ts`): a
-values-only pass (reader model, text + 1 photo) for the empty required
-attributes, 'add' mode; queued by `tags_ai_fill`, run by the worker after
+locked `tags` are never touched. (3) "Let AI decide" (`tagFill.ts`): for the
+empty required attributes, the rules first (free, the same every time), then
+— only for what they left empty — a values-only AI pass (reader model, text +
+1 photo); 'add' mode, rows 'rules' / 'ai' (an AI failure still writes what
+the rules found); queued by `tags_ai_fill`, run by the worker after
 read / write / publish (≤ 5 a run, 35 s needed), or at once from the
 product page.
 
@@ -679,7 +689,8 @@ listing editor set the `_locked` flag (an emptied value hands it back).
 `pb_products_refresh` (and `tagGate.ts`): Ready needs a price (cost or copied
 selling price), a category, a fabric, a colour, at least one photo
 (`pb_product_images.kind = 'image'`) and a value for every attribute of the
-category. `missing_attrs` stays the required TAG attributes only; the app
+category. `missing_attrs` stays the required TAG attributes only (plus
+'Category' for a category the list no longer has); the app
 names the other gaps from the product itself (`seoTypes.ts missingDetails`):
 "Needs info · Missing: Cost price, Fabric, Photo, Colour". Adding a photo on
 the product page re-applies the gate.
