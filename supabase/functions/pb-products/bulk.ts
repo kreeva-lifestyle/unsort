@@ -22,7 +22,7 @@ import { RULE_COLS, hasPrice, type Pricing, type RuleRow } from './types.ts';
 const PAGE = 200, AT_ONCE = 8;
 interface Row {
   id: string; status: string; price: number | null; compare_at_price: number | null; locked: string[] | null; rule_id: string | null;
-  pb_products: { cost_price: number | null; sell_price: number | null; status: string };
+  pb_products: { id: string; cost_price: number | null; sell_price: number | null; status: string };
 }
 type Override = { markup_pct?: number; add_flat?: number } | null;
 
@@ -46,7 +46,7 @@ export async function repriceWebsite(b: Body, userId: string | null) {
     for (;;) {
       if (Date.now() - t0 > 100_000) { more = true; break; }
       const page = await sel<Row>(`pb_listings?website_id=eq.${enc(id)}&generated_at=not.is.null&or=(status.in.(published,review,failed),and(status.eq.publishing,claimed_at.is.null))`
-        + `${lastId ? `&id=gt.${enc(lastId)}` : ''}&select=id,status,price,compare_at_price,locked,rule_id,pb_products!inner(cost_price,sell_price,status)&pb_products.status=eq.ready&order=id.asc&limit=${PAGE}`);
+        + `${lastId ? `&id=gt.${enc(lastId)}` : ''}&select=id,status,price,compare_at_price,locked,rule_id,pb_products!inner(id,cost_price,sell_price,status)&pb_products.status=eq.ready&order=id.asc&limit=${PAGE}`);
       if (!page.length) break;
       lastId = page[page.length - 1].id;
       const todo = page.flatMap((l) => {

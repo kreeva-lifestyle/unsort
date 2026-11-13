@@ -89,7 +89,7 @@ export async function generateOne(l: ListingRow, o: { manual: boolean; prevStatu
     const calc = listingPrice(p, site.pricing || {}, rule?.price_override ?? null)!;
     const price = locked.has('price') && l.price !== null ? Number(l.price) : calc.price;
     if (!(price > 0)) throw new HttpError(400, 'The price for this website comes out at ₹0 — check the cost price and the website\'s pricing.');
-    const compare = locked.has('price') ? compareAt(price, site.pricing || {}) : calc.compare_at;
+    const compare = locked.has('price') ? compareAt(price, site.pricing || {}, p.id) : calc.compare_at;
 
     // Content: this store's profile, the phrase it is written for, and what the other stores already say.
     const profile = profileOf(site), L = limitsOf(c);

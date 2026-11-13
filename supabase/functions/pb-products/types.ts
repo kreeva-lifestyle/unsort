@@ -30,6 +30,8 @@ export interface ProductRow {
 
 export interface Pricing {
   markup_pct: number; add_flat: number; rounding: string; compare_at_pct: number; min_price: number | null;
+  /** Random was price: each product gets its own whole % from compare_at_pct up to this (pricing.ts comparePct). Absent / null = one %. */
+  compare_at_max_pct?: number | null;
 }
 
 export interface TagRules {

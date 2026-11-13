@@ -91,7 +91,7 @@ export async function publishOne(l: ListingRow, o: { manual: boolean; putBack?: 
     const altHandle = (h: string) => `${h.slice(0, 72)}-${l.id.slice(0, 6)}`;
     const first = l.handle || makeHandle(l.title || '', p.sku, p.id); // never without one: a lost create is found again by its handle
     // A price typed by hand keeps its compare-at in step with the site's pricing.
-    const compare = (l.locked || []).includes('price') ? compareAt(Number(l.price), site.pricing || {}) : l.compare_at_price;
+    const compare = (l.locked || []).includes('price') ? compareAt(Number(l.price), site.pricing || {}, l.product_id) : l.compare_at_price;
     const earlier = tried.flatMap(t => (Array.isArray(t.details?.handles) ? t.details.handles : []));
 
     // What the store already has: the known product, else one this listing made before (lost id).

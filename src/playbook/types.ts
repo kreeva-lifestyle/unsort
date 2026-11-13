@@ -60,6 +60,8 @@ export interface PbPricing {
   rounding: PbRounding;
   /** 0 = no compare-at price; 30 = show a "was" price 30% above the price. */
   compare_at_pct: number;
+  /** Random was price: each product gets its own whole % from compare_at_pct up to this, the same one every time. null = one % for all. */
+  compare_at_max_pct?: number | null;
   /** Never sell below this (₹), or null. */
   min_price: number | null;
 }

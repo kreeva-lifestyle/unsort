@@ -79,7 +79,15 @@ Types: `src/playbook/types.ts` (jsonb shapes documented there).
      `none` → 2 dp; `nearest_10` → round to 10; `end_99` → ceil to next
      ...99 (e.g. 1234 → 1299; 1299 stays); `end_49_99` → next ...49 or ...99;
      then `max(p, min_price)`. `compare_at_pct > 0` → compare_at =
-     round(p × (1 + pct/100)) with the same rounding; else null. Locked
+     round(p × (1 + pct/100)) with the same rounding; else null. Random
+     was price (2026-11-13): when `compare_at_max_pct` is above
+     `compare_at_pct`, pct = compare_at_pct + a whole step up to
+     compare_at_max_pct, picked from the product id (`comparePct`:
+     FNV-1a + fmix32 over the id → [0, 1)), so a product gets the same %
+     every time and on every website with the same range; no product (the
+     `preview_price` action) → compare_at_pct. A locked price recomputes its
+     compare-at the same way. The app's copy (`src/playbook/data/pricing.ts`)
+     is checked against the server's by `test/pricingMirror.test.mjs`. Locked
      `price` is kept.
    - **Content** (rewritten 2026-11-12: the prompt, output and checks are now
      in "One store, one voice" below; what follows is the part that still

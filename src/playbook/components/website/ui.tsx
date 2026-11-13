@@ -92,14 +92,16 @@ export function Seg<V extends string>({ value, options, onChange, label }: {
 const parseNum = (s: string): number | null => (s.trim() === '' || !Number.isFinite(Number(s)) ? null : Number(s));
 
 /** Number input; null when empty. Shows exactly what is typed while focused. Letters are blocked (numKey). */
-export function NumInput({ value, onChange, id, placeholder, min = 0, max }: {
+export function NumInput({ value, onChange, id, placeholder, min = 0, max, describedBy }: {
   value: number | null; onChange: (v: number | null) => void; id?: string; placeholder?: string; min?: number; max?: number;
+  /** ids of the hint / error under the field (aria-describedby). */
+  describedBy?: string;
 }) {
   const [raw, setRaw] = useState('');
   const [focus, setFocus] = useState(false);
   const outside = value == null ? '' : String(value);
   return (
-    <input id={id} type="text" inputMode="decimal" value={focus ? raw : outside} placeholder={placeholder} onKeyDown={numKey}
+    <input id={id} type="text" inputMode="decimal" value={focus ? raw : outside} placeholder={placeholder} onKeyDown={numKey} aria-describedby={describedBy}
       onFocus={() => { setRaw(outside); setFocus(true); }} onBlur={() => setFocus(false)}
       onChange={e => {
         const s = e.target.value.replace(/[^0-9.]/g, '');

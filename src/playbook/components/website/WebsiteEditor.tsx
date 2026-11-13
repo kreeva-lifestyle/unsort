@@ -14,6 +14,7 @@ import type { AddToast } from '../PbToasts';
 import type { PbWebsite } from '../../types';
 import type { VendorLite } from '../../data/products';
 import { updateWebsite, type WebsitePatch } from '../../data/websites';
+import { badWasRange } from '../../data/pricing';
 import { useIsPhone } from '../../hooks/useIsPhone';
 import { Dot } from '../product/status';
 import { PbPageHeader, PbTag, focusPageTitle } from '../ui';
@@ -80,6 +81,7 @@ export default function WebsiteEditor({ site, initialDraft, onDraft, onClose, on
     const name = draft.name.trim().replace(/\s+/g, ' ');
     if (!name) { setErr('Give the website a name'); showSection('connection'); return; }
     if (draft.content.title_template.trim() === '') { setErr('The title pattern cannot be empty — use {ai_title} to let the AI write it.'); showSection('content'); return; }
+    if (badWasRange(draft.pricing)) { setErr('Was price: make the To % more than the From %.'); showSection('pricing'); return; }
     // Only the keys that really changed — so the activity log says what was edited.
     const next: Draft = { ...draft, name }, cur = pick(site);
     const patch = Object.fromEntries((Object.keys(next) as (keyof Draft)[])
