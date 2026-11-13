@@ -36,6 +36,8 @@
 -- functions replaced with the same signature. Nothing is dropped. SECURITY
 -- INVOKER; the functions that change data check that the caller is the server.
 -- The one exception is the trigger function pb_copies_follow (see 3).
+-- (Applied to the live database in two parts: everything but the delete
+-- trigger pb_copies_gone, then that trigger.)
 
 -- ── 1. what the gate holds a product as a copy of ─────────────────────────
 -- No foreign key on purpose: "on delete set null" would empty the note before

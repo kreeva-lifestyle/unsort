@@ -7,15 +7,15 @@
 -- that the AI or a person can re-word later ("Maroon" → "Wine"), and a code
 -- that is on a store must not follow that: orders, labels and stock sheets
 -- carry it. So the colour part is decided ONCE and kept:
---   null = not decided yet (worked out when the product is first sent);
+--   null = not decided yet (decided by the first send a store accepts);
 --   ''   = its codes carry no colour part.
--- It is kept on the PRODUCT, and saved BEFORE the first send (second review,
--- findings 2 and 8): a send that fails half-way must find the same code on its
--- next try, and the same goods must carry one code on every website. (The
--- first version kept it per listing and saved it after a successful send.)
+-- It is kept on the PRODUCT, and saved right after the first store took the
+-- product (second and third reviews): a send that fails half-way must find the
+-- same code on its next try, a send the store refuses decides nothing, and the
+-- same goods must carry one code on every website.
 -- A product that is already on a store when this arrives is decided as '':
 -- its codes stay exactly as they are (publish.ts).
 --
 -- Additive: one column.
 alter table public.pb_products add column if not exists sku_colour text;
-comment on column public.pb_products.sku_colour is 'The colour part this product''s sizes carry in their SKUs and barcodes on the stores (pb-products skuCode.ts); '''' = none, null = not decided yet (decided and saved before its first send). Kept, so codes on a store do not follow a re-worded colour.';
+comment on column public.pb_products.sku_colour is 'The colour part this product''s sizes carry in their SKUs and barcodes on the stores (pb-products skuCode.ts); '''' = none, null = not decided yet (decided by the first send a store accepts). Kept, so codes on a store do not follow a re-worded colour.';
