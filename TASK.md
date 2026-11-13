@@ -23,11 +23,13 @@ are tagged.
   Settings → Tags → Categories → **Waiting for a category**: tap each and
   move its products (Anarkali → Salwar Suit). Set up Product Type for the
   new category first, so the rules and the AI can choose it.
-- **Product Type values.** Product Type exists (Settings → Tags) but has no
-  values yet. Add the types and tick their categories (Salwar Suit:
-  Anarkali, Sharara…; Lehenga: Bridal Lehenga…), then link Product Type to
-  the categories that need it. Claude will first add acriine.in's types as
-  a start ("Being built next").
+- **Product Type: check the values, then link it.** Claude added 10 from
+  acriine.in: Lehenga — Lehenga Choli, Chaniya Choli, Bridal Lehenga, South
+  Indian Lehenga; Saree — Paithani; Salwar Suit — Anarkali, Sharara,
+  Gharara, Palazzo Suit, Angrakha. Untick or add what you like (for
+  example Kurta Set for Salwar Suit), then link Product Type to those
+  categories and tap **Link and let AI decide**. 13 more acriine tags
+  (Wedding, Gown, Dandiya Night…) wait in Tags → Suggestions.
 - **Two colours ("Pink and White"):** Multicolour, or the main colour?
   Colour takes one value.
 - **"Wedding":** add it back as another name for Marriage? A deleted word
@@ -79,12 +81,6 @@ are tagged.
 - **Q20 · Public repository.** It has to stay public while the server
   functions load their code from GitHub. Making it private first needs
   another way to deploy them; say if you want that.
-
-## Playbook — being built next
-
-- **acriine.in's tags.** Its product types become Product Type values,
-  ticked for the matching categories; its other tags go to Tags →
-  Suggestions for review. After Product Type is live.
 
 ## Playbook — things only the owner can do
 
