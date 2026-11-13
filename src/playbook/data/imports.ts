@@ -26,7 +26,11 @@ export type ImportCheck = {
   already_here?: number;
   /** The vendor the last import from this website was filed under, if there was one. */
   last_vendor?: string | null;
+  /** Do the products name who makes them? (pb-products import/maker.ts) */
+  maker?: ImportMaker | null;
 };
+/** Products looked at, how many name a maker other than the website, those makers, and the website's own name when products give it. */
+export type ImportMaker = { checked: number; named: number; names: { name: string; products: number }[]; own: string | null };
 
 export const checkWebsite = (url: string) => pbCall<ImportCheck>('import_check', { url });
 

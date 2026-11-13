@@ -10,9 +10,12 @@
 //   - its Crawl-delay sets the pace for this host (fetch.ts setPace).
 // robots.txt missing (4xx) = no rules; broken (5xx) or unreachable = stop and
 // try later (the standard says not to crawl a site whose robots.txt fails).
+// The check also says whether the products name their maker (maker.ts): every
+// Shopify product it counts, 20 WooCommerce products, the generic sample.
 import { HttpError } from '../http.ts';
 import { SHOPIFY_PAGE } from './cursor.ts';
 import { type Got, setPace, siteGet, siteJson } from './fetch.ts';
+import { type MakerCheck, makerTally } from './maker.ts';
 import { metaTags } from './meta.ts';
 import { type Found, type ShopifyProduct, type WooProduct, fromShopify, fromWoo } from './normalize.ts';
 import { genericProbe } from './sitemaps.ts';
@@ -24,6 +27,8 @@ export interface Estimate { total: number | null; in_stock: number | null; cappe
 export interface Detected {
   platform: Platform; origin: string; host: string; robots: Robots;
   estimate: Estimate; sample: Found[]; warnings: string[]; vendor_suggestion: string; sitemaps: string[];
+  /** With the estimate only: do the products name who makes them? */
+  maker?: MakerCheck;
 }
 
 /** The check counts Shopify products in pages of 250 (fewer requests), or of 50 when 250 is over the body limit. */
@@ -67,12 +72,13 @@ async function shopifyList(p: Probe, path: string): Promise<{ products: ShopifyP
 }
 
 /** Shopify: count pages until a short one (≤ ESTIMATE_PAGES requests). */
-async function shopifyEstimate(p: Probe, base: string, size: number, first: ShopifyProduct[], currency: string | null): Promise<{ est: Estimate; sample: Found[] }> {
+async function shopifyEstimate(p: Probe, base: string, size: number, first: ShopifyProduct[], currency: string | null, makers: ReturnType<typeof makerTally>): Promise<{ est: Estimate; sample: Found[] }> {
   let total = 0, inStock = 0, capped = false, page = 1, items: ShopifyProduct[] | null = first;
   const sample: Found[] = [];
   while (items) {
     total += items.length;
     for (const f of mapSafe(items, x => fromShopify(x, p.origin, currency))) {
+      makers.add(f);
       if (!f.in_stock) continue;
       inStock++;
       if (sample.length < 3) sample.push(f);
@@ -108,6 +114,8 @@ export async function detect(site: SiteUrl, o: { estimate: boolean }): Promise<D
   const base = { origin, host, robots, warnings, sitemaps: [] as string[] };
   const probe: Probe = { origin, robots, blocked: false };
   const vendor = async () => { const h = await homePage(probe); return siteName(h?.ok ? h.text : '', host); };
+  const makers = makerTally();
+  const maker = (name: string) => (o.estimate ? { maker: makers.result({ name, host }) } : {});
 
   // Shopify
   const tryList = async (path: string) => {
@@ -121,18 +129,22 @@ export async function detect(site: SiteUrl, o: { estimate: boolean }): Promise<D
   if (sp.products) {
     const currency = o.estimate ? await shopCurrency(origin, robots) : null;
     if (currency && currency !== 'INR') warnings.push(foreignPrices(currency));
-    const { est, sample } = o.estimate ? await shopifyEstimate(probe, sp.path, sp.size, sp.products, currency) : { est: { total: null, in_stock: null, capped: false }, sample: [] };
-    return { ...base, platform: 'shopify', estimate: est, sample, vendor_suggestion: await vendor() };
+    const { est, sample } = o.estimate ? await shopifyEstimate(probe, sp.path, sp.size, sp.products, currency, makers) : { est: { total: null, in_stock: null, capped: false }, sample: [] };
+    const name = await vendor();
+    return { ...base, platform: 'shopify', estimate: est, sample, vendor_suggestion: name, ...maker(name) };
   }
   // WooCommerce (Store API: public, no key)
-  const woo = await getJson<WooProduct[]>(probe, `/wp-json/wc/store/v1/products?per_page=${o.estimate ? 3 : 1}&stock_status=instock`);
+  const woo = await getJson<WooProduct[]>(probe, `/wp-json/wc/store/v1/products?per_page=${o.estimate ? 20 : 1}&stock_status=instock`);
   if (woo && Array.isArray(woo.data)) {
     let total: number | null = null;
     if (o.estimate) { const all = await getJson<unknown>(probe, '/wp-json/wc/store/v1/products?per_page=1'); total = all ? num(all.got.headers, 'x-wp-total') : null; }
-    const sample = mapSafe(woo.data, p => fromWoo(p, origin)).filter(f => f.in_stock).slice(0, 3);
+    const read = mapSafe(woo.data, p => fromWoo(p, origin));
+    read.forEach(f => makers.add(f));
+    const sample = read.filter(f => f.in_stock).slice(0, 3);
     const cur = sample.find(s => s.currency && s.currency !== 'INR')?.currency;
     if (cur) warnings.push(foreignPrices(cur));
-    return { ...base, platform: 'woocommerce', estimate: { total, in_stock: num(woo.got.headers, 'x-wp-total'), capped: false }, sample, vendor_suggestion: await vendor() };
+    const name = await vendor();
+    return { ...base, platform: 'woocommerce', estimate: { total, in_stock: num(woo.got.headers, 'x-wp-total'), capped: false }, sample, vendor_suggestion: name, ...maker(name) };
   }
   // Generic: product pages with JSON-LD, found through the sitemap (or the home page itself)
   const home = await homePage(probe);
@@ -144,7 +156,8 @@ export async function detect(site: SiteUrl, o: { estimate: boolean }): Promise<D
     warnings.push('This is not a Shopify or WooCommerce store, so Playbook reads each product page one by one (best effort): some products or details may be missed.');
     const cur = g.sample.find(s => s.currency && s.currency !== 'INR')?.currency;
     if (cur) warnings.push(foreignPrices(cur));
-    return { ...base, platform: 'generic', estimate: { total: g.total, in_stock: null, capped: g.capped }, sample: g.sample, warnings, vendor_suggestion: vendorName, sitemaps: g.sitemaps };
+    g.sample.forEach(f => makers.add(f));
+    return { ...base, platform: 'generic', estimate: { total: g.total, in_stock: null, capped: g.capped }, sample: g.sample, warnings, vendor_suggestion: vendorName, sitemaps: g.sitemaps, ...maker(vendorName) };
   }
   if (probe.blocked) throw new HttpError(400, ROBOTS_NO);
   if (home && !home.ok) warnings.push('The website did not answer Playbook normally — it may block automated visitors.');
