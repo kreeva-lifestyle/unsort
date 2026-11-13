@@ -18,6 +18,8 @@
 //   reread_failed the products not read again yet go back to Needs info
 //   reread        (only from the log of 12 Nov 2026) the fields a re-read changed
 //   copies        the copies it archived that are still archived go back to Needs info (copies.ts)
+//   category_move / category_rename  products filed back under their old category / the name changed back
+//                 (categoryMove.ts; the revert is the server's own: categoryRevert.ts)
 // Part 2 (20261113090000_pb_bulk_log_tags_stock.sql): the changes that reach
 // products through the tag lists — retag, tag_fill ("Let AI decide"),
 // value_delete, value_merge, attribute_delete, categories, category_links,
@@ -32,8 +34,9 @@ import { plain } from './http.ts';
 /** Changes that reach products through the tag lists. */
 export type TagKind = 'retag' | 'tag_fill' | 'value_delete' | 'value_merge' | 'attribute_delete' | 'categories' | 'category_links' | 'suggestions';
 export const TAG_KINDS: readonly TagKind[] = ['retag', 'tag_fill', 'value_delete', 'value_merge', 'attribute_delete', 'categories', 'category_links', 'suggestions'];
-export type BulkKind = 'import' | 'route_site' | 'reprice_site' | 'retry_failed' | 'reread_failed' | 'reread' | 'copies' | TagKind | 'stock_notice';
-const BY_PRODUCT: readonly BulkKind[] = [...TAG_KINDS, 'stock_notice'];
+export type BulkKind = 'import' | 'route_site' | 'reprice_site' | 'retry_failed' | 'reread_failed' | 'reread' | 'copies' | TagKind | 'stock_notice'
+  | 'category_move' | 'category_rename';
+const BY_PRODUCT: readonly BulkKind[] = [...TAG_KINDS, 'stock_notice', 'category_move', 'category_rename'];
 
 /** The note on a listing a revert took back. Routing leaves such a listing alone. "Send matching products now" queues it
  *  again when it never reached the store (routeSite.ts); one that was hidden on the store is put back from its own page.

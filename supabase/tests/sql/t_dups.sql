@@ -1,6 +1,6 @@
 -- "Was this product already added?" — the rules in the database, checked (pre-launch fix D21: they had no test).
 -- The real SQL is loaded by run.sh: 20261112150000_pb_duplicates.sql, 20261112170000_pb_photo_prints.sql,
--- 20261113040000_pb_stock_save.sql, 20261113120000_pb_copies.sql, 20261113130000_pb_stock_word.sql, 20261113150000_pb_gate_category_list.sql and 20261113210000_pb_tag_value_categories.sql. Every check prints "ok …" or "FAIL …";
+-- 20261113040000_pb_stock_save.sql, 20261113120000_pb_copies.sql, 20261113130000_pb_stock_word.sql, 20261113150000_pb_gate_category_list.sql, 20261113210000_pb_tag_value_categories.sql and 20261113220000_pb_category_rename_move.sql. Every check prints "ok …" or "FAIL …";
 -- run.sh fails when a FAIL is printed. Nothing is kept: each part rolls back.
 \set ON_ERROR_STOP 1
 \pset format unaligned
@@ -362,7 +362,43 @@ select t_is('… and the product is Ready again', (select status from pb_product
 select set_config('request.jwt.claims', '{}', false);
 rollback;
 
+-- ── 11. rename a category; move its products to another one (20261113220000_pb_category_rename_move.sql) ──
+begin;
+\set A_C2 '''e0000000-0000-4000-8000-000000000004'''
+\set A_T2 '''e0000000-0000-4000-8000-000000000005'''
+\set V_AN '''e1000000-0000-4000-8000-000000000005'''
+\set R10 '''d9000000-0000-4000-8000-000000000002'''
+insert into public.pb_settings (key, value) values ('categories', '["Saree", "Anarkali", "Salwar Suit"]');
+select t_product(96, :V1, 'KX 9601', 'Pink', 1) is not null, t_product(97, :V1, 'KX 9602', 'Blue', 2) is not null, t_product(98, :V1, 'KX 9603', 'Red', 3) is not null;
+update public.pb_products set category = 'Anarkali' where id in (t_id(96), t_id(97)); -- 98 stays a Saree
+insert into public.pb_attributes (id, name, key, multi, position, by_category) values (:A_C2, 'Colour', 'colour', false, 1, false), (:A_T2, 'Type', 'type', false, 2, true);
+insert into public.pb_attribute_values (id, attribute_id, name, key, aliases, position, categories) values (:V_AN, :A_T2, 'Anarkali', 'anarkali', '{}', 1, '{Anarkali, Saree}');
+insert into public.pb_category_attributes (category, attribute_id, position) values ('Anarkali', :A_C2, 1);
+insert into public.pb_routing_rules (name, conditions) values ('Only Anarkali', '{"categories": ["Anarkali", "Saree"]}');
+select t_refused('a signed-in person cannot rename a category', $$select public.pb_category_rename('Anarkali', 'Anarkali Suit')$$);
+select set_config('request.jwt.claims', '{"role":"service_role"}', false);
+select t_refused('a name already on the list is refused (that is a move)', $$select public.pb_category_rename('Anarkali', 'salwar suit')$$);
+select t_is('renamed (case and spaces aside): its 2 products', public.pb_category_rename(' anarkali ', 'Anarkali Suit')::text, '2');
+select t_is('… in the list, in its place', (select value::text from pb_settings where key = 'categories'), '["Saree", "Anarkali Suit", "Salwar Suit"]');
+select t_is('… its must-have tags', (select string_agg(category, ',') from pb_category_attributes where attribute_id = :A_C2), 'Anarkali Suit');
+select t_is('… its products', (select string_agg(distinct category, ',') from pb_products where id in (t_id(96), t_id(97))), 'Anarkali Suit');
+select t_is('… the Product Type ticks', (select array_to_string(categories, ',') from pb_attribute_values where id = :V_AN), 'Anarkali Suit,Saree');
+select t_is('… the website rules', (select (conditions -> 'categories')::text from pb_routing_rules where name = 'Only Anarkali'), '["Anarkali Suit", "Saree"]');
+select t_is('… a product of another category is untouched', (select category from pb_products where id = t_id(98)), 'Saree');
+select t_is('a rename of the letters only', public.pb_category_rename('anarkali suit', 'ANARKALI SUIT')::text, '2');
+insert into pb_bulk_runs (id, kind, label, status) values (:R10, 'category_move', 'Moved the products of Anarkali Suit to Salwar Suit', 'running');
+select set_config('request.headers', json_build_object('x-pb-bulk', :R10)::text, false);
+select t_is('moved: both products, checked again', (select count(*)::text from public.pb_category_move('Anarkali Suit', ' salwar suit ')), '2');
+select set_config('request.headers', '{}', false);
+select t_is('… filed under the list''s spelling', (select string_agg(distinct category, ',') from pb_products where id in (t_id(96), t_id(97))), 'Salwar Suit');
+select t_is('… Ready there (Salwar Suit needs no tags)', (select string_agg(distinct status, ',') from pb_products where id in (t_id(96), t_id(97))), 'ready');
+select t_is('… and the log keeps each product''s old category, for a revert', (select before ->> 'category' from pb_bulk_items where run_id = :R10 and tbl = 'pb_products' and pk ->> 'id' = t_id(96)::text order by id limit 1), 'ANARKALI SUIT');
+select t_refused('moving to a category not on the list is refused', $$select * from public.pb_category_move('Saree', 'Gown')$$);
+select t_refused('moving a category onto itself is refused', $$select * from public.pb_category_move('Saree', 'saree')$$);
+select set_config('request.jwt.claims', '{}', false);
+rollback;
+
 -- Every check above printed a line: a part that silently printed nothing would be a failure too.
-select case when last_value = 172 then 'ok   every check ran (172)' else 'FAIL the number of checks is ' || last_value || ', not 172: a part printed fewer lines than it has, or this number was not updated' end from public.t_checks;
+select case when last_value = 188 then 'ok   every check ran (188)' else 'FAIL the number of checks is ' || last_value || ', not 188: a part printed fewer lines than it has, or this number was not updated' end from public.t_checks;
 drop function public.t_refused(text, text); drop function public.t_is(text, text, text); drop function public.t_rel(uuid, uuid); drop function public.t_product(int, uuid, text, text, int, numeric, text); drop function public.t_id(int);
 drop sequence public.t_checks;

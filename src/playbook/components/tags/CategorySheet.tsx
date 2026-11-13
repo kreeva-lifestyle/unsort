@@ -4,7 +4,9 @@
 // must"), so linking first counts the products that lack it and asks:
 // "12 products will need a Colour" → Link and let AI decide (the sheet's one
 // gradient: links, then queues those products for the AI) / Link only /
-// Cancel. Removing the category from the list lives at the bottom. An attribute
+// Cancel. Rename at the top (everywhere: products, links, Product Type ticks,
+// website rules); removing the category from the list lives at the bottom, and
+// with products in it first asks where they go (CategoryMoveBox). An attribute
 // whose values depend on the category (Product Type) says how many of its values
 // are ticked for this category — none means its products cannot be finished.
 import { useEffect, useState } from 'react';
@@ -12,26 +14,31 @@ import { friendlyError } from '../../../lib/friendlyError';
 import type { AddToast } from '../PbToasts';
 import type { TagsApi } from '../../data/tags';
 import { offeredFor, type PbAttribute, type PbCategoryLink, type PbLinkStat } from '../../tagTypes';
-import { PB, pbBody, pbMeta, pbName, pbTileReview } from '../../pbTheme';
+import { PB, pbBody, pbInput, pbMeta, pbName, pbTileReview } from '../../pbTheme';
 import { useConfirm } from '../../../components/ui/ConfirmModal';
 import PbModal from '../product/PbModal';
 import { PbButton, PbConfirm } from '../ui';
 import { Dot } from '../product/status';
+import CategoryMoveBox from './CategoryMoveBox';
 import { plural } from './tagText';
 
-export default function CategorySheet({ category, attrs, links, stats, api, addToast, onClose, onChanged, onRemove, canEdit }: {
-  category: string | null; attrs: PbAttribute[]; links: PbCategoryLink[]; stats: PbLinkStat[]; api: TagsApi; addToast: AddToast;
+/** `categories`: the list (where products can move); `products`: how many are filed under this category now. */
+export default function CategorySheet({ category, categories, products, attrs, links, stats, api, addToast, onClose, onChanged, onRemove, canEdit }: {
+  category: string | null; categories: string[]; products: number; attrs: PbAttribute[]; links: PbCategoryLink[]; stats: PbLinkStat[]; api: TagsApi; addToast: AddToast;
   onClose: () => void; onChanged: () => void; onRemove: (c: string) => Promise<void>; canEdit: boolean;
 }) {
   const [ids, setIds] = useState<string[]>([]);
   const [busy, setBusy] = useState('');
   const [ask0, setAsk0] = useState<{ attr: PbAttribute; lacking: number } | null>(null);
+  const [name, setName] = useState('');
+  const [moving, setMoving] = useState(false);
   const { ask, modalProps } = useConfirm();
   const cat = category ?? '';
   useEffect(() => {
     setIds(links.filter(l => l.category.toLowerCase() === cat.toLowerCase()).sort((a, b) => a.position - b.position).map(l => l.attribute_id));
     setAsk0(null);
   }, [cat, links]);
+  useEffect(() => { setName(cat); setMoving(false); }, [cat]);
   if (!category) return null;
   const linked = ids.map(id => attrs.find(a => a.id === id)).filter((a): a is PbAttribute => !!a);
   const free = attrs.filter(a => !ids.includes(a.id));
@@ -70,14 +77,35 @@ export default function CategorySheet({ category, attrs, links, stats, api, addT
     }
     catch (e) { addToast(friendlyError(e), 'error'); }
   };
+  const nm = name.trim().replace(/\s+/g, ' ');
+  const rename = async () => {
+    if (!nm || nm === category || busy) return;
+    setBusy('rename');
+    try {
+      const r = await api.renameCategory(category, nm);
+      addToast(`Renamed ${category} to ${nm}${r.renamed ? ` — ${plural(r.renamed, 'product')} follow` : ''}`, 'success'); onChanged(); onClose();
+    } catch (e) { addToast(friendlyError(e), 'error'); } finally { setBusy(''); }
+  };
   const remove = async () => {
-    if (!await ask({ title: `Remove ${category}?`, message: 'The AI stops picking it for new products. Products already in it keep it; it stops needing its attributes.', confirmLabel: 'Remove', danger: true })) return;
+    if (products > 0) { setMoving(true); return; } // where do its products go? (CategoryMoveBox)
+    if (!await ask({ title: `Remove ${category}?`, message: 'The AI stops picking it for new products, and it stops needing its attributes. No product is filed under it.', confirmLabel: 'Remove', danger: true })) return;
     setBusy('remove');
     try { await onRemove(category); onClose(); } finally { setBusy(''); }
   };
   return (
     <PbModal open title={category} onClose={onClose}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingTop: 8 }}>
+        {canEdit && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 }}>
+            <label htmlFor="pbc-name" style={{ ...pbMeta, fontWeight: 600 }}>Name</label>
+            <div style={{ display: 'flex', gap: 8, minWidth: 0 }}>
+              <input id="pbc-name" value={name} onChange={e => setName(e.target.value)} maxLength={60} autoCapitalize="words" aria-describedby="pbc-name-hint"
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void rename(); } }} className="pb-input" style={{ ...pbInput, minWidth: 0 }} />
+              <PbButton icon="edit" onClick={() => void rename()} disabled={!nm || nm === category} busy={busy === 'rename'} busyLabel="Renaming…" dim={!!busy && busy !== 'rename'} style={{ flexShrink: 0 }}>Rename</PbButton>
+            </div>
+            <span id="pbc-name-hint" style={pbMeta}>A new name follows everywhere: its products, the tags it needs, Product Type ticks and website rules.</span>
+          </div>
+        )}
         <p style={{ ...pbBody, color: PB.tx2, margin: 0 }}>Every product in {category} needs a value for each attribute here before it can go to websites. Playbook fills them from the text first, then the AI.</p>
         <ol aria-label={`Attributes ${category} uses`} style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
           {linked.map((a, i) => (
@@ -117,10 +145,15 @@ export default function CategorySheet({ category, attrs, links, stats, api, addT
             </div>
           </div>
         )}
-        {canEdit && (
+        {canEdit && moving && (
+          <CategoryMoveBox from={category} count={products} categories={categories} remove api={api} addToast={addToast}
+            onDone={() => { onChanged(); onClose(); }} onCancel={() => setMoving(false)}
+            onRemoveOnly={async () => { await onRemove(category); onClose(); }} />
+        )}
+        {canEdit && !moving && (
           <div style={{ borderTop: `1px solid ${PB.tileBd}`, paddingTop: 16, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
             <PbButton kind="danger" icon="trash" onClick={() => void remove()} busy={busy === 'remove'} busyLabel="Removing…" dim={!!busy && busy !== 'remove'}>Remove category</PbButton>
-            <span style={{ ...pbBody, color: PB.tx2 }}>Asks first.</span>
+            <span style={{ ...pbBody, color: PB.tx2 }}>{products > 0 ? `Asks where its ${plural(products, 'product')} go first.` : 'Asks first.'}</span>
           </div>
         )}
       </div>

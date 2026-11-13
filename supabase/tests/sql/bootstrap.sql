@@ -20,5 +20,6 @@ create table public.pb_listings (id uuid primary key default gen_random_uuid(), 
   published_at timestamptz, attempts int not null default 0, claimed_at timestamptz, error text, created_at timestamptz default now(), updated_at timestamptz default now(), image_alts text[] not null default '{}',
   stock_due boolean not null default false, stock_tried_at timestamptz, media_checked_at timestamptz, unique (product_id, website_id));
 create table public.pb_settings (key text primary key, value jsonb not null, updated_at timestamptz not null default now());
+create table public.pb_routing_rules (id uuid primary key default gen_random_uuid(), website_id uuid, position int not null default 0, name text, enabled boolean not null default true, action text not null default 'include', conditions jsonb not null default '{}', price_override jsonb);
 create table public.pb_activity (id bigint generated always as identity primary key, product_id uuid, website_id uuid, listing_id uuid, action text not null, details jsonb not null default '{}', user_id uuid, created_at timestamptz not null default now());
 create table public.pb_import_runs (id uuid primary key default gen_random_uuid(), host text, added int default 0, found int default 0, skipped int default 0, status text, created_by uuid, created_at timestamptz default now(), finished_at timestamptz);

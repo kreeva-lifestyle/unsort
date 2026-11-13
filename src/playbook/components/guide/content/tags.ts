@@ -21,6 +21,12 @@ export const TAGS: GuideSection[] = [
       ),
       h('2 · Link attributes to categories'),
       p('Under **Categories**, tap a category (this is the same list the AI picks a category from — it used to sit on Settings) and add the attributes it uses, in the order you like. **Every attribute of a category is a must**: a product without a value for one of them waits in **Needs info** and is not sent to websites. A category you take off the list holds its products in **Needs info** with "Missing: Category" until you choose another one for them.'),
+      list(
+        '**Rename** a category in its sheet: the new name follows everywhere — its products, the tags it needs, Product Type ticks and website rules.',
+        '**Remove category** with products in it first asks where they go: pick a category and tap **Move to …**. They move, the old name leaves the list, and the word rules then the AI choose the tags the new category needs and they lack (Product Type…). **Remove without moving** leaves them waiting with "Missing: Category".',
+        'Names no longer on the list that still have products show under **Waiting for a category** (for example Anarkali after you made it a Product Type of Salwar Suit): tap one to move its products.',
+        'A move or a rename of two products or more can be taken back for 7 days on **Settings → Bulk changes**: each product that is still where the move put it goes back.',
+      ),
       p('Before linking, Playbook counts the products that lack it — "12 products will need a Colour" — and offers **Link and let AI decide** (links it and asks the AI to choose a Colour for those 12), **Link only** or **Cancel**. Unlinking frees them again.'),
       h('3 · Values that depend on the category (Product Type)'),
       p('Some values only fit one kind of product: **Bridal Lehenga** is a Lehenga, **Banarasi Saree** a Saree, **Anarkali** a Salwar Suit. Edit the attribute (Playbook has made **Product Type** for this) and turn on **Values depend on the category**. Then tap each value and tick the categories under **Offered for**: the value is offered only to products of those categories — by the word rules, the AI and you — so a saree can never be tagged Bridal Lehenga.'),

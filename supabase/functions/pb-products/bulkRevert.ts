@@ -11,6 +11,7 @@
 //     photo files (the database only says which: untouched, on no store).
 //     Kept and said: products on a store, products somebody typed into.
 //   reread — after the fields are back, the tag rules run again for them.
+// A category rename or move is taken back here entirely (categoryRevert.ts).
 // A listing that is live on its store is not hidden here: it is marked, and
 // the worker takes it off (takeOff.ts). A vendor's stock notice: the database
 // finds the listings it took off the websites by their note (PERM_NOTE); one
@@ -22,6 +23,7 @@ import { HttpError } from './http.ts';
 import { removeFiles } from './productDelete.ts';
 import { PERM_NOTE } from './stockSend.ts';
 import { retagProducts } from './tagsProduct.ts';
+import { CATEGORY_KINDS, previewCategory, revertCategory } from './categoryRevert.ts';
 
 type Counts = Record<string, number>;
 const GONE = 'That bulk change is no longer in the list.';
@@ -59,6 +61,7 @@ async function listCounts(r: RunRow): Promise<Counts> {
 
 export async function bulkPreview(b: Body) {
   const r = await runOf(b);
+  if (CATEGORY_KINDS.includes(r.kind)) return { ok: true, kind: r.kind, ...await previewCategory(r) };
   const extra = await listCounts(r);
   const res = await rpc<Record<string, unknown>>('pb_bulk_revert', { p_run: r.id, p_apply: false, p_note: noteOf(r) });
   return { ok: true, kind: r.kind, ...counts(res), ...extra };
@@ -67,6 +70,7 @@ export async function bulkPreview(b: Body) {
 export async function bulkRevert(b: Body, userId: string | null) {
   const r = await runOf(b);
   if (r.kind === 'import') return revertImport(r, userId);
+  if (CATEGORY_KINDS.includes(r.kind)) return { ok: true, kind: r.kind, ...await revertCategory(r, userId) };
   const extra = await listCounts(r);
   const res = await rpc<Record<string, unknown>>('pb_bulk_revert', { p_run: r.id, p_apply: true, p_user: userId, p_note: noteOf(r) });
   const done = { ...counts(res), ...extra };
