@@ -24,7 +24,14 @@ Types: `src/playbook/types.ts` (jsonb shapes documented there).
    text wins. Colour is a plain name from a preferred list (`COLOURS`: a trade
    name such as "Rama" → Teal Blue); the fabric is kept exactly as the post
    writes it (spelling mistakes apart); a sales line is never turned into a
-   fact. **A fresh read:** "Read again" (every unlocked field), or a product
+   fact. **The owner's own filing (13 Nov 2026, `readerExamples.ts`):** the
+   products a person filed by hand (`category` in `locked`) from the same
+   place — an imported product's website (the host in `source_ref`, with or
+   without www), a Telegram product's vendor — are the reader's examples: up
+   to 8, most words in common with this product first, each with the store's
+   own type word ("Pink Cotton Suit Set (the store's own type: Dresses) →
+   Salwar Suit"), categories off the list left out. They come after the facts
+   in the prompt; a failed lookup only leaves them out. **A fresh read:** "Read again" (every unlocked field), or a product
    read before that is put back to `new` with `ai_read_at` still set (the
    worker then re-judges only name, fabric, colour and the reader's own
    `attributes` keys; sku, category, sizes and cost are filled only when
