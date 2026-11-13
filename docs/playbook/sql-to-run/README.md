@@ -12,7 +12,7 @@ by hand once:
 
 | File | What it adds | Tested |
 |---|---|---|
-| `20261113090000_pb_bulk_log_tags_stock.sql` | Bulk-change log, part 2: changes to the tag lists and a vendor's stock notice are recorded and can be reverted | On a local PostgreSQL 16 with `supabase/tests/bulk_log/run.sh`: every scenario returns the data exactly to its start |
+| `20261113090000_pb_bulk_log_tags_stock.sql` | Bulk-change log, part 2: changes to the tag lists and a vendor's stock notice are recorded and can be reverted | On a local PostgreSQL 16 with `supabase/tests/sql/run.sh`: every scenario returns the data exactly to its start |
 
 Until it is run, those two kinds of change are simply not in the log;
 nothing that is live depends on it.

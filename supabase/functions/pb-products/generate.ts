@@ -16,7 +16,7 @@ import { ago, enc, logActivity, nowIso, one, patch, sel, uniqueCi } from './db.t
 import { factValues, genFacts, genSchema, genSystem, limitsOf, type GenOut } from './genPrompt.ts';
 import { writeCopy } from './genWrite.ts';
 import { HttpError, plain, usdOf } from './http.ts';
-import { aiPhotos } from './photos.ts';
+import { aiPhotos, galleryOf } from './photos.ts';
 import { compareAt, listingPrice } from './pricing.ts';
 import { cleanKeyword, keywordOf, profileOf } from './profile.ts';
 import { checkCopy, hardOf, type Version } from './seoCheck.ts';
@@ -76,7 +76,7 @@ export async function generateOne(l: ListingRow, o: { manual: boolean; prevStatu
     }
     const [vendor, imgs, rule, seoRows] = await Promise.all([
       p.vendor_id ? one<{ name: string; codes: string[] | null }>(`pb_vendors?id=eq.${enc(p.vendor_id)}&select=name,codes`) : Promise.resolve(null),
-      sel<{ path: string }>(`pb_product_images?product_id=eq.${enc(p.id)}&kind=eq.image&select=path&order=position.asc&limit=20`),
+      galleryOf(p.id),
       l.rule_id ? one<{ price_override: { markup_pct?: number; add_flat?: number } | null }>(`pb_routing_rules?id=eq.${enc(l.rule_id)}&select=price_override`) : Promise.resolve(null),
       seoGet([l.id]),
     ]);

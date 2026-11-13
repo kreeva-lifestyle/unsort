@@ -4,9 +4,14 @@
 // (transforms off on the plan) the photo is left out instead of failing the
 // whole read / write. Shopify still gets the full-size original (publicUrl).
 import { type Block, imageBlock } from './ai.ts';
-import { enc, publicUrl, SB_URL } from './db.ts';
+import { enc, publicUrl, sel, SB_URL } from './db.ts';
 import { fetchT } from './http.ts';
 import { BUCKET } from './types.ts';
+
+/** A product's photos as the writer and the stores get them: in order, the first 20 (videos are for staff). One
+ *  definition, because routing compares this list with what a store was last sent (route.ts `behind`). */
+export const galleryOf = (productId: string) =>
+  sel<{ path: string }>(`pb_product_images?product_id=eq.${enc(productId)}&kind=eq.image&select=path&order=position.asc&limit=20`);
 
 const AI_MAX_BYTES = 4_500_000;
 const CHECK_MS = 6_000;
