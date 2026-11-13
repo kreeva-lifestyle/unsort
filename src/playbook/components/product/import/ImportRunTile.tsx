@@ -1,7 +1,8 @@
 // The import run tile at the top of Products: where the newest run is
 // (dot + label, the host, mono counts), refreshed every 10 s by useImportRun.
 // Running: "You can leave this page" + Cancel import. Done: the counts +
-// Show these products (the list filtered to the run's vendor) + Dismiss.
+// Show these products (the list filtered to the website they were copied from — an import may have no vendor,
+// owner 2026-11-13) + Dismiss.
 // Failed: the plain reason (failed tint) + Try again (opens the sheet with the
 // address; not offered when the store's own rules refused us) + Dismiss. Cancel is a secondary button — the one
 // gradient on Products stays "+ Add product".
@@ -16,7 +17,7 @@ import { Dot } from '../status';
 import { RUN_STATUS, importError, refusedByStore, runCounts, runTitle } from './importText';
 
 export default function ImportRunTile({ run, pollError, onChanged, onDismiss, onRetry, onShow, addToast }: {
-  run: ImportRunRow; pollError: string; onChanged: () => void; onDismiss: () => void; onRetry: (url: string) => void; onShow?: (vendorId: string) => void; addToast: AddToast;
+  run: ImportRunRow; pollError: string; onChanged: () => void; onDismiss: () => void; onRetry: (url: string) => void; onShow?: (host: string) => void; addToast: AddToast;
 }) {
   const [cancelling, setCancelling] = useState(false);
   const st = RUN_STATUS[run.status];
@@ -51,7 +52,7 @@ export default function ImportRunTile({ run, pollError, onChanged, onDismiss, on
       </div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginLeft: 'auto' }}>
         {active && <PbButton onClick={() => void cancel()} busy={cancelling} busyLabel="Cancelling…">Cancel import</PbButton>}
-        {run.status === 'done' && run.added > 0 && run.vendor_id && onShow && <PbButton onClick={() => onShow(run.vendor_id!)}>Show these products</PbButton>}
+        {run.status === 'done' && run.added > 0 && onShow && <PbButton onClick={() => onShow(run.host)}>Show these products</PbButton>}
         {run.status === 'failed' && !refusedByStore(run.error) && <PbButton icon="refresh" onClick={() => onRetry(run.url)}>Try again</PbButton>}
         {!active && <PbButton onClick={onDismiss}>Dismiss</PbButton>}
       </div>

@@ -2,12 +2,15 @@
 // "Sell at their price", each switch row with the consequence spelled out
 // (copy-and-a11y.md §A4). A store pricing in another currency (`foreign`)
 // gets no price switch: nothing is copied.
-// The vendor (owner, 2026-11-12: "why is it asking for vendor name"): a
-// website imported before is not asked again — the vendor of its last import
-// is shown as a line with Change. On a first import the box is prefilled from
-// the site's name and the vendors already in Playbook are offered as chips,
-// because the stores copied here sell the products of vendors the owner
-// already knows: one tap instead of typing, and no second vendor from a typo.
+// The vendor is optional (owner, 2026-11-13: "vendor not mandatory while
+// scrapping from website"): left empty, the products come in without one and
+// it can be set on any product later. A website imported before is not asked
+// again — the vendor of its latest import is shown as a line with Change (and
+// none if that import had none). On a first import the box starts empty and the
+// vendors already in Playbook are offered as chips, because the stores copied
+// here sell the products of vendors the owner already knows: one tap instead
+// of typing, and no second vendor from a typo. (Until 2026-11-13 the box was
+// required and prefilled with the website's own name.)
 import { useState, type ReactNode } from 'react';
 import { PB, pbInput, pbLabel, pbMeta, pbName } from '../../../pbTheme';
 import PbButton from '../../ui/PbButton';
@@ -36,8 +39,8 @@ export function vendorChoices(vendors: string[], typed: string, suggested: strin
   return fits.filter(v => v.toLowerCase() !== t).slice(0, 8);
 }
 
-export default function ImportOptions({ value, onChange, disabled, vendorError, foreign, lastVendor, suggested = '', vendors = [] }: {
-  value: ImportChoices; onChange: (v: ImportChoices) => void; disabled?: boolean; vendorError?: string; foreign?: string | null;
+export default function ImportOptions({ value, onChange, disabled, foreign, lastVendor, suggested = '', vendors = [] }: {
+  value: ImportChoices; onChange: (v: ImportChoices) => void; disabled?: boolean; foreign?: string | null;
   /** The vendor this website's last import was filed under: shown instead of asking again. */
   lastVendor?: string | null;
   /** The name read from the site (what the box is prefilled with on a first import). */
@@ -62,10 +65,10 @@ export default function ImportOptions({ value, onChange, disabled, vendorError, 
         </div>
       ) : (
         <div style={{ minWidth: 0 }}>
-          <label htmlFor="pb-imp-vendor" style={pbLabel}>Vendor</label>
+          <label htmlFor="pb-imp-vendor" style={pbLabel}>Vendor (optional)</label>
           <input id="pb-imp-vendor" value={value.vendor} onChange={e => set({ vendor: e.target.value })} maxLength={120} disabled={disabled}
             placeholder="e.g. Kalki Fashion" autoCapitalize="words" enterKeyHint="done" className="pb-input" style={pbInput}
-            aria-describedby="pb-imp-vendor-hint" aria-invalid={vendorError ? true : undefined} />
+            aria-describedby="pb-imp-vendor-hint" />
           {picks.length > 0 && (
             <div style={{ marginTop: 8 }}>
               <PbChipRow label="Vendors already in Playbook">
@@ -74,8 +77,7 @@ export default function ImportOptions({ value, onChange, disabled, vendorError, 
             </div>
           )}
           <div id="pb-imp-vendor-hint" style={{ ...pbMeta, marginTop: 8 }}>
-            {vendorError ? <span style={{ color: PB.failed }}>{vendorError}</span>
-              : 'Who these products come from. A website does not say, so Playbook asks once and remembers it for this website. Tap a vendor you already have, or type a new name.'}
+            Who makes these products. Leave it empty if you don’t know: they come in without a vendor, and you can set one on any product later. Tap one of your vendors or type a name — Playbook remembers it for this website.
           </div>
         </div>
       )}

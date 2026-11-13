@@ -122,6 +122,13 @@ export default function Products({ addToast, start = {}, onGuide }: { addToast: 
   const filtered = !!(filter.search || filter.status || filter.vendorId || filter.websiteId || filter.source);
   const add = () => setAdding(true);
   const openImport = (url = '') => setImporting({ open: true, url });
+  // "Show these products" on a finished import: the list filtered to the website they were copied from (an import
+  // may have no vendor). A website first imported in this visit is not in the Source choices yet: added here.
+  const showImport = (host: string) => {
+    const v = `import:${host.replace(/^www\./, '')}`;
+    setSources(s => (s.some(o => o.v === v) ? s : [...s, { v, label: v.slice(7) }]));
+    setSearch(''); setFilter({ ...EMPTY_FILTER, source: v });
+  };
   // The products arrive while the run goes; the list refreshes once when it finishes.
   const runDone = imp.run?.status === 'done';
   useEffect(() => { if (runDone) void load(); }, [runDone, load]);
@@ -138,7 +145,7 @@ export default function Products({ addToast, start = {}, onGuide }: { addToast: 
           phoneAction={<PbButton kind="primary" iconOnly icon="plus" aria-label="Add product" onClick={add} />} />
         {imp.run && (
           <div style={{ marginBottom: 'var(--pb-pad-tile)' }}>
-            <ImportRunTile run={imp.run} pollError={imp.error} onChanged={() => void imp.reload()} onDismiss={() => imp.dismiss(imp.run!.id)} onRetry={openImport} onShow={id => { setSearch(''); setFilter({ ...EMPTY_FILTER, vendorId: id }); }} addToast={addToast} />
+            <ImportRunTile run={imp.run} pollError={imp.error} onChanged={() => void imp.reload()} onDismiss={() => imp.dismiss(imp.run!.id)} onRetry={openImport} onShow={showImport} addToast={addToast} />
           </div>
         )}
         {/* Phone: the header holds one action (+), so the import lives as a row at the top of the list. */}

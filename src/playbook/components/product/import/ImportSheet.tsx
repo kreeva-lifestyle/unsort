@@ -1,8 +1,8 @@
 // "Import from website" (PbModal sheet on phone / modal on desktop): paste a
 // store's address → Check website → the preview (platform, estimate, what is
 // already here from an earlier import, 3 samples, warnings) and the choices
-// (vendor, in-stock only, their price, manufacturers to leave out: MakerSkip) → the one primary, "Import ~980
-// products" — or "Check for new products" when the website was imported before. The run itself happens on the
+// (vendor — optional, owner 2026-11-13 —, in-stock only, their price, manufacturers to leave out: MakerSkip) → the one
+// primary, "Import ~980 products" — or "Check for new products" when the website was imported before. The run itself happens on the
 // server; the Products page shows its progress tile. Only one gradient at a
 // time: "Check website" while nothing is checked, the Import button after.
 // Typing makes the form dirty (PbModal asks "Discard this import?" on ×/Back).
@@ -34,7 +34,6 @@ export default function ImportSheet({ open, initialUrl = '', onClose, onStarted,
   const [choices, setChoices] = useState<ImportChoices>(CHOICES);
   const [busy, setBusy] = useState<'' | 'check' | 'start'>('');
   const [err, setErr] = useState('');
-  const [vendorErr, setVendorErr] = useState('');
   const phone = useIsPhone();
   const errBox = useRef<HTMLDivElement>(null);
   const seq = useRef(0); // the current check; a closed sheet or a new check makes an older answer stale
@@ -42,7 +41,7 @@ export default function ImportSheet({ open, initialUrl = '', onClose, onStarted,
   // A Retry from the run tile opens the sheet with that run's address.
   useEffect(() => { if (open) setUrl(initialUrl); }, [open, initialUrl]);
 
-  const reset = () => { setUrl(''); setCheck(null); setChoices(CHOICES); setErr(''); setVendorErr(''); };
+  const reset = () => { setUrl(''); setCheck(null); setChoices(CHOICES); setErr(''); };
   const close = () => { if (busy === 'start') return; seq.current++; setBusy(''); reset(); onClose(); };
   const usable = check && !nothingFound(check);
   // A store that prices in another currency: nothing is copied, whatever the switch says (the server skips it).
@@ -60,13 +59,13 @@ export default function ImportSheet({ open, initialUrl = '', onClose, onStarted,
         const c = await checkWebsite(address);
         if (my !== seq.current) return;
         setCheck(c);
-        // A website imported before keeps its vendor; a new one starts from the site's own name.
-        setChoices(x => ({ ...x, vendor: x.vendor || c.last_vendor || c.vendor_suggestion || c.host, skip: c.last_skip_makers ?? [] }));
+        // A website imported before keeps its latest import's vendor (or none); a new one starts empty — the vendor is
+        // optional, and the website's own name is usually the shop, not who makes the clothes.
+        setChoices(x => ({ ...x, vendor: x.vendor || c.last_vendor || '', skip: c.last_skip_makers ?? [] }));
       } catch (e2) { if (my === seq.current) setErr(importError(e2)); } finally { if (my === seq.current) setBusy(''); }
       return;
     }
-    if (!choices.vendor.trim()) { setVendorErr('Enter a vendor name'); return; }
-    setBusy('start'); setErr(''); setVendorErr('');
+    setBusy('start'); setErr('');
     try {
       const r = await startImport({ url: address, in_stock_only: choices.inStockOnly, use_their_price: choices.theirPrice && !foreign, vendor_name: choices.vendor.trim(), estimate: (choices.inStockOnly ? check.estimate_in_stock ?? check.estimate : check.estimate) ?? null, skip_makers: choices.skip });
       addToast(`Import from ${check.host} started — it runs on the server, you can leave this page`, 'success');
@@ -75,7 +74,7 @@ export default function ImportSheet({ open, initialUrl = '', onClose, onStarted,
     } catch (e2) { setErr(importError(e2)); setBusy(''); }
   };
   // Editing the address after a check throws the preview and its choices away: they belong to the old store.
-  const onUrl = (v: string) => { setUrl(v); if (check) { setCheck(null); setChoices(CHOICES); setVendorErr(''); setErr(''); } };
+  const onUrl = (v: string) => { setUrl(v); if (check) { setCheck(null); setChoices(CHOICES); setErr(''); } };
 
   const primary = usable ? importLabel(check, choices.inStockOnly) : 'Check website';
   return (
@@ -103,7 +102,7 @@ export default function ImportSheet({ open, initialUrl = '', onClose, onStarted,
           </div>
         </div>
         {check && <ImportPreview check={check} inStockOnly={choices.inStockOnly} />}
-        {usable && <ImportOptions value={choices} onChange={v => { setChoices(v); setVendorErr(''); }} disabled={busy === 'start'} vendorError={vendorErr} foreign={foreign}
+        {usable && <ImportOptions value={choices} onChange={setChoices} disabled={busy === 'start'} foreign={foreign}
           lastVendor={check.last_vendor} suggested={check.vendor_suggestion || check.host} vendors={vendors} />}
         {usable && <MakerSkip maker={check.maker} skip={choices.skip} onChange={skip => setChoices(x => ({ ...x, skip }))} disabled={busy === 'start'} />}
         {usable && <LegalLine onGuide={onGuide ? () => { reset(); onClose(); onGuide('import-website'); } : undefined} />}
