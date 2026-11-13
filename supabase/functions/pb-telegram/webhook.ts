@@ -6,11 +6,14 @@
 //   - a group turned into a supergroup (its id changes) → the new id is kept;
 //   - a FORWARDED message in the linked group → pb_tg_messages (duplicates
 //     ignored), last_message_at updated. The crawler's own mapping
-//     (pb_tg_forwards) fixes its origin when the header names another channel.
+//     (pb_tg_forwards) fixes its origin when the header names another channel;
+//   - the bot removed from the linked group, or added back (groupCheck.ts):
+//     Settings says so and the crawler holds its forwards meanwhile.
 // Everything else is ignored. Answers 200 at once, except when saving a
 // forwarded message failed: then 500, so Telegram sends it again.
 import { insert, nowIso } from '../pb-products/db.ts';
 import { HttpError, plain } from '../pb-products/http.ts';
+import { groupChanged, refreshGroup } from './groupCheck.ts';
 import { parseUpdate } from './parse.ts';
 import { config, rpc, saveConfig, scrub, secrets, tg, type TgSecrets } from './tg.ts';
 
@@ -69,7 +72,11 @@ export async function webhook(req: Request): Promise<Response> {
         return ok();
       }
       const r = await rpc<string>('pb_tg_link_try', { p_code: p.link, p_chat: p.chat_id, p_title: p.chat_title ?? null });
-      if (r === 'linked') await say(token, p.chat_id, 'Linked to Playbook ✓');
+      if (r === 'linked') {
+        await say(token, p.chat_id, 'Linked to Playbook ✓');
+        // A new group: what was known about the old one no longer holds — ask Telegram about this one now.
+        await refreshGroup(token, await config(), true).catch((e) => console.error(`pb-telegram group check: ${scrub(plain(e), token)}`));
+      }
       else if (r === 'wrong') await say(token, p.chat_id, 'That code is not right or has expired — get a new one in Playbook → Settings → Telegram.');
       else if (r === 'locked') await say(token, p.chat_id, 'Too many wrong codes — get a new code in Playbook → Settings → Telegram.');
       return ok(); // 'none': no code is live — no answer at all
@@ -78,13 +85,21 @@ export async function webhook(req: Request): Promise<Response> {
       if (cfg.group_chat_id === p.migrate.from) await saveConfig({ group_chat_id: p.migrate.to });
       return ok();
     }
-    if (!p.row || cfg.group_chat_id === null || p.chat_id !== cfg.group_chat_id) return ok();
+    if (cfg.group_chat_id === null || p.chat_id !== cfg.group_chat_id) return ok();
+    // The bot's own place in the group (its id is the number before the colon in its token).
+    if (p.member && (p.member.bot || p.member.users.includes(Number(token.split(':')[0])))) {
+      await groupChanged(token, p.member.change).catch((e) => console.error(`pb-telegram group state: ${scrub(plain(e), token)}`));
+      return ok();
+    }
+    if (!p.row) return ok();
     try {
       await insert('pb_tg_messages', [{ ...p.row }], { onConflict: 'chat_id,message_id', mode: 'ignore' });
     } catch (e) {
       if (!(e instanceof HttpError && e.status === 409)) throw e; // the same update twice (update_id) is fine
     }
-    await saveConfig({ last_message_at: nowIso(), ...(p.chat_title && p.chat_title !== cfg.group_title ? { group_title: p.chat_title } : {}) }).catch((e) => console.error(`pb-telegram last_message_at: ${plain(e)}`));
+    // A forward that arrives is proof the bot reads the group: a "not in the group" answer is out of date.
+    await saveConfig({ last_message_at: nowIso(), ...(p.chat_title && p.chat_title !== cfg.group_title ? { group_title: p.chat_title } : {}),
+      ...(cfg.group_ok === false ? { group_ok: true, group_error: null, group_checked_at: nowIso() } : {}) }).catch((e) => console.error(`pb-telegram last_message_at: ${plain(e)}`));
     return ok();
   } catch (e) {
     console.error(`pb-telegram webhook: ${scrub(plain(e), token)}`);

@@ -18,6 +18,8 @@ export type DashData = {
   noted: number; oldestReview: string | null;
   /** When the worker last ran (null = not recorded yet) · the day's AI limit in ₹ (0 = none) · ₹ of AI today (null = could not be read). */
   lastRun: string | null; limit: number; spentToday: number | null;
+  /** Why vendor posts from Telegram are not coming in, in one sentence (null: all is well, or Telegram is not set up). */
+  telegram: string | null;
 };
 
 export type DashGo = (p: PbPage, s?: ProductsStart) => void;

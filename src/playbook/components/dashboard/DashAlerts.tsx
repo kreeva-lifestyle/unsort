@@ -9,7 +9,10 @@
 //   store     a website whose last contact with Shopify failed (a rejected
 //             key, a missing permission, a frozen store);
 //   noted     published listings that carry a note (a photo Shopify could
-//             not process, a field it refused…), with the list one tap away.
+//             not process, a field it refused…), with the list one tap away;
+//   telegram  the bot is out of the admin group or cannot read it, or
+//             forwarded posts never arrived (pre-launch fix D20: these were
+//             silent, and whole nights of vendor posts were lost).
 // Where a message is sent when nobody is looking at this page (Telegram,
 // phone) is the owner's decision and is not built here.
 import type { ReactNode } from 'react';
@@ -49,6 +52,11 @@ export default function DashAlerts({ d, go }: { d: DashData; go: DashGo }) {
       {over && (
         <Banner id="pb-dash-limit" tone="review" button="Open Settings" onOpen={() => go('settings')} title="Today’s AI limit is used up">
           The AI has cost {rupees(d.spentToday ?? 0)} today (limit {rupees(d.limit)}). Nothing more is written until tomorrow, or a higher limit. Vendor posts are still read, and sending to Shopify goes on.
+        </Banner>
+      )}
+      {d.telegram && (
+        <Banner id="pb-dash-telegram" tone="failed" button="Open Settings" onOpen={() => go('settings')} title="Telegram: vendor posts are not coming in">
+          {d.telegram}
         </Banner>
       )}
       {broken.slice(0, 3).map(s => (

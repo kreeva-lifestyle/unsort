@@ -15,6 +15,13 @@
 //     restart, a dropped line, Telegram's limits) is not reported checked, so
 //     it carries on from the cursor next cycle. A channel whose check failed
 //     waits a few minutes, so one broken channel never holds up the others.
+//   - Playbook's bot is not reading the admin group (removed from it, or not
+//     an admin): crawler_config says so in `group_problem` and marks nothing
+//     due. Nothing is forwarded and no cursor moves, so no post is passed by
+//     while nobody is reading; the reason is reported as this crawler's status.
+//   - Forwards that never reached Playbook: crawler_config gives the channel
+//     a `rewind_to`. Its cursor goes back to that post, which is reported
+//     (`rewound`), and its next daily check sends those posts again.
 // State lives between cycles in memory; Playbook keeps the cursors too, so a
 // restart carries on. A report before the first channel list (signed out,
 // stopped early) sends no list at all, so it never wipes Playbook's cursors.
@@ -32,6 +39,7 @@ export function makeCrawler({ tg, pb, version, backfill = 0, forwardGapMs = 1500
   let globalError = null;
   let lastReport = 0;
   let synced = false;               // false until the first channel list from Playbook (a report before it sends no list)
+  let heldWhy = null;               // why Playbook asked to wait (its bot is not reading the group), as last logged
   const forwarded = [];             // { group_message_id, channel_id, message_id } not yet reported
   const flood = { until: 0 };       // a long flood wait pauses every channel
   const pacer = makePacer(forwardGapMs, sleep, now);
@@ -53,6 +61,7 @@ export function makeCrawler({ tg, pb, version, backfill = 0, forwardGapMs = 1500
         ...(s.readyPending ? { cursor_ready: true } : {}),
         ...(s.checkedPending ? { checked: true } : {}),
         ...(s.lastSent != null ? { sent: s.lastSent } : {}),
+        ...(s.rewound != null ? { rewound: s.rewound } : {}),
       })),
     };
   }
@@ -63,9 +72,11 @@ export function makeCrawler({ tg, pb, version, backfill = 0, forwardGapMs = 1500
     onReport();
     const fwd = forwarded.splice(0, 1000);
     const marked = [...channels.values()].filter(s => s.checkedPending || s.readyPending);
+    const back = [...channels.values()].filter(s => s.rewound != null).map(s => [s, s.rewound]);
     try {
       await pb.progress(payload(error, fwd));
       for (const s of marked) { s.checkedPending = false; s.readyPending = false; }
+      for (const [s, to] of back) if (s.rewound === to) s.rewound = null;   // Playbook knows: said once
       return true;
     } catch (e) {
       forwarded.unshift(...fwd);       // sent again next time (and so is `checked`)
@@ -94,6 +105,12 @@ export function makeCrawler({ tg, pb, version, backfill = 0, forwardGapMs = 1500
         s.cursor = null; s.entity = null; s.checkedPending = false; s.runSent = 0;
       }
       s.cursor = mergeCursor(s.cursor, ch.last_id);
+      // Forwards after this post never reached Playbook: go back to it (never forward of where it is).
+      const to = ch.rewind_to == null ? NaN : Number(ch.rewind_to);
+      if (Number.isSafeInteger(to) && to >= 0 && s.cursor != null && to < s.cursor) {
+        log(`${s.username ? '@' + s.username : s.channel_id}: going back to message ${to} — posts after it did not reach Playbook; they are sent again at the next daily check`);
+        s.cursor = to; s.rewound = to; s.checkedPending = false;
+      }
       s.due = !!ch.due;
       s.dueAt = Date.parse(ch.next_check_at || '') || Infinity;
     }
@@ -140,8 +157,14 @@ export function makeCrawler({ tg, pb, version, backfill = 0, forwardGapMs = 1500
     const cfg = await pb.config();
     syncList(Array.isArray(cfg.channels) ? cfg.channels : []);
     await ensureGroup(cfg.group_chat_id);
-    const out = { sent: 0, setup: null, checked: null, channels: channels.size, grouped: !!group };
-    if (group) {                      // no group yet: nothing is set up either, so nothing piles up
+    // Playbook's bot is not reading the group: forwarding now would pass posts by unread.
+    const held = typeof cfg.group_problem === 'string' && cfg.group_problem ? cfg.group_problem.slice(0, 280) : null;
+    if (held && heldWhy !== held) log(`Waiting: ${held}`);   // once, not every cycle
+    if (!held && heldWhy) log('Playbook’s bot is reading the admin group again — carrying on');
+    heldWhy = held;
+    if (held && group) globalError = held;
+    const out = { sent: 0, setup: null, checked: null, channels: channels.size, grouped: !!group, held: !!held };
+    if (group && !held) {             // no group yet: nothing is set up either, so nothing piles up
       const { setup, check } = pick();
       const ctx = {
         tg, group: group.entity, backfill, pacer, sleep, now, log, forwarded, flood,

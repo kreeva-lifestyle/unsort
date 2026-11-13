@@ -10,9 +10,9 @@
 // never set). It only moves after Telegram accepted a forward and is reported
 // every few seconds, so a crash or error never loses a post (at worst one
 // album is sent twice, and Playbook files a post once per channel + message id).
-// Each forward's {group message → channel post} goes to ctx.forwarded, so
-// Playbook knows the vendor even for a repost (whose forward header names the
-// original channel).
+// Each forward's {group message → channel post, when the vendor posted it}
+// goes to ctx.forwarded, so Playbook knows the vendor and the post's own time
+// even for a repost (whose forward header names the original channel and date).
 import { planBatches, startCursor } from './batch.mjs';
 import { channelErrorText, classify, isFatal } from './errors.mjs';
 
@@ -128,7 +128,9 @@ async function forwardUnit(s, u, ctx) {
     try {
       const got = await ctx.tg.forward(ctx.group, s.entity, u.ids);
       (Array.isArray(got) ? got : []).forEach((gid, i) => {
-        if (gid != null && u.ids[i] != null) ctx.forwarded?.push({ group_message_id: gid, channel_id: s.channel_id, message_id: u.ids[i] });
+        if (gid != null && u.ids[i] != null) {
+          ctx.forwarded?.push({ group_message_id: gid, channel_id: s.channel_id, message_id: u.ids[i], ...(u.dates?.[i] != null ? { posted_at: u.dates[i] } : {}) });
+        }
       });
       return 'sent';
     } catch (e) {

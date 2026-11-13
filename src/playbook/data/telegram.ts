@@ -7,12 +7,24 @@ import { pbFnCall } from './pbFunctions';
 import type { PbTgChannel, PbTgConfig, PbVendor } from '../types';
 
 const CONFIG_COLS = 'bot_username,group_chat_id,group_title,link_code,link_code_expires_at,link_attempts,webhook_ok,webhook_error,'
-  + 'crawler_seen_at,crawler_version,crawler_error,crawler_channels,crawl_window_start,crawl_window_end,last_message_at,updated_at';
+  + 'crawler_seen_at,crawler_version,crawler_error,crawler_channels,crawl_window_start,crawl_window_end,last_message_at,updated_at,group_ok,group_error,group_checked_at';
 /** Defaults of the migration (23:00 → 07:00 IST), until the row says otherwise. */
 export const WINDOW_DEFAULT = { start: 1380, end: 420 };
 
-/** waiting: not used yet; retrying: failed once or twice, tried again by itself; failed: gave up after 3 tries. */
-export type TgStatus = { config: PbTgConfig | null; waiting: number; retrying: number; failed: number; schedule: TgScheduleRow[] };
+/** waiting: not used yet; retrying: failed once or twice, tried again by itself; failed: gave up after 3 tries;
+ *  skipped: set aside in the last 7 days for a reason worth a look (not separators or repeated posts);
+ *  lost: forwards the crawler made that never reached Playbook, per channel. */
+export type TgStatus = { config: PbTgConfig | null; waiting: number; retrying: number; failed: number; skipped: number; lost: TgLost[]; schedule: TgScheduleRow[] };
+/** One vendor channel whose forwarded posts did not arrive (pb_tg_lost_forwards). */
+export type TgLost = { origin_chat_id: number; origin_title: string | null; origin_username: string | null; lost: number; first_id: number; last_id: number };
+/** Why a message was not used. Separators (stickers, arrows) and repeated posts are not listed: they hide nothing. */
+export const SKIP_WHY: Record<string, string> = {
+  no_photos: 'Text with no photos and no price',
+  chatter: 'Not about a product (a greeting, payment details, a contact line)',
+  no_vendor: 'Forwarded from a person, not from a channel, so the vendor is not known',
+  less_alone: 'A “Less” with no product right before it',
+};
+const WORTH_A_LOOK = Object.keys(SKIP_WHY);
 /** One vendor channel in the daily-check list (Settings → Telegram → Crawler). */
 export type TgScheduleRow = Pick<PbVendor, 'id' | 'name' | 'active' | 'tg_username' | 'tg_title' | 'tg_channel_id' | 'tg_slot_minute' | 'tg_slot_set_at' | 'tg_checked_at' | 'tg_cursor_ready'>;
 const SCHEDULE_COLS = 'id,name,active,tg_username,tg_title,tg_channel_id,tg_slot_minute,tg_slot_set_at,tg_checked_at,tg_cursor_ready';
@@ -29,23 +41,53 @@ const asChannels = (v: unknown): PbTgChannel[] => (Array.isArray(v) ? v : []).fi
 export async function getTgStatus(): Promise<TgStatus> {
   const msgs = () => supabase.from('pb_tg_messages').select('id', { count: 'exact', head: true });
   const since = new Date(Date.now() - RETRY_DAYS * 86_400_000).toISOString();
-  const [cfg, waiting, failedAll, retrying, sched] = await Promise.all([
+  const [cfg, waiting, failedAll, retrying, skipped, lost, sched] = await Promise.all([
     supabase.from('pb_tg_config').select(CONFIG_COLS).eq('id', 1).maybeSingle(),
     msgs().eq('state', 'pending'),
     msgs().eq('state', 'failed'),
     msgs().eq('state', 'failed').gt('received_at', since).or(RETRYING),
+    msgs().eq('state', 'ignored').gt('received_at', since).in('skip_why', WORTH_A_LOOK),
+    supabase.rpc('pb_tg_lost_forwards'),
     // The channels the crawler checks: active vendors with a channel (the same filter as crawler_config).
     supabase.from('pb_vendors').select(SCHEDULE_COLS).eq('active', true).or('tg_username.not.is.null,tg_channel_id.not.is.null')
       .order('tg_slot_minute', { ascending: true, nullsFirst: false }).limit(500),
   ]);
-  for (const r of [cfg, waiting, failedAll, retrying, sched]) if (r.error) throw r.error;
+  for (const r of [cfg, waiting, failedAll, retrying, skipped, lost, sched]) if (r.error) throw r.error;
   const row = cfg.data as (Omit<PbTgConfig, 'crawler_channels'> & { crawler_channels: unknown }) | null;
   return {
     config: row ? { ...row, crawler_channels: asChannels(row.crawler_channels) } : null,
     waiting: waiting.count ?? 0, retrying: retrying.count ?? 0,
     failed: Math.max(0, (failedAll.count ?? 0) - (retrying.count ?? 0)),
+    skipped: skipped.count ?? 0, lost: (lost.data ?? []) as TgLost[],
     schedule: (sched.data ?? []) as TgScheduleRow[],
   };
+}
+
+export type TgSkipped = { id: number; title: string; username: string | null; postId: number | null; kind: string; text: string; why: string; at: string };
+/** The messages set aside in the last 7 days that may hide something (newest first, up to 50). */
+export async function listSkipped(): Promise<TgSkipped[]> {
+  const { data, error } = await supabase.from('pb_tg_messages')
+    .select('id,origin_title,origin_username,origin_message_id,kind,text,skip_why,received_at')
+    .eq('state', 'ignored').gt('received_at', new Date(Date.now() - RETRY_DAYS * 86_400_000).toISOString()).in('skip_why', WORTH_A_LOOK)
+    .order('received_at', { ascending: false }).limit(50);
+  if (error) throw error;
+  return (data ?? []).map(r => ({
+    id: r.id as number, title: r.origin_title || (r.origin_username ? `@${r.origin_username}` : 'Unknown sender'), username: r.origin_username,
+    postId: r.origin_message_id as number | null, kind: String(r.kind || ''), text: String(r.text || '').slice(0, 200),
+    why: SKIP_WHY[String(r.skip_why)] ?? 'Not used', at: r.received_at as string,
+  }));
+}
+
+/** For the dashboard: why vendor posts are not coming in, in one sentence; null when all is well or Telegram is not set up. */
+export async function telegramTrouble(): Promise<string | null> {
+  const { data, error } = await supabase.from('pb_tg_config').select('group_chat_id,group_ok,group_error').eq('id', 1).maybeSingle();
+  if (error) throw error;
+  if (!data?.group_chat_id) return null;
+  if (data.group_ok === false) return data.group_error || 'The bot is not reading the admin group, so no vendor post is copied.';
+  const lost = await supabase.rpc('pb_tg_lost_forwards');
+  if (lost.error) throw lost.error;
+  const n = ((lost.data ?? []) as TgLost[]).reduce((a, l) => a + l.lost, 0);
+  return n ? `${n} forwarded ${n === 1 ? 'post' : 'posts'} never reached Playbook. ${n === 1 ? 'It is' : 'They are'} sent again at the channel’s next daily check; Settings shows which.` : null;
 }
 
 export type TgFailedPost = { key: string; title: string; username: string | null; firstId: number | null; messages: number; note: string };
@@ -83,8 +125,8 @@ export const createCrawlerKey = () => tg<{ key: string }>('crawler_key');
 export const respreadSlots = () => tg<{ ok: boolean }>('respread');
 /** Admin / manager: the overnight window (IST minutes of day, may cross midnight, at least 60 min); the server respreads the channels. */
 export const saveCrawlWindow = (start: number, end: number) => tg<{ ok: boolean }>('save_window', { start, end });
-/** Asks Telegram whether the bot's webhook points at Playbook. */
-export const testBot = () => tg<{ ok: boolean; url_ok: boolean; pending_update_count: number; last_error_message: string | null }>('test_bot');
+/** Asks Telegram whether the bot's webhook points at Playbook, and whether the bot is in the admin group and can read it. */
+export const testBot = () => tg<{ ok: boolean; url_ok: boolean; pending_update_count: number; last_error_message: string | null; group_ok?: boolean | null; group_error?: string | null }>('test_bot');
 
 /** The code from the config row while it is still valid. */
 export const activeCode = (c: PbTgConfig | null, now = Date.now()) =>

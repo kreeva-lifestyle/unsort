@@ -115,6 +115,8 @@ export default function ListingEditor({ listing, site, onClose, onChanged, addTo
         {l.compare_at_price != null && <span>Was <s style={pbNum}>{rupees(l.compare_at_price)}</s></span>}
         {l.generated_at && <span>Written <span style={{ color: PB.tx3 }}>{shortDate(l.generated_at)}</span></span>}
         {l.published_at && <span>Published <span style={{ color: PB.tx3 }}>{shortDate(l.published_at)}</span></span>}
+        {/* A re-send moves "Published"; the day it first went live stays (shown once the two differ). */}
+        {l.first_published_at && l.first_published_at !== l.published_at && <span>First live <span style={{ color: PB.tx3 }}>{shortDate(l.first_published_at)}</span></span>}
         {l.ai_cost_usd != null && <span>AI cost <span style={{ ...pbNum, color: PB.tx }}>{aiRupees(l.ai_cost_usd)}</span></span>}
         {admin && (
           <a href={admin} target="_blank" rel="noreferrer" className="pb-pill pb-phone-full" style={{ ...pbBtnSecondary, marginLeft: 'auto' }}>

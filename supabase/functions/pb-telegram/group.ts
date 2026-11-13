@@ -28,60 +28,51 @@
 // FIRST in the waiting messages is a LATE description (lateDesc) for the
 // product made before it; otherwise text with no photos becomes a product only
 // when it names a rate / code / price. A channel post forwarded twice counts once.
+// Pre-launch fixes D15 / D16 (2026-11-13), the text rules being in text.ts:
+//   - a short caption with a design number or a price is the description (it
+//     was dropped, and the photos became a product with no code or cost);
+//   - CHATTER (bank details, a greeting, "call us") never joins a product:
+//     as a text it is set aside like a separator; a picture whose caption is
+//     a greeting or bank details (a poster) is not a product photo, nor is
+//     the rest of its album (a phone number on a caption does not make a
+//     picture a poster);
+//   - grouping no longer goes by position alone: photos posted 15 minutes or
+//     more (the vendor's own clock, `ot`) after the photos before them, in
+//     another album, start another product — so a poster or a design posted
+//     without any text is not joined to the next design. Without `ot` (not
+//     known for that message) the rule does not apply.
+// Every message set aside carries why (`why`), for Settings → Telegram.
+
+import { hasKeywords, inlineLess, isCaption, isChatter, isDescription, isPoster, lessOf } from './text.ts';
+export { hasKeywords, inlineLess, isChatter, isDescription, lessOf, stripLess } from './text.ts';
 
 export type Kind = 'photo' | 'video' | 'text' | 'other';
-export interface GMsg { id: number; chat: number; mid: number; kind: Kind; text: string; album: string | null; at: number }
+/** `at`: when it ARRIVED (ms); `ot`: when the vendor posted it in their channel (ms; null / absent = not known). */
+export interface GMsg { id: number; chat: number; mid: number; kind: Kind; text: string; album: string | null; at: number; ot?: number | null }
+/** Why a message is not used (shown in Settings → Telegram, "Messages not used"). */
+export type SkipWhy = 'separator' | 'repeat' | 'no_photos' | 'chatter';
 export interface GProduct {
   chat: number; first: number; media: number[]; desc: number[]; description: string;
   less: number | null; lessIds: number[]; extra: number[]; noDescription: boolean;
   /** When its oldest message arrived, and its newest description (null: none). */
   at: number; descAt: number | null;
+  /** When the vendor posted its first message (ms; null: not known). */
+  postedAt: number | null;
 }
 export interface GPlan {
   products: GProduct[]; lateLess: { chat: number; id: number; mid: number; amount: number }[];
   /** Description-only groups first in their channel's batch (see assemble / latedesc.ts). */
   lateDesc: GProduct[]; ignore: number[];
+  /** Why, for the ignored ones and for a product's `extra` that is not a plain separator. */
+  why: Record<number, SkipWhy>;
 }
 
 export const QUIET_MS = 3 * 60_000;
 export const DESC_WAIT_MS = 20 * 60_000;
 export const NO_DESC_MS = 60 * 60_000;
 export const SETTLE_MS = 60_000;
-const DESC_MIN = 40;
-const LESS_MAX = 40;
-const KEYWORDS = /\b(rate|code|price|inr)\b|₹|\brs\.?\s*\d|\d\s*\/-/i;
-const AMT = String.raw`(\d[\d,]*(?:\.\d{1,2})?)(?![\d.,]*\s*%)`;
-// "200 less". Not when "less" is followed by its own number ("Rate 1600 less 5%"): there the number before it is the rate.
-const LESS_A = new RegExp(String.raw`${AMT}\s*(?:\/-|rs\.?|₹|inr|rupees?)?\s*(?:\/-)?\s*less\b(?!\s*[:\-–=]?\s*(?:rs\.?|₹|inr)?\s*\d)`, 'i');
-const LESS_B = new RegExp(String.raw`\bless\b\s*[:\-–=]?\s*(?:rs\.?|₹|inr)?\s*${AMT}`, 'i');
-const amountOf = (s: string) => { const n = Number(s.replace(/,/g, '')); return Number.isFinite(n) && n > 0 && n < 10_000_000 ? n : null; };
-/** A less phrase in one short line. */
-const lessIn = (line: string) => {
-  const l = line.trim();
-  if (!l || l.length > LESS_MAX) return null;
-  const m = LESS_B.exec(l) ?? LESS_A.exec(l);
-  const amount = m ? amountOf(m[1]) : null;
-  return m && amount !== null ? { amount, match: m[0], rest: l.replace(m[0], '') } : null;
-};
-
-/** The amount of a short "Less" message, else null ("Rate 1600 less 200" is a description). */
-export function lessOf(text: string): number | null {
-  const x = lessIn(text);
-  return x && !/\d/.test(x.rest) ? x.amount : null;
-}
-/** A less written on a short line inside a description ("RATE 1600 LESS 200"). */
-export function inlineLess(text: string): number | null {
-  for (const l of text.split('\n')) { const x = lessIn(l); if (x) return x.amount; }
-  return null;
-}
-/** The text without its less phrases — what the reader shows the AI, so a less is never taken off twice. */
-export function stripLess(text: string): string {
-  return text.split('\n').map(l => { const x = lessIn(l); return x ? x.rest.replace(/\s{2,}/g, ' ').trim() : l; })
-    .filter((l, i, a) => l.trim() || (i > 0 && a[i - 1].trim())).join('\n').trim();
-}
-
-export const hasKeywords = (text: string) => KEYWORDS.test(text);
-export const isDescription = (text: string) => { const t = text.trim(); return (t.length >= DESC_MIN && /\p{L}{3}/u.test(t)) || hasKeywords(t); };
+/** Photos this far apart in the vendor's own time, with no album joining them, are two products (D16). */
+export const SPLIT_GAP_MS = 15 * 60_000;
 const norm = (s: string) => s.replace(/\s+/g, ' ').trim().toLowerCase();
 const isMedia = (m: GMsg) => m.kind === 'photo' || m.kind === 'video';
 
@@ -94,31 +85,45 @@ const fresh = (at: number): Cur => ({ media: [], desc: [], texts: [], less: null
 function channelPlan(msgs: GMsg[], now: number, out: GPlan, truncated: boolean) {
   let cur: Cur | null = null;
   let groups = 0;
+  let asideAlbum: string | null = null; // an album whose caption was not about a product: its other pictures go with it
+  const drop = (ids: number[], why: SkipWhy) => { for (const id of ids) { out.ignore.push(id); out.why[id] ??= why; } };
   /** `trigAt`: the message that closed it (the next product's) — the group waits until that is SETTLE_MS old. */
   const emit = (c: Cur, trigAt?: number) => {
     const firstGroup = groups++ === 0;
     if (trigAt !== undefined && now - trigAt < SETTLE_MS) return; // still pending: planned again next run
     const all = [...c.media, ...c.desc];
+    const posted = all.map(m => m.ot).filter((x): x is number => typeof x === 'number');
     const g: GProduct = {
       chat: msgs[0].chat, first: Math.min(...all.map(m => m.mid)), media: c.media.map(m => m.id), desc: c.desc.map(m => m.id),
       description: c.texts.join('\n\n'), less: c.less, lessIds: c.lessIds, extra: c.extra, noDescription: !c.texts.length,
       at: Math.min(...all.map(m => m.at)), descAt: c.desc.length ? Math.max(...c.desc.map(m => m.at)) : null,
+      postedAt: posted.length ? Math.min(...posted) : null,
     };
     if (!c.media.length && firstGroup && c.texts.length) out.lateDesc.push(g);
-    else if (!c.media.length && !hasKeywords(g.description)) out.ignore.push(...g.desc, ...c.lessIds, ...c.extra);
+    else if (!c.media.length && !hasKeywords(g.description)) { drop(g.desc, 'no_photos'); drop([...c.lessIds, ...c.extra], 'separator'); }
     else out.products.push(g);
+  };
+  /** A message that is not part of any product: it also ends the product before it, once that has its description. */
+  const aside = (m: GMsg, why: SkipWhy) => {
+    if (!cur) { drop([m.id], why); return; }
+    cur.extra.push(m.id); out.why[m.id] = why;
+    if (cur.texts.length) { cur.closed = true; cur.sepAfterDesc = true; }
   };
   for (const m of msgs) {
     const t = (m.text || '').trim();
     if (cur) cur.lastAt = Math.max(cur.lastAt, m.at);
     if (isMedia(m)) {
+      // A picture captioned with a greeting or payment details (a poster), and the rest of its album: not a product photo.
+      if ((t && isPoster(t)) || (!!m.album && m.album === asideAlbum)) { asideAlbum = m.album; aside(m, 'chatter'); continue; }
       const capLess = t ? lessOf(t) : null;
-      const capDesc = t && capLess === null && isDescription(t) ? t : null;
+      const capDesc = t && capLess === null && isCaption(t) ? t : null;
       const last: GMsg | undefined = cur?.media[cur.media.length - 1];
       const sameAlbum = !!m.album && last?.album === m.album;
       const sameText = !!capDesc && !!cur?.texts.some(x => norm(x) === norm(capDesc));
+      // The vendor's own clock: these photos were posted long after the ones before them, outside their album.
+      const apart = !!last && !sameAlbum && typeof m.ot === 'number' && typeof last.ot === 'number' && m.ot - last.ot >= SPLIT_GAP_MS;
       if (cur && cur.descFirst && !cur.media.length && !cur.sepAfterDesc) cur.closed = false; // its photos, after the description
-      else if (!cur || (cur.closed && !sameAlbum) || (capDesc && !sameAlbum && !sameText && (cur.texts.length || cur.captioned))) {
+      else if (!cur || (cur.closed && !sameAlbum) || apart || (capDesc && !sameAlbum && !sameText && (cur.texts.length || cur.captioned))) {
         if (cur) emit(cur, m.at);
         cur = fresh(m.at); cur.captioned = !!t;
       }
@@ -139,10 +144,7 @@ function channelPlan(msgs: GMsg[], now: number, out: GPlan, truncated: boolean) 
       if (!cur.texts.some(x => norm(x) === norm(t))) { cur.desc.push(m); cur.texts.push(t); } else cur.extra.push(m.id);
       const il = inlineLess(t); if (il !== null && cur.less === null) cur.less = il;
       cur.closed = true;
-    } else if (cur) { // separator / sticker / short text
-      cur.extra.push(m.id);
-      if (cur.texts.length) { cur.closed = true; cur.sepAfterDesc = true; }
-    } else out.ignore.push(m.id);
+    } else aside(m, m.kind === 'text' && isChatter(t) ? 'chatter' : 'separator'); // a greeting, bank details / a sticker, an arrow, a short text
   }
   if (!cur || truncated) return; // the batch ended inside this channel: its last group may be cut
   const age = now - cur.lastAt;
@@ -158,13 +160,13 @@ function channelPlan(msgs: GMsg[], now: number, out: GPlan, truncated: boolean) 
  * in this batch — their last group is left for the next run.
  */
 export function plan(msgs: GMsg[], now: number, held: Set<number> = new Set()): GPlan {
-  const out: GPlan = { products: [], lateLess: [], lateDesc: [], ignore: [] };
+  const out: GPlan = { products: [], lateLess: [], lateDesc: [], ignore: [], why: {} };
   const by = new Map<number, GMsg[]>();
   for (const m of msgs) { const l = by.get(m.chat); if (l) l.push(m); else by.set(m.chat, [m]); }
   for (const list of by.values()) {
     list.sort((a, b) => a.mid - b.mid || a.id - b.id);
     const seen = new Set<number>(), uniq: GMsg[] = [];
-    for (const m of list) { if (seen.has(m.mid)) out.ignore.push(m.id); else { seen.add(m.mid); uniq.push(m); } } // forwarded twice
+    for (const m of list) { if (seen.has(m.mid)) { out.ignore.push(m.id); out.why[m.id] = 'repeat'; } else { seen.add(m.mid); uniq.push(m); } } // forwarded twice
     channelPlan(uniq, now, out, held.has(list[0].chat));
   }
   out.products.sort((a, b) => a.at - b.at); // oldest first, whichever channel

@@ -9,12 +9,15 @@
 // Channels are checked once a day, so a whole day's posts of one channel
 // arrive in a burst (~1.5 s apart): grouping goes by origin_message_id, and
 // its waits (group.ts) count from when the closing message ARRIVED, so a burst
-// groups the same as posts spread over the day.
+// groups the same as posts spread over the day. What tells two products apart
+// in a burst is the vendor's own clock (origin_date → GMsg.ot, group.ts).
+// Every message set aside is marked 'ignored' with why (skip_why), so Settings
+// can list what was not used (pre-launch fix D14).
 import { ago, enc, logActivity, one, patch, sel } from '../pb-products/db.ts';
 import { plain } from '../pb-products/http.ts';
 import { adopt } from './adopt.ts';
 import { makeProduct, MSG_COLS, type MsgRow, TRIES } from './create.ts';
-import { type GMsg, type GProduct, hasKeywords, type Kind, plan } from './group.ts';
+import { type GMsg, type GProduct, hasKeywords, type Kind, plan, type SkipWhy } from './group.ts';
 import { applyLateDesc } from './latedesc.ts';
 import { applyLateLess } from './less.ts';
 import { scrub, secrets } from './tg.ts';
@@ -31,6 +34,13 @@ async function mark(ids: number[], set: Record<string, unknown>) {
   }
 }
 
+/** Marks messages ignored, each with why (`fallback` for the ones the plan gave no reason). */
+async function skip(ids: number[], why: Record<number, SkipWhy>, fallback: SkipWhy, more: Record<string, unknown> = {}) {
+  const by = new Map<SkipWhy, number[]>();
+  for (const id of ids) { const w = why[id] ?? fallback; by.set(w, [...(by.get(w) || []), id]); }
+  for (const [w, list] of by) await mark(list, { state: 'ignored', skip_why: w, ...more });
+}
+
 export async function assemble() {
   const t0 = Date.now(), deadline = t0 + BUDGET_MS;
   const out = { ok: true, products: 0, less: 0, late: 0, adopted: 0, ignored: 0, failed: 0, waiting: 0 };
@@ -42,7 +52,7 @@ export async function assemble() {
   ]);
   // Forwarded from a person, with no crawler mapping after 10 minutes: no vendor can be known.
   const orphans = pending.filter(r => r.origin_chat_id === null && Date.now() - Date.parse(r.received_at) > NO_ORIGIN_MS).map(r => r.id);
-  if (orphans.length) { await mark(orphans, { state: 'ignored', note: 'Forwarded from a person, not a channel — the vendor is not known.' }); out.ignored += orphans.length; }
+  if (orphans.length) { await mark(orphans, { state: 'ignored', skip_why: 'no_vendor', note: 'Forwarded from a person, not a channel — the vendor is not known.' }); out.ignored += orphans.length; }
   let rows = [...pending, ...failed.filter(r => tries(r) > 0 && tries(r) < TRIES)].filter(r => r.origin_chat_id !== null);
 
   const a = await adopt(rows, token, deadline, tries);
@@ -52,20 +62,20 @@ export async function assemble() {
   const byId = new Map(rows.map(r => [r.id, r]));
   const gm: GMsg[] = rows.map(r => ({
     id: r.id, chat: r.origin_chat_id as number, mid: r.origin_message_id ?? r.message_id, kind: r.kind as Kind,
-    text: r.text || '', album: r.media_group_id, at: Date.parse(r.received_at),
+    text: r.text || '', album: r.media_group_id, at: Date.parse(r.received_at), ot: r.origin_date ? Date.parse(r.origin_date) : null,
   }));
   // A full page may cut its last channel short: that channel's last group waits.
   const last = pending[pending.length - 1];
   const held = new Set<number>(pending.length >= PAGE && last?.origin_chat_id != null ? [last.origin_chat_id] : []);
   const p = plan(gm, Date.now(), held);
 
-  if (p.ignore.length) { await mark(p.ignore, { state: 'ignored' }); out.ignored += p.ignore.length; }
+  if (p.ignore.length) { await skip(p.ignore, p.why, 'separator'); out.ignored += p.ignore.length; }
 
   for (const l of p.lateLess) {
     try {
       const r = await applyLateLess({ ...l, mid: byId.get(l.id)?.origin_message_id ?? null });
       if (r === 'applied') out.less++;
-      if (r === 'orphan') { await mark([l.id], { state: 'ignored', note: 'A "Less" with no product right before it.' }); out.ignored++; }
+      if (r === 'orphan') { await mark([l.id], { state: 'ignored', skip_why: 'less_alone', note: 'A "Less" with no product right before it.' }); out.ignored++; }
     } catch (e) {
       console.error(`pb-telegram less ${l.id}: ${plain(e)}`);
     }
@@ -82,7 +92,7 @@ export async function assemble() {
       continue;
     }
     if (hasKeywords(g.description)) todo.push(g); // a priced text on its own: its own product
-    else { await mark([...g.desc, ...g.lessIds, ...g.extra], { state: 'ignored' }); out.ignored++; }
+    else { await mark(g.desc, { state: 'ignored', skip_why: 'no_photos' }); await skip([...g.lessIds, ...g.extra], p.why, 'separator'); out.ignored++; }
   }
 
   const done = new Set<number>();
@@ -110,7 +120,7 @@ export async function assemble() {
       ids.forEach(id => done.add(id)); g.extra.forEach(id => done.add(id));
       if (r.outcome === 'retry') { await fail(r.error, r.product_id); continue; }
       await mark(ids, { state: 'used', product_id: r.product_id, note: null });
-      if (g.extra.length) await mark(g.extra, { state: 'ignored', product_id: r.product_id });
+      if (g.extra.length) await skip(g.extra, p.why, 'separator', { product_id: r.product_id });
       if (r.outcome === 'created') out.products++;
     } catch (e) {
       const msg = scrub(plain(e), token);

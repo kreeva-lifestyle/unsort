@@ -187,6 +187,45 @@ ignored).
    (`stripLess`) so it is never taken off twice. Videos never go to the AI or
    Shopify (every image query filters `kind = 'image'`).
 
+## Pre-launch fixes (2026-11-13: D13, D14, D15, D16, D20)
+- **When the vendor posted (D13).** `pb_tg_messages.origin_date` = the forward
+  header's date when it names the vendor's own channel; the crawler (1.2.0)
+  sends `posted_at` with each mapping (`pb_tg_post_dates` → `pb_tg_forwards.
+  posted_at` → the waiting messages), which wins, and for a repost with no
+  crawler date the header's date (the first channel's) is cleared by the
+  origin trigger. A product gets `source_posted_at` = its earliest message.
+  `pb_listings.first_published_at` is set on the first publish only.
+- **Text rules (`text.ts`, D15 / D16).** A short line with a design number and
+  a price is a description without an English price word: two numbers of 3–6
+  digits, or one with a mark (`mrp`, `only`, `@`, `rs`, `bhav`, `design`,
+  `d.no`, रेट, भाव, ભાવ…). On a caption one number is enough. CHATTER (bank
+  details; a text that OPENS with a greeting; a payment word or a short phone
+  line with no number, price or keyword in it; never a text that names a
+  price) is not a description and is not appended to one. POSTER, the
+  narrower test for a caption (a greeting or bank details): only then is the
+  picture itself set aside, with the rest of its album. "Welcome" is not a
+  greeting here ("resellers most welcome"), and a phone number on a caption
+  never makes a photo a poster.
+- **Grouping by the vendor's clock (D16).** `GMsg.ot` = `origin_date`. Photos
+  posted `SPLIT_GAP_MS` (15 min) or more after the photos before them, outside
+  their album, start another product; the earlier group is emitted at once
+  (it does not wait 60 minutes). Unknown dates: the rule does not apply.
+- **Why a message was not used (D14).** `pb_tg_messages.skip_why`:
+  `separator`, `repeat`, `no_photos`, `chatter`, `no_vendor`, `less_alone`.
+  Settings lists the last four ("See which messages were not used").
+- **The bot out of the group (D20).** `groupCheck.ts` asks Telegram
+  (`getChatMember` for the bot; a plain member needs Group Privacy off) at
+  most every 10 minutes while a check is due, at once on the webhook's
+  `my_chat_member` / `left_chat_member` / `new_chat_members`, and on Check
+  bot; the answer is `pb_tg_config.group_ok / group_error`. While it is "no",
+  `crawler_config` returns `group_problem` and no channel is due, so no
+  crawler version forwards or moves a cursor. `pb_tg_lost_forwards()` =
+  mappings of the last 2 days, older than 10 minutes, with no message; the
+  channel gets `rewind_to` (first lost − 1), the crawler goes back and
+  reports `rewound`, and the rows are stamped `resent_at`. A post sent twice
+  is dropped as a repeat. `setWebhook` now asks for `message` and
+  `my_chat_member`; Check bot upgrades an older registration.
+
 ## Failures and retries
 - A group that fails (database, network, Telegram busy) → its messages
   `failed`, note "… (attempt N of 3)"; retried on later runs (a held product is
@@ -223,6 +262,8 @@ ignored).
 - Stuck messages: `select state, count(*) from pb_tg_messages group by 1;`
   `select id, note from pb_tg_messages where state = 'failed' order by id desc limit 20;`
 - Re-run a failed group: set its messages back to `pending` with `note = null`.
+- Skipped messages: `select skip_why, count(*) from pb_tg_messages where state = 'ignored' and received_at > now() - interval '7 days' group by 1;`
+  Lost forwards: `select * from pb_tg_lost_forwards();`
 - Known limits: a pause of more than 20 minutes in the middle of a check
   (a very long Telegram flood wait) can still split a "description first,
   then photos" post across the pause; Spread evenly or a new window saved

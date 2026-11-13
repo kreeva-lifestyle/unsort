@@ -105,16 +105,20 @@ test('two channels interleaved are grouped apart', () => {
 });
 
 test('text with no photos: first in the batch → late description; later → product only when priced', () => {
-  const chat = feed(-1004, 1, [['text', 'Good morning to all our dear customers, new stock tomorrow']]);
+  const chat = feed(-1004, 1, [['text', 'Soft georgette anarkali with net dupatta, all sizes, ready stock']]);
   assert.equal(plan(chat, chat[0].at + QUIET_MS).lateDesc.length, 0, 'a lone description waits for photos first');
   const r1 = plan(chat, chat[0].at + DESC_WAIT_MS);
   assert.equal(r1.products.length, 0);
   assert.equal(r1.lateDesc.length, 1, 'assemble decides: a late description, or dropped (no rate)');
+  // A greeting is never a late description: it would replace the text of the product before it.
+  const hello = feed(-1004, 1, [['text', 'Good morning to all our dear customers, new stock tomorrow']]);
+  const r0 = plan(hello, hello[0].at + DESC_WAIT_MS);
+  assert.equal(r0.lateDesc.length, 0); assert.deepEqual(r0.ignore, [hello[0].id]); assert.equal(r0.why[hello[0].id], 'chatter');
   const later = feed(-1004, 20, [...photos(2, 'm'), ['text', DESC], ['other'], ['text', 'Good morning to all our dear customers, new stock tomorrow'], ['other'], ['text', 'Code KA-77 rate 1100/-']]);
   const r2 = plan(later, later[later.length - 1].at + DESC_WAIT_MS);
   assert.equal(r2.products.length, 2, 'the photo product, then the priced text');
   assert.deepEqual(r2.products[1].desc, [later[6].id]);
-  assert.ok(r2.ignore.includes(later[4].id), 'unpriced chatter between products is dropped');
+  assert.ok(r2.products[0].extra.includes(later[4].id) && r2.why[later[4].id] === 'chatter', 'a greeting between products is set aside, with why');
 });
 
 test('separator closes a description; a Less after it still belongs to it', () => {

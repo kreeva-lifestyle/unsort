@@ -107,11 +107,11 @@ test('normalize(): real GramJS messages → id, album id, service flag, oldest f
   const list = [
     new Api.Message({ id: 12, peerId: new Api.PeerChannel({ channelId: bigInt(1) }), message: 'x', date: 1, groupedId: bigInt('13579') }),
     new Api.MessageService({ id: 11, peerId: new Api.PeerChannel({ channelId: bigInt(1) }), date: 1, action: new Api.MessageActionChatJoinedByLink({ inviterId: bigInt(2) }) }),
-    new Api.Message({ id: 10, peerId: new Api.PeerChannel({ channelId: bigInt(1) }), message: 'y', date: 1 }),
+    new Api.Message({ id: 10, peerId: new Api.PeerChannel({ channelId: bigInt(1) }), message: 'y', date: 1794304800 }),
   ];
   assert.deepEqual(normalize(list), [
-    { id: 10, groupedId: null, service: false },
-    { id: 11, groupedId: null, service: true },
-    { id: 12, groupedId: '13579', service: false },
+    { id: 10, groupedId: null, service: false, date: 1794304800 },   // when the vendor posted it
+    { id: 11, groupedId: null, service: true, date: 1 },
+    { id: 12, groupedId: '13579', service: false, date: 1 },
   ]);
 });

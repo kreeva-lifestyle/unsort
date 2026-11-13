@@ -165,9 +165,11 @@ export async function publishOne(l: ListingRow, o: { manual: boolean; putBack?: 
     const media = photoRecord(gallery, paths, known, (prod.media?.nodes || []).map(m => m.id));
     // `photos_tried`: the list the store refused, so routing does not send the same list again by itself (route.ts `behind`).
     const photos = noFiles ? { photos: was?.photos ?? [], ...(was?.media ? { media: was.media } : {}), photos_tried: paths } : { photos: paths, ...(media ? { media } : {}) };
+    const at = nowIso();
     const saved = await patch<ListingRow>('pb_listings', mine, gone
       ? { status: 'skipped', shopify_status: prod.status, attempts: 0, error: PERM_NOTE, claimed_at: null } // archived on Shopify: off the website
-      : { status: 'published', shopify_status: prod.status, published_at: nowIso(), attempts: 0, error: warning, claimed_at: null, ...(gallery.fresh.length ? { media_checked_at: null } : {}) }, LISTING_COLS);
+      : { status: 'published', shopify_status: prod.status, published_at: at, ...(l.first_published_at ? {} : { first_published_at: at }), // the first time only: a re-send does not make it new again
+        attempts: 0, error: warning, claimed_at: null, ...(gallery.fresh.length ? { media_checked_at: null } : {}) }, LISTING_COLS);
     await logActivity({ product_id: l.product_id, website_id: l.website_id, listing_id: l.id, action: 'published', details: { shopify_product_id: prod.id, status: prod.status, update: !!existing, ...(adopted ? { adopted: true } : {}), ...photos, tags: l.tags || [], sizes: p.sizes || [], sku: p.sku || '', in_stock: p.in_stock !== false, ...(warning ? { warning } : {}) }, user_id: o.userId });
     if (gone) await retire(l.product_id); else await stockMoved(l.id, p); // the stock changed while this was sent → its own send follows
     if (!saved[0]) throw new HttpError(409, 'Published on Shopify, but the listing changed meanwhile — open it again.');

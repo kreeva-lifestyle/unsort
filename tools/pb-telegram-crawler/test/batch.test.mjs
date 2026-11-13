@@ -34,7 +34,7 @@ test('the same groupedId split by another message makes two calls', () => {
 
 test('service messages are skipped but still move the cursor', () => {
   const { units } = planBatches([m(1), svc(2), m(3)], 100);
-  assert.deepEqual(units, [{ ids: [1], lastId: 1 }, { skip: true, lastId: 2 }, { ids: [3], lastId: 3 }]);
+  assert.deepEqual(units, [{ ids: [1], dates: [null], lastId: 1 }, { skip: true, lastId: 2 }, { ids: [3], dates: [null], lastId: 3 }]);
 });
 
 test('a full page that ends in an album holds that album for the next page', () => {

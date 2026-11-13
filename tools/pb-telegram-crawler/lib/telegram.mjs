@@ -116,5 +116,7 @@ export function normalize(list) {
     id: Number(m.id),
     groupedId: m.groupedId != null ? String(m.groupedId) : null,
     service: m.className !== 'Message',
+    // When the vendor posted it (unix seconds). Playbook groups a night's burst by this, not by arrival.
+    date: Number.isFinite(Number(m.date)) && Number(m.date) > 0 ? Number(m.date) : null,
   })).sort((a, b) => a.id - b.id);
 }

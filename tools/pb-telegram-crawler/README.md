@@ -171,6 +171,7 @@ the TG_SESSION the server uses.
 | Telegram error: … | Restart the service; if it comes back, send the exact text to the developer. |
 | Telegram signed the staff account out | Run `npm run login` again and replace TG_SESSION. |
 | Skipped message N after 10 failed tries | That one message could not be forwarded for over 6 hours; add it by hand if it mattered. |
+| The bot is not in the admin group any more… / …cannot see its messages | Playbook's bot was removed from the group or is not an admin there. Add it back as an admin (Settings → Telegram, step 2, **Check again**). The crawler forwards nothing and keeps its place in every channel until then. |
 
 Other behaviour: at most one channel is set up and one checked per minute;
 forwards are at least 1.5 s apart and silent (no notification in the group);
@@ -181,8 +182,12 @@ stuck connection is rebuilt; a dropped connection is retried with a growing
 wait (5 s up to 5 min); if nothing moves for 15 minutes the crawler exits and
 the host restarts it; if Playbook cannot be reached it retries the same way and
 copies nothing until it can. It tells Playbook which vendor channel each
-forwarded post came from, so a vendor's repost of a supplier's post still goes
-to the vendor. Logs go to the screen / host logs only and never contain
+forwarded post came from and when the vendor posted it, so a vendor's repost
+of a supplier's post still goes to the vendor, and a night's posts are told
+apart by the vendor's own clock. From 1.2.0: while Playbook says its bot is
+not reading the admin group, nothing is forwarded; and when Playbook says
+forwards did not arrive, that channel goes back to the first of them and sends
+them again at its next daily check (a post that did arrive is counted once). Logs go to the screen / host logs only and never contain
 TG_SESSION or the crawler key.
 
 **Not covered:** a post the vendor edits after it was copied (for example a

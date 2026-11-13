@@ -35,7 +35,7 @@ export async function applyLateDesc(g: GProduct, rows: Map<number, MsgRow>): Pro
   if (!done.length) return 'wait';
   const ids = [...g.desc, ...g.lessIds].filter(id => rows.has(id));
   await patch('pb_tg_messages', `id=in.(${ids.join(',')})&state=in.(pending,failed)`, { state: 'used', product_id: p.id, note: null });
-  if (g.extra.length) await patch('pb_tg_messages', `id=in.(${g.extra.join(',')})&state=in.(pending,failed)`, { state: 'ignored', product_id: p.id });
+  if (g.extra.length) await patch('pb_tg_messages', `id=in.(${g.extra.join(',')})&state=in.(pending,failed)`, { state: 'ignored', product_id: p.id, skip_why: 'separator' });
   await logActivity({ product_id: p.id, action: 'telegram_late_description', details: { messages: ids.length } });
   return 'applied';
 }

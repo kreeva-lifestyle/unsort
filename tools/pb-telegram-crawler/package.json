@@ -1,6 +1,6 @@
 {
   "name": "pb-telegram-crawler",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Playbook Telegram crawler: reads the vendor channels listed in Playbook from a staff Telegram account and forwards each new post into the admin group, where the Playbook bot turns them into products.",
   "type": "module",
   "private": true,

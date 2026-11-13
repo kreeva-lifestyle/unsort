@@ -1,17 +1,22 @@
 // The crawler (tools/pb-telegram-crawler) — header x-crawler-key, whose sha-256
 // must equal pb_tg_secrets.crawler_key_hash (key made in Settings → Telegram).
-//   crawler_config   → { ok, now, group_chat_id, group_title, window: { start, end },
+//   crawler_config   → { ok, now, group_chat_id, group_title, group_problem, window: { start, end },
 //                        channels: [{ vendor_id, vendor_name, username, channel_id, last_id,
 //                                     slot_minute, due, next_check_at, checked_at, cursor_ready,
-//                                     vendor_ready }] }
+//                                     vendor_ready, rewind_to? }] }
 //                      sorted by daily time. `due` comes from schedule.ts (the one
 //                      place the rule lives); the crawler checks one due channel at a time.
+//                      group_problem (a sentence) = the bot is not reading the admin group:
+//                      no channel is due then (crawlerHealth.ts). rewind_to = go back to
+//                      this post id: forwards after it never reached Playbook.
 //   crawler_progress { version, error?, channels: [{ username, channel_id, title, last_id, error?,
-//                      cursor_ready?, checked?, sent? }],
-//                      forwarded?: [{ group_message_id, channel_id, message_id }] } → { ok, mapped }
+//                      cursor_ready?, checked?, sent?, rewound? }],
+//                      forwarded?: [{ group_message_id, channel_id, message_id, posted_at? }] } → { ok, mapped }
 //     cursor_ready: true + last_id → pb_vendors.tg_cursor_ready (the newest post id is noted);
 //     checked: true → pb_vendors.tg_checked_at = now (a daily check finished);
-//     sent         → how many messages that check forwarded (shown in Settings).
+//     sent         → how many messages that check forwarded (shown in Settings);
+//     rewound      → the post id it went back to, as rewind_to asked;
+//     posted_at    → when the vendor posted that message (unix seconds).
 // `forwarded` says which vendor channel post each new group message is: stored
 // by pb_tg_map_forwards, it overrides forward_origin (a repost names the
 // supplier's channel there, not the vendor's).
@@ -23,6 +28,7 @@
 // a cursor it still holds (the vendor was reset) and note a fresh one.
 import { enc, nowIso, patch, sel } from '../pb-products/db.ts';
 import { HttpError, plain } from '../pb-products/http.ts';
+import { health, markResent, postDates, rewinds } from './crawlerHealth.ts';
 import { dueInfo, offsetOf, WINDOW_DEFAULT } from './schedule.ts';
 import { type CrawlerChannel, config, rpc, saveConfig, secrets, sha256 } from './tg.ts';
 import { HEX64, same } from './webhook.ts';
@@ -84,7 +90,14 @@ export async function crawlerConfig() {
   });
   const at = (m: number | null) => (m === null ? Infinity : offsetOf(m, window.start));
   channels.sort((a, b) => at(a.slot_minute) - at(b.slot_minute));
-  return { ok: true, now: new Date(now).toISOString(), group_chat_id: cfg.group_chat_id, group_title: cfg.group_title, window, channels };
+  // The bot is not reading the group: nothing is due, so nothing is forwarded and no cursor moves past a post.
+  const h = await health(cfg, channels.some(c => c.due));
+  const back = rewinds(h.lost);
+  const list = channels.map((c) => {
+    const to = c.channel_id !== null ? back.get(c.channel_id) : undefined;
+    return { ...c, ...(h.problem ? { due: false } : {}), ...(to !== undefined && c.last_id !== null && to < c.last_id ? { rewind_to: to } : {}) };
+  });
+  return { ok: true, now: new Date(now).toISOString(), group_chat_id: cfg.group_chat_id, group_title: cfg.group_title, group_problem: h.problem, window, channels: list };
 }
 
 export async function crawlerProgress(b: Record<string, unknown>) {
@@ -96,6 +109,7 @@ export async function crawlerProgress(b: Record<string, unknown>) {
   if (!Array.isArray(b.channels)) throw new HttpError(400, 'channels must be a list.');
   const prev = (await config()).crawler_channels;
   const flags: { username: string | null; channel_id: number | null; ready: boolean; checked: boolean }[] = [];
+  const wentBack: { channel_id: number; to: number }[] = [];
   const channels: CrawlerChannel[] = b.channels.slice(0, 500).map((raw) => {
     const c = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
     const username = cleanUsername(c.username), channel_id = botApiId(c.channel_id);
@@ -104,6 +118,8 @@ export async function crawlerProgress(b: Record<string, unknown>) {
     const before = prev.find(p => (channel_id !== null && p.channel_id === channel_id) || (!!username && p.username === username));
     const last_id = Number.isSafeInteger(last) && last >= 0 ? last : before?.last_id ?? null;
     flags.push({ username, channel_id: channel_id ?? before?.channel_id ?? null, ready: c.cursor_ready === true && last_id !== null, checked: c.checked === true });
+    const to = c.rewound == null || c.rewound === '' ? NaN : Number(c.rewound), ch = channel_id ?? before?.channel_id ?? null;
+    if (ch !== null && Number.isSafeInteger(to) && to >= 0) wentBack.push({ channel_id: ch, to });
     return {
       username, channel_id: channel_id ?? before?.channel_id ?? null, title: txt(c.title, 200) ?? before?.title ?? null, last_id,
       error: txt(c.error, 300), sent: Number.isSafeInteger(sent) && sent >= 0 ? sent : before?.sent ?? null,
@@ -118,6 +134,7 @@ export async function crawlerProgress(b: Record<string, unknown>) {
   await markVendors(flags.filter(f => f.ready), 'tg_cursor_ready=eq.false&', { tg_cursor_ready: true });
   await markVendors(flags.filter(f => f.checked), '', { tg_checked_at: nowIso() });
   const mapped = await mapForwards(b.forwarded, channels);
+  await markResent(wentBack);
   return { ok: true, mapped };
 }
 
@@ -135,16 +152,21 @@ async function mapForwards(raw: unknown, channels: CrawlerChannel[]): Promise<nu
   if (!Array.isArray(raw) || !raw.length) return 0;
   const group = (await config()).group_chat_id;
   if (group === null) return 0;
+  const dates: { chat_id: number; message_id: number; posted_at: number }[] = [];
   const rows = raw.slice(0, 2000).map((x) => {
     const f = (x && typeof x === 'object' ? x : {}) as Record<string, unknown>;
     const gm = Number(f.group_message_id), mid = Number(f.message_id), ch = botApiId(f.channel_id);
     if (!Number.isSafeInteger(gm) || gm <= 0 || !Number.isSafeInteger(mid) || mid <= 0 || ch === null) return null;
     const c = channels.find(k => k.channel_id === ch);
+    const posted = f.posted_at == null ? NaN : Number(f.posted_at); // unix seconds, as the vendor's channel has it
+    if (Number.isSafeInteger(posted) && posted > 1_420_000_000 && posted * 1000 < Date.now() + 86_400_000) dates.push({ chat_id: group, message_id: gm, posted_at: posted });
     return { chat_id: group, message_id: gm, origin_chat_id: ch, origin_message_id: mid, origin_title: c?.title ?? null, origin_username: c?.username ?? null };
   }).filter(Boolean);
   if (!rows.length) return 0;
   // A failure is reported to the crawler, which keeps the list and sends it again.
-  return Number(await rpc<number>('pb_tg_map_forwards', { p_rows: rows })) || 0;
+  const mapped = Number(await rpc<number>('pb_tg_map_forwards', { p_rows: rows })) || 0;
+  await postDates(dates);
+  return mapped;
 }
 
 /** A username the crawler resolved gives its vendor the channel id and title. */
