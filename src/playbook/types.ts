@@ -23,6 +23,8 @@ export interface PbProduct {
   temp_out_at: string | null;
   /** When a vendor's notice said PERMANENT stock out: with in_stock false the product is archived here and on Shopify. */
   perm_out_at: string | null;
+  /** The earlier product this one waits as a copy of ("Already here as …"); the Ready gate keeps it. Null when it is not held. */
+  copy_of: string | null;
   /** tags: its chosen values' names (cache; pb_product_values, tagTypes.ts) · missing_attrs: required attributes still empty → Needs info. */
   tags: string[]; missing_attrs: string[];
   /** Anything else the AI read: work, occasion, pattern, set_contents, wash_care, notes… (string values). */

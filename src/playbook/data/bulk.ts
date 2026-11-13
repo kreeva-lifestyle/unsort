@@ -1,6 +1,7 @@
 // The log of bulk changes (Settings → Bulk changes; owner, 2026-11-12). A
 // bulk change is one tap that changes many products or listings: an import,
-// "Send matching products now", "Re-price", "Retry all", "Read again". The
+// "Send matching products now", "Re-price", "Retry all", "Read again",
+// "Archive the copies". The
 // server records each one with the rows it changed (pb_bulk_runs /
 // pb_bulk_items) and can take it back for 7 days: only the rows that are
 // still as the change left them; what somebody changed since is left alone.
@@ -9,7 +10,7 @@
 import { supabase } from '../../lib/supabase';
 import { pbCall } from './pbFunctions';
 
-export type BulkKind = 'import' | 'route_site' | 'reprice_site' | 'retry_failed' | 'reread_failed' | 'reread';
+export type BulkKind = 'import' | 'route_site' | 'reprice_site' | 'retry_failed' | 'reread_failed' | 'reread' | 'copies';
 export type BulkStatus = 'running' | 'done' | 'reverted' | 'partly_reverted';
 /** Counts by name (restored, changed, busy…): which ones a kind has is in components/settings/bulkText.ts. */
 export type BulkCounts = Record<string, number>;

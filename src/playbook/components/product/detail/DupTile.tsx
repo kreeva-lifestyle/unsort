@@ -13,17 +13,13 @@
 import { useState } from 'react';
 import { friendlyError } from '../../../../lib/friendlyError';
 import type { AddToast } from '../../PbToasts';
-import { answerDup, dupName, sourceText, type DupMatch, type DupVerdict } from '../../../data/duplicates';
+import { DUP_WHY as WHY, answerDup, dupName, sourceText, type DupMatch, type DupVerdict } from '../../../data/duplicates';
 import { PB, pbBody, pbBtnSecondary, pbMeta, pbName, pbNum, pbTileTitle } from '../../../pbTheme';
 import PbButton from '../../ui/PbButton';
 import PbTile, { type PbSpan } from '../../ui/PbTile';
 import { Dot, PRODUCT_STATUS } from '../status';
 import ProductPhoto from '../list/ProductPhoto';
 import type { PbProductStatus } from '../../../types';
-
-const WHY: Record<DupMatch['how'], string> = {
-  code: 'Same design code', other_vendor: 'Same code at another supplier', near_code: 'Same number, other letters', photo: 'Same photo',
-};
 
 function Other({ m, onOpen }: { m: DupMatch; onOpen: (id: string) => void }) {
   const st = PRODUCT_STATUS[m.other_status as PbProductStatus] ?? PRODUCT_STATUS.ready;

@@ -112,9 +112,9 @@ export async function getSettings(): Promise<Settings> {
   };
 }
 
-/** POST /rest/v1/rpc/<fn> → its result (service role). */
-export async function rpc<T>(fn: string, args: Record<string, unknown>): Promise<T> {
-  const r = await fetch(`${SB_URL}/rest/v1/rpc/${fn}`, { method: 'POST', headers: { ...svcHeaders, 'content-type': 'application/json' }, body: JSON.stringify(args) });
+/** POST /rest/v1/rpc/<fn> → its result (service role). `run`: the bulk change this belongs to (bulkLog.ts). */
+export async function rpc<T>(fn: string, args: Record<string, unknown>, run?: string | null): Promise<T> {
+  const r = await fetch(`${SB_URL}/rest/v1/rpc/${fn}`, { method: 'POST', headers: { ...svcHeaders, ...tagged(run), 'content-type': 'application/json' }, body: JSON.stringify(args) });
   if (!r.ok) {
     const body = await r.json().catch(() => ({})) as { message?: string; code?: string };
     // Our own `raise exception` sentences (pb_tag_merge…, SQLSTATE P0001) are shown as they are.

@@ -22,6 +22,8 @@
 //   set_stock          staff          { product_id, in_stock }            → { ok, resent, waiting }        (stock.ts)
 //   photos_set         staff          { product_id, order[], remove[] }   → { ok, removed, status, resent, review, reread }  keep these photos in this order, delete those (photosEdit.ts)
 //   photos_sync        staff          { product_id }                      → { ok, status, resent, review, reread }  after photos were added in the app: the stores follow
+//   copies_preview     staff          {}                                  → { ok, archived, priced, on_site }  what "They are copies" would do now (copies.ts)
+//   copies_archive     staff          {}                                  → { ok, archived, priced, on_site, run_id }  archives the held copies; a bulk change, so it can be reverted
 //   bulk_preview       staff          { run_id }                          → { ok, kind, …counts }  what a revert would do now (bulkRevert.ts)
 //   bulk_revert        admin|manager  { run_id }                          → { ok, kind, …counts }  takes a bulk change back (bulkLog.ts)
 //   delete_product     admin|manager  { product_id }                      → { ok, photos_left }   (409 while it is on Shopify or being worked on)
@@ -68,6 +70,7 @@ import { HttpError, corsHeaders, fail, json, plain } from './http.ts';
 import { importCancel, importCheck, importList, importStart } from './import/actions.ts';
 import { repriceWebsite, rereadFailed, retryFailed } from './bulk.ts';
 import { bulkPreview, bulkRevert } from './bulkRevert.ts';
+import { copiesArchive, copiesPreview } from './copies.ts';
 import { photosSet, photosSync } from './photosEdit.ts';
 import { deleteProduct } from './productDelete.ts';
 import { routeWebsite } from './routeSite.ts';
@@ -92,6 +95,8 @@ const ACTIONS: Record<string, { who: Who; run: (b: A.Body, c: Caller) => Promise
   set_stock: { who: 'staff', run: (b, c) => setStock(b, userOf(c)) },
   photos_set: { who: 'staff', run: (b, c) => photosSet(b, userOf(c)) },
   photos_sync: { who: 'staff', run: (b, c) => photosSync(b, userOf(c)) },
+  copies_preview: { who: 'staff', run: () => copiesPreview() },
+  copies_archive: { who: 'staff', run: (_b, c) => copiesArchive(userOf(c)) },
   bulk_preview: { who: 'staff', run: (b) => bulkPreview(b) },
   bulk_revert: { who: 'admin', run: (b, c) => bulkRevert(b, userOf(c)) },
   generate_listing: { who: 'staff', run: (b, c) => A.generateListing(b, userOf(c)) },

@@ -87,6 +87,17 @@ export function skuParts(sku: string, sizes: string[]): { base: string; join: st
 }
 export const skuBase = (sku: string, sizes: string[]) => skuParts(sku, sizes).base;
 
+/** The code each size's SKU and barcode start with. A vendor's design code (Telegram, typed by hand) is shared by
+ *  every colour of the design, so two colours kept as two products sent the same SKU and barcode for each size
+ *  (pre-launch fix D19): the colour goes into the code — "KA-5070" in Teal Blue → "KA-5070-TEALBLUE" — unless the
+ *  code names it already ("KB 302 WINE"). A product copied from a store keeps that store's own per-colour code. */
+export function codeBase(p: { sku?: string | null; color?: string | null; source?: string | null }, base: string, join: string): string {
+  const flat = (v: unknown) => String(v ?? '').toUpperCase().replace(/[^A-Z0-9]+/g, '');
+  const colour = flat(p.color).slice(0, 14);
+  if (!base || !colour || p.source === 'import' || flat(base).includes(colour)) return base;
+  return `${base}${join}${colour}`;
+}
+
 const money = (n: number | null) => (n === null || n === undefined || !(Number(n) > 0) ? null : Number(n).toFixed(2));
 
 /** "700 g" / "1.25 kg" (import/meta.ts gramsText) as Shopify's weight; null when it is not one of those. */
@@ -104,7 +115,8 @@ export function buildProductInput(a: { l: ListingRow; p: ProductRow; site: Websi
   const price = money(l.price);
   const compareAtPrice = l.compare_at_price !== null && Number(l.compare_at_price) > Number(l.price) ? money(l.compare_at_price) : null;
   const sizes = uniqueCi((p.sizes || []).map(s => String(s).replace(/\s+/g, ' ').trim()).filter(Boolean)); // "S" and "s" are one size
-  const { base: sku, join } = skuParts(String(p.sku || ''), sizes);
+  const parts = skuParts(String(p.sku || ''), sizes), join = parts.join;
+  const sku = codeBase(p, parts.base, join);
   const optName = sizes.length ? 'Size' : 'Title';
   const values = sizes.length ? sizes : ['Default Title'];
   // A choice the store has that Playbook did not make (someone added "Colour" in Shopify): productSet would delete it.

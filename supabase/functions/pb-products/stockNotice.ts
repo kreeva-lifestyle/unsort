@@ -22,15 +22,17 @@
 //     product as temporary which can be filterable; nothing is to be done"):
 //     nothing changes on the websites; the products get the note `temp_out_at`,
 //     which the Products list can filter. The note goes when the vendor posts
-//     the product again with its details (backInStock: "after 7 days we got a
+//     the product again with its details (restock.ts: "after 7 days we got a
 //     broadcast of that product … then that product is back in stock").
+// The later word wins: a product the vendor posted again AFTER the notice is
+// left as it is, whichever of the two was read first (postedAgain).
 //   PERMANENT ("Archive it"): stock.ts takeOffSale — out of stock, archived on
 //     Shopify and archived in Playbook.
 //   neither word: out of stock (shown as Sold out), nothing archived.
 // A product is only ever taken for a notice on its FIRST read, when nobody has
 // typed anything into it and the reader found no price in it: a product that
 // is already in use is never renamed or archived by a later read.
-import { enc, logActivity, nowIso, patch, rpc } from './db.ts';
+import { enc, logActivity, nowIso, patch, rpc, sel } from './db.ts';
 import { HttpError } from './http.ts';
 import { saveStock, takeOffSale } from './stock.ts';
 import { PRODUCT_COLS, type ProductRow } from './types.ts';
@@ -43,10 +45,10 @@ export interface Cand {
 }
 
 /** A number with a label in front ("D no 5081", "D-5081", "code 5081"), not a lettered design code ("KB 273"). */
-const LABEL = /^(?:#|D|DN|DNO|NO|CODE|DESIGN|DESIGNNO)\d/;
+export const LABEL = /^(?:#|D|DN|DNO|NO|CODE|DESIGN|DESIGNNO)\d/;
 const letters = (s: string) => String(s || '').toLowerCase().replace(/[^a-z]+/g, '');
 /** Trade names and the plain colour the reader gives the same shade (readerPrompt.ts COLOURS). */
-const SAME: Record<string, string[]> = {
+export const SAME: Record<string, string[]> = {
   rama: ['tealblue', 'ramagreen'], tealblue: ['rama'], parrot: ['parrotgreen', 'limegreen'], parrotgreen: ['parrot', 'limegreen'],
   offwhite: ['cream', 'ivory'], cream: ['offwhite'], rani: ['ranipink'], mehendi: ['mehendigreen'], navy: ['navyblue'], firozi: ['skyblue', 'turquoise'],
 };
@@ -81,13 +83,23 @@ export function pick(item: NoticeItem, cands: Cand[]): { apply: Cand[]; left: st
   return { apply: [...apply], left: missing.length ? `no product of this design in ${missing.join(', ')} (it has ${skus(set)})` : '' };
 }
 
+/** The later word wins (pre-launch fix D17): the products of `apply` that a post made AFTER the notice speaks for — that
+ *  post itself and the same colour of the design (an unknown colour counts as the same). They are left as they are. */
+export function postedAgain(apply: Cand[], laterIds: Set<string>): Cand[] {
+  const later = apply.filter(c => laterIds.has(c.id));
+  const same = (a: Cand, b: Cand) => { const x = a.colour_keys || [], y = b.colour_keys || []; return !x.length || !y.length || x.some(k => y.includes(k) || (SAME[k] || []).some(n => y.includes(n))); };
+  return later.length ? apply.filter(c => laterIds.has(c.id) || later.some(l => same(c, l))) : [];
+}
+
 const DID: Record<Notice['kind'], string> = { temporary: 'noted as temporarily out (still on sale)', permanent: 'archived and taken off the websites', unknown: 'out of stock' };
 
 /** One line for the notice's "Notes from Telegram": what was done for this code (by the notice's kind) and what is left to check. */
-export function noticeLine(item: NoticeItem, r: { apply: Cand[]; left: string }, kind: Notice['kind'] = 'unknown'): string {
+export function noticeLine(item: NoticeItem, r: { apply: Cand[]; left: string }, kind: Notice['kind'] = 'unknown', again: Cand[] = []): string {
   const label = `${item.code}${(item.colours || []).length ? ` ${item.colours.join(', ')}` : ''}`.replace(/\s+/g, ' ').trim();
-  const done = r.apply.length ? `${DID[kind] || DID.unknown}: ${r.apply.map(c => c.sku || c.name || 'a product').join(', ')}` : '';
-  return `${label} — ${[done, r.left ? `CHECK: ${r.left}` : ''].filter(Boolean).join('. ') || 'not in Playbook, nothing to do'}`.slice(0, 300);
+  const names = (l: Cand[]) => l.map(c => c.sku || c.name || 'a product').join(', ');
+  const done = r.apply.length ? `${DID[kind] || DID.unknown}: ${names(r.apply)}` : '';
+  const newer = again.length ? `posted again after this notice, left as it is: ${names(again)}` : '';
+  return `${label} — ${[done, newer, r.left ? `CHECK: ${r.left}` : ''].filter(Boolean).join('. ') || 'not in Playbook, nothing to do'}`.slice(0, 300);
 }
 
 /** Handle a post the reader recognised as a stock notice. Returns the saved notice row, or null when it is an ordinary product.
@@ -99,6 +111,10 @@ export async function stockNotice(p: ProductRow, n: Notice | null | undefined, p
   let marked = 0, left = 0;
   for (const it of items) {
     const r = pick(it, await rpc<Cand[]>('pb_stock_candidates', { p_vendor: p.vendor_id, p_code: it.code }) || []);
+    // A vendor's post that is newer than this notice (read first, or this notice was read late) has the last word.
+    const newer = r.apply.length ? await sel<{ id: string }>(`pb_products?id=in.(${r.apply.map(c => c.id).join(',')})&source=neq.import&created_at=gt.${enc(p.created_at)}&select=id`) : [];
+    const again = postedAgain(r.apply, new Set(newer.map(x => x.id)));
+    r.apply = r.apply.filter(c => !again.includes(c));
     for (const c of r.apply) {
       if (kind === 'temporary') { // a note only: the product stays on sale, Shopify is not touched
         if (!(await patch('pb_products', `id=eq.${enc(c.id)}`, { temp_out_at: nowIso() })).length) continue;
@@ -110,7 +126,7 @@ export async function stockNotice(p: ProductRow, n: Notice | null | undefined, p
       else if ((await saveStock({ id: c.id }, { in_stock: false, temp_out_at: null }, { notice: p.id, kind }, userId)) >= 0) marked++;
     }
     if (r.left) left++;
-    lines.push(noticeLine(it, r, kind));
+    lines.push(noticeLine(it, r, kind, again));
   }
   const name = `Stock notice${kind === 'unknown' ? '' : ` (${kind})`}: ${items.map(i => `${i.code}${i.colours?.length ? ` ${i.colours.join(', ')}` : ''}`).join('; ')}`.replace(/\s+/g, ' ').slice(0, 200);
   const saved = await patch<ProductRow>('pb_products', `id=eq.${enc(p.id)}&status=eq.reading`,
@@ -118,16 +134,4 @@ export async function stockNotice(p: ProductRow, n: Notice | null | undefined, p
   if (!saved[0]) throw Object.assign(new HttpError(409, 'The product changed while it was being read — open it again.'), { usd: ai.usd }); // paid for: counted with the failure
   await logActivity({ product_id: p.id, action: 'read', details: { model: ai.model, usd: ai.usd, stock_notice: { kind, items: items.length, marked, left } }, user_id: userId });
   return saved[0];
-}
-
-/** The vendor posted a product again with its details, and the gate holds the new post as a copy of one that is already
- *  here: if that one carried the "temporarily out" note, it is back in stock and the note goes. Never fails a read. */
-export async function backInStock(p: ProductRow, userId: string | null): Promise<void> {
-  if (p.source === 'import' || p.status !== 'needs_info') return;
-  try {
-    const first = await rpc<string | null>('pb_dup_held', { p_id: p.id });
-    if (!first) return;
-    const back = await patch('pb_products', `id=eq.${enc(first)}&temp_out_at=not.is.null`, { temp_out_at: null });
-    if (back.length) await logActivity({ product_id: first, action: 'stock', details: { temporary: false, posted_again: p.id }, user_id: userId });
-  } catch (e) { console.error(`pb-products back in stock ${p.id}: ${e instanceof Error ? e.message : e}`); }
 }

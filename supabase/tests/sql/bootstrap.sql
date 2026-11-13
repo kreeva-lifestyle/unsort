@@ -1,5 +1,7 @@
 create role anon nologin; create role authenticated nologin; create role service_role nologin;
 create schema auth;
+create schema private; -- the copy rules keep their scan and a person's answers here (20261112150000_pb_duplicates.sql)
+create schema cron; create function cron.schedule(text, text, text) returns bigint language sql as $$ select 1::bigint $$; -- the real one is pg_cron's
 create function auth.role() returns text language sql stable as $$ select nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role' $$;
 create function auth.uid() returns uuid language sql stable as $$ select null::uuid $$;
 create function public.app_is_staff() returns boolean language sql stable as $$ select true $$;

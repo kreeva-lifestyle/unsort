@@ -226,6 +226,28 @@ ignored).
   is dropped as a repeat. `setWebhook` now asks for `message` and
   `my_chat_member`; Check bot upgrades an older registration.
 
+## Repeats (2026-11-13: D17, D18, D21)
+A vendor's re-post as a NEW channel post still becomes its own product row and
+costs one read. What follows the read (`pb-products/restock.ts`; the full rules
+are in `product-directory-spec.md`, "Batch 6"):
+- **It brings the earlier product back.** The vendor's earlier product of the
+  same design and colour goes back In stock (or loses its "temporarily out"
+  note) — by the gate's copy rule for a lettered code, and by the design number
+  inside the vendor for a number-only code. The re-post then waits in Needs
+  info as a copy and says what it brought back.
+- **The later word wins.** A stock-out that is newer than the post is not
+  undone, and a notice read late leaves alone what the vendor posted again
+  after it.
+- **Copies do not pile up unseen.** Products → Needs info counts them, shows
+  them alone and archives them together (a bulk change, revertible for 7 days).
+- **Two posts of one product in the same minute.** The one read second is held
+  by its own gate; when the earlier one is read second, it re-applies the gate
+  to the later one.
+Not changed: a re-post of a product that is in stock and known by a number
+alone is still only a suggestion, a changed rate on a re-post is not applied to
+the earlier product, and a product archived by a permanent stock-out is not
+brought back (owner decisions Q7, Q8 and Q9 are open).
+
 ## Failures and retries
 - A group that fails (database, network, Telegram busy) → its messages
   `failed`, note "… (attempt N of 3)"; retried on later runs (a held product is

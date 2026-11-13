@@ -17,10 +17,11 @@
 //   retry_failed  the listings not tried again yet go back to Failed
 //   reread_failed the products not read again yet go back to Needs info
 //   reread        (only from the log of 12 Nov 2026) the fields a re-read changed
+//   copies        the copies it archived that are still archived go back to Needs info (copies.ts)
 import { countRows, enc, insert, nowIso, one, patch, remove } from './db.ts';
 import { plain } from './http.ts';
 
-export type BulkKind = 'import' | 'route_site' | 'reprice_site' | 'retry_failed' | 'reread_failed' | 'reread';
+export type BulkKind = 'import' | 'route_site' | 'reprice_site' | 'retry_failed' | 'reread_failed' | 'reread' | 'copies';
 
 /** The note on a listing a revert took back. Routing leaves such a listing alone. "Send matching products now" queues it
  *  again when it never reached the store (routeSite.ts); one that was hidden on the store is put back from its own page.

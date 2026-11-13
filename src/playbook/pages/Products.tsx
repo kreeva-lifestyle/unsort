@@ -10,9 +10,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import MissingTagsBar from '../components/product/list/MissingTagsBar';
 import FailedBar from '../components/product/list/FailedBar';
 import UnreadBar from '../components/product/list/UnreadBar';
+import CopiesBar from '../components/product/list/CopiesBar';
 import { friendlyError } from '../../lib/friendlyError';
 import { logSwallowed } from '../../lib/errorLogger';
-import { heldLabels, listSources } from '../data/duplicates';
+import { NO_HINTS, listHints, listSources, type ListHints } from '../data/duplicates';
 import { useBackClose } from '../../hooks/useBackClose';
 import { useConfirm } from '../../components/ui/ConfirmModal';
 import type { AddToast } from '../components/PbToasts';
@@ -48,7 +49,7 @@ export default function Products({ addToast, start = {}, onGuide }: { addToast: 
   const [sites, setSites] = useState<WebsiteLite[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [sources, setSources] = useState<{ v: string; label: string }[]>([]);
-  const [held, setHeld] = useState<Record<string, string>>({});
+  const [hints, setHints] = useState<ListHints>(NO_HINTS);
   const [adding, setAdding] = useState(!!start.add);
   const [importing, setImporting] = useState<{ open: boolean; url: string }>({ open: false, url: '' });
   const imp = useImportRun();
@@ -92,8 +93,8 @@ export default function Products({ addToast, start = {}, onGuide }: { addToast: 
       const last = Math.max(0, Math.ceil(r.count / PAGE_SIZE) - 1);
       if (page > last) { setPage(last); return; }
       setRows(r.rows); setCount(r.count); setLoadErr('');
-      // Which Needs-info rows look already added: a second, smaller read, so the list itself shows first.
-      heldLabels(r.rows).then(h => { if (my === seq.current) setHeld(h); }).catch(e => logSwallowed('pb copies', e));
+      // Which rows are held as a copy, or look like another product: a second, smaller read, so the list itself shows first.
+      listHints(r.rows).then(h => { if (my === seq.current) setHints(h); }).catch(e => logSwallowed('pb copies', e));
     } catch (e) {
       if (my !== seq.current) return;
       // The server answers "range not satisfiable" for a page past the end: same cure, from the first page.
@@ -146,10 +147,13 @@ export default function Products({ addToast, start = {}, onGuide }: { addToast: 
         </div>
         {filter.status === 'needs_info' && <UnreadBar addToast={addToast} onQueued={() => void load()} />}
         {filter.status === 'needs_info' && <MissingTagsBar addToast={addToast} onQueued={() => void load()} />}
+        {(filter.status === 'needs_info' || filter.status === 'copy') && (
+          <CopiesBar only={filter.status === 'copy'} reload={rows} addToast={addToast} onShow={() => setFilter({ status: filter.status === 'copy' ? 'needs_info' : 'copy' })} onDone={() => void load()} />
+        )}
         {filter.status === 'l:failed' && <FailedBar websiteId={filter.websiteId} addToast={addToast} onRetried={() => void load()} />}
         <div className="pb-bento pb-bento--auto">
           <ProductFilters search={search} onSearch={setSearch} filter={filter} onFilter={setFilter} vendors={vendors} websites={sites} sources={sources} onClear={clearAll} />
-          <ProductResults rows={rows} sites={sites} held={held} loading={loading} loadErr={loadErr} filtered={filtered} search={filter.search}
+          <ProductResults rows={rows} sites={sites} hints={hints} loading={loading} loadErr={loadErr} filtered={filtered} search={filter.search}
             onOpen={setOpenId} onAdd={add} onClear={clearAll} onRetry={() => void load()} />
         </div>
         {rows.length > 0 && <Pager page={page} pageSize={PAGE_SIZE} count={count} onPage={setPage} />}

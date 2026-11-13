@@ -41,11 +41,25 @@ export async function answerDup(productId: string, others: string[], verdict: Du
 /** What to call the other product in a sentence: its code, else its name. */
 export const dupName = (m: Pick<DupMatch, 'other_sku' | 'other_name'>) => m.other_sku || m.other_name || 'another product';
 
-/** For the list: which of these Needs-info products are held as a copy, and of what ("KB 264 WINE XS"). */
-export async function heldLabels(rows: { id: string; status: string }[]): Promise<Record<string, string>> {
-  const ids = rows.filter(r => r.status === 'needs_info').map(r => r.id);
-  const out: Record<string, string> = {};
-  for (const m of await getDupMatches(ids)) if (m.kind === 'held' && !out[m.product_id]) out[m.product_id] = dupName(m);
+/** Why two products were matched, as the product page says it. */
+export const DUP_WHY: Record<DupHow, string> = {
+  code: 'Same design code', other_vendor: 'Same code at another supplier', near_code: 'Same number, other letters', photo: 'Same photo',
+};
+
+/** held: id → what it waits as a copy of ("KB 264 WINE XS") · maybe: id → a product it may be a copy of, and why
+ *  ("KB 264 WINE XS · same photo"): a suggestion only, nothing is held. */
+export interface ListHints { held: Record<string, string>; maybe: Record<string, string> }
+export const NO_HINTS: ListHints = { held: {}, maybe: {} };
+
+/** For the list, in one read for the page: which products are held as a copy, and which only look like another one
+ *  (pre-launch fix D18: a weaker match showed on the product's own page alone, so nothing in the list said so). */
+export async function listHints(rows: { id: string }[]): Promise<ListHints> {
+  const out: ListHints = { held: {}, maybe: {} };
+  for (const m of await getDupMatches(rows.map(r => r.id))) {
+    if (m.kind === 'held') out.held[m.product_id] ??= dupName(m);
+    else if (m.kind === 'maybe') out.maybe[m.product_id] ??= `${dupName(m)} · ${DUP_WHY[m.how].toLowerCase()}`;
+  }
+  for (const id of Object.keys(out.held)) delete out.maybe[id];
   return out;
 }
 

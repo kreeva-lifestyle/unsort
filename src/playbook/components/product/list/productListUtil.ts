@@ -21,6 +21,7 @@ export const STATUS_CHIPS: { v: string; label: string }[] = [
 
 /** Every other status the old select offered, kept in a "More statuses" picker. */
 export const MORE_STATUSES: { v: string; label: string }[] = [
+  { v: 'copy', label: 'Waiting as copies' },
   ...(['new', 'reading', 'ready', 'archived'] as const).map(s => ({ v: s, label: PRODUCT_STATUS[s].label })),
   ...(['publishing', 'skipped'] as const).map(s => ({ v: `l:${s}`, label: `Listing: ${LISTING_STATUS[s].label}` })),
   { v: 'l:warn', label: 'Published with a note' },
@@ -60,6 +61,9 @@ export function listingSummary(p: ProductRow, nameOf?: (id: string) => string): 
   return out;
 }
 
+/** A weaker match, said on the row: "May be a copy of KB 264 WINE XS · same photo" (`of` from data/duplicates.ts listHints). */
+export const mayBeLabel = (of: string) => `May be a copy of ${of}`;
+
 /** Name to show; never blank. */
 export const productTitle = (p: ProductRow) => p.name || p.sku || 'Untitled product';
 
@@ -68,7 +72,7 @@ export const missingOf = (p: Pick<ProductRow, 'cost_price' | 'sell_price' | 'cat
   missingAll(missingDetails(p, p.pb_product_images.length), p.missing_attrs);
 
 /** The status label of a Needs-info product says why: "Needs info · Already here as KB 264 WINE XS" (it looks like a
- *  copy; `copyOf` from data/duplicates.ts heldLabels) and / or "Missing: Fabric, Colour". */
+ *  copy; `copyOf` from data/duplicates.ts listHints) and / or "Missing: Fabric, Colour". */
 export const statusLabel = (p: Pick<ProductRow, 'status' | 'cost_price' | 'sell_price' | 'category' | 'fabric' | 'color' | 'missing_attrs' | 'pb_product_images'> & { in_stock?: boolean; temp_out_at?: string | null; perm_out_at?: string | null }, copyOf?: string) => {
   const miss = p.status === 'needs_info' ? missingOf(p) : [];
   const why = [p.status === 'needs_info' && copyOf ? `Already here as ${copyOf}` : '', miss.length ? `Missing: ${miss.join(', ')}` : ''].filter(Boolean);

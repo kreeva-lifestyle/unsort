@@ -1204,6 +1204,69 @@ fixes". In short:
   found and sent again (`rewind_to`). Crawler 1.2.0.
 - Migration `20261113110000_pb_tg_dates_skipped_group.sql` (additive).
 
+### Batch 6 — repeats, copies and codes (D17, D18, D19, D21)
+- **D17 a new broadcast brings a product back** (`restock.ts`, called by the
+  reader after the gate). Only on a product's FIRST read (a late description
+  makes the next read a first read again), never for an imported product,
+  never for a stock notice. Which earlier products the post means:
+  - the product the gate holds it as a copy of (`pb_dup_held`), and
+  - the vendor's earlier products of the same design in the same colour, found
+    as a stock notice finds them (`pb_stock_candidates`: the design NUMBER at
+    this vendor, so "D no 5081" counts; "D no 5081", "D-5081" and "5081" are
+    one design, KB 5081 and NKB 5081 are two and nothing is guessed). The
+    colour must match in full or by its trade name (Rama = Teal Blue); with no
+    colour on one side, only when the design has a single earlier product.
+  For each: out of stock → `pb_stock_save { in_stock: true }` (the stores are
+  sent the change); a "temporarily out" note → cleared. Archived or
+  permanently out → left alone (the post is its own product).
+  The post is then the same product posted again: when the gate does not hold
+  it already (a number alone never holds by itself) the pair is stored as
+  "same" and the gate is re-applied, so it waits in Needs info · Already here
+  as … and never becomes a second listing; its Notes from Telegram say "This
+  post brought back in stock: …". A number-only re-post of a product that is
+  IN stock stays a suggestion, as before (owner decision Q7 is open).
+- **The later word wins**, whichever post was read first (a read can be
+  retried minutes later): a product is not brought back when its last stock
+  change is newer than the post (the notice that made it arrived after the
+  post; a person's switch was made after it), and a stock notice leaves alone
+  the products a vendor post made after the notice speaks for
+  (`stockNotice.ts postedAgain`; its line says "posted again after this
+  notice, left as it is: …").
+- **D18 copies can be found and cleared together.**
+  `pb_products.copy_of` = what the gate holds a product as a copy of, written
+  by the gate with the status. Products → More statuses → **Waiting as
+  copies** filters on it; on Needs info a bar counts them, with **Show only
+  these** and **Archive the copies**. Archiving (`copies_preview` /
+  `copies_archive` → `pb_copies_archive`) judges each copy again at that
+  moment and leaves two kinds for a person, counted: `on_site` (a listing of
+  it is on a store) and `priced` (it came with a vendor cost the earlier
+  product contradicts, or lacks while having no price at all; an earlier
+  product copied from a store sells at that store's price, so a cost on the
+  copy is nothing it lacks). A product that stops being a copy because what it
+  copied was archived in the same run is judged again by the gate. No answer
+  is stored for the pairs. It is a bulk change (kind `copies`).
+  Weaker matches (kind `maybe`: a number-only code, another vendor's code,
+  the same number under other letters, the same photo) now show on the list
+  row as "May be a copy of … · same photo" (`listHints`, one read per page).
+- **D19 two colours never share a store code** (`productInput.ts codeBase`).
+  For a product from Telegram or typed in, the colour goes into each size's
+  SKU and barcode: `KA-5070` + Wine + M → `KA-5070-WINE-M`. Unchanged: a code
+  that names its colour already, a product with no colour, and a product
+  copied from a store (its own per-colour code).
+- **D21 the copy rules are tested, and two posts read in the same minute are
+  caught.** `supabase/tests/sql/t_dups.sql` checks `pb_code_key`,
+  `pb_colour_keys`, the scan, the gate's hold and note, the answers, the
+  products a notice or a re-post means, and clearing copies with its revert,
+  against the real migration files; `run.sh` fails on a failed check and the
+  workflow "Playbook SQL tests" runs it on every change to the SQL. After a
+  read is saved the reader asks for the product's matches and has the gate
+  judge again any LATER post that still stands as Ready
+  (`restock.ts regateLater`): it had been judged before this one's code was
+  saved.
+- Migration `20261113120000_pb_copies.sql` (additive: one column, one index,
+  `pb_copies_archive`, `pb_bulk_revert_copies`, the gate and the revert entry
+  point replaced with the same signatures).
+
 ## Bulk changes: the log and Revert (owner, 2026-11-12)
 
 Owner: "We should also have revert option. Firstly log all bulk changes we
@@ -1248,6 +1311,7 @@ Revert can be tapped again for the rest.
 | `reprice_site` | Update prices on Shopify | price and compare-at price back; a published listing is sent again. The website's pricing rule is not touched |
 | `retry_failed` | Retry all | the listings nothing has picked up yet go back to Failed with their old message; what was already tried again stays |
 | `reread_failed` | Read again (unread products) | the products not read again yet go back to Needs info |
+| `copies` | Archive the copies (Products → Needs info) | the products still archived go back to Needs info and the gate judges them again (still a copy → it waits as before); a product the change let go is judged again too; one somebody restored or changed since is left alone (`pb_bulk_revert_copies`) |
 | `reread` | only from the log: the re-read of all products on 12 Nov 2026 | each field that read changed goes back where the product still holds what the read wrote and the field is not locked; the gate runs and the tag rules run again. The reader's log kept the first 200 characters of each old value, so the long notes of 105 products are not put back |
 
 The two bulk changes of the week before the log existed were written into it
