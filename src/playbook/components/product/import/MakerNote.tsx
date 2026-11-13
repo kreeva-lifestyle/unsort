@@ -14,7 +14,8 @@ const products = (x: number) => <>{n(x)} {x === 1 ? 'product' : 'products'}</>;
 
 export default function MakerNote({ m }: { m: ImportMaker | null | undefined }) {
   if (!m || !m.checked) return null;
-  const list: ReactNode = m.names.map((x, i) => <span key={x.name}>{i ? ', ' : ''}<b style={{ fontWeight: 600 }}>{x.name}</b> ({n(x.products)})</span>);
+  const more = m.names.length - 5;
+  const list: ReactNode = <>{m.names.slice(0, 5).map((x, i) => <span key={x.name}>{i ? ', ' : ''}<b style={{ fontWeight: 600 }}>{x.name}</b> ({n(x.products)})</span>)}{more > 0 ? <> and {n(more)} more</> : null}</>;
   const own = m.own ? <>“<b style={{ fontWeight: 600 }}>{m.own}</b>”, the website’s own name</> : null;
   const most = m.named / m.checked >= 0.8;
   let title: string, body: ReactNode;

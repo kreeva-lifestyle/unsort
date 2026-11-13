@@ -1,7 +1,7 @@
 // "Import from website" (PbModal sheet on phone / modal on desktop): paste a
 // store's address → Check website → the preview (platform, estimate, what is
 // already here from an earlier import, 3 samples, warnings) and the choices
-// (vendor, in-stock only, their price) → the one primary, "Import ~980
+// (vendor, in-stock only, their price, manufacturers to leave out: MakerSkip) → the one primary, "Import ~980
 // products" — or "Check for new products" when the website was imported before. The run itself happens on the
 // server; the Products page shows its progress tile. Only one gradient at a
 // time: "Check website" while nothing is checked, the Import button after.
@@ -18,10 +18,11 @@ import PbButton from '../../ui/PbButton';
 import PbModal from '../PbModal';
 import ImportOptions, { type ImportChoices } from './ImportOptions';
 import ImportPreview from './ImportPreview';
+import MakerSkip from './MakerSkip';
 import LegalLine from './LegalLine';
 import { importError, importLabel, normalizeUrl, nothingFound } from './importText';
 
-const CHOICES: ImportChoices = { vendor: '', inStockOnly: true, theirPrice: true };
+const CHOICES: ImportChoices = { vendor: '', inStockOnly: true, theirPrice: true, skip: [] };
 
 export default function ImportSheet({ open, initialUrl = '', onClose, onStarted, addToast, onGuide, vendors = [] }: {
   open: boolean; initialUrl?: string; onClose: () => void; onStarted: (runId: string) => void; addToast: AddToast; onGuide?: (section: string) => void;
@@ -60,14 +61,14 @@ export default function ImportSheet({ open, initialUrl = '', onClose, onStarted,
         if (my !== seq.current) return;
         setCheck(c);
         // A website imported before keeps its vendor; a new one starts from the site's own name.
-        setChoices(x => ({ ...x, vendor: x.vendor || c.last_vendor || c.vendor_suggestion || c.host }));
+        setChoices(x => ({ ...x, vendor: x.vendor || c.last_vendor || c.vendor_suggestion || c.host, skip: c.last_skip_makers ?? [] }));
       } catch (e2) { if (my === seq.current) setErr(importError(e2)); } finally { if (my === seq.current) setBusy(''); }
       return;
     }
     if (!choices.vendor.trim()) { setVendorErr('Enter a vendor name'); return; }
     setBusy('start'); setErr(''); setVendorErr('');
     try {
-      const r = await startImport({ url: address, in_stock_only: choices.inStockOnly, use_their_price: choices.theirPrice && !foreign, vendor_name: choices.vendor.trim(), estimate: (choices.inStockOnly ? check.estimate_in_stock ?? check.estimate : check.estimate) ?? null });
+      const r = await startImport({ url: address, in_stock_only: choices.inStockOnly, use_their_price: choices.theirPrice && !foreign, vendor_name: choices.vendor.trim(), estimate: (choices.inStockOnly ? check.estimate_in_stock ?? check.estimate : check.estimate) ?? null, skip_makers: choices.skip });
       addToast(`Import from ${check.host} started — it runs on the server, you can leave this page`, 'success');
       reset(); setBusy('');
       onStarted(r.run_id);
@@ -104,6 +105,7 @@ export default function ImportSheet({ open, initialUrl = '', onClose, onStarted,
         {check && <ImportPreview check={check} inStockOnly={choices.inStockOnly} />}
         {usable && <ImportOptions value={choices} onChange={v => { setChoices(v); setVendorErr(''); }} disabled={busy === 'start'} vendorError={vendorErr} foreign={foreign}
           lastVendor={check.last_vendor} suggested={check.vendor_suggestion || check.host} vendors={vendors} />}
+        {usable && <MakerSkip maker={check.maker} skip={choices.skip} onChange={skip => setChoices(x => ({ ...x, skip }))} disabled={busy === 'start'} />}
         {usable && <LegalLine onGuide={onGuide ? () => { reset(); onClose(); onGuide('import-website'); } : undefined} />}
         {busy === 'check' && <div role="status" style={pbMeta}>Looking at the store… this takes a few seconds.</div>}
         {err && <div ref={errBox} role="alert" style={pbErrorBox}>{err}</div>}

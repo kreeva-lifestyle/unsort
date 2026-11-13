@@ -12,11 +12,16 @@
 // Caps: MAX_PRODUCTS new products (added + failed) per run — products already
 // here do not count, so "run it again for the rest" works — and MAX_SCANNED
 // products looked at in all.
+// Manufacturers the run leaves out (skip_makers, owner 2026-11-13): a product
+// that names one in the store's list data is passed over before its page is
+// fetched; one whose own page names one (JSON-LD manufacturer) after it.
+// Both count in maker_skipped.
 import { plain } from '../http.ts';
 import { ingest } from '../ingest.ts';
 import { MAX_PRODUCTS, MAX_SCANNED } from './cursor.ts';
 import { ingestBody } from './body.ts';
 import { type Gate, enrich } from './enrich.ts';
+import { skipsMaker } from './maker.ts';
 import { type Found } from './normalize.ts';
 import { type Robots } from './urlCheck.ts';
 
@@ -24,9 +29,9 @@ const INGEST_AT_ONCE = 3;
 /** Shopify / Woo: no new batch (3 page fetches + ingest) starts this close to the end of the import clock. */
 export const META_RESERVE_MS = 10_000;
 
-export interface Counts { found: number; added: number; skipped: number; out_of_stock: number; failed: number }
+export interface Counts { found: number; added: number; skipped: number; out_of_stock: number; failed: number; maker_skipped: number }
 export interface PageCtx {
-  run: { id: string; host: string; use_their_price: boolean; platform: string | null; in_stock_only: boolean };
+  run: { id: string; host: string; use_their_price: boolean; platform: string | null; in_stock_only: boolean; skip_makers?: string[] | null };
   origin: string; robots: Robots; vendor: string; perItem: boolean; until: number;
   worked: boolean; // a batch already ran this tick (so a slow site still moves by at least one)
   gate: Gate; known: (refs: string[]) => Promise<Set<string>>;
@@ -39,6 +44,7 @@ export async function addProducts(items: Found[], start: number, counts: Counts,
   const taken: Found[] = [];
   let i = start;
   const seen = ctx.perItem && i < items.length ? await ctx.known(items.slice(i).map(f => f.ref)) : new Set<string>();
+  const skip = ctx.run.skip_makers ?? [];
   while (i < items.length && !capped(counts)) {
     if (ctx.perItem && ctx.worked && Date.now() > ctx.until - META_RESERVE_MS) break; // the next tick carries on at item i
     const batch: Found[] = [];
@@ -47,6 +53,7 @@ export async function addProducts(items: Found[], start: number, counts: Counts,
       counts.found++;
       if (!f.in_stock && ctx.run.in_stock_only) counts.out_of_stock++;
       else if (seen.has(f.ref)) counts.skipped++;
+      else if (skipsMaker(f, skip)) counts.maker_skipped++;
       else batch.push(f);
     }
     if (!batch.length) continue;
@@ -54,7 +61,9 @@ export async function addProducts(items: Found[], start: number, counts: Counts,
     taken.push(...batch);
     await Promise.all(batch.map(async (f) => {
       try {
-        const r = await ingest(ingestBody(ctx.perItem ? await enrich(f, ctx.origin, ctx.robots, ctx.gate) : f, ctx.run, ctx.vendor), ctx.run.id); // recorded under the import, so it can be taken back
+        const full = ctx.perItem ? await enrich(f, ctx.origin, ctx.robots, ctx.gate) : f;
+        if (full !== f && skipsMaker(full, skip)) { counts.maker_skipped++; return; } // its own page names a manufacturer left out
+        const r = await ingest(ingestBody(full, ctx.run, ctx.vendor), ctx.run.id); // recorded under the import, so it can be taken back
         if (r.duplicate) counts.skipped++; else counts.added++;
       } catch (e) {
         counts.failed++;

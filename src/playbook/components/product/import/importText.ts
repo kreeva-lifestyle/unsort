@@ -91,13 +91,14 @@ export function runTitle(r: Pick<ImportRunRow, 'status' | 'host' | 'added' | 'sk
   }
 }
 
-/** The counts that are not zero, in order: "480 found · 470 added · 10 already here · 3 out of stock · 2 failed". */
-export function runCounts(r: Pick<ImportRunRow, 'found' | 'added' | 'skipped' | 'out_of_stock' | 'failed' | 'cursor'>): { n: number; label: string }[] {
+/** The counts that are not zero, in order: "480 found · 470 added · 10 already here · 12 left out by manufacturer · 3 out of stock · 2 failed". */
+export function runCounts(r: Pick<ImportRunRow, 'found' | 'added' | 'skipped' | 'out_of_stock' | 'failed' | 'cursor'> & { maker_skipped?: number }): { n: number; label: string }[] {
   const est = r.cursor && typeof r.cursor.estimate === 'number' && r.cursor.estimate > 0 ? r.cursor.estimate : null;
   const out: { n: number; label: string }[] = [];
   if (r.found || est) out.push({ n: r.found, label: est ? `of about ${count(est)} found` : 'found' });
   if (r.added) out.push({ n: r.added, label: 'added' });
   if (r.skipped) out.push({ n: r.skipped, label: 'already here' });
+  if (r.maker_skipped) out.push({ n: r.maker_skipped, label: 'left out by manufacturer' });
   if (r.out_of_stock) out.push({ n: r.out_of_stock, label: 'out of stock' });
   if (r.failed) out.push({ n: r.failed, label: 'failed' });
   return out;

@@ -20,6 +20,7 @@ import { SB_URL, enc, insert, logActivity, patch, sel, svcHeaders } from '../db.
 import { HttpError, plain } from '../http.ts';
 import { vendorId } from '../ingest.ts';
 import { detect } from './detect.ts';
+import { skipList } from './maker.ts';
 import { RUN_COLS, type RunRow, ownDomains } from './runner.ts';
 import { type SiteUrl, checkUrl } from './urlCheck.ts';
 
@@ -39,12 +40,16 @@ async function refuseOpen(host: string) {
 
 /** What Playbook already holds from this website (www. or not): how many products were copied from it,
  *  and the vendor its last import was filed under. */
-export async function importedBefore(host: string): Promise<{ count: number; vendor: string | null }> {
+export async function importedBefore(host: string): Promise<{ count: number; vendor: string | null; skip: string[] }> {
   const like = variants(host).map(h => `source_ref.like."${h}:*"`).join(',');
   const r = await fetch(`${SB_URL}/rest/v1/pb_products?source=eq.import&or=(${enc(like)})&select=id`, { method: 'HEAD', headers: { ...svcHeaders, prefer: 'count=exact' } });
   const count = r.ok ? Number((r.headers.get('content-range') || '').split('/')[1]) || 0 : 0;
-  const last = await sel<{ pb_vendors: { name: string } | null }>(`pb_import_runs?host=in.(${variants(host).map(enc).join(',')})&vendor_id=not.is.null&select=pb_vendors(name)&order=created_at.desc&limit=1`);
-  return { count, vendor: last[0]?.pb_vendors?.name ?? null };
+  const hosts = variants(host).map(enc).join(',');
+  const [last, lastRun] = await Promise.all([
+    sel<{ pb_vendors: { name: string } | null }>(`pb_import_runs?host=in.(${hosts})&vendor_id=not.is.null&select=pb_vendors(name)&order=created_at.desc&limit=1`),
+    sel<{ skip_makers: string[] | null }>(`pb_import_runs?host=in.(${hosts})&select=skip_makers&order=created_at.desc&limit=1`),
+  ]);
+  return { count, vendor: last[0]?.pb_vendors?.name ?? null, skip: lastRun[0]?.skip_makers ?? [] };
 }
 
 export async function importCheck(b: Body) {
@@ -57,7 +62,7 @@ export async function importCheck(b: Body) {
     throw new HttpError(400, (msg + extra).length <= 300 ? msg + extra : msg); // the app shows sentences up to 300 characters as they are
   }
   // The preview is about the store; what we already hold is a help, so a failed look-up is logged, not fatal.
-  const before = await importedBefore(d.host).catch((e) => { console.error(`pb-products import_check ${d.host}: ${plain(e)}`); return { count: 0, vendor: null }; });
+  const before = await importedBefore(d.host).catch((e) => { console.error(`pb-products import_check ${d.host}: ${plain(e)}`); return { count: 0, vendor: null, skip: [] as string[] }; });
   // A count, '5000+' when counting stopped at the cap, null when this kind of store cannot say.
   const shown = (n: number | null) => (n === null ? null : d.estimate.capped ? `${n}+` : n);
   return {
@@ -66,6 +71,7 @@ export async function importCheck(b: Body) {
     sample: d.sample.slice(0, 3).map(f => ({ name: f.name, price: f.price, currency: f.currency, image: f.images[0] ?? null, url: f.url, in_stock: f.in_stock })),
     warnings: d.warnings, vendor_suggestion: d.vendor_suggestion, already_here: before.count, last_vendor: before.vendor,
     maker: d.maker ?? null, // do the products name who makes them? (import/maker.ts)
+    last_skip_makers: before.skip, // the manufacturers the last import from this website left out
   };
 }
 
@@ -84,14 +90,14 @@ export async function importStart(b: Body, userId: string | null) {
   const row = {
     url: site.url, host: d.host, platform: d.platform, status: 'queued',
     in_stock_only: b.in_stock_only !== false, use_their_price: b.use_their_price !== false,
-    vendor_id, cursor, created_by: userId,
+    vendor_id, cursor, created_by: userId, skip_makers: skipList(b.skip_makers),
   };
   let made: { id: string }[];
   try { made = await insert<{ id: string }>('pb_import_runs', [row]); } catch (e) {
     if (e instanceof HttpError && e.status === 409) throw new HttpError(409, busySentence(d.host, 'queued')); // pb_import_runs_one_open
     throw e;
   }
-  await logActivity({ action: 'import_started', user_id: userId, details: { run_id: made[0].id, host: d.host, platform: d.platform, in_stock_only: row.in_stock_only, use_their_price: row.use_their_price, vendor: vendorName } });
+  await logActivity({ action: 'import_started', user_id: userId, details: { run_id: made[0].id, host: d.host, platform: d.platform, in_stock_only: row.in_stock_only, use_their_price: row.use_their_price, vendor: vendorName, ...(row.skip_makers.length ? { skip_makers: row.skip_makers } : {}) } });
   return { ok: true, run_id: made[0].id, platform: d.platform, host: d.host, warnings: d.warnings };
 }
 
