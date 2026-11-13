@@ -1223,6 +1223,12 @@ fixes". In short:
   permanently out → left alone (the post is its own product). A post that
   arrived without the vendor's time (an old crawler) brings nothing back and
   stamps nothing: its place in the order is not known.
+  Old news: when the vendor said "permanent stock out" for that design and
+  colour AFTER making the post, and the notice was read first, the post goes
+  the way that product went — permanently out and archived, with the note "Not
+  listed: after this post the vendor said permanent stock out for …"
+  (`pb_stock_gone`: the vendor's products of that design number a newer word
+  took off sale for good; third review, finding 1).
   A post that matched a sold-out product is that product posted again: when
   the gate does not hold it already (a number alone never holds by itself) the
   pair is stored as "same" and the gate is re-applied BEFORE any stock is
@@ -1264,12 +1270,18 @@ fixes". In short:
   not always write, and an older re-post read last put a sold-out product
   back on sale; its second look found the switch, the temporary note, the
   equal-time and the stale look-up corners above.
-  Known limits: three words with a PERMANENT notice read last — a permanent
-  notice that is older than a stock-out (or a person's switch off) already on
-  record is not applied, so the product stays out of stock but is not
-  archived; and a notice that names a design Playbook has not read yet does
-  nothing, so if that product's own post is read afterwards (a failed read
-  tried again) it comes in as in stock.
+  Products that are out of stock when this arrives get `stock_said_at = now()`
+  (no time was on record, and any old post read afterwards would have walked
+  past an empty record; live on the day: none).
+  Known limits: a permanent notice that is older than a stock-out (or a
+  person's switch OFF) already on record is not applied, so the product stays
+  out of stock but is not archived; a notice that names a design Playbook has
+  not read yet does nothing, so if that product's own post is read afterwards
+  it comes in as in stock; after a person switches Stock ON, a notice OLDER
+  than a re-post that was already read (its read failed and was tried again)
+  still switches the product off; and two worker runs that interleave within
+  a few milliseconds can leave a product sold out although the vendor's later
+  post says it is back (the safe direction).
 - **D18 copies can be found and cleared together.**
   `pb_products.copy_of` = what the gate holds a product as a copy of, written
   by the gate with the status. The note follows what it points at
@@ -1289,11 +1301,19 @@ fixes". In short:
   `on_site` (a listing of the copy is on a store), `priced` (it came with a
   vendor cost the earlier product contradicts, or lacks while having no price
   at all; an earlier product copied from a store sells at that store's price,
-  so a cost on the copy is nothing it lacks) and `linked` (it is part of a
-  chain: it copies a product that is itself waiting as a copy, or another
-  waiting copy points at it — a chain only forms where colours do not line up,
-  Black ← no colour ← Grey, and archived together no Grey product would be
-  left). Notes that no longer hold are cleared by the same call. Nothing is
+  so a cost on the copy is nothing it lacks), `no_colour` (the earlier product
+  has no colour: the gate holds any colour as its copy because it cannot tell,
+  and archiving would keep the incomplete product and lose a complete Grey or
+  Black one) and `linked` (it is part of a chain: another waiting copy points
+  at it, or it copies a product that is itself waiting as a copy). Notes that
+  no longer hold are cleared by the same call. Known limits: a copy whose
+  original a person archives, re-colours or deletes by hand loses its note at
+  once but waits in Needs info until its own gate runs (opening and saving
+  it); the note trigger costs about one copy-rule look-up per waiting copy of
+  the changed product (fine up to dozens of copies of one design); and a copy
+  that arrives in the very second "Archive the copies" is tapped while every
+  note on record no longer holds is archived without the question (the toast
+  says so, and Bulk changes takes it back). Nothing is
   let go to the websites by it, and no answer is stored for the pairs. Weaker
   matches (kind `maybe`: a number-only code, another vendor's code, the same
   number under other letters, the same photo) now show on the list row as
@@ -1303,13 +1323,19 @@ fixes". In short:
   barcode: `KA-5070` + Wine + M → `KA-5070-WINE-M`. Unchanged: a code that
   carries words after its design code (it names its colour in the vendor's
   own words: `KB 302 WINE`, `KB 264 RAMA`), a product with no colour, and a
-  product copied from a store. The colour part is decided ONCE per product
-  and saved BEFORE its first send (`pb_products.sku_colour`; '' = none;
-  `publishParts.ts skuColour`), then used for every send to every website: a
-  send that fails half-way finds the same codes on its next try, codes that
-  are on a store do not follow a colour that is re-worded later, and the same
-  goods carry one code on every store. A product that was on a store before
-  this is decided as '' (its codes stay as they are).
+  product copied from a store. The colour part is decided ONCE per product,
+  by the first send a store ACCEPTS (`pb_products.sku_colour`; '' = none;
+  `publishParts.ts skuColour` / `keepColour`, saved right after productSet and
+  before anything else can fail), then used for every send to every website:
+  a send that fails half-way finds the same codes on its next try, a send the
+  store refuses decides nothing (a colour corrected afterwards is the one
+  used), codes that are on a store do not follow a colour that is re-worded
+  later, and the same goods carry one code on every store — when two websites
+  send a new product at once, the one the store took first decides and the
+  other is sent again with it (a passing failure, no attempt used up). A
+  product that was on a store before this is decided as '' (its codes stay as
+  they are; live on the day: no listing existed). Known limit: a product that
+  was deleted in Shopify and is put back is sent as new, with the colour part.
 - **D21 the copy rules are tested, and two posts read in the same minute are
   caught.** `supabase/tests/sql/t_dups.sql` checks `pb_code_key`,
   `pb_colour_keys`, the scan, the gate's hold and note, the answers, the

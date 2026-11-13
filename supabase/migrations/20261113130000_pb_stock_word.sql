@@ -34,9 +34,16 @@
 -- The stores are owed a send only when what they show changes (the stock, a
 -- permanent stock-out): a note or a time alone is not sent.
 --
--- Additive: one column, one function replaced with the same signature and
--- answers (plus -2). SECURITY INVOKER, as before.
+-- Additive: one column, one small index, one function replaced with the same
+-- signature and answers (plus -2), one new read-only function. SECURITY
+-- INVOKER, as before.
 alter table public.pb_products add column if not exists stock_said_at timestamptz;
+-- Products that are out of stock when this arrives have no time on record, and
+-- a word with a time walks straight past an empty record: the first OLD post
+-- read afterwards would put them back on sale (third review, 2). The word that
+-- took them out is put on record as of now — nothing posted before today
+-- brings them back, a new post does.
+update public.pb_products set stock_said_at = now() where not in_stock and stock_said_at is null;
 comment on column public.pb_products.stock_said_at is 'When the latest word that decided this product''s stock was said: the time the vendor made the notice or the new post that last set it, or when a person switched its Stock off. Empty after a person switched it on. pb_stock_save refuses an older word.';
 
 create or replace function public.pb_stock_save(p_product uuid, p_change jsonb)
@@ -76,3 +83,28 @@ begin
   return n;
 end $$;
 comment on function public.pb_stock_save(uuid, jsonb) is 'Save a product''s stock and mark its listings on sale on Shopify as owing their store the change, in one transaction (pb-products stock.ts). With said_at or as_of in p_change: only when no newer word about its stock is on record (-2 otherwise).';
+
+-- A vendor's post can be OLDER than a "permanent stock out" for the same design
+-- that was read before it (its own read failed and was tried again). The
+-- product the notice named is archived by then, so the re-post step no longer
+-- finds it and the post would be listed as a new product (third review, 1).
+-- These are the vendor's products with that design number that a word NEWER
+-- than p_after took off sale for good, in the shape of pb_stock_candidates
+-- (plus when that word was said). Reads only; row security applies.
+create or replace function public.pb_stock_gone(p_vendor uuid, p_code text, p_after timestamptz)
+returns table (id uuid, name text, sku text, color text, in_stock boolean, status text,
+               code_key text, colour_keys text[], same_vendor boolean, notice_key text, said_at timestamptz)
+language sql stable security invoker set search_path = '' as $$
+  with n as (select public.pb_code_key(p_code) as k, public.pb_code_num(p_code) as num)
+  select p.id, p.name, p.sku, p.color, p.in_stock, p.status,
+         public.pb_code_key(p.sku), public.pb_colour_keys(p.sku, p.color), true, n.k, p.stock_said_at
+  from n
+  join public.pb_products p
+    on n.num <> '' and p_vendor is not null and p.vendor_id = p_vendor and public.pb_code_num(p.sku) = n.num
+   and p.perm_out_at is not null and not p.in_stock and p.stock_said_at > p_after
+  order by p.created_at
+  limit 50
+$$;
+create index if not exists pb_products_perm_out_idx on public.pb_products (vendor_id) where perm_out_at is not null;
+comment on function public.pb_stock_gone(uuid, text, timestamptz) is 'The vendor''s products with this design number that a word newer than p_after took off sale for good (pb-products restock.ts: a post older than that word is not listed as new).';
+grant execute on function public.pb_stock_gone(uuid, text, timestamptz) to authenticated, service_role;

@@ -247,7 +247,10 @@ are in `product-directory-spec.md`, "Batch 6"):
   re-post only clears a note older than itself. A person switching Stock OFF
   is the latest word as of the tap; switching it ON claims no time, so a
   notice posted before the tap that arrives after it still applies. A post
-  without the vendor's time (an old crawler) brings nothing back.
+  without the vendor's time (an old crawler) brings nothing back. A post made
+  BEFORE a "permanent stock out" of its design and colour but read after it is
+  archived with that product ("Not listed: after this post the vendor said
+  permanent stock out for …"), never listed as new.
 - **Copies do not pile up unseen.** Products → Needs info counts them, shows
   them alone and archives them together (a bulk change, revertible for 7 days).
 - **Two posts of one product in the same minute.** The one read second is held

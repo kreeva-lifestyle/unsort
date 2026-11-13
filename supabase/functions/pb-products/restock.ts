@@ -23,6 +23,12 @@
 // read afterwards leaves them alone. A post that arrived without the vendor's
 // time (an old crawler) brings nothing back and stamps nothing: its place in
 // the order is not known, and a stock-out must not lose to a guess.
+// Old news: when the vendor said "permanent stock out" for this very design and
+// colour AFTER making the post, and that notice was read first, the product it
+// named is archived and nothing here would find it. The post is then taken off
+// sale for good like that product (as the notice would have done, had the post
+// been read in time), with a note saying why — it is never listed as new.
+// A post made after a permanent stock-out is its own product, as before.
 // A post that matched a sold-out product is that product posted again, so it
 // must not become a second listing: when the gate does not hold it already (a
 // number alone never holds by itself) the pair is remembered as "same" and the
@@ -32,12 +38,14 @@
 // a product that is IN stock stays a suggestion, as before. Never fails a read.
 import { enc, one, patch, rpc, sel } from './db.ts';
 import { plain } from './http.ts';
-import { NEWER, saidAt, saveStock } from './stock.ts';
+import { NEWER, saidAt, saveStock, takeOffSale } from './stock.ts';
 import { type Cand, LABEL, SAME } from './stockNotice.ts';
 import { refresh } from './tagStore.ts';
 import type { ProductRow } from './types.ts';
 
 interface Target { id: string; name: string | null; sku: string | null; in_stock: boolean; temp_out_at: string | null }
+/** pb_stock_gone: a product a word newer than this post took off sale for good; `said_at` = when that word was said. */
+type Gone = Cand & { said_at: string };
 
 /** Two colour keys that mean one colour: the same word, or a trade name and its plain colour, either way round. */
 export const sameColour = (a: string, b: string) => a === b || (SAME[a] || []).includes(b) || (SAME[b] || []).includes(a);
@@ -68,7 +76,12 @@ export async function backInStock(p: ProductRow, userId: string | null, first: b
     const at = cands.findIndex(c => c.id === p.id);
     if (at < 0) return p;
     await rpc('pb_stock_save', { p_product: p.id, p_change: { said_at: said } }); // its own word about itself
-    const ids = restockTargets(cands[at], cands.slice(0, at)).map(c => c.id);
+    const earlier = cands.slice(0, at);
+    const gone = (await rpc<Gone[]>('pb_stock_gone', { p_vendor: p.vendor_id, p_code: p.sku, p_after: said }) || []).filter(g => g.id !== p.id);
+    // judged among ALL the design's products, so a number two letter codes share is still not guessed
+    const dead = gone.length ? restockTargets(cands[at], [...earlier.filter(c => !gone.some(g => g.id === c.id)), ...gone]).filter(c => gone.some(g => g.id === c.id)) as Gone[] : [];
+    if (dead.length) return await oldNews(p, dead, userId);
+    const ids = restockTargets(cands[at], earlier).map(c => c.id);
     if (!ids.length) return p;
     const rows = await sel<Target>(`pb_products?id=in.(${ids.join(',')})&status=neq.archived&perm_out_at=is.null&select=id,name,sku,in_stock,temp_out_at&order=created_at.asc`);
     const act = rows.filter(t => !t.in_stock || (!!t.temp_out_at && Date.parse(t.temp_out_at) < Date.parse(said))); // a note from a later post stays
@@ -93,6 +106,16 @@ export async function backInStock(p: ProductRow, userId: string | null, first: b
     }
   } catch (e) { console.error(`pb-products back in stock ${p.id}: ${plain(e)}`); }
   return out;
+}
+
+/** The post is older than a permanent stock-out of the product it stands for: it goes the way that product went. */
+async function oldNews(p: ProductRow, dead: Gone[], userId: string | null): Promise<ProductRow> {
+  const last = new Date(Math.max(...dead.map(d => Date.parse(d.said_at)))).toISOString();
+  if (await takeOffSale({ id: p.id }, { older_than_notice_for: dead[0].id }, userId, last) < 0) return p;
+  const cur = await one<{ status: string; intake_notes: string[] | null }>(`pb_products?id=eq.${enc(p.id)}&select=status,intake_notes`);
+  const note = `Not listed: after this post the vendor said permanent stock out for ${dead.map(d => d.sku || d.name || 'this design').join(', ')}`.slice(0, 300);
+  await patch('pb_products', `id=eq.${enc(p.id)}`, { intake_notes: [...new Set([...(cur?.intake_notes || []), note])].slice(0, 20) });
+  return { ...p, status: cur?.status || p.status, in_stock: false };
 }
 
 /** Two posts of one product read in the same minute (pre-launch fix D21): the later one was judged before this one's

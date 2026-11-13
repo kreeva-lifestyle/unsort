@@ -1,6 +1,6 @@
 // "Archive the copies" (pre-launch fix D18): the products the Ready gate holds
 // as copies of ones added earlier, archived in one go instead of one tap each.
-//   copies_archive {} → { ok, archived, priced, on_site, linked, run_id }
+//   copies_archive {} → { ok, archived, priced, on_site, linked, no_colour, run_id }
 // The database does it (pb_copies_archive, 20261113120000_pb_copies.sql): every
 // copy is judged once, as things stand before anything is archived, so it does
 // exactly what the app showed beforehand (the app asks the same function with
@@ -9,6 +9,9 @@
 //   on_site  a listing of it is already on a store;
 //   priced   it came with a vendor price the earlier product lacks, or a
 //            different one (a changed rate would be lost with the copy);
+//   no_colour the earlier product has no colour: this one may be another
+//            colour, and archiving it could keep the incomplete product and
+//            lose the complete one;
 //   linked   it is part of a chain of copies (it copies a waiting copy, or a
 //            waiting copy points at it): archived together, the only product
 //            of a colour could go.
@@ -20,8 +23,8 @@
 import { endRun, startRun } from './bulkLog.ts';
 import { logActivity, rpc } from './db.ts';
 
-export interface CopyCounts { archived: number; priced: number; on_site: number; linked: number }
-const counts = (r: Partial<CopyCounts> | null | undefined): CopyCounts => ({ archived: Number(r?.archived) || 0, priced: Number(r?.priced) || 0, on_site: Number(r?.on_site) || 0, linked: Number(r?.linked) || 0 });
+export interface CopyCounts { archived: number; priced: number; on_site: number; linked: number; no_colour: number }
+const counts = (r: Partial<CopyCounts> | null | undefined): CopyCounts => ({ archived: Number(r?.archived) || 0, priced: Number(r?.priced) || 0, on_site: Number(r?.on_site) || 0, linked: Number(r?.linked) || 0, no_colour: Number(r?.no_colour) || 0 });
 
 export async function copiesArchive(userId: string | null) {
   const run = await startRun('copies', 'Archived the products waiting as copies', { userId });

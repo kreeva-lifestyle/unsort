@@ -147,15 +147,16 @@ select t_is('… the gate holds it again once the code is back', (select g.statu
 -- a note can still be out of date: here the pair is answered without the gate being asked. The count leaves it out; the action clears it.
 select public.pb_dup_verdict_set(t_id(61), t_id(60), 'different');
 -- 51 (no colour) is held as a copy of 50 (Black); 52 (Grey) only as a copy of 51: a chain. Archived together, no Grey product would be left,
--- and archiving 51 alone would leave 52 waiting for nothing. Both are left for a person ("linked").
-select t_is('looking only: what would be archived, and what is left', public.pb_copies_archive(false)::text, '{"linked": 2, "priced": 2, "on_site": 1, "archived": 3}');
+-- and archiving 51 alone would leave 52 waiting for nothing. Both are left for a person: 51 because a waiting copy points at it ("linked"),
+-- 52 because the product it copies has no colour, so it may be another colour ("no_colour").
+select t_is('looking only: what would be archived, and what is left', public.pb_copies_archive(false)::text, '{"linked": 1, "priced": 2, "on_site": 1, "archived": 3, "no_colour": 1}');
 select t_is('… nothing changed', (select count(*)::text from pb_products where status = 'archived'), '1');
 select t_refused('a signed-in person cannot run it', 'select public.pb_copies_archive(true)');
 select t_is('… nothing changed', (select count(*)::text from pb_products where status = 'archived'), '1');
 select set_config('request.jwt.claims', '{"role":"service_role"}', false);
 insert into pb_bulk_runs (id, kind, label, status) values (:R1, 'copies', 'Archived the products waiting as copies', 'running');
 select set_config('request.headers', json_build_object('x-pb-bulk', :R1)::text, false);
-select t_is('done: exactly what was shown', public.pb_copies_archive(true)::text, '{"linked": 2, "priced": 2, "on_site": 1, "archived": 3}');
+select t_is('done: exactly what was shown', public.pb_copies_archive(true)::text, '{"linked": 1, "priced": 2, "on_site": 1, "archived": 3, "no_colour": 1}');
 select set_config('request.headers', '{}', false);
 update pb_bulk_runs set status = 'done', items = (select count(*) from pb_bulk_items where run_id = :R1), finished_at = now() where id = :R1;
 select t_is('products now', (select string_agg(right(id::text, 2) || ':' || status, ' ' order by id) from pb_products where id <> all (array[t_id(20), t_id(30), t_id(40), t_id(50), t_id(60), t_id(65)])),
@@ -166,7 +167,7 @@ select t_is('a note that was out of date is cleared, its product left as it is',
 select t_is('a timeline line for each', (select count(*)::text from pb_activity where action = 'archived' and details ->> 'bulk' = 'true'), '3');
 select t_is('… that says what it copied', (select right(details ->> 'copy_of', 2) from pb_activity where product_id = t_id(31) and action = 'archived'), '30');
 select t_is('the log has every row it changed', (select count(*)::text from pb_bulk_items where run_id = :R1 and tbl = 'pb_products'), '3');
-select t_is('a second tap finds nothing more to archive', public.pb_copies_archive(false)::text, '{"linked": 2, "priced": 2, "on_site": 1, "archived": 0}');
+select t_is('a second tap finds nothing more to archive', public.pb_copies_archive(false)::text, '{"linked": 1, "priced": 2, "on_site": 1, "archived": 0, "no_colour": 1}');
 -- meanwhile a person restores one of them (Restore → read again), and the product another one copied is archived
 update pb_products set status = 'new' where id = t_id(23);
 update pb_products set status = 'archived' where id = t_id(30);
@@ -191,6 +192,30 @@ select t_is('two copies of one product', (select string_agg(right(id::text, 2) |
 delete from pb_products where id = t_id(80);
 select t_is('the product they copied is deleted: the note moves on, or goes', (select string_agg(right(id::text, 2) || '>' || coalesce(right(copy_of::text, 2), 'none'), ' ' order by id) from pb_products where id in (t_id(81), t_id(82))), '81>none 82>81');
 select t_is('… and no note points at a product that is gone', (select count(*)::text from pb_products c where c.copy_of is not null and not exists (select 1 from pb_products o where o.id = c.copy_of)), '0');
+rollback;
+
+-- ── 6b. "Archive the copies" when the EARLIER product has no colour (third review, 3) ──
+-- The gate holds any colour as a copy of a product without one (it cannot tell them apart). Archiving on that ground
+-- would keep the incomplete product and lose the complete ones — or the only Grey and the only Black of a design.
+begin;
+\set V4 '''a1000000-0000-4000-8000-000000000004'''
+select t_product(90, :V4, 'ZQ-100', null, 1) is not null, t_product(91, :V4, 'ZQ-100', 'Grey', 2) is not null, t_product(92, :V4, 'ZQ-100', 'Black', 3) is not null,
+       t_product(95, :V4, 'ZP-200', 'Red', 1) is not null, t_product(96, :V4, 'ZP-200', null, 2) is not null;
+select count(*) from public.pb_products_refresh(array(select id from pb_products));
+select t_is('held: two colours behind a product with none, and a post with no colour behind a Red one',
+  (select string_agg(right(id::text, 2) || '>' || right(copy_of::text, 2), ' ' order by id) from pb_products where status = 'needs_info' and copy_of is not null), '91>90 92>90 96>95');
+select t_is('Grey and Black are two colours to the rules', t_rel(t_id(92), t_id(91)), 'colour/code');
+select t_is('looking only: the two that may be another colour are left; the post with no colour is a plain copy',
+  public.pb_copies_archive(false)::text, '{"linked": 0, "priced": 0, "on_site": 0, "archived": 1, "no_colour": 2}');
+select set_config('request.jwt.claims', '{"role":"service_role"}', false);
+select t_is('done: the same', public.pb_copies_archive(true)::text, '{"linked": 0, "priced": 0, "on_site": 0, "archived": 1, "no_colour": 2}');
+select set_config('request.jwt.claims', '{}', false);
+select t_is('the Grey and the Black product still stand', (select string_agg(right(id::text, 2) || ':' || status, ' ' order by id) from pb_products where id in (t_id(91), t_id(92), t_id(96))), '91:needs_info 92:needs_info 96:archived');
+-- the earlier product gets its colour (a person types it): the rules can now tell, and the other colour is let go by its own gate
+update pb_products set color = 'Grey' where id = t_id(90);
+select t_is('once the earlier product has a colour: the same colour is a plain copy, the other colour is no copy at all',
+  (select string_agg(right(g.id::text, 2) || ':' || g.status, ' ' order by g.id) from public.pb_products_refresh(array[t_id(91), t_id(92)]) g) || ' ' || public.pb_copies_archive(false)::text,
+  '91:needs_info 92:ready {"linked": 0, "priced": 0, "on_site": 0, "archived": 1, "no_colour": 0}');
 rollback;
 
 -- ── 7. the later word about a product's stock wins (pb_stock_save with said_at) ──
@@ -237,9 +262,19 @@ select t_is('switched ON by a person: always applies', public.pb_stock_save(t_id
 select t_is('… and the time on record is forgotten', (select in_stock::text || '/' || coalesce(stock_said_at::text, 'null') from pb_products where id = t_id(70)), 'true/null');
 select t_is('a notice posted before the tap, read after it, still applies', public.pb_stock_save(t_id(70), '{"in_stock": false, "temp_out_at": null, "said_at": "2026-11-10T11:00:00Z"}')::text, '1');
 select t_is('… out of stock, with the notice''s time on record', (select in_stock::text || ' ' || stock_said_at::text from pb_products where id = t_id(70)), 'false 2026-11-10 11:00:00+00');
+-- a post that is OLDER than a permanent stock-out of its design: the product that word took off sale is found, although it is archived (third review, 1)
+select t_product(73, :V1, 'D no 7300', 'Pink', 1) is not null, t_product(74, :V1, '7300 BLUE', 'Blue', 2) is not null, t_product(75, :V2, 'D no 7300', 'Pink', 2) is not null;
+select public.pb_stock_save(t_id(73), '{"in_stock": false, "temp_out_at": null, "perm_out_at": "2026-11-12T00:00:00Z", "said_at": "2026-11-10T15:00:00Z"}') is not null;
+update pb_products set status = 'archived' where id = t_id(73);
+select t_is('archived with nothing on a store, so a re-post no longer finds it among the candidates', (select count(*)::text from public.pb_stock_candidates(:V1, '7300') c where c.id = t_id(73)), '0');
+select t_is('a post from 10:00 is older than the word that took it off for good', (select string_agg(right(g.id::text, 2) || ':' || g.code_key || ':' || array_to_string(g.colour_keys, '+') || ':' || g.said_at::text, ' ') from public.pb_stock_gone(:V1, 'D.No 7300', '2026-11-10T10:00:00Z') g), '73:#7300:pink:2026-11-10 15:00:00+00');
+select t_is('a post from 16:00 is newer: nothing (it is its own product)', (select count(*)::text from public.pb_stock_gone(:V1, '7300', '2026-11-10T16:00:00Z')), '0');
+select t_is('never another vendor''s product, and never without a design number', (select count(*)::text from public.pb_stock_gone(:V2, '7300', '2026-11-10T10:00:00Z')) || '/' || (select count(*)::text from public.pb_stock_gone(:V1, 'Pink kurta', '2026-11-10T10:00:00Z')), '0/0');
+select public.pb_stock_save(t_id(74), '{"in_stock": false, "temp_out_at": null, "said_at": "2026-11-10T15:00:00Z"}') is not null;
+select t_is('a product that is only out of stock (not for good) is not one of them', (select string_agg(right(g.id::text, 2), ' ') from public.pb_stock_gone(:V1, '7300', '2026-11-10T10:00:00Z') g), '73');
 rollback;
 
 -- Every check above printed a line: a part that silently printed nothing would be a failure too.
-select case when last_value = 133 then 'ok   every check ran (133)' else 'FAIL the number of checks is ' || last_value || ', not 133: a part printed fewer lines than it has, or this number was not updated' end from public.t_checks;
+select case when last_value = 144 then 'ok   every check ran (144)' else 'FAIL the number of checks is ' || last_value || ', not 144: a part printed fewer lines than it has, or this number was not updated' end from public.t_checks;
 drop function public.t_refused(text, text); drop function public.t_is(text, text, text); drop function public.t_rel(uuid, uuid); drop function public.t_product(int, uuid, text, text, int, numeric, text); drop function public.t_id(int);
 drop sequence public.t_checks;

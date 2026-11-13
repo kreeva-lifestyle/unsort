@@ -29,6 +29,8 @@ export function world(w) {
     if (w.down && u.includes(w.down)) return ok({ message: 'down' }, 500);
     if (u.startsWith('/rest/v1/rpc/pb_dup_held')) return ok(w.held ?? null);
     if (u.startsWith('/rest/v1/rpc/pb_stock_candidates')) return ok(w.cands || []);
+    // w.gone: the vendor's products of this design that a word took off sale for good; only the ones newer than the post are answered
+    if (u.startsWith('/rest/v1/rpc/pb_stock_gone')) return ok((w.gone || []).filter(g => Date.parse(g.said_at) > Date.parse(body.p_after)));
     if (u.startsWith('/rest/v1/rpc/pb_stock_save')) {
       const r = w.rows.find(x => x.id === body.p_product), ch = body.p_change;
       if (!r) return ok(-1);
@@ -58,7 +60,14 @@ export function world(w) {
       return ok(w.rows.filter(r => want.includes(r.id) && r.status !== 'archived' && !r.perm_out_at));
     }
     if (u.startsWith('/rest/v1/pb_products?id=eq.') && method === 'GET') return ok(u.includes('select=intake_notes') ? [{ intake_notes: w.notes || [] }] : w.rows.filter(r => u.includes(r.id)));
-    if (u.startsWith('/rest/v1/pb_products?id=eq.') && method === 'PATCH') { w.patched.push({ id: /id=eq\.([\w-]+)/.exec(u)[1], body }); return ok([{ id: /id=eq\.([\w-]+)/.exec(u)[1] }]); }
+    if (u.startsWith('/rest/v1/pb_products?id=eq.') && method === 'PATCH') {
+      const pid = /id=eq\.([\w-]+)/.exec(u)[1], r = w.rows.find(x => x.id === pid);
+      // "archive it once nothing of it is on sale" (stockSend.ts retire) only applies to a product that is permanently out
+      if (u.includes('perm_out_at=not.is.null') && !(r && r.perm_out_at && !r.in_stock)) return ok([]);
+      w.patched.push({ id: pid, body });
+      if (r) Object.assign(r, body);
+      return ok([{ id: pid }]);
+    }
     return ok([]);
   };
   return w;

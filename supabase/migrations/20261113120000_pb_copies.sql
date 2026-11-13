@@ -19,8 +19,9 @@
 --     so what the confirmation showed is exactly what is done. Only the ones
 --     with nothing of their own to lose, left for a person and counted:
 --     a copy that is already on a store; one that came with a vendor price the
---     earlier product lacks or contradicts; and one in a chain (a copy OF a
---     waiting copy, or one another waiting copy points at) — archiving a chain
+--     earlier product lacks or contradicts; one whose earlier product has no
+--     colour (it may be another colour); and one in a chain (a copy OF a
+--     waiting copy, or one another waiting copy points at) — archiving those
 --     in one go could remove the only product of a colour. Nothing is let go
 --     to the websites. apply = false only counts (the app shows the counts
 --     before asking).
@@ -113,17 +114,19 @@ create or replace function public.pb_copies_follow() returns trigger
 language plpgsql security definer set search_path = '' as $$
 begin
   -- the products that point at it: the next earlier product, or none
-  update public.pb_products c set copy_of = h.held
-  from (select x.id, case when x.status = 'needs_info' then public.pb_dup_held(x.id) end as held
-        from public.pb_products x where x.copy_of = old.id) h
-  where c.id = h.id and c.copy_of is distinct from h.held;
+  with h as materialized (  -- materialized: the look-up is made once per product, not once per place it is used
+    select x.id, case when x.status = 'needs_info' then public.pb_dup_held(x.id) end as held
+    from public.pb_products x where x.copy_of = old.id)
+  update public.pb_products c set copy_of = h.held from h where c.id = h.id and c.copy_of is distinct from h.held;
   -- it is (again) a product others can be copies of: the waiting products it holds
   if tg_op = 'UPDATE' then
     if new.status <> 'archived' then
-      update public.pb_products c set copy_of = h.held
-      from (select m.other_id, public.pb_dup_held(m.other_id) as held
-            from private.pb_dup_scan(array[new.id]) m where m.kind = 'original') h
-      where c.id = h.other_id and c.status = 'needs_info' and c.copy_of is distinct from h.held;
+      with h as materialized (
+        select m.other_id, public.pb_dup_held(m.other_id) as held
+        from private.pb_dup_scan(array[new.id]) m
+        join public.pb_products w on w.id = m.other_id and w.status = 'needs_info'
+        where m.kind = 'original')
+      update public.pb_products c set copy_of = h.held from h where c.id = h.other_id and c.copy_of is distinct from h.held;
     end if;
   end if;
   return null;
@@ -142,6 +145,12 @@ create or replace trigger pb_copies_gone after delete on public.pb_products
 --             different one, or no price at all (the new rate would be lost).
 --             An earlier product copied from a store sells at that store's
 --             price, so a vendor cost on the copy is nothing it lacks.
+--   no_colour — the earlier product has no colour. The gate holds any colour
+--             as a copy of it (it cannot tell), but archiving on that ground
+--             could remove the only Grey or Black product of the design and
+--             keep the incomplete one (third review, 3). A copy WITHOUT a
+--             colour of an earlier product that has one is archived: it
+--             carries nothing the earlier one lacks.
 --   linked  — it is part of a chain: what it copies is itself waiting as a
 --             copy, or another waiting copy points at it. A chain only forms
 --             where the colours do not line up (Black ← no colour ← Grey):
@@ -153,7 +162,7 @@ create or replace trigger pb_copies_gone after delete on public.pb_products
 create or replace function public.pb_copies_archive(p_apply boolean default false, p_user uuid default null)
 returns jsonb
 language plpgsql security invoker set search_path = public as $$
-declare v_ids uuid[]; v_origs uuid[]; v_stale uuid[]; archived int := 0; priced int := 0; on_site int := 0; linked int := 0;
+declare v_ids uuid[]; v_origs uuid[]; v_stale uuid[]; archived int := 0; priced int := 0; on_site int := 0; linked int := 0; no_colour int := 0;
 begin
   if p_apply and coalesce(auth.role(), '') <> 'service_role' then raise exception 'Only the server can do this.'; end if;
   with held as materialized (
@@ -164,6 +173,7 @@ begin
         when h.orig is null then 'stale'
         when exists (select 1 from pb_listings l where l.product_id = h.id and pb_listing_on_sale(l.status, l.shopify_product_id, l.shopify_status)) then 'on_site'
         when h.cost_price is not null and (case when o.cost_price is not null then o.cost_price <> h.cost_price else o.sell_price is null end) then 'priced'
+        when cardinality(pb_colour_keys(o.sku, o.color)) = 0 then 'no_colour'           -- it may be another colour
         when exists (select 1 from held x where x.orig = h.id)                          -- another waiting copy points at it
           or (o.status = 'needs_info' and pb_dup_held(o.id) is not null) then 'linked'  -- what it copies is itself waiting as a copy
         else 'archive' end as verdict
@@ -172,8 +182,9 @@ begin
   select coalesce(array_agg(j.id order by j.created_at, j.id) filter (where j.verdict = 'archive'), '{}'),
          coalesce(array_agg(j.orig order by j.created_at, j.id) filter (where j.verdict = 'archive'), '{}'),
          coalesce(array_agg(j.id) filter (where j.verdict = 'stale'), '{}'),
-         count(*) filter (where j.verdict = 'priced'), count(*) filter (where j.verdict = 'on_site'), count(*) filter (where j.verdict = 'linked')
-    into v_ids, v_origs, v_stale, priced, on_site, linked
+         count(*) filter (where j.verdict = 'priced'), count(*) filter (where j.verdict = 'on_site'), count(*) filter (where j.verdict = 'linked'),
+         count(*) filter (where j.verdict = 'no_colour')
+    into v_ids, v_origs, v_stale, priced, on_site, linked, no_colour
   from judged j;
   archived := cardinality(v_ids);
   if p_apply then
@@ -188,9 +199,9 @@ begin
     select count(*) into archived from logged;
     update pb_products set copy_of = null where id = any(v_stale) and status = 'needs_info';
   end if;
-  return jsonb_build_object('archived', archived, 'priced', priced, 'on_site', on_site, 'linked', linked);
+  return jsonb_build_object('archived', archived, 'priced', priced, 'on_site', on_site, 'linked', linked, 'no_colour', no_colour);
 end $$;
-comment on function public.pb_copies_archive(boolean, uuid) is 'Archive the products the Ready gate holds as copies (pb-products copies.ts); p_apply = false only counts. Leaves the ones on a store, with a vendor price of their own, or in a chain of copies; lets nothing go to the websites.';
+comment on function public.pb_copies_archive(boolean, uuid) is 'Archive the products the Ready gate holds as copies (pb-products copies.ts); p_apply = false only counts. Leaves the ones on a store, with a vendor price of their own, held by a product with no colour, or in a chain of copies; lets nothing go to the websites.';
 grant execute on function public.pb_copies_archive(boolean, uuid) to authenticated, service_role;
 
 -- ── 5. taking it back ─────────────────────────────────────────────────────

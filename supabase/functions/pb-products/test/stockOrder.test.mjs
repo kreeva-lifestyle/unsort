@@ -115,6 +115,34 @@ test('second review: a notice and a new post made at the very same time — the 
   assert.equal(stockOf(w, 1), false, 'new post first');
 });
 
+test('third review: a post OLDER than a permanent stock-out of the product it stands for is not listed as new', async () => {
+  // the vendor: 09:00 posts 5081 again (P), 15:00 "Permanent stock out 5081". P's first read failed; the notice was read first,
+  // so X is archived and permanently out — it is no longer among the candidates.
+  const gone = { ...cand(1, 'D no 5081', '#5081', ['pink']), in_stock: false, status: 'archived', said_at: at(10, 15) };
+  let w = world({ held: null, gone: [gone], rows: [row(1, 'D no 5081', { in_stock: false, status: 'archived', perm_out_at: at(10, 15), stock_said_at: at(10, 15) }), row(9, '5081')], cands: [cand(9, '5081', '#5081', ['pink'])], notes: ['Less ₹200'] });
+  const out = await backInStock(post(9, '5081', 'Pink'), 'u1', true);
+  const p = w.rows[1];
+  assert.deepEqual([p.in_stock, !!p.perm_out_at, p.stock_said_at, p.status], [false, true, at(10, 15), 'archived'], 'it goes the way the product went: permanently out, with the notice\'s time, archived');
+  assert.equal(out.status, 'archived', 'the reader is told, so nothing is sent to a website');
+  assert.deepEqual(w.patched.at(-1).body.intake_notes.at(-1), 'Not listed: after this post the vendor said permanent stock out for D no 5081');
+  assert.ok(w.logged.some(l => l.action === 'stock' && l.product_id === id(9) && l.details.permanent && l.details.older_than_notice_for === id(1)), 'and its timeline says why');
+  assert.deepEqual(w.verdicts, [], 'nothing is held as a copy of an archived product');
+  // a post made AFTER the permanent stock-out is its own product, as before (owner decision Q9 is open)
+  w = world({ held: null, gone: [{ ...gone, said_at: at(10, 8) }], rows: [row(1, 'D no 5081', { in_stock: false, status: 'archived', perm_out_at: at(10, 8), stock_said_at: at(10, 8) }), row(9, '5081')], cands: [cand(9, '5081', '#5081', ['pink'])] });
+  const later = post(9, '5081', 'Pink');
+  assert.equal(await backInStock(later, null, true), later);
+  assert.deepEqual([w.rows[1].in_stock, w.rows[1].status], [true, 'ready']);
+  // another colour of the design was taken off for good: this post is not that product
+  w = world({ held: null, gone: [{ ...gone, colour_keys: ['blue'] }], rows: [row(1, 'D no 5081 BLUE', { in_stock: false, status: 'archived', perm_out_at: at(10, 15), stock_said_at: at(10, 15) }), row(9, '5081')], cands: [cand(9, '5081', '#5081', ['pink'])] });
+  await backInStock(post(9, '5081', 'Pink'), null, true);
+  assert.equal(w.rows[1].in_stock, true);
+  // the number is under two letter codes at this vendor, one of them gone: not guessed, as everywhere
+  w = world({ held: null, gone: [{ ...gone, sku: 'KB 5081', code_key: 'KB5081' }], rows: [row(1, 'KB 5081', { in_stock: false, status: 'archived', perm_out_at: at(10, 15), stock_said_at: at(10, 15) }), row(2, 'NKB 5081'), row(9, '5081')],
+    cands: [cand(2, 'NKB 5081', 'NKB5081', ['pink']), cand(9, '5081', '#5081', ['pink'])] });
+  await backInStock(post(9, '5081', 'Pink'), null, true);
+  assert.equal(w.rows[2].in_stock, true);
+});
+
 test('a person\'s Stock switch is the latest word as of that moment', async () => {
   const w = world({ held: null, rows: [row(1, 'D no 5081', { stock_said_at: at(11) }), row(9, '5081')], cands: C5081 });
   const r = await setStock({ product_id: id(1), in_stock: false }, 'u1');

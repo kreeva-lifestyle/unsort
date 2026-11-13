@@ -12,7 +12,9 @@ const { publishOne } = await import('../publish.ts');
 const P = 'cccccccc-0000-4000-8000-000000000001', W = 'eeeeeeee-0000-4000-8000-000000000001', L = 'dddddddd-0000-4000-8000-000000000001';
 const GID = 'gid://shopify/Product/1';
 
-/** `w.sets`: the SKUs of every productSet that reached the store. `w.channelDown`: the Online Store step fails (Shopify 500). */
+/** `w.sets`: the SKUs of every productSet that reached the store. `w.channelDown`: the Online Store step fails (Shopify 500).
+ *  `w.refuse`: the store refuses the product outright (userErrors). `w.other`: another website's send decides the colour
+ *  part (to this) while this send is at the store. */
 function world(o = {}) {
   const w = {
     product: { id: P, vendor_id: null, source: 'telegram', sku: 'KA-5070', name: 'Kurta', category: 'Kurta', fabric: 'Cotton', color: 'Wine', sizes: ['M', 'L'], in_stock: true, temp_out_at: null, perm_out_at: null,
@@ -21,7 +23,7 @@ function world(o = {}) {
       generated_at: '2026-11-02T00:00:00Z', shopify_product_id: null, shopify_status: null, published_at: null, first_published_at: null, attempts: 0, ...o.listing },
     site: { id: W, name: 'Kreeva', shop_domain: 'kreeva.myshopify.com', auth_mode: 'token', api_version: '2026-10', active: true, publish_mode: 'live', track_inventory: false, pricing: {}, tag_rules: {},
       content: { profile: { custom_fields: false, faq_in_description: false } } },
-    sets: [], failed: [], channelDown: !!o.channelDown, store: null,
+    sets: [], failed: [], channelDown: !!o.channelDown, refuse: !!o.refuse, other: o.other ?? null, store: null,
   };
   const node = (handle) => ({ id: GID, handle, tags: [], options: [{ id: 'o1', name: 'Size', optionValues: [{ id: 'ov1', name: 'M' }, { id: 'ov2', name: 'L' }] }],
     variants: { nodes: [{ id: 'v1', selectedOptions: [{ name: 'Size', value: 'M' }] }, { id: 'v2', selectedOptions: [{ name: 'Size', value: 'L' }] }] }, media: { nodes: [] }, metafield: { value: L } });
@@ -36,8 +38,10 @@ function world(o = {}) {
       if (q.includes('PbExisting')) return ok({ data: { product: w.store } });
       if (q.includes('productSet')) {
         const input = body.variables.input;
+        if (w.refuse) return ok({ data: { productSet: { product: null, userErrors: [{ field: ['input', 'title'], message: 'Title is not allowed' }] } } });
         w.sets.push(input.variants.map(v => v.inventoryItem.sku));
         w.store = node(input.handle);
+        if (w.other !== null && w.product.sku_colour === null) { w.product.sku_colour = w.other; w.other = null; }
         return ok({ data: { productSet: { product: { id: GID, status: 'ACTIVE', handle: input.handle, media: { nodes: [] } }, userErrors: [] } } });
       }
       if (q.includes('publications')) return ok({ data: { publications: { nodes: [{ id: 'gid://shopify/Publication/1', catalog: { title: 'Online Store' } }] } } });
@@ -70,12 +74,33 @@ test('a first send that fails after the product is saved on Shopify: the retry s
   const w = world({ channelDown: true });
   await assert.rejects(send(w), /Shopify is having trouble/);
   assert.deepEqual(w.sets, [['KA-5070-WINE-M', 'KA-5070-WINE-L']]);
-  assert.equal(w.product.sku_colour, 'WINE', 'the colour part was saved before anything was sent');
+  assert.equal(w.product.sku_colour, 'WINE', 'the colour part was saved as soon as the store had the product, before the step that failed');
   assert.deepEqual([w.listing.status, w.listing.shopify_product_id], ['failed', GID], 'the product is on the store; the listing failed at the Online Store step');
   w.product.color = 'Maroon'; // meanwhile the AI or a person re-words the colour
   w.channelDown = false;
   assert.equal((await send(w)).status, 'published');
   assert.deepEqual(w.sets[1], ['KA-5070-WINE-M', 'KA-5070-WINE-L'], 'not without the colour part, and not with the new word for it');
+});
+
+test('third review: a send the store refuses decides nothing, so a colour corrected afterwards is the one in the codes', async () => {
+  const w = world({ refuse: true, product: { color: 'Maroon' } }); // the AI read the Wine product as Maroon
+  await assert.rejects(send(w), /Title is not allowed/);
+  assert.deepEqual([w.sets, w.product.sku_colour, w.listing.shopify_product_id], [[], null, null], 'not on the store, nothing decided');
+  w.product.color = 'Wine'; // a person corrects it; the listing is fixed and sent again
+  w.refuse = false;
+  assert.equal((await send(w)).status, 'published');
+  assert.deepEqual(w.sets, [['KA-5070-WINE-M', 'KA-5070-WINE-L']], 'not the codes of the Maroon product of the same design');
+  assert.equal(w.product.sku_colour, 'WINE');
+});
+
+test('two websites get a new product at the same moment with the colour re-worded in between: both end with one code', async () => {
+  const w = world({ other: 'MAROON' }); // the other website's send reaches its store first and decides MAROON
+  await assert.rejects(send(w), e => e.status === 503 && /settled its size codes/.test(e.message));
+  assert.deepEqual(w.sets, [['KA-5070-WINE-M', 'KA-5070-WINE-L']], 'this send went out with the colour as it was worded then');
+  assert.deepEqual([w.listing.status, w.listing.shopify_product_id, w.listing.attempts], ['failed', GID, 0], 'the product is known, and the try does not count: it is sent again by itself');
+  assert.equal(w.failed[0].details.temporary, true);
+  assert.equal((await send(w)).status, 'published');
+  assert.deepEqual(w.sets[1], ['KA-5070-MAROON-M', 'KA-5070-MAROON-L'], 'the same codes as on the other website');
 });
 
 test('a product that is on a store from before codes carried a colour keeps its codes exactly as they are', async () => {

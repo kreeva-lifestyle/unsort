@@ -7,8 +7,9 @@
 // every list load). Archiving asks first, with every copy judged as things
 // stand right then (pb_copies_archive, apply = false — only on the tap): copies
 // with nothing of their own are archived; one that is already on a website,
-// that came with a price the earlier product lacks or contradicts, or that is
-// tied to another waiting copy, is left to be opened. It is a bulk change, so
+// that came with a price the earlier product lacks or contradicts, whose
+// earlier product has no colour, or that is tied to another waiting copy, is
+// left to be opened. It is a bulk change, so
 // Settings → Bulk changes takes it back for 7 days. Two signals: "Checking…" /
 // "Archiving…" on the button, then a toast. Hidden when no product waits as a copy.
 import { useEffect, useState } from 'react';
@@ -24,10 +25,11 @@ import { Dot } from '../status';
 
 const copies = (k: number) => `${count(k)} ${k === 1 ? 'copy' : 'copies'}`;
 /** "2 came with a different price, 1 is already on a website" — the copies left for a person. */
-export function leftText(c: Pick<CopyCounts, 'priced' | 'on_site' | 'linked'>): string {
+export function leftText(c: Omit<CopyCounts, 'archived'>): string {
   return [
     c.priced ? `${count(c.priced)} came with a different price` : '',
     c.on_site ? `${count(c.on_site)} ${c.on_site === 1 ? 'is' : 'are'} already on a website` : '',
+    c.no_colour ? `${count(c.no_colour)} may be another colour (the earlier product has no colour)` : '',
     c.linked ? `${count(c.linked)} ${c.linked === 1 ? 'is' : 'are'} tied to another waiting copy` : '',
   ].filter(Boolean).join(', ');
 }
@@ -56,23 +58,22 @@ export default function CopiesBar({ only, reload, addToast, onShow, onDone }: {
       const p = await previewCopies();
       const left = leftText(p);
       setN(p.archived + leftOver(p));
-      if (!p.archived) {
-        // Nothing left at all: the notes that brought the bar up no longer hold. The server clears them (once).
-        if (!left) await archiveCopies();
-        addToast(left ? `None can be archived together: ${left}. Open them one by one.` : 'No product is waiting as a copy any more', 'info');
-        if (!left) onDone();
-        return;
+      if (!p.archived && left) { addToast(`None can be archived together: ${left}. Open them one by one.`, 'info'); return; }
+      // Nothing to archive and nothing left: the notes that brought the bar up no longer hold, and the same call
+      // clears them — no question to ask. Its answer is still what the toast says.
+      if (p.archived) {
+        const ok = await ask({
+          title: `Archive ${copies(p.archived)}?`,
+          message: `${p.archived === 1 ? 'It moves' : 'They move'} to Archived. Nothing is deleted and nothing changes on your websites. You can take this back for 7 days in Settings → Bulk changes.${left ? ` Left for you to open: ${left}.` : ''}`,
+          confirmLabel: `Archive ${copies(p.archived)}`,
+        });
+        if (!ok) return;
       }
-      const ok = await ask({
-        title: `Archive ${copies(p.archived)}?`,
-        message: `${p.archived === 1 ? 'It moves' : 'They move'} to Archived. Nothing is deleted and nothing changes on your websites. You can take this back for 7 days in Settings → Bulk changes.${left ? ` Left for you to open: ${left}.` : ''}`,
-        confirmLabel: `Archive ${copies(p.archived)}`,
-      });
-      if (!ok) return;
       setBusy('archive');
       const r = await archiveCopies();
       const rest = leftText(r);
-      addToast(r.archived ? `${copies(r.archived)} archived${rest ? ` · left to open: ${rest}` : ''}. Settings → Bulk changes takes it back` : 'Nothing was left to archive', 'success');
+      if (r.archived) addToast(`${copies(r.archived)} archived${rest ? ` · left to open: ${rest}` : ''}. Settings → Bulk changes takes it back`, 'success');
+      else addToast(p.archived ? 'Nothing was left to archive' : 'No product is waiting as a copy any more', 'info');
       setN(leftOver(r));
       onDone();
     } catch (e) { addToast(friendlyError(e), 'error'); } finally { setBusy(''); }

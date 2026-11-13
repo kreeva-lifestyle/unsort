@@ -19,16 +19,23 @@ import { gql, onlineStoreId } from './shopify.ts';
 import type { Existing } from './shopifyProduct.ts';
 import type { ProductRow, WebsiteRow } from './types.ts';
 
-/** The colour part of the product's codes (skuCode.ts), decided once and saved BEFORE anything is sent: a send that
- *  fails half-way finds the same codes on its next try, and every website gets the same ones. A product that is on
- *  a store already keeps its codes as they are (''). Two first sends at once: the one that saves first decides. */
+/** The colour part this send uses for the product's codes (skuCode.ts): the one decided for it, else worked out now —
+ *  '' for a product that is on a store from before codes carried a colour, else its colour as it is. Nothing is saved
+ *  here: a send the store refuses decides nothing, so a colour corrected afterwards is the one that counts. */
 export async function skuColour(p: ProductRow): Promise<string> {
   if (typeof p.sku_colour === 'string') return p.sku_colour;
   const onStore = await sel<{ id: string }>(`pb_listings?product_id=eq.${enc(p.id)}&shopify_product_id=not.is.null&select=id&limit=1`);
-  const want = onStore.length ? '' : keptColour(p);
-  if ((await patch('pb_products', `id=eq.${enc(p.id)}&sku_colour=is.null`, { sku_colour: want })).length) return want;
+  return onStore.length ? '' : keptColour(p);
+}
+
+/** The store took the product with these codes: the colour part is decided from now on, for every website (called
+ *  right after productSet, before anything else can fail, so a retry finds it). Returns the decided one — another
+ *  website's send may have got here first, with the colour worded differently. */
+export async function keepColour(p: ProductRow, used: string): Promise<string> {
+  if (typeof p.sku_colour === 'string') return p.sku_colour;
+  if ((await patch('pb_products', `id=eq.${enc(p.id)}&sku_colour=is.null`, { sku_colour: used })).length) return used;
   const now = await one<{ sku_colour: string | null }>(`pb_products?id=eq.${enc(p.id)}&select=sku_colour`);
-  return typeof now?.sku_colour === 'string' ? now.sku_colour : want;
+  return typeof now?.sku_colour === 'string' ? now.sku_colour : used;
 }
 
 /** Shopify was busy, not wrong: the same request can pass a little later. */

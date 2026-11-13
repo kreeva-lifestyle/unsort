@@ -27,22 +27,22 @@ function world(answer, items = 0) {
 }
 
 test('archiving is a bulk change: opened, marked on the database call, closed with its counts', async () => {
-  const calls = world({ archived: 9, priced: 2, on_site: 1, linked: 2 }, 9);
-  assert.deepEqual(await copiesArchive('u1'), { ok: true, archived: 9, priced: 2, on_site: 1, linked: 2, run_id: RUN });
+  const calls = world({ archived: 9, priced: 2, on_site: 1, linked: 2, no_colour: 3 }, 9);
+  assert.deepEqual(await copiesArchive('u1'), { ok: true, archived: 9, priced: 2, on_site: 1, linked: 2, no_colour: 3, run_id: RUN });
   assert.deepEqual(calls[0].body, [{ kind: 'copies', label: 'Archived the products waiting as copies', website_id: null, created_by: 'u1', status: 'running' }]);
   const rpc = calls.find(c => c.u.startsWith('/rest/v1/rpc/pb_copies_archive'));
   assert.deepEqual(rpc.body, { p_apply: true, p_user: 'u1' });
   assert.equal(rpc.run, RUN, 'so the database records every product it archives, in the same transaction');
   const done = calls.find(c => c.method === 'PATCH' && c.u.startsWith('/rest/v1/pb_bulk_runs'));
   assert.equal(done.body.status, 'done'); assert.equal(done.body.items, 9);
-  assert.deepEqual(done.body.details, { archived: 9, priced: 2, on_site: 1, linked: 2 });
+  assert.deepEqual(done.body.details, { archived: 9, priced: 2, on_site: 1, linked: 2, no_colour: 3 });
   const log = calls.find(c => c.method === 'POST' && c.u.startsWith('/rest/v1/pb_activity'));
-  assert.deepEqual(log.body[0].details, { archived: 9, priced: 2, on_site: 1, linked: 2, run_id: RUN });
+  assert.deepEqual(log.body[0].details, { archived: 9, priced: 2, on_site: 1, linked: 2, no_colour: 3, run_id: RUN });
 });
 
 test('nothing to archive: the change leaves the log again and no id is handed out', async () => {
-  const calls = world({ archived: 0, priced: 3, on_site: 0 }, 0); // an answer without "linked" (the database before this fix): counted as none
-  assert.deepEqual(await copiesArchive('u1'), { ok: true, archived: 0, priced: 3, on_site: 0, linked: 0, run_id: null });
+  const calls = world({ archived: 0, priced: 3, on_site: 0 }, 0); // an answer without the newer counts: counted as none
+  assert.deepEqual(await copiesArchive('u1'), { ok: true, archived: 0, priced: 3, on_site: 0, linked: 0, no_colour: 0, run_id: null });
   assert.ok(calls.some(c => c.method === 'DELETE' && /pb_bulk_runs\?id=eq\.11111111.*status=eq\.running/.test(c.u)));
   assert.ok(!calls.some(c => c.u.startsWith('/rest/v1/pb_activity')));
 });

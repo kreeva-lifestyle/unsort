@@ -49,7 +49,7 @@ export const COPIES: GuideSection[] = [
       list(
         '**Products → Needs info** says how many products are waiting as copies. **Show only these** lists them alone (also under **More statuses → Waiting as copies**).',
         '**Archive the copies** first tells you what it would do, and does nothing until you confirm. It then does exactly that: it archives the copies that have nothing of their own.',
-        'It leaves three kinds for you to open: a copy that came with a **different price** from the product you have (the vendor may have changed the rate — type the new cost on the earlier product first), a copy that is **already on a website**, and copies that are **tied to another waiting copy** (one waits as a copy of the other — it happens when a post came without its colour; open the earlier of the two and answer it first).',
+        'It leaves four kinds for you to open: a copy that came with a **different price** from the product you have (the vendor may have changed the rate — type the new cost on the earlier product first), a copy that is **already on a website**, a copy whose earlier product has **no colour** (it may be another colour — give the earlier product its colour, and the rest sorts itself out), and copies that are **tied to another waiting copy** (one waits as a copy of the other; open the earlier of the two and answer it first).',
         'Nothing is deleted and nothing changes on your websites. **Settings → Bulk changes → Revert** brings them back to Needs info for 7 days, where they wait as copies again; **Restore** on one product reads it again and treats it as its own product.',
       ),
       h('Where a product came from'),
