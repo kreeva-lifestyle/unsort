@@ -41,11 +41,11 @@
 //   Tags (a controlled taxonomy built on the Tags page; docs/playbook/product-directory-spec.md "Tags"):
 //   taxonomy_get       staff          –                                   → { ok, categories, attributes[{…, values[{…, uses}]}], links, stats, category_products, suggestions_pending, fill }
 //   categories_save    admin|manager  { categories[] }                    → { ok, categories, regated }
-//   attribute_save     admin|manager  { id?, name, multi?, shopify_prefix? } → { ok, attribute }
+//   attribute_save     admin|manager  { id?, name, multi?, shopify_prefix?, by_category? } → { ok, attribute }
 //   attribute_delete   admin|manager  { id }                              → { ok, regated }
 //   attribute_order    admin|manager  { ids[] }                           → { ok }
 //   value_check        staff          { attribute_id, name, exclude_id? } → { ok, matches[], exists }
-//   value_save         admin|manager  { attribute_id, id?, name, aliases?, force? } → { ok, value } | 409 { error, matches[] }
+//   value_save         admin|manager  { attribute_id, id?, name, aliases?, categories?, force? } → { ok, value } | 409 { error, matches[] }
 //   value_delete       admin|manager  { id }                              → { ok, regated }
 //   value_merge        admin|manager  { from, into }                      → { ok, moved }
 //   category_link_check staff         { category, attribute_id }          → { ok, lacking }

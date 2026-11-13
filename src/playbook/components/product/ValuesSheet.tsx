@@ -66,7 +66,7 @@ export default function ValuesSheet({ attr, chosen, productId, save, addToast, o
               </button>
             );
           })}
-          {!list.length && <span style={{ ...pbBody, color: PB.tx2 }}>{attr.values.length ? `No ${attr.name} value matches “${q.trim()}”.` : `${attr.name} has no values yet — add them on Settings → Tags.`}</span>}
+          {!list.length && <span style={{ ...pbBody, color: PB.tx2 }}>{attr.values.length ? `No ${attr.name} value matches “${q.trim()}”.` : attr.by_category ? `No ${attr.name} value is ticked for this product's category yet — tick them on Settings → Tags.` : `${attr.name} has no values yet — add them on Settings → Tags.`}</span>}
         </div>
         {err && <div role="alert" style={pbErrorBox}>{err}</div>}
       </div>

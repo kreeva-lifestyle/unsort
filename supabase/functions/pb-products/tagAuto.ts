@@ -35,7 +35,9 @@ export function autoValues(p: AutoProduct, attrs: MatchAttr[], o: { manualAttrId
   const filled = new Set<string>();
   for (const x of scope) {
     const rules = m.chosen[x.id];
-    const ai = rules?.length ? null : o.ai?.chosen[x.id];
+    // Only the values this attribute offers here: the reader's list holds every Product Type value with its categories,
+    // and the AI may still pick one ticked for another category (owner, 13 Nov 2026: "so no mistake can happen").
+    const ai = rules?.length ? null : o.ai?.chosen[x.id]?.filter(id => x.values.some(v => v.id === id));
     for (const id of rules ?? ai ?? []) rows.push({ value_id: id, source: rules?.length ? 'rules' : 'ai' });
     if (rules?.length || ai?.length) filled.add(x.id);
   }

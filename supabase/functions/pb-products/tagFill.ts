@@ -6,10 +6,12 @@
 // (tagAuto.ts, free and the same every time), then — only for what they left
 // empty — one cheap call with the reader's model, text + one photo, choosing
 // ONLY from the allowed values of those attributes (tagPrompt.ts); rows are
-// added as 'rules' / 'ai' and never
-// touch an attribute that has a value, so 'manual' choices stay; a product
+// written as 'rules' / 'ai' for exactly those attributes and never touch a
+// 'manual' choice that counts; a product
 // whose 'tags' are locked is skipped by the queue (a person asking on the
-// product page itself may still fill its empty attributes). Then the gate
+// product page itself may still fill its empty attributes). An attribute
+// whose only value is one its category does not offer (a Product Type ticked
+// for another category) counts as empty: that value is replaced. Then the gate
 // (pb_products_refresh); a product that becomes Ready is routed (now on the
 // product page, by the worker's route_due step otherwise).
 import { askClaude } from './ai.ts';
@@ -45,18 +47,26 @@ export interface FillResult { filled: string[]; left: string[]; refreshed: Refre
 /** Fill one product's empty required attributes. `manual` = a person asked on the product page. `run`: the queued
  *  "Let AI decide" this belongs to, as a bulk change (its id is the fill run's: tagsQueue.ts). */
 export async function fillOne(p: ProductRow, tax: Taxonomy, o: { manual: boolean; userId: string | null; budget: Budget; run?: string | null }): Promise<FillResult> {
-  const have = new Set((await productValues(p.id)).map(v => v.attribute_id));
-  const target = attrsFor(tax, p.category).filter(a => !have.has(a.id) && a.values.length);
+  const pv = await productValues(p.id);
+  const attrs = attrsFor(tax, p.category);
+  const ok = new Set(attrs.flatMap(a => a.values.map(v => v.id))); // the values its category offers: only they count
+  const have = new Set(pv.filter(v => ok.has(v.value_id)).map(v => v.attribute_id));
+  const target = attrs.filter(a => !have.has(a.id) && a.values.length);
   if (!target.length) return { filled: [], left: [], refreshed: (await rpc<Refreshed[]>('pb_products_refresh', { p_ids: [p.id] }))[0] ?? null, usd: 0 };
+  // A person's value from another category (the product moved, or the value's categories changed) would keep the new
+  // choice out ('manual' wins in the database) though it no longer counts: it goes first.
+  const stale = [...new Set(pv.filter(v => v.source === 'manual' && !ok.has(v.value_id) && target.some(a => a.id === v.attribute_id)).map(v => v.attribute_id))];
+  if (stale.length) await writeValues(p.id, [], 'manual', stale, o.run);
   // The word rules first (owner, 13 Nov 2026: rules, then AI, then a person): what the product's own words settle
   // costs nothing and comes out the same every time. The AI is asked only for the attributes still empty.
   const byRules = autoValues(p, matchAttrs(target), { categories: tax.categories, shades: shadesOf(tax) });
   const rest = target.filter(a => !byRules.filled.has(a.id));
   let ai: Awaited<ReturnType<typeof askFor>> | null = null;
   try { if (rest.length) ai = await askFor(p, tax, rest, o.budget); }
-  catch (e) { if (byRules.rows.length) await writeValues(p.id, byRules.rows, 'add', undefined, o.run); throw e; } // the words' values are kept
+  catch (e) { if (byRules.rows.length) await writeValues(p.id, byRules.rows, 'auto', [...byRules.filled], o.run); throw e; } // the words' values are kept
   const rows = [...byRules.rows, ...rest.flatMap(a => (ai?.chosen[a.id] ?? []).map(value_id => ({ value_id, source: 'ai' as const })))];
-  const refreshed = await writeValues(p.id, rows, 'add', undefined, o.run);
+  // Only the attributes it filled are replaced: their rules / AI rows (none, or a value from another category).
+  const refreshed = await writeValues(p.id, rows, 'auto', target.map(a => a.id), o.run);
   const byWords = target.filter(a => byRules.filled.has(a.id)).map(a => a.name);
   const filled = [...byWords, ...rest.filter(a => ai?.chosen[a.id]?.length).map(a => a.name)];
   if (ai) await suggestFor(p.id, ai.other.map(x => ({ phrase: x.phrase, key: tagKey(x.phrase), attribute_id: x.attribute_id, source: 'ai' as const })), tax, o.run);

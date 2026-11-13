@@ -8,6 +8,8 @@ export interface PbAttrValue {
   /** "Also known as" words (normalized keys): kala, kaala… */
   aliases: string[];
   position: number;
+  /** The categories it is offered for while its attribute's values depend on the category (Product Type). */
+  categories: string[];
   /** Products carrying it (taxonomy_get). */
   uses?: number;
 }
@@ -19,8 +21,18 @@ export interface PbAttribute {
   position: number;
   /** Tags as "Colour_Black" on stores with the prefixed tag style; null = the attribute's name. */
   shopify_prefix: string | null;
+  /** "Values depend on the category" (owner, 13 Nov 2026: Product Type): each value is offered only for the categories
+   *  ticked on it, and one with none ticked nowhere — to the word rules, the AI and staff (pb_tag_offered). */
+  by_category: boolean;
   values: PbAttrValue[];
 }
+
+/** A category name as the server compares it: case, accents, spaces and punctuation aside. */
+export const catKey = (s: string | null | undefined) =>
+  String(s ?? '').normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^\p{L}\p{M}\p{N}]+/gu, ' ').trim();
+/** Is this value offered for a product of this category? Mirrors pb-products taxonomy.ts offered(). */
+export const offeredFor = (a: Pick<PbAttribute, 'by_category'>, v: Pick<PbAttrValue, 'categories'>, category: string | null | undefined) =>
+  !a.by_category || (!!catKey(category) && (v.categories ?? []).some(c => catKey(c) === catKey(category)));
 
 export interface PbCategoryLink { category: string; attribute_id: string; position: number }
 export interface PbLinkStat { category: string; attribute_id: string; products: number; lacking: number }

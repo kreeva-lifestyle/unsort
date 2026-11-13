@@ -1,6 +1,6 @@
 // node --test --experimental-strip-types supabase/functions/pb-products/test/
 // "Let AI decide" (tagFill.ts) against a fake database and a fake AI (fetch is replaced): the word rules first,
-// then the AI ONLY for the empty required attributes they did not settle, rows written in 'add' mode, then
+// then the AI ONLY for the empty required attributes they did not settle, rows written for those attributes only, then
 // the gate, and ticks the run; a locked product is skipped; an AI error counts as "left empty" without
 // losing the queue entry's tick. Leaving the queue comes FIRST and is the claim: a product another
 // worker run already took is neither filled nor ticked.
@@ -18,7 +18,8 @@ const TAX = {
 };
 const PRODUCT = { id: 'p1', name: 'Lehenga choli', category: 'Lehenga', status: 'needs_info', locked: [], attributes: {}, raw_text: 'Cosmos with beads', source: 'telegram', missing_attrs: ['Colour'] };
 
-function world({ product = PRODUCT, ai = { tags: { colour: { values: ['Pink'], other: [] } } }, aiStatus = 200, taken = false, bulk = false, finishedAt = null, waiting = false, reached = 1 } = {}) {
+const MANUAL_WORK = [{ value_id: 'emb', source: 'manual', pb_attribute_values: { attribute_id: 'work' } }];
+function world({ product = PRODUCT, ai = { tags: { colour: { values: ['Pink'], other: [] } } }, aiStatus = 200, taken = false, bulk = false, finishedAt = null, waiting = false, reached = 1, values = MANUAL_WORK } = {}) {
   const calls = { ai: [], set: [], ticks: [], patches: [], tagged: [], closed: [] };
   globalThis.fetch = async (url, init = {}) => {
     const u = decodeURIComponent(String(url)); const method = init.method || 'GET';
@@ -39,7 +40,7 @@ function world({ product = PRODUCT, ai = { tags: { colour: { values: ['Pink'], o
     if (path.startsWith('pb_bulk_runs?') && method === 'DELETE') { calls.closed.push('dropped'); return new Response(null, { status: 204 }); }
     if (path.startsWith('app_secrets?')) return ok([{ value: 'sk-test' }]);
     if (path.startsWith('pb_products?id=eq.p1&select=')) return ok([product]);
-    if (path.startsWith('pb_product_values?')) return ok([{ value_id: 'emb', source: 'manual', pb_attribute_values: { attribute_id: 'work' } }]);
+    if (path.startsWith('pb_product_values?')) return ok(values);
     if (path.startsWith('pb_settings?')) return ok([]);
     if (path.startsWith('pb_product_images?')) return ok([]);
     if (path.startsWith('rpc/pb_product_values_set')) { const b = JSON.parse(init.body); calls.set.push(b); return ok([{ id: 'p1', status: 'ready', was: 'needs_info', missing: [] }]); }
@@ -53,13 +54,13 @@ function world({ product = PRODUCT, ai = { tags: { colour: { values: ['Pink'], o
 }
 const budget = () => ({ soft: Date.now() + 60_000, hard: Date.now() + 90_000 });
 
-test('fills only the empty required attribute (Work has a manual value), as ai rows in add mode; leaves the queue; ticks', async () => {
+test('fills only the empty required attribute (Work has a manual value), as ai rows for it alone; leaves the queue; ticks', async () => {
   const c = world();
   await fillQueued({ id: 'p1', tag_fill_run: 'run1' }, TAX, null, budget());
   assert.equal(c.ai.length, 1);
   const schema = c.ai[0].output_config.format.schema;
   assert.deepEqual(Object.keys(schema.properties.tags.properties), ['colour']); // never asks for Work
-  assert.deepEqual(c.set[0], { p_product: 'p1', p_rows: [{ value_id: 'pink', source: 'ai' }], p_mode: 'add', p_attributes: null });
+  assert.deepEqual(c.set[0], { p_product: 'p1', p_rows: [{ value_id: 'pink', source: 'ai' }], p_mode: 'auto', p_attributes: ['col'] });
   assert.ok(c.patches.some(([p, b]) => p.includes('tag_fill_run=eq.run1') && b.tag_fill_run === null));
   assert.deepEqual(c.ticks, [{ p_run: 'run1', p_filled: 1, p_left: 0 }]);
 });
@@ -157,7 +158,7 @@ test('the words settle it: a product whose text names its colour gets it from th
   const c = world({ product: { ...PRODUCT, raw_text: 'Pink lehenga with beads' } });
   await fillQueued({ id: 'p1', tag_fill_run: 'run1' }, TAX, null, budget());
   assert.equal(c.ai.length, 0);
-  assert.deepEqual(c.set[0], { p_product: 'p1', p_rows: [{ value_id: 'pink', source: 'rules' }], p_mode: 'add', p_attributes: null });
+  assert.deepEqual(c.set[0], { p_product: 'p1', p_rows: [{ value_id: 'pink', source: 'rules' }], p_mode: 'auto', p_attributes: ['col'] });
   assert.deepEqual(c.ticks, [{ p_run: 'run1', p_filled: 1, p_left: 0 }]);
 });
 
@@ -174,4 +175,39 @@ test('the AI refuses: what the words found is still written, and the product cou
   await fillQueued({ id: 'p1', tag_fill_run: 'run1' }, TAX3, null, budget());
   assert.deepEqual(c.set.map(s => s.p_rows), [[{ value_id: 'pink', source: 'rules' }]]);
   assert.deepEqual(c.ticks, [{ p_run: 'run1', p_filled: 0, p_left: 1 }]);
+});
+
+// Values that depend on the category (owner, 13 Nov 2026: Product Type — "so no mistake can happen").
+const TAXT = {
+  ...TAX,
+  attrs: [...TAX.attrs, { id: 'type', name: 'Product Type', key: 'product type', multi: false, position: 3, shopify_prefix: null, by_category: true }],
+  values: [...TAX.values,
+    { id: 'bridal', attribute_id: 'type', name: 'Bridal Lehenga', key: 'bridal lehenga', aliases: [], position: 1, categories: ['Lehenga'] },
+    { id: 'anarkali', attribute_id: 'type', name: 'Anarkali', key: 'anarkali', aliases: [], position: 2, categories: ['Salwar Suit'] },
+    { id: 'gown', attribute_id: 'type', name: 'Gown', key: 'gown', aliases: [], position: 3, categories: [] }],
+  links: [...TAX.links, { category: 'Lehenga', attribute_id: 'type', position: 3 }],
+};
+
+test('Product Type: the AI picks only from the values ticked for the product\'s category; a person\'s value from another category goes first', async () => {
+  const c = world({
+    values: [{ value_id: 'pink', source: 'rules', pb_attribute_values: { attribute_id: 'col' } }, ...MANUAL_WORK,
+      { value_id: 'anarkali', source: 'manual', pb_attribute_values: { attribute_id: 'type' } }], // chosen when it was a Salwar Suit
+    ai: { tags: { product_type: { values: ['Bridal Lehenga'], other: [] } } },
+  });
+  await fillQueued({ id: 'p1', tag_fill_run: 'run1' }, TAXT, null, budget());
+  const props = c.ai[0].output_config.format.schema.properties.tags.properties;
+  assert.deepEqual(Object.keys(props), ['product_type']); // Colour and Work have values that count; Anarkali does not here
+  assert.deepEqual(props.product_type.properties.values.items.enum, ['Bridal Lehenga']); // not Anarkali (Salwar Suit), not Gown (no category)
+  assert.deepEqual(c.set.map(s => [s.p_mode, s.p_attributes, s.p_rows]), [['manual', ['type'], []], ['auto', ['type'], [{ value_id: 'bridal', source: 'ai' }]]]);
+  assert.deepEqual(c.ticks, [{ p_run: 'run1', p_filled: 1, p_left: 0 }]);
+});
+
+test('Product Type: an AI value from another category is replaced the same way, with nothing to clear first', async () => {
+  const c = world({
+    values: [{ value_id: 'pink', source: 'rules', pb_attribute_values: { attribute_id: 'col' } }, ...MANUAL_WORK,
+      { value_id: 'anarkali', source: 'ai', pb_attribute_values: { attribute_id: 'type' } }],
+    ai: { tags: { product_type: { values: ['Bridal Lehenga'], other: [] } } },
+  });
+  await fillQueued({ id: 'p1', tag_fill_run: 'run1' }, TAXT, null, budget());
+  assert.deepEqual(c.set.map(s => [s.p_mode, s.p_attributes, s.p_rows]), [['auto', ['type'], [{ value_id: 'bridal', source: 'ai' }]]]);
 });
