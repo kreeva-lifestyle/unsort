@@ -21,15 +21,15 @@ are tagged.
 - **121 products wait for a category** ("Missing: Category"): Anarkali 96,
   Kurta Set 23, Gown 1, Indo-Western 1 — categories taken off the list.
   Settings → Tags → Categories → **Waiting for a category**: tap each and
-  move its products (Anarkali → Salwar Suit). Set up Product Type for the
-  new category first, so the rules and the AI can choose it.
-- **Product Type: check the values, then link it.** Claude added 10 from
-  acriine.in: Lehenga — Lehenga Choli, Chaniya Choli, Bridal Lehenga, South
-  Indian Lehenga; Saree — Paithani; Salwar Suit — Anarkali, Sharara,
-  Gharara, Palazzo Suit, Angrakha. Untick or add what you like (for
-  example Kurta Set for Salwar Suit), then link Product Type to those
-  categories and tap **Link and let AI decide**. 13 more acriine tags
-  (Wedding, Gown, Dandiya Night…) wait in Tags → Suggestions.
+  move its products (Anarkali and Kurta Set → Salwar Suit). Link Product
+  Type to Salwar Suit first, so the rules and the AI choose Anarkali or
+  Kurta Set for them there.
+- **Product Type: check the types, then link it.** Every category has
+  types now (Saree 7, Lehenga 2, Salwar Suit 9, Co-ord Set 5, Kids Wear 6,
+  Pre-Stitched Saree 5, Men's Kurta 6). Remove or add what you like, then
+  link Product Type to the categories that need it and tap **Link and let
+  AI decide**. Gown, Long Gown, Dress, Long Dress and Indo Western wait in
+  Tags → Suggestions: no category takes them yet.
 - **Two colours ("Pink and White"):** Multicolour, or the main colour?
   Colour takes one value.
 - **"Wedding":** add it back as another name for Marriage? A deleted word
