@@ -111,7 +111,10 @@ test('the category list and a category\'s must-have tags: named by what changed,
   const r = await categoriesSave({ categories: ['lehenga', 'Kurti'] }, 'u1');
   assert.deepEqual(r, { ok: true, categories: ['Lehenga', 'Kurti'], regated: 4, run_id: RUN });
   assert.equal(opened(calls).label, 'Category list: removed Saree, Gown; added Kurti');
-  assert.equal(calls.find(c => c.method === 'POST' && c.u.startsWith('/rest/v1/pb_settings')).run, RUN);
+  const saved = calls.find(c => c.method === 'POST' && c.u.startsWith('/rest/v1/pb_settings'));
+  assert.equal(saved.run, RUN);
+  // pb_settings has no id column: asking for one made the database refuse every save (13 Nov 2026, "unable to remove categories")
+  assert.match(saved.u, /[?&]select=key(&|$)/); assert.doesNotMatch(saved.u, /select=id/);
   assert.equal(rpcCall(calls, 'pb_categories_prune').run, RUN);
 
   calls = world(recorded({ kind: 'category_links', products: 9 }), (m, u) => {
