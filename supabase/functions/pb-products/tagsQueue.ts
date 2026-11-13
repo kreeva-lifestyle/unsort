@@ -1,6 +1,7 @@
 // Staff actions on the suggestions queue and "Let AI decide" (index.ts):
 //   suggestions_list { status?, attribute_id?, page? } → pending phrases by uses, each with up to 3
-//                    example product names and its closest look-alikes (tagLook.ts)
+//                    example product names, its closest look-alikes (tagLook.ts) and its nearest
+//                    value (tagNearest.ts: the word rules, else the AI's kept answer; null = not asked yet)
 //   suggestion_act   { ids, action: add|alias|ignore|move, attribute_id?, value_id?, name?, force? }
 //                    add runs the look-alike check first: a phrase with look-alikes is NOT added
 //                    and comes back in `conflicts` (unless force); add / alias then re-run the
@@ -17,14 +18,15 @@ import { HttpError, plain, usdOf } from './http.ts';
 import { routeProduct } from './route.ts';
 import { fillOne } from './tagFill.ts';
 import { exactIn, lookAlikes } from './tagLook.ts';
+import { nearestOf, type StoredNearest } from './tagNearest.ts';
 import { displayName, tagKey } from './tagText.ts';
 import { retagProducts } from './tagsProduct.ts';
 import { loadTaxonomy, taxValues } from './taxonomy.ts';
 import { PRODUCT_COLS, type ProductRow } from './types.ts';
 import { newBudget } from './worker.ts';
 
-interface SugRow { id: string; phrase: string; key: string; attribute_id: string | null; status: string; uses: number; examples: string[]; source: string; first_seen_at: string; last_seen_at: string }
-const SUG_COLS = 'id,phrase,key,attribute_id,status,uses,examples,source,first_seen_at,last_seen_at';
+interface SugRow { id: string; phrase: string; key: string; attribute_id: string | null; status: string; uses: number; examples: string[]; source: string; first_seen_at: string; last_seen_at: string; nearest: StoredNearest | null }
+const SUG_COLS = 'id,phrase,key,attribute_id,status,uses,examples,source,first_seen_at,last_seen_at,nearest';
 const STATUSES = ['pending', 'added', 'aliased', 'ignored'];
 
 async function count(path: string): Promise<number> {
@@ -46,7 +48,7 @@ export async function suggestionsList(b: Body) {
   const values = taxValues(tax);
   return {
     ok: true, page, per, count: total,
-    rows: rows.map(r => ({ ...r, example_names: r.examples.slice(0, 3).map(id => names.get(id)).filter(Boolean), matches: lookAlikes(r.phrase, values, { attributeId: r.attribute_id, max: 3 }) })),
+    rows: rows.map(r => ({ ...r, example_names: r.examples.slice(0, 3).map(id => names.get(id)).filter(Boolean), matches: lookAlikes(r.phrase, values, { attributeId: r.attribute_id, max: 3 }), nearest: nearestOf(r, values) })),
   };
 }
 

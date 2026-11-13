@@ -52,6 +52,7 @@
 //   category_link_save admin|manager  { category, attribute_ids[] }       → { ok, to_needs_info, to_ready }
 //   suggestions_list   staff          { status?, attribute_id?, page? }   → { ok, rows[{…, example_names, matches}], count, page, per }
 //   suggestion_act     admin|manager  { ids, action:add|alias|ignore|move, attribute_id?, value_id?, name?, force? } → { ok, done, conflicts{id: matches[]}, retagged }
+//   suggestions_nearest admin|manager { ids[≤20] } → { ok, nearest{id: {value_id, value, attribute_id, attribute, why, by}} } (rules, else one AI call, kept)
 //   product_values_set staff          { product_id, value_ids[], attribute_id? } → { ok, status, missing, locked, routed } (locks 'tags')
 //   retag              admin|manager  { dry_run (default true) }          → { ok, dry_run, products, locked, changed, to_needs_info, to_ready, sample[≤10] }
 //   tags_ai_fill       staff          { product_ids? | category? | attribute_id? | needs_info?, missing_only?, now? } → { ok, run_id, queued } | now: { ok, filled, left, status, missing, routed }
@@ -77,6 +78,7 @@ import { setStock } from './stock.ts';
 import { previewPrice, saveCredentials, testSite } from './siteActions.ts';
 import * as T from './tagsActions.ts';
 import { fillStatus, suggestionAct, suggestionsList, tagsAiFill } from './tagsQueue.ts';
+import { suggestionsNearest } from './tagsNearest.ts';
 import { productValuesSet, retag } from './tagsProduct.ts';
 import type { Caller } from './types.ts';
 
@@ -120,6 +122,7 @@ const ACTIONS: Record<string, { who: Who; run: (b: A.Body, c: Caller) => Promise
   category_link_save: { who: 'admin', run: (b, c) => T.categoryLinkSave(b, userOf(c)) },
   suggestions_list: { who: 'staff', run: (b) => suggestionsList(b) },
   suggestion_act: { who: 'admin', run: (b, c) => suggestionAct(b, userOf(c)) },
+  suggestions_nearest: { who: 'admin', run: (b, c) => suggestionsNearest(b, userOf(c)) },
   product_values_set: { who: 'staff', run: (b, c) => productValuesSet(b, userOf(c)) },
   retag: { who: 'admin', run: (b, c) => retag(b, userOf(c)) },
   tags_ai_fill: { who: 'staff', run: (b, c) => tagsAiFill(b, userOf(c)) },

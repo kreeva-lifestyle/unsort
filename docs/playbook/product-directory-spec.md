@@ -200,7 +200,8 @@ is_active). Service role for all DB writes. CORS like listing-ai.
 | `value_save` | admin/manager | `{ attribute_id, id?, name, aliases?, force? }` | a new name (or rename) with look-alikes → **409** `{ error, matches }` unless `force`; an alias another value of the same attribute uses → 409 → `{ ok, value }` |
 | `value_delete` / `value_merge` | admin/manager | `{ id }` / `{ from, into }` | `pb_value_delete` / `pb_value_merge` (same attribute; products move, from's key + aliases become into's aliases) |
 | `category_link_check` / `category_link_save` | staff / admin | `{ category, attribute_id }` / `{ category, attribute_ids[] }` | products lacking it → `{ lacking }`; replace the category's attributes in order and re-gate → `{ to_needs_info, to_ready }` |
-| `suggestions_list` | staff | `{ status?, attribute_id? ('none'), page? }` | 20 a page by uses → rows `{ …, example_names[≤3], matches[≤3] }`, `count` |
+| `suggestions_list` | staff | `{ status?, attribute_id? ('none'), page? }` | 20 a page by uses → rows `{ …, example_names[≤3], matches[≤3], nearest }`, `count` (`nearest`: `{ value_id, value, attribute_id, attribute, why, by: rules/ai }`, `value_id` null = none close; null = not asked yet) |
+| `suggestions_nearest` | admin/manager | `{ ids[≤20] }` | pending rows without a `nearest`: the word rules, else ONE AI call for all (reader model), kept in `pb_tag_suggestions.nearest` → `{ nearest{id: …} }`; cost logged as `tags_matched` |
 | `suggestion_act` | admin/manager | `{ ids[≤100], act: add/alias/ignore/move, attribute_id?, value_id?, name?, force? }` | add runs the look-alike check first: rows with look-alikes come back in `conflicts {id: matches}` (not added) unless `force`; add / alias re-run the rules for the example products → `{ done, conflicts, retagged }` |
 | `product_values_set` | staff | `{ product_id, value_ids[], attribute_id? }` | staff's choice ('manual') for one attribute or all; checked against the category's allowed values and one-value attributes; locks `tags`; gate; routes it when it became Ready → `{ status, missing, locked, routed }` |
 | `retag` | admin/manager | `{ dry_run (default true) }` | the rules again for every unlocked product, for its category's attributes only (AI rows kept where the rules find nothing; 'manual' never touched; other attributes' values stay) → `{ products, locked, changed, to_needs_info, to_ready, sample[≤10] }`; apply in batches of 100 (`pb_product_values_bulk`, each row with its `attributes`) |
@@ -538,6 +539,23 @@ every attribute: same key, same stem, same words in another order, the Hindi
 gota patti…), a colour shade (rani pink → pink), Damerau–Levenshtein ≤ 1
 (≤ 6 letters) / ≤ 2, Jaro–Winkler ≥ 0.92; a hit in another attribute is
 flagged (`other_attribute`: "Silk" under Work is a Fabric value).
+
+**Nearest match** (2026-11-13, `tagNearest.ts` / `tagsNearest.ts`). Each
+pending suggestion shows the closest value already in the lists, with
+"Same as <value>" (= `suggestion_act` alias). Word rules first: the best
+look-alike, else a name or alias of TWO words or more inside the phrase,
+whole words in order (own attribute first, then all; two values as long →
+none). Single words are left to the AI: replaying the owner's 57 choices of
+13 Nov, "contains Silk" was wrong for five silks (filed under Art Silk,
+Cotton Silk, Organza) while every look-alike agreed. The rest goes to the
+AI in one call per page (≤ 20 phrases): the lists with each value's aliases
+(the owner's earlier filings), the 40 latest ignored phrases, each phrase
+with its source, attribute and two example products; the answer is an enum
+of "Attribute: Value" labels or "none" plus a ≤ 14-word why, kept in
+`pb_tag_suggestions.nearest` `{ value_id | null, why, at }` (a value deleted
+since → asked again). Asked only from the Tags page by an admin / manager,
+so not held by the daily AI limit; the cost is a `tags_matched` activity
+row that `pb_ai_cost_since` counts (20261113190000_pb_tag_nearest.sql).
 
 **Websites.** `{tags}` = the chosen values in the site's `tag_rules.tag_style`:
 `plain` ("Black", default) or `prefixed` (`${shopify_prefix || attribute}_${name}`);

@@ -14,7 +14,7 @@ Most come from the launch research report sent on 13 Nov 2026 (questions
 Q1 to Q20; the report itself is not in this repository). Each entry gives
 the recommendation; once decided, Claude builds it.
 
-The first eight come from the tags research report of 13 Nov ("Scrape
+The first six come from the tags research report of 13 Nov ("Scrape
 mapping to Playbook taxonomy"). All are small; each changes how products
 are tagged.
 
@@ -27,12 +27,8 @@ are tagged.
   One line each (the cut of the top, the kind of bottom). Similar sets were
   filed three different ways; with these lines the rules and the AI file
   them the same way every time.
-- **Teal, Rust, Mustard, Mauve:** new Colour values, or part of an existing
-  colour (Teal → Blue, Rust → Orange…)? 18 products have no exact colour.
 - **Two colours ("Pink and White"):** Multicolour, or the main colour?
   Colour takes one value.
-- **Crunchy, Roman, Glass, Fendy, Rangoli and Vichitra silk:** new Fabric
-  values, or Silk / Art Silk? 27 products are only "some silk" today.
 - **"Wedding":** add it back as another name for Marriage? A deleted word
   comes back as a question every time it is seen.
 - **Occasion:** let the AI judge it (suppliers never say), or set a default

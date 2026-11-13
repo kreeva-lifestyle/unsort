@@ -1,15 +1,18 @@
 // Suggestions (Tags page): phrases Playbook saw that are not values yet —
 // store tags, words in posts, the AI's "other" — most seen first, 20 a page,
-// filtered by attribute. "+ Add to <Attribute>" runs the look-alike guard
-// first (LookAlikeModal); "Also known as…" files it under an existing value;
-// Ignore never suggests it again. Bulk select: Add (when all share one
-// attribute) / Ignore, in a bar that sticks to the top while the list scrolls.
-import { useCallback, useEffect, useState } from 'react';
+// filtered by attribute. Each shows its nearest value already in the lists
+// (the word rules, else the AI: asked once for the cards not looked at yet,
+// by someone who can act on them, and kept); "Same as <value>" files it there.
+// "+ Add to <Attribute>" runs the look-alike guard first (LookAlikeModal);
+// "Also known as…" files it under a value you choose; Ignore never suggests it
+// again. Bulk select: Add (when all share one attribute) / Ignore, in a bar
+// that sticks to the top while the list scrolls.
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { friendlyError } from '../../../lib/friendlyError';
 import type { AddToast } from '../PbToasts';
 import type { SuggestionAct, TagsApi } from '../../data/tags';
 import type { PbAttribute, PbLookAlike, PbSuggestion } from '../../tagTypes';
-import { PB, pbMeta, pbNum } from '../../pbTheme';
+import { PB, pbErrorBox, pbMeta, pbNum } from '../../pbTheme';
 import { PbButton, PbChip, PbChipRow, PbSection, PbTile } from '../ui';
 import AliasPicker, { type AliasTarget } from './AliasPicker';
 import LookAlikeModal from './LookAlikeModal';
@@ -28,15 +31,33 @@ export default function SuggestionsTile({ attrs, api, addToast, version, onChang
   const [busy, setBusy] = useState('');
   const [guard, setGuard] = useState<{ s: PbSuggestion; matches: PbLookAlike[] } | null>(null);
   const [alias, setAlias] = useState<PbSuggestion | null>(null);
+  const [asking, setAsking] = useState(false);
+  const [nearErr, setNearErr] = useState('');
+  const asked = useRef(0);
+  /** The nearest value for the cards not looked at yet: one call, kept on the server, merged in by id.
+   *  `byHand`: "Ask again" was tapped, so the end is said in a toast too (on load the cards filling in say it). */
+  const askNearest = useCallback(async (list: PbSuggestion[], byHand = false) => {
+    const ids = list.filter(r => !r.nearest).map(r => r.id);
+    if (!canEdit || !ids.length) return;
+    const me = ++asked.current;
+    setAsking(true); setNearErr('');
+    try {
+      const got = await api.nearestSuggestions(ids);
+      setRows(rs => rs && rs.map(r => (got[r.id] ? { ...r, nearest: got[r.id] } : r)));
+      if (byHand) addToast(`The AI looked at ${plural(Object.keys(got).length, 'suggestion')}`, 'success');
+    } catch (e) { if (me === asked.current) setNearErr(friendlyError(e)); }
+    finally { if (me === asked.current) setAsking(false); }
+  }, [api, canEdit, addToast]);
   const load = useCallback(async () => {
     try {
       const r = await api.listSuggestions('pending', page, attr);
       // The last suggestion of a later page was just handled: step back to the page that still has some.
       if (!r.rows.length && page > 0) { setPage(Math.max(0, Math.ceil(r.count / 20) - 1)); return; }
       setRows(r.rows); setCount(r.count); setErr('');
+      void askNearest(r.rows);
     }
     catch (e) { setErr(friendlyError(e)); }
-  }, [api, page, attr]);
+  }, [api, page, attr, askNearest]);
   useEffect(() => { void load(); }, [load, version]);
   useEffect(() => { setSel(new Set()); }, [page, attr, version]);
 
@@ -91,11 +112,17 @@ export default function SuggestionsTile({ attrs, api, addToast, version, onChang
                 {ids.length > 0 && <PbButton icon="eyeOff" onClick={() => void act({ ids, act: 'ignore' }, 'bulk:ignore', n => `Ignored ${plural(n, 'suggestion')}`)} busy={busy === 'bulk:ignore'} busyLabel="Ignoring…" dim={!!busy && busy !== 'bulk:ignore'}>Ignore {ids.length}</PbButton>}
               </div>
             )}
+            {nearErr && (
+              <div role="alert" style={{ ...pbErrorBox, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <span style={{ flex: '1 1 220px', minWidth: 0 }}>The AI could not look for the nearest values. {nearErr} Try again in a minute.</span>
+                <PbButton icon="refresh" onClick={() => rows && void askNearest(rows, true)} busy={asking} busyLabel="Asking…">Ask again</PbButton>
+              </div>
+            )}
             <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 300px), 1fr))', gap: 12 }}>
               {rows.map(s => (
-                <SuggestionCard key={s.id} s={s} attrs={attrs} selected={sel.has(s.id)} busy={busy} canEdit={canEdit}
+                <SuggestionCard key={s.id} s={s} attrs={attrs} selected={sel.has(s.id)} busy={busy} canEdit={canEdit} asking={asking}
                   onSelect={on => setSel(x => { const n = new Set(x); if (on) n.add(s.id); else n.delete(s.id); return n; })}
-                  onAdd={() => add(s)} onAlias={() => setAlias(s)}
+                  onAdd={() => add(s)} onAlias={() => setAlias(s)} onUse={t => aliasTo(s, t)}
                   onIgnore={() => void act({ ids: [s.id], act: 'ignore' }, `ignore:${s.id}`, () => `Ignored “${s.phrase}” — it will not be suggested again`)}
                   onMove={to => void act({ ids: [s.id], act: 'move', attribute_id: to }, `move:${s.id}`, () => `Moved “${s.phrase}”${to ? ` to ${nameOf(to)}` : ''}`)} />
               ))}
