@@ -14,15 +14,15 @@ import { getAiCost } from '../data/listingSeo';
 import { dupName, getDupMatches, sourceText, type DupMatch } from '../data/duplicates';
 import { useAuth } from '../../hooks/useAuth';
 import DupTile from '../components/product/detail/DupTile';
-import { refreshGate } from '../data/tags';
 import { logSwallowed } from '../../lib/errorLogger';
 import type { PbAiCost } from '../seoTypes';
-import { addPhotos, checkPhoto, getProduct, setProductStatus, type ProductDetail, type VendorLite, type WebsiteLite } from '../data/products';
+import { getProduct, setProductStatus, type ProductDetail, type VendorLite, type WebsiteLite } from '../data/products';
 import ProductFacts from '../components/product/ProductFacts';
 import ProductListings from '../components/product/ProductListings';
 import { Dot, PRODUCT_STATUS } from '../components/product/status';
 import ProductActions, { PhoneActionsTile } from '../components/product/detail/ProductActions';
 import { PhonePhotoHero, PhotosTile } from '../components/product/detail/ProductPhotos';
+import { usePhotoActions } from '../components/product/detail/usePhotoActions';
 import WebMetaTile from '../components/product/detail/WebMetaTile';
 import { AiReadTile, PhoneNameCard, ProductHero, WebsitesStat } from '../components/product/detail/ProductSummary';
 import ProductStates from '../components/product/detail/ProductStates';
@@ -46,7 +46,6 @@ export default function ProductPage({ id, onClose, onChanged, onOpenOther, onDel
   const [p, setP] = useState<ProductDetail | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [loadErr, setLoadErr] = useState('');
-  const fileInput = useRef<HTMLInputElement>(null);
   const top = useRef<HTMLDivElement>(null);
   const phone = useIsPhone();
   // Opened from far down the list: start at the top (Playbook scrolls inside its own container).
@@ -67,30 +66,23 @@ export default function ProductPage({ id, onClose, onChanged, onOpenOther, onDel
   const loaded = !!p;
   useEffect(() => { if (loaded) focusPageTitle(); }, [loaded]);
 
-  /** One busy key per screen. */
-  const act = async (key: string, fn: () => Promise<unknown>, done: string) => {
+  /** One busy key per screen. `done`: the success toast, or how to word it from the server's answer. */
+  const act = async (key: string, fn: () => Promise<unknown>, done: string | ((r: unknown) => string)) => {
     if (busy) return;
     setBusy(key);
     try {
-      // read_product / route_product answer ok with a `warning` when part of the job did not happen.
-      const warning = (await fn() as { warning?: string } | undefined)?.warning;
-      if (warning) addToast(`${done}, but: ${warning}`, 'error'); else addToast(done, 'success');
-      refresh();
+      // read_product / route_product / photos_set answer ok with a `warning` when part of the job did not happen.
+      const r = await fn(), warning = (r as { warning?: string } | undefined)?.warning;
+      const said = typeof done === 'function' ? done(r) : done;
+      if (warning) addToast(`${said}, but: ${warning}`, 'error'); else addToast(said, 'success');
+      onChanged();
+      await load(); // the page stays busy until it shows the new state: no second change on top of the old one
     }
     catch (e) { addToast(friendlyError(e), 'error'); }
     finally { setBusy(null); }
   };
-
-  const pickPhotos = (list: FileList | null) => {
-    const files = Array.from(list ?? []);
-    if (fileInput.current) fileInput.current.value = '';
-    const bad = files.map(checkPhoto).filter(Boolean);
-    if (bad.length) { addToast(bad.join(' · '), 'error'); return; }
-    if (!files.length || !p) return;
-    const next = p.pb_product_images.reduce((m, i) => Math.max(m, i.position + 1), 0);
-    // A product held only for its photo becomes Ready here (the gate), and the automation sends it to the websites.
-    void act('photos', async () => { await addPhotos(p.id, files, next); await refreshGate(p.id); }, files.length === 1 ? 'Photo added' : `${files.length} photos added`);
-  };
+  // Photos: add, make main, move, remove (the viewer's buttons).
+  const { addPhoto, edit: photoEdit, input: photoInput } = usePhotoActions(p, { busy, act, ask, addToast });
 
   // Delete for good: admin / manager only (the server checks again). One pop-up says what goes and what that means.
   const { profile } = useAuth();
@@ -130,7 +122,6 @@ export default function ProductPage({ id, onClose, onChanged, onOpenOther, onDel
     onRestore: () => act('restore', () => setProductStatus(p.id, 'new'), 'Restored — the AI will read it again'),
     onArchive: archive, onDelete: canDelete ? remove : undefined,
   };
-  const addPhoto = () => fileInput.current?.click();
   // The page's one gradient: Edit on the first listing waiting for approval, else Save facts.
   const waiting = p.pb_listings.some(l => l.status === 'review'), owed = p.pb_listings.filter(l => l.stock_due).length;
   const facts = (
@@ -146,7 +137,7 @@ export default function ProductPage({ id, onClose, onChanged, onOpenOther, onDel
     <div ref={top} style={{ scrollMarginTop: 140, display: 'flex', flexDirection: 'column', gap: phone ? 12 : 24, minWidth: 0 }}>
       {phone ? (
         <>
-          <PhonePhotoHero images={p.pb_product_images} onAdd={addPhoto} busy={busy} onBack={onClose} />
+          <PhonePhotoHero images={p.pb_product_images} onAdd={addPhoto} busy={busy} edit={photoEdit} onBack={onClose} />
           <PhoneNameCard p={p} vendors={vendors} copyOf={copyOf} />
           {dupTile()}
           <IntakeNotesTile p={p} addToast={addToast} onChanged={refresh} />
@@ -166,7 +157,7 @@ export default function ProductPage({ id, onClose, onChanged, onOpenOther, onDel
             </span>}
             actions={<ProductActions {...actionProps} />} />
           <div className="pb-bento">
-            <PhotosTile images={p.pb_product_images} onAdd={addPhoto} busy={busy} />
+            <PhotosTile images={p.pb_product_images} onAdd={addPhoto} busy={busy} edit={photoEdit} />
             <ProductHero p={p} vendors={vendors} copyOf={copyOf} />
             <WebsitesStat p={p} />
             {dupTile(12)}
@@ -185,7 +176,7 @@ export default function ProductPage({ id, onClose, onChanged, onOpenOther, onDel
         </div>
       )}
       {!phone && listings}
-      <input ref={fileInput} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={e => pickPhotos(e.target.files)} />
+      {photoInput}
       <PbConfirm {...modalProps} />
     </div>
   );

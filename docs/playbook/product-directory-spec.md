@@ -1145,6 +1145,42 @@ limit is used up the worker is still woken each minute when work waits (it
 reads settings and stops).
 
 
+### Batch 4 — photos: remove, main photo, order (D10)
+Photos could be added but never removed or reordered; the first photo is the
+main image on every store, and a photo the AI could not open held the product
+back with no way to take it out.
+- **Database** (`20261113100000_pb_photos_set.sql`): `pb_photos_set(product,
+  order uuid[])` — one transaction: the kept photos get positions 0…n-1, each
+  listing's `image_alts` move with their photos, and the photos left out are
+  moved behind (100000+) and handed back. It deletes nothing itself.
+- **Server** (`photosEdit.ts`): `photos_set { product_id, order[], remove[] }`
+  (staff). `order` = the photos that stay, first = main; `remove` = deleted
+  for good (row → photo prints by cascade → file). A photo in neither list
+  (added meanwhile) stays, after the others. Refused while the AI reads the
+  product or writes one of its listings. Then `follow`: the gate runs (no
+  photo left → Needs info); a product whose `ai_error` is "could not open one
+  of the product photos" goes back to `new` (read again); on a Ready product a
+  **published** listing whose store gallery differs is set `publishing` (on a
+  Review first site `review`) — no AI call — and a listing the writer gave up
+  on for a photo is queued again. A listing still waiting is **not** rewritten
+  for a photo (its alt texts already moved). `photos_sync { product_id }` runs
+  the same follow-up after photos were added in the app. A failure after the
+  photos are saved is a warning; `route_due` makes the worker check again.
+- **Routing** (`route.ts`): `behind` is also true when the photos differ from
+  the last `published` row's `photos` (or `photos_tried`: a list the store
+  refused, written by `publish.ts`, is not sent again by itself), so every
+  later routing catches up too. New: a listing published before that is
+  waiting to go out again (`publishing` unclaimed, or `review`) is left as it
+  is and only re-priced in place — before, a second change within the minute
+  sent a live listing back to the AI writer.
+- **One list** (`photos.ts galleryOf`): the first 20 photos by position, used
+  by the writer, publish and routing alike.
+- **App**: tap a photo → the viewer has **Make main photo**, **Position**
+  (move to any place) and **Remove photo** (confirm). The viewer follows the
+  photo it shows. `usePhotoActions` holds the page's photo jobs; the page
+  stays busy until it has reloaded. Adding photos now also calls `photos_sync`.
+- **Local SQL tests** moved to `supabase/tests/sql/` (`t_photos.sql` added).
+
 ## Bulk changes: the log and Revert (owner, 2026-11-12)
 
 Owner: "We should also have revert option. Firstly log all bulk changes we
@@ -1210,7 +1246,7 @@ stock-notice revert (`pb_bulk_revert_stock`) and `pb_listings.put_back`
 ("this send also makes the product visible again"). It could not be applied
 from here: the automated path holds SQL that contains a `delete` for a
 confirmation that does not reach the owner. It was proven on a local
-PostgreSQL instead (`supabase/tests/bulk_log/run.sh`): delete a value, merge
+PostgreSQL instead (`supabase/tests/sql/run.sh`): delete a value, merge
 two values, delete an attribute, change a category's tags and the category
 list, retag, a suggestion made into a value, a stock notice with out of
 stock / permanent / temporary lines. Every scenario returns the data exactly

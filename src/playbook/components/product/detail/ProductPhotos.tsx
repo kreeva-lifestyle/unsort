@@ -2,7 +2,8 @@
 // are portrait) with the rest and the "Add photos" cell in a grid beside it. Phone: the photo hero at the top of
 // the page, a sideways snap strip with the back button laid over it.
 // Tapping a photo opens it in the in-app viewer (PhotoViewer, never a new
-// tab — mobile.md §10); uploads go through the page.
+// tab — mobile.md §10), where it can be made the main photo, moved or
+// removed; uploads and those changes go through the page (usePhotoActions).
 // Telegram videos follow the photos (a "Videos" row on desktop, slides after
 // the photos on phone); the cover is always a photo.
 import type { CSSProperties, ReactNode } from 'react';
@@ -13,10 +14,11 @@ import PbIcon from '../../ui/PbIcon';
 import PbTile from '../../ui/PbTile';
 import { PbBackButton } from '../../ui/PbPageHeader';
 import { VideoCell, mediaCount, splitMedia } from './ProductVideos';
-import { usePhotoViewer } from './PhotoViewer';
+import { usePhotoViewer, type PhotoEdit } from './PhotoViewer';
 
 type Img = ProductDetail['pb_product_images'][number];
-type AddProps = { onAdd: () => void; busy: string | null };
+/** `edit`: make main / move / remove, offered in the viewer (PhotoViewer.tsx). */
+type AddProps = { onAdd: () => void; busy: string | null; edit?: PhotoEdit };
 
 // The cover and the phone slides are up to 400 px wide on screen; the small grid cells about 180.
 const BIG = 400, SMALL = 180;
@@ -52,10 +54,10 @@ function NoPhotos({ children }: { children?: ReactNode }) {
   );
 }
 
-export function PhotosTile({ images, onAdd, busy }: AddProps & { images: Img[] }) {
+export function PhotosTile({ images, onAdd, busy, edit }: AddProps & { images: Img[] }) {
   const { photos, videos } = splitMedia(images);
   const [cover, ...rest] = photos;
-  const viewer = usePhotoViewer(photos);
+  const viewer = usePhotoViewer(photos, edit);
   return (
     <PbTile as="section" span={8} rows={2} aria-labelledby="pb-photos-title" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
@@ -85,9 +87,9 @@ export function PhotosTile({ images, onAdd, busy }: AddProps & { images: Img[] }
   );
 }
 
-export function PhonePhotoHero({ images: all, onAdd, busy, onBack }: AddProps & { images: Img[]; onBack: () => void }) {
+export function PhonePhotoHero({ images: all, onAdd, busy, edit, onBack }: AddProps & { images: Img[]; onBack: () => void }) {
   const { photos: images, videos } = splitMedia(all);
-  const viewer = usePhotoViewer(images);
+  const viewer = usePhotoViewer(images, edit);
   // Slides are 4:5 of the strip width, capped so a tablet or landscape phone still shows the name below the fold.
   const slide = all.length === 1 ? '0 0 min(calc(100% - 104px), 360px)' : '0 0 min(82%, 320px)';
   return (

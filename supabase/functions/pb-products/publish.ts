@@ -21,6 +21,7 @@ import { makeHandle } from './content.ts';
 import { faqHtml, fieldInputs } from './fields.ts';
 import { HttpError, plain } from './http.ts';
 import { compareAt } from './pricing.ts';
+import { galleryOf } from './photos.ts';
 import { profileOf } from './profile.ts';
 import { buildProductInput, PRODUCT_SET, STOCK_WARNING } from './productInput.ts';
 import { busyStreak, filesFor, FREE_RETRIES, type Gallery, knownPhotos, leaveGallery, mergeTags, photoRecord, sendFields, temporary, toOnlineStore } from './publishParts.ts';
@@ -64,7 +65,7 @@ export async function publishOne(l: ListingRow, o: { manual: boolean; putBack?: 
     const [p, site, imgs, last, tried] = await Promise.all([
       one<ProductRow>(`pb_products?id=eq.${enc(l.product_id)}&select=${PRODUCT_COLS}`),
       one<WebsiteRow>(`pb_websites?id=eq.${enc(l.website_id)}&select=${WEBSITE_COLS}`),
-      sel<{ path: string }>(`pb_product_images?product_id=eq.${enc(l.product_id)}&kind=eq.image&select=path&order=position.asc&limit=20`),
+      galleryOf(l.product_id),
       one<{ details: Sent | null; created_at: string }>(`pb_activity?product_id=eq.${enc(l.product_id)}&listing_id=eq.${enc(l.id)}&action=eq.published&select=details,created_at&order=created_at.desc`),
       sel<{ details: { handles?: string[]; temporary?: boolean; channel_due?: boolean } | null; created_at: string }>(`pb_activity?product_id=eq.${enc(l.product_id)}&listing_id=eq.${enc(l.id)}&action=eq.failed&select=details,created_at&order=created_at.desc&limit=12`),
     ]);
@@ -162,7 +163,8 @@ export async function publishOne(l: ListingRow, o: { manual: boolean; putBack?: 
     const warning = warnings.join(' ') || null;
     // What the store has of Playbook's photos now. The store refused the change → what it had before.
     const media = photoRecord(gallery, paths, known, (prod.media?.nodes || []).map(m => m.id));
-    const photos = noFiles ? { photos: was?.photos ?? [], ...(was?.media ? { media: was.media } : {}) } : { photos: paths, ...(media ? { media } : {}) };
+    // `photos_tried`: the list the store refused, so routing does not send the same list again by itself (route.ts `behind`).
+    const photos = noFiles ? { photos: was?.photos ?? [], ...(was?.media ? { media: was.media } : {}), photos_tried: paths } : { photos: paths, ...(media ? { media } : {}) };
     const saved = await patch<ListingRow>('pb_listings', mine, gone
       ? { status: 'skipped', shopify_status: prod.status, attempts: 0, error: PERM_NOTE, claimed_at: null } // archived on Shopify: off the website
       : { status: 'published', shopify_status: prod.status, published_at: nowIso(), attempts: 0, error: warning, claimed_at: null, ...(gallery.fresh.length ? { media_checked_at: null } : {}) }, LISTING_COLS);
