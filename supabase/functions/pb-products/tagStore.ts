@@ -14,7 +14,7 @@ import { plain } from './http.ts';
 import { type Suggest, type ValueSet, autoValues, suggestable } from './tagAuto.ts';
 import type { ReadTags } from './tagPrompt.ts';
 import { type ChosenTag, valueTags } from './tags.ts';
-import { type Taxonomy, allAttrs, attrsFor, matchAttrs, taxValues } from './taxonomy.ts';
+import { type Taxonomy, allAttrs, attrsFor, matchAttrs, shadesOf, taxValues } from './taxonomy.ts';
 import type { ProductRow } from './types.ts';
 
 export interface Refreshed { id: string; status: string; was: string; missing: string[] }
@@ -58,7 +58,7 @@ export async function autoTag(p: Facts, tax: Taxonomy, o: { ai?: ReadTags | null
   const attrs = o.byCategory ? attrsFor(tax, p.category) : allAttrs(tax);
   const have = await productValues(p.id);
   const manual = new Set(have.filter(v => v.source === 'manual').map(v => v.attribute_id));
-  const r = autoValues(p, matchAttrs(attrs), { manualAttrIds: manual, ai: o.ai, categories: tax.categories });
+  const r = autoValues(p, matchAttrs(attrs), { manualAttrIds: manual, ai: o.ai, categories: tax.categories, shades: shadesOf(tax) });
   // Only the attributes checked here are replaced. Without the list the database cleared every attribute, so the
   // read (its category's attributes only) deleted what the import had found for the others — with nothing linked,
   // everything (owner, 13 Nov 2026).

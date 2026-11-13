@@ -24,7 +24,7 @@ import { readTags, tagPromptLines, tagSchema, tagSpec } from './tagPrompt.ts';
 import { type Refreshed, productValues, suggestFor, writeValues } from './tagStore.ts';
 import { tagKey } from './tagText.ts';
 import { autoValues } from './tagAuto.ts';
-import { type AttrWithValues, type Taxonomy, attrsFor, matchAttrs } from './taxonomy.ts';
+import { type AttrWithValues, type Taxonomy, attrsFor, matchAttrs, shadesOf } from './taxonomy.ts';
 import { PRODUCT_COLS, type Budget, type ProductRow } from './types.ts';
 
 export const FILL_NEEDS_MS = 35_000;
@@ -50,7 +50,7 @@ export async function fillOne(p: ProductRow, tax: Taxonomy, o: { manual: boolean
   if (!target.length) return { filled: [], left: [], refreshed: (await rpc<Refreshed[]>('pb_products_refresh', { p_ids: [p.id] }))[0] ?? null, usd: 0 };
   // The word rules first (owner, 13 Nov 2026: rules, then AI, then a person): what the product's own words settle
   // costs nothing and comes out the same every time. The AI is asked only for the attributes still empty.
-  const byRules = autoValues(p, matchAttrs(target), { categories: tax.categories });
+  const byRules = autoValues(p, matchAttrs(target), { categories: tax.categories, shades: shadesOf(tax) });
   const rest = target.filter(a => !byRules.filled.has(a.id));
   let ai: Awaited<ReturnType<typeof askFor>> | null = null;
   try { if (rest.length) ai = await askFor(p, tax, rest, o.budget); }

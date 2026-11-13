@@ -72,3 +72,45 @@ test('suggestable: known words dropped, an unassigned phrase takes its look-alik
   ], values);
   assert.deepEqual(out.map(s => [s.phrase, s.attribute_id]), [['Embroided', 'work'], ['Ideal Collection', null]]);
 });
+
+// The word rules of 13 Nov 2026 (the tags research report: what the supplier's words already say).
+const FAB2 = { id: 'fab', name: 'Fabric', multi: false, values: [v('silk', 'Silk'), v('chs', 'Chanderi Silk'), v('art', 'Art Silk'), v('geo', 'Georgette')] };
+const OCC = { id: 'occ', name: 'Occasion', multi: true, values: [v('meh', 'Mehendi'), v('haldi', 'Haldi'), v('party', 'Party')] };
+const COL1 = { id: 'col', name: 'Colour', multi: false, values: [v('green', 'Green'), v('yellow', 'Yellow'), v('pink', 'Pink'), v('blue', 'Blue')] };
+const WORK2 = { id: 'work', name: 'Work', multi: true, values: [v('dp', 'Digital Print'), v('emb', 'Embroidery'), v('mir', 'Mirror Work')] };
+
+test('a two-word value that refines another is found with its words turned round ("Pure Roman Silk Chanderi")', () => {
+  assert.deepEqual(matchProduct({ text: 'Pure Roman Silk Chanderi with zari' }, [FAB2]).chosen.fab, ['chs']);
+  assert.deepEqual(matchProduct({ text: 'Fabric: Silk Art blend' }, [FAB2]).chosen.fab, ['art']);
+  // only for a refinement: "Work" is not a value, so "work mirror" is not Mirror Work
+  assert.equal(matchProduct({ text: 'heavy embroidery work mirror finish' }, [WORK2]).chosen.work.includes('mir'), false);
+});
+
+test('a one-value attribute takes the value that refines the best one: Chanderi Silk over Silk', () => {
+  assert.deepEqual(matchProduct({ name: 'Silk Anarkali', text: 'pure chanderi silk with zari' }, [FAB2]).chosen.fab, ['chs']);
+  assert.deepEqual(matchProduct({ name: 'Silk Anarkali', text: 'georgette dupatta' }, [FAB2]).chosen.fab, ['silk']); // not a refinement: the name wins
+});
+
+test('a word that is part of a colour\'s name counts for Colour only ("Mehendi Green" is not the Mehendi occasion)', () => {
+  const r = matchProduct({ name: 'Mehendi Green Anarkali Suit' }, [COL1, OCC]);
+  assert.deepEqual(r.chosen.col, ['green']);
+  assert.equal(r.chosen.occ, undefined);
+  assert.equal(matchProduct({ text: 'Haldi Yellow sharara set' }, [COL1, OCC]).chosen.occ, undefined);
+  // the guard works when only Occasion is looked for (Let AI decide with Colour already filled)
+  assert.equal(matchProduct({ facts: ['Mehendi Green'] }, [OCC], { shades: COL1.values }).chosen.occ, undefined);
+  // a Colour alias of two words covers its first word too
+  const withAlias = { ...COL1, values: [...COL1.values, v('mg', 'Mehndi', ['mehendi green'])] };
+  assert.equal(matchProduct({ text: 'mehendi green' }, [OCC], { shades: withAlias.values }).chosen.occ, undefined);
+  // still the occasion when it is one
+  assert.deepEqual(matchProduct({ text: 'Perfect for mehendi and haldi functions. Colour: green' }, [COL1, OCC]).chosen.occ, ['meh', 'haldi']);
+});
+
+test('a fabric or a work before a colour keeps both ("Georgette Pink", "Embroidered Blue")', () => {
+  const r = matchProduct({ name: 'Georgette Pink Anarkali', text: 'Embroidered Blue dupatta' }, [COL1, FAB2, WORK2]);
+  assert.deepEqual(r.chosen.fab, ['geo']);
+  assert.deepEqual(r.chosen.work, ['emb']);
+});
+
+test('"Digitally Printed" is Digital Print', () => {
+  assert.deepEqual(matchProduct({ text: 'Digitally Printed georgette kurta' }, [WORK2]).chosen.work, ['dp']);
+});

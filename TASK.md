@@ -84,11 +84,12 @@ are tagged.
 
 ## Playbook — approved, being built
 
-- **Put the 13 Nov tag fixes live on the server.** Merged, but the
-  database change (`20261113150000_pb_gate_category_list.sql`) and the
-  server update wait: Claude's Supabase connection was down on 13 Nov.
-  Until then the old behaviour stays. Next: Claude applies both as soon as
-  the connection is back, then checks them.
+- **Put the 13 Nov tag fixes and the better word rules live on the
+  server.** Merged, but the database change
+  (`20261113150000_pb_gate_category_list.sql`) and the server update wait:
+  Claude's Supabase connection was down on 13 Nov. Until then the old
+  behaviour stays. Next: Claude applies both as soon as the connection is
+  back, then checks them.
 - **An import that learns each website's words** (tags research report, 13
   Nov; owner: "go ahead"). Five steps:
   1. Look at the whole website first and list every word it uses.
@@ -99,12 +100,11 @@ are tagged.
      it to products already in, with undo.
 
   Built in parts:
-  - better word rules (filler words, spellings such as zari / jari, the
-    most specific value wins, colour words count only for Colour);
+  - better word rules (merged 13 Nov, live with the entry above);
   - categories with fixed IDs, and memory per website;
   - the look-first list and the cards.
 
-  Next: the word rules.
+  Next: categories with fixed IDs and memory per website.
 
 ## Playbook — things only the owner can do
 
