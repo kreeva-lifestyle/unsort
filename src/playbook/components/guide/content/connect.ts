@@ -36,8 +36,8 @@ export const CONNECT: GuideSection[] = [
       p('Do this part on a computer: Shopify\'s app screens are made for a desktop browser. Sign in to Shopify as the store owner (or staff allowed to develop apps).'),
       steps(
         'Open the Dev Dashboard from the store\'s Shopify admin: click the **store name** (top right) → **View Dev Dashboard**. Not there? **Settings → Apps → Develop apps → Build apps in Dev Dashboard**. An app made this way belongs to your store\'s organisation, which is what lets it connect.',
-        'Click **Apps** (left) → **Create app** (top right) → **Start from Dev Dashboard**. Name it, e.g. `Playbook`, and click **Create**.',
-        `The app opens on a new **version**. Leave **App URL** and **Webhooks API version** as they are. Under **Scopes** add ${SCOPES}. Click **Release**.`,
+        'Click **Apps** (left) → **Create app** (top right) → **Start from Dev Dashboard**. The **Create an app** form opens.',
+        `Fill it in: **App name** e.g. \`Playbook\`; leave **Version name**, **App URL** (https://example.com) and **Allowed redirection URL(s)** as they are; **untick Embed app in Shopify admin** (Playbook does not open inside Shopify); leave **Use legacy install flow** unticked. In **Scopes** paste \`write_products,read_products,write_publications,read_publications,write_inventory\`. Leave **Webhooks API version** as it is. Click **Create app** (top right) — and **Release** if Shopify asks to release the version.`,
         'Open the app again and click **Install app** (top of the **Installs** card). Choose the store, check the permissions it asks for, and click **Install**.',
         'In the app open **Settings**. On the **Credentials** card copy the **Client ID** and the **Client secret** (the eye or copy icon shows the secret).',
         'In this app: **Websites →** your website **→ Connection**. Under **How the app signs in** pick **Client ID + secret**, paste both, tap **Save credentials**.',
