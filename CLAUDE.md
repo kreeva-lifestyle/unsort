@@ -23,8 +23,9 @@ inside the app (`src/lib/division.ts`, logos in `src/components/brand/`):
   `src/hooks/useModalLock`, `src/components/ui/`, `src/components/brand/`,
   the login page and `App.tsx` routing. DailyWork code must not import from `src/playbook/`, and Playbook
   must not import DailyWork feature folders.
-- The deploy flow, pre-merge review, post-deploy checks, engineering ethics
-  and database rules below apply to both divisions.
+- The deploy flow, pre-merge review, post-deploy checks, engineering ethics,
+  database rules and the pending-work list (`TASK.md`) below apply to both
+  divisions.
 
 ## Auto-deploy flow
 After every set of changes:
@@ -44,6 +45,21 @@ owner decided this on 2026-10-20; never merge such a PR otherwise.
 ## Owner's reminders
 When the owner asks to be reminded about a task, schedule it for **1:00 PM
 IST (07:30 UTC)** on the day they name, unless they give another time.
+
+## Pending work — `TASK.md` (owner, 2026-11-13)
+`TASK.md` at the repository root is the one list of everything still
+pending, for both divisions: work not built yet, follow-ups, decisions the
+owner still has to make, and things only the owner can do.
+- Read it at the start of a session, and before building something check
+  whether it is already listed there.
+- Anything left pending — deferred, blocked, waiting on an owner decision or
+  an owner action, a known follow-up — is added to `TASK.md` in the same PR:
+  one entry each, saying what it is, why it waits and what happens next.
+- Once an item is implemented (merged, deployed and verified) or the owner
+  has done or decided it, **delete its entry** in the PR that finishes it.
+  No ticking off and no "done" list: finished items leave the file (the PR
+  history keeps them).
+- Plain words, short entries: the owner reads this file on a phone.
 
 ## Pre-merge self-review — MANDATORY
 Before creating the PR, re-read the full diff (`git diff main...HEAD`) as a
