@@ -84,27 +84,14 @@ are tagged.
 
 ## Playbook — approved, being built
 
-- **Put the 13 Nov tag fixes and the better word rules live on the
-  server.** Merged, but the database change
+- **Put the 13 Nov tag work live on the server:** the three tag fixes, the
+  better word rules and the remembered category choices (the AI follows how
+  you filed earlier products from the same website or vendor; no word cards,
+  owner 13 Nov). All merged, but the database change
   (`20261113150000_pb_gate_category_list.sql`) and the server update wait:
   Claude's Supabase connection was down on 13 Nov. Until then the old
   behaviour stays. Next: Claude applies both as soon as the connection is
   back, then checks them.
-- **An import that learns each website's words** (tags research report, 13
-  Nov; owner: "go ahead"). Five steps:
-  1. Look at the whole website first and list every word it uses.
-  2. Settle what the rules and earlier answers can.
-  3. Ask the AI once per leftover word, from your lists only.
-  4. Show you one card per word, the biggest first.
-  5. Remember each answer for that website (or every website), and apply
-     it to products already in, with undo.
-
-  Built in parts:
-  - better word rules (merged 13 Nov, live with the entry above);
-  - categories with fixed IDs, and memory per website;
-  - the look-first list and the cards.
-
-  Next: categories with fixed IDs and memory per website.
 
 ## Playbook — things only the owner can do
 

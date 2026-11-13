@@ -34,11 +34,12 @@ import { HttpError, plain, usdOf } from './http.ts';
 import { aiPhotos } from './photos.ts';
 import { readChanges } from './readChanges.ts';
 import { nameWithColour } from './readName.ts';
+import { ownerExamples } from './readerExamples.ts';
+import { factsText } from './readerFacts.ts';
 import { READ_PHOTOS, readerPrompt, readerSchema, type ReadOut } from './readerPrompt.ts';
 import { afterRead } from './restock.ts';
 import { stockNotice } from './stockNotice.ts';
 import { routeProduct } from './route.ts';
-import { stripLess } from '../pb-telegram/group.ts';
 import { mergeReadAttrs } from './import/meta.ts';
 import { tagAfterRead } from './tagRead.ts';
 import { refresh } from './tagStore.ts';
@@ -110,10 +111,11 @@ export async function readOne(p: ProductRow, o: { manual: boolean; prevStatus?: 
       sel<{ path: string }>(`pb_product_images?product_id=eq.${enc(p.id)}&kind=eq.image&select=path&order=position.asc&limit=${READ_PHOTOS}`),
     ]);
     const photos = await aiPhotos(imgs.map(i => i.path));
+    const examples = await ownerExamples(p, s.categories).catch((e) => { console.error(`pb-products examples ${p.id}: ${plain(e)}`); return ''; }); // the owner's own filing (readerExamples.ts)
     const ask = (n: number) => askClaude<ReadOut>({
       model: s.reader.model, effort: s.reader.effort,
       system: readerPrompt(s.categories, p.source === 'import', spec),
-      content: [...photos.blocks.slice(0, n), { type: 'text', text: factsText(p, vendor?.name ?? '', o.manual || again) }],
+      content: [...photos.blocks.slice(0, n), { type: 'text', text: factsText(p, vendor?.name ?? '', o.manual || again) + (examples ? `\n\n${examples}` : '') }],
       schema: readerSchema(s.categories, spec, p.source === 'import'), maxTokens: 8000, timeoutMs: o.budget.hard - Date.now(),
     });
     // A photo the AI cannot open must not stop the read: once more with the first two (what the reader had before 2026-11-12).
@@ -177,22 +179,4 @@ async function routeAfterRead(product: ProductRow, o: { manual: boolean; userId:
       .catch((w) => { console.error(`pb-products route-retry reset ${product.id}: ${plain(w)}`); return [] as ProductRow[]; });
     return { product: back[0] ?? product, routed: 0, warning };
   }
-}
-
-/** `fresh` (a re-read): the AI's earlier name and colour are left out, so it judges them again from the post and
- *  the photos instead of repeating itself; the ones a person typed (locked) stay as known. The fabric always
- *  stays: it is never reworded, only its spelling corrected (readerPrompt.ts). */
-function factsText(p: ProductRow, vendor: string, fresh = false): string {
-  const less = Number(p.less_amount) > 0; // the reader must return the RATE: the stored cost is already rate − less
-  const keep = (f: string) => !fresh || (p.locked || []).includes(f);
-  const known = [
-    p.name && keep('name') && `Name: ${p.name}`, p.sku && `SKU: ${p.sku}`, vendor && `Vendor: ${vendor}`,
-    p.category && `Category: ${p.category}`, p.fabric && `Fabric: ${p.fabric}`, p.color && keep('color') && `Color: ${p.color}`,
-    p.sizes?.length && `Sizes: ${p.sizes.join(', ')}`, !less && p.cost_price !== null && p.cost_price !== undefined && `Cost price: ${p.cost_price}`,
-  ].filter(Boolean).join('\n');
-  // Every less phrase ("Less: 200", "200 Less", "RATE 1600 LESS 200" → "RATE 1600") is hidden, so it is never taken off twice.
-  const post = less ? stripLess(String(p.raw_text || '')) : p.raw_text;
-  const note = less ? '\n\nThe vendor also gives a separate discount ("less"); Playbook subtracts it itself, so cost_price must be the RATE written in the post, before any less.'
-    : p.sell_price !== null && p.sell_price !== undefined ? '\n\nThis product was imported from another online store: the price in the text is that store\'s SELLING price, not a vendor cost. Return cost_price null.' : '';
-  return `${known ? `Already known:\n${known}\n\n` : ''}Vendor's post:\n${String(post || '(no text — use the photos)').slice(0, 6000)}${note}`;
 }
