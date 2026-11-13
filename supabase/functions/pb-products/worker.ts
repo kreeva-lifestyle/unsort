@@ -45,6 +45,8 @@ import type { Budget } from './types.ts';
 export interface WorkResult { read: number; routed: number; generated: number; published: number; failed: number; imported?: number; tagged?: number; stock?: number; taken_off?: number; paused?: boolean; limit?: boolean }
 
 const CAPS = { read: 6, generate: 8, publish: 10, route: 10, fill: 5, stock: 10, media: 5, retire: 5, takeOff: 10 };
+/** "Let AI decide" products one run may take, CAPS.fill at a time. */
+const FILL_MAX = 60;
 /** The slice of each run that stock sends may use. */
 const STOCK_MS = 25_000;
 /** Time an AI step needs left before it is claimed: photo checks + a slow answer (Opus / high effort). */
@@ -141,12 +143,20 @@ export async function work(userId: string | null, manual = false): Promise<WorkR
 
   try { if (inTime() && !(await stopped())) await checkMedia(CAPS.media, inTime); } catch (e) { failed('media', 'run', e); }
   try { if (inTime() && !(await stopped())) out.routed += await routeDue(CAPS.route, userId, inTime); } catch (e) { failed('route_due', 'run', e); }
+  // "Let AI decide", 5 at a time while there is time for one more and the day's AI limit allows (asked before each 5).
+  // Most are settled by the word rules in a fraction of a second, so a run goes on up to FILL_MAX: it used to stop at 5,
+  // and 133 products took half an hour (owner, 13 Nov 2026). One that needs the AI takes longer; the time left decides.
   try {
-    const queued = left(FILL_NEEDS_MS) && !(await stopped()) && !(await capped()) ? await fillCandidates(CAPS.fill) : [];
-    const tax = queued.length ? await loadTaxonomy() : null;
-    for (const c of queued) {
-      if (!tax || !left(FILL_NEEDS_MS) || await stopped()) break;
-      if (await fillQueued(c, tax, userId, budget)) out.tagged = (out.tagged ?? 0) + 1; // false: another run took it
+    let tax: Awaited<ReturnType<typeof loadTaxonomy>> | null = null, taken = 0;
+    while (taken < FILL_MAX && left(FILL_NEEDS_MS) && !(await stopped()) && !(await capped())) {
+      const batch = await fillCandidates(Math.min(CAPS.fill, FILL_MAX - taken));
+      if (!batch.length) break;
+      tax ??= await loadTaxonomy();
+      for (const c of batch) {
+        if (!left(FILL_NEEDS_MS) || await stopped()) break;
+        taken++;
+        if (await fillQueued(c, tax, userId, budget)) out.tagged = (out.tagged ?? 0) + 1; // false: another run took it
+      }
     }
   } catch (e) { failed('tags_fill', 'run', e); }
   try { await closeFills(); } catch (e) { failed('tags_fill', 'close', e); } // its bulk change, once the queue is over

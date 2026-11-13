@@ -7,10 +7,10 @@
 //                    takes it back for 7 days
 //   tags_ai_fill     { product_ids? | category? | attribute_id? | needs_info?, missing_only?, now? } → queue (or,
 //                    with now and one product, fill it right away: tagFill.ts)
-//   tags_fill_status → the latest run's progress
+//   tags_fill_status → the progress of the newest batch of runs, all of them together (fillProgress.ts)
 import { uuid, type Body } from './actions.ts';
 import { endRun, startRun } from './bulkLog.ts';
-import { SB_URL, enc, insert, logActivity, nowIso, one, patch, sel, svcHeaders } from './db.ts';
+import { SB_URL, enc, insert, logActivity, one, patch, sel, svcHeaders } from './db.ts';
 import { HttpError, plain, usdOf } from './http.ts';
 import { routeProduct } from './route.ts';
 import { fillOne } from './tagFill.ts';
@@ -48,19 +48,7 @@ export async function suggestionsList(b: Body) {
   };
 }
 
-export async function fillStatus() {
-  const r = await one<{ id: string; total: number; filled: number; left_empty: number; created_at: string; finished_at: string | null }>('pb_tag_fill_runs?select=id,total,filled,left_empty,created_at,finished_at&order=created_at.desc&limit=1');
-  if (!r) return null;
-  // Waiting = what the worker would still take (fillCandidates): an archived product keeps its queue mark but is never picked.
-  const waiting = r.finished_at ? 0 : await count(`pb_products?select=id&tag_fill_run=eq.${enc(r.id)}&status=in.(ready,needs_info)`);
-  // Nothing left to take, yet no tick closed the run (its last products were archived meanwhile): close it here,
-  // or the progress line never ends. Not in its first minutes: a run is created before its products are marked.
-  if (!r.finished_at && !waiting && Date.parse(r.created_at) < Date.now() - 2 * 60_000) {
-    r.finished_at = nowIso();
-    await patch('pb_tag_fill_runs', `id=eq.${enc(r.id)}&finished_at=is.null`, { finished_at: r.finished_at });
-  }
-  return { ...r, done: Math.max(0, r.total - waiting), waiting };
-}
+export { fillStatus } from './fillProgress.ts';
 
 export async function tagsAiFill(b: Body, userId: string | null) {
   const ids = (Array.isArray(b.product_ids) ? b.product_ids : []).map(v => uuid(v, 'A product')).slice(0, 500);
