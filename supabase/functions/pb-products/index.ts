@@ -51,7 +51,7 @@
 //   category_link_check staff         { category, attribute_id }          → { ok, lacking }
 //   category_link_save admin|manager  { category, attribute_ids[] }       → { ok, to_needs_info, to_ready }
 //   suggestions_list   staff          { status?, attribute_id?, page? }   → { ok, rows[{…, example_names, matches}], count, page, per }
-//   suggestion_act     admin|manager  { ids, action:add|alias|ignore|move, attribute_id?, value_id?, name?, force? } → { ok, done, conflicts{id: matches[]}, retagged }
+//   suggestion_act     admin|manager  { ids, act:add|alias|ignore|move|nearest, attribute_id?, value_id?, name?, force? } → { ok, done, conflicts{id: matches[]}, retagged, skipped? (nearest) }
 //   suggestions_nearest admin|manager { ids[≤20] } → { ok, nearest{id: {value_id, value, attribute_id, attribute, why, by}} } (rules, else one AI call, kept)
 //   product_values_set staff          { product_id, value_ids[], attribute_id? } → { ok, status, missing, locked, routed } (locks 'tags')
 //   retag              admin|manager  { dry_run (default true) }          → { ok, dry_run, products, locked, changed, to_needs_info, to_ready, sample[≤10] }
@@ -77,7 +77,8 @@ import { routeWebsite } from './routeSite.ts';
 import { setStock } from './stock.ts';
 import { previewPrice, saveCredentials, testSite } from './siteActions.ts';
 import * as T from './tagsActions.ts';
-import { fillStatus, suggestionAct, suggestionsList, tagsAiFill } from './tagsQueue.ts';
+import { fillStatus, suggestionsList, tagsAiFill } from './tagsQueue.ts';
+import { suggestionAct } from './tagsSuggestAct.ts';
 import { suggestionsNearest } from './tagsNearest.ts';
 import { productValuesSet, retag } from './tagsProduct.ts';
 import type { Caller } from './types.ts';

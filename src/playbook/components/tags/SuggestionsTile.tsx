@@ -5,12 +5,14 @@
 // by someone who can act on them, and kept); "Same as <value>" files it there.
 // "+ Add to <Attribute>" runs the look-alike guard first (LookAlikeModal);
 // "Also known as…" files it under a value you choose; Ignore never suggests it
-// again. Bulk select: Add (when all share one attribute) / Ignore, in a bar
-// that sticks to the top while the list scrolls.
+// again. Bulk select: Same as nearest (each into its own nearest value, owner
+// 13 Nov) / Add (when all share one attribute) / Ignore, in a bar that sticks
+// to the top while the list scrolls.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { friendlyError } from '../../../lib/friendlyError';
 import type { AddToast } from '../PbToasts';
 import type { SuggestionAct, TagsApi } from '../../data/tags';
+import { UNDO_HINT } from '../../data/websites';
 import type { PbAttribute, PbLookAlike, PbSuggestion } from '../../tagTypes';
 import { PB, pbErrorBox, pbMeta, pbNum } from '../../pbTheme';
 import { PbButton, PbChip, PbChipRow, PbSection, PbTile } from '../ui';
@@ -61,13 +63,16 @@ export default function SuggestionsTile({ attrs, api, addToast, version, onChang
   useEffect(() => { void load(); }, [load, version]);
   useEffect(() => { setSel(new Set()); }, [page, attr, version]);
 
-  const act = async (a: SuggestionAct, key: string, ok: (n: number) => string) => {
+  /** `hint`: the last part of the success toast (where a bulk change is taken back). */
+  const act = async (a: SuggestionAct, key: string, ok: (n: number) => string, hint = '') => {
     setBusy(key);
     try {
       const r = await api.actSuggestions(a);
       const first = Object.entries(r.conflicts)[0];
       if (first) { const s = rows?.find(x => x.id === first[0]); if (s) setGuard({ s, matches: first[1] as PbLookAlike[] }); }
-      if (r.done) { addToast(ok(r.done) + (r.retagged ? ` · ${plural(r.retagged, 'product')} tagged` : ''), 'success'); setSel(new Set()); onChanged(); }
+      const left = r.skipped ? `${plural(r.skipped, 'suggestion')} left as ${r.skipped === 1 ? 'it was' : 'they were'}: no nearest value now` : '';
+      if (r.done) { addToast([ok(r.done), r.retagged ? `${plural(r.retagged, 'product')} tagged` : '', left, hint].filter(Boolean).join(' · '), 'success'); setSel(new Set()); onChanged(); }
+      else if (left) { addToast(`${left[0].toUpperCase()}${left.slice(1)}.`, 'info'); onChanged(); } // the list loads again and shows why
       return first ? 'asked' : true; // 'asked': the server found a look-alike and the question is now open
     } catch (e) { addToast(friendlyError(e), 'error'); return false; } finally { setBusy(''); }
   };
@@ -83,6 +88,7 @@ export default function SuggestionsTile({ attrs, api, addToast, version, onChang
   const ids = [...sel];
   const chosen = (rows ?? []).filter(r => sel.has(r.id));
   const oneAttr = chosen.length && chosen.every(r => r.attribute_id && r.attribute_id === chosen[0].attribute_id) ? chosen[0].attribute_id : null;
+  const near = chosen.filter(r => r.nearest?.value_id).map(r => r.id);
   const pages = Math.max(1, Math.ceil(count / 20));
   return (
     <PbTile as="section" variant={err && !rows ? 'failed' : 'default'} aria-labelledby="pbt-sug">
@@ -108,6 +114,8 @@ export default function SuggestionsTile({ attrs, api, addToast, version, onChang
                   <TagCheck checked={rows.every(r => sel.has(r.id))} onChange={on => setSel(on ? new Set(rows.map(r => r.id)) : new Set())} label="Select every suggestion on this page"
                     text={ids.length ? <><span style={pbNum}>{ids.length}</span> selected</> : 'Select all'} />
                 </span>
+                {near.length > 0 && <PbButton icon="merge" onClick={() => void act({ ids: near, act: 'nearest' }, 'bulk:nearest', n => `Filed ${plural(n, 'suggestion')} under ${n === 1 ? 'its nearest value' : 'their nearest values'}`, near.length > 1 ? UNDO_HINT : '')}
+                  busy={busy === 'bulk:nearest'} busyLabel="Filing…" dim={!!busy && busy !== 'bulk:nearest'}>Same as nearest for {near.length}</PbButton>}
                 {ids.length > 0 && oneAttr && <PbButton icon="plus" onClick={() => void act({ ids, act: 'add' }, 'bulk:add', n => `Added ${plural(n, 'value')} to ${nameOf(oneAttr)}`)} busy={busy === 'bulk:add'} busyLabel="Adding…" dim={!!busy && busy !== 'bulk:add'}>Add {ids.length} to {nameOf(oneAttr)}</PbButton>}
                 {ids.length > 0 && <PbButton icon="eyeOff" onClick={() => void act({ ids, act: 'ignore' }, 'bulk:ignore', n => `Ignored ${plural(n, 'suggestion')}`)} busy={busy === 'bulk:ignore'} busyLabel="Ignoring…" dim={!!busy && busy !== 'bulk:ignore'}>Ignore {ids.length}</PbButton>}
               </div>
