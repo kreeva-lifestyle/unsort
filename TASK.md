@@ -6,7 +6,7 @@ done (built, merged, deployed and checked, or done or decided by the
 owner), its entry is deleted in the same change. The rules are in
 `CLAUDE.md` → "Pending work — TASK.md".
 
-Last checked: 13 Nov 2026.
+Last checked: 15 Nov 2026.
 
 ## Playbook — decisions the owner still has to make
 
@@ -117,4 +117,9 @@ are tagged.
 
 ## DailyWork
 
-- Nothing pending.
+- **Stitch Calculator (Minis): should "Piece wise" use the area?** Built
+  as you described: Cost = Stitch ÷ 1000 × Rate per stitch × the area's
+  multiplier (250 × 4, 400 × 2.5, 600 × 1.5), and Meter wise / Piece
+  wise only says whether the cost is per meter or per piece. Waits on
+  you: if a piece-wise cost should not be multiplied by the area, say so
+  and Piece wise will skip it.
