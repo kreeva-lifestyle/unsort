@@ -1,7 +1,8 @@
 // Stitch Calculator (Minis, owner 2026-11-15): the cost of a design from its stitch count.
 // Area first (250 / 400 / 600, its multiplier shown with it), then Stitch, Rate per stitch and Rate
-// (Meter wise / Piece wise). Cost = Stitch ÷ 1000 × Rate per stitch × area multiplier (stitchModel.ts),
-// worked out as the boxes change, with the working shown under it. Nothing is saved: it is a calculator.
+// (Meter wise / Piece wise). Meter wise: Cost = Stitch ÷ 1000 × Rate per stitch × area multiplier; Piece
+// wise: no area (owner, 2026-11-15) — the Area box is dimmed with a note. Worked out as the boxes change
+// (stitchModel.ts), with the working shown under it. Nothing is saved: it is a calculator.
 // The user guide (StitchGuide) sits beside it on a wide screen and under it on a phone.
 import { useState } from 'react';
 import { T, S } from '../../../lib/theme';
@@ -16,9 +17,10 @@ export default function StitchCalculator() {
   const [basis, setBasis] = useState<RateBasis>('meter');
 
   const s = parseNum(stitch), r = parseNum(rate);
-  const res = stitchCost(s, r, area);
+  const piece = basis === 'piece';
+  const res = stitchCost(s, r, area, basis);
   const per = BASIS.find(x => x.id === basis)!.per;
-  const missing = !area ? 'Select the area first.' : s == null ? 'Enter the stitch count.' : r == null ? 'Enter the rate per stitch.' : '';
+  const missing = !piece && !area ? 'Select the area first.' : s == null ? 'Enter the stitch count.' : r == null ? 'Enter the rate per stitch.' : '';
   const dirty = !!(area || stitch || rate || basis !== 'meter');
   const clear = () => { setArea(null); setStitch(''); setRate(''); setBasis('meter'); };
 
@@ -33,10 +35,12 @@ export default function StitchCalculator() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: 12 }}>
             <div>
               <label htmlFor="st-area" style={S.fLabel}>Area</label>
-              <select id="st-area" value={area ?? ''} onChange={e => setArea(e.target.value ? Number(e.target.value) as StitchArea : null)} style={S.fInput}>
+              <select id="st-area" value={area ?? ''} onChange={e => setArea(e.target.value ? Number(e.target.value) as StitchArea : null)} disabled={piece}
+                aria-describedby={piece ? 'st-area-hint' : undefined} style={{ ...S.fInput, opacity: piece ? 0.5 : 1 }}>
                 <option value="">Select area</option>
                 {AREAS.map(a => <option key={a.area} value={a.area}>{a.area} (× {fmtStep(a.factor)})</option>)}
               </select>
+              {piece && <div id="st-area-hint" style={{ fontSize: 11, color: T.tx3, marginTop: 4 }}>Not used for piece wise.</div>}
             </div>
             <div>
               <label htmlFor="st-stitch" style={S.fLabel}>Stitch</label>
@@ -64,7 +68,8 @@ export default function StitchCalculator() {
                 {res && <span style={{ fontSize: 12, color: T.tx2 }}>{per}</span>}
               </span>
               <span style={{ display: 'block', fontSize: 11, color: T.tx3, marginTop: 6, lineHeight: 1.6, fontFamily: res ? T.mono : T.sans, overflowWrap: 'anywhere' }}>
-                {res ? <>{fmtStep(s!)} ÷ 1000 × {fmtStep(r!)} = {fmtStep(res.amount)}<br />{fmtStep(res.amount)} × {fmtStep(res.factor)} (area {area}) = {fmtCost(res.cost)}</> : missing}
+                {res ? <>{fmtStep(s!)} ÷ 1000 × {fmtStep(r!)} = {fmtStep(res.amount)}<br />
+                  {res.factor == null ? 'Piece wise: no area multiplier' : <>{fmtStep(res.amount)} × {fmtStep(res.factor)} (area {area}) = {fmtCost(res.cost)}</>}</> : missing}
               </span>
             </output>
             <button type="button" className="touch44" onClick={clear} disabled={!dirty}

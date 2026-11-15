@@ -1,9 +1,9 @@
 // Stitch Calculator (Minis) — the owner's rule (2026-11-15):
 //   Stitch ÷ 1000 × Rate per stitch = amount
-//   amount × the multiplier of the area chosen first = Cost
-//   Area 250 → × 4 · 400 → × 2.5 · 600 → × 1.5
-// "Meter wise" / "Piece wise" says what the cost is for; it does not change the sum.
-// Pure, so the screen, its working line and the guide's example agree.
+//   Meter wise: amount × the multiplier of the area chosen first = Cost per meter
+//               (Area 250 → × 4 · 400 → × 2.5 · 600 → × 1.5)
+//   Piece wise: amount = Cost per piece — "piece wise should not multiply by area"
+// Pure, so the screen, its working line and the guide's examples agree.
 
 export type StitchArea = 250 | 400 | 600;
 export const AREAS: { area: StitchArea; factor: number }[] = [
@@ -26,14 +26,16 @@ export function parseNum(raw: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-export interface StitchResult { amount: number; factor: number; cost: number }
+/** `factor`: the area's multiplier, null for piece wise (no area). */
+export interface StitchResult { amount: number; factor: number | null; cost: number }
 
-/** null until the area, the stitch count and the rate are all there. */
-export function stitchCost(stitch: number | null, rate: number | null, area: StitchArea | null): StitchResult | null {
-  const a = AREAS.find(x => x.area === area);
-  if (stitch == null || rate == null || !a) return null;
+/** null until the stitch count and the rate are there — and, meter wise, the area. */
+export function stitchCost(stitch: number | null, rate: number | null, area: StitchArea | null, basis: RateBasis = 'meter'): StitchResult | null {
+  if (stitch == null || rate == null) return null;
   const amount = (stitch / 1000) * rate;
-  return { amount, factor: a.factor, cost: amount * a.factor };
+  if (basis === 'piece') return { amount, factor: null, cost: amount };
+  const a = AREAS.find(x => x.area === area);
+  return a ? { amount, factor: a.factor, cost: amount * a.factor } : null;
 }
 
 const round = (n: number, places: number) => { const f = 10 ** places; return Math.round((n + Number.EPSILON) * f) / f; };

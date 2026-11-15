@@ -117,9 +117,4 @@ are tagged.
 
 ## DailyWork
 
-- **Stitch Calculator (Minis): should "Piece wise" use the area?** Built
-  as you described: Cost = Stitch ÷ 1000 × Rate per stitch × the area's
-  multiplier (250 × 4, 400 × 2.5, 600 × 1.5), and Meter wise / Piece
-  wise only says whether the cost is per meter or per piece. Waits on
-  you: if a piece-wise cost should not be multiplied by the area, say so
-  and Piece wise will skip it.
+- Nothing pending.

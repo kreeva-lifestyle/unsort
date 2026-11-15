@@ -36,7 +36,7 @@ export const MINI_TILES: { id: MiniView; title: string; desc: string }[] = [
   { id: 'dropbox_upload', title: 'Dropbox Uploader', desc: 'Send any file to Dropbox — pick the folder each time, watch the progress, get told if it fails' },
   { id: 'costing', title: 'Product Costing', desc: 'Cost a product from its components and suppliers — photo, material codes, and a purchase plan PDF for any quantity' },
   { id: 'pricing', title: 'Price Projector', desc: 'Project a selling price from fabric, material, stitching, maintenance and profit — thresholds per category and cost-cutting suggestions' },
-  { id: 'stitch', title: 'Stitch Calculator', desc: 'Cost of a design from its stitch count — rate per stitch and area 250 / 400 / 600, meter wise or piece wise, with a guide' },
+  { id: 'stitch', title: 'Stitch Calculator', desc: 'Cost of a design from its stitch count and rate per stitch — meter wise (× area 250 / 400 / 600) or piece wise, with a guide' },
   { id: 'size_summariser', title: 'Size Summariser', desc: 'Drop a customer’s stitching-measurement form PDF — one A4 Hindi tailor sheet: every measurement with its picture, every design choice, warnings, no customer details' },
   { id: 'otp', title: 'OTP Inbox', desc: 'OTPs from the owner’s phone, live — staff tap to copy, codes expire in minutes' },
 ];
