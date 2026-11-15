@@ -23,3 +23,4 @@ export const PriceProjector = retryImport(() => import('./pricing/PriceProjector
 export const OtpInbox = retryImport(() => import('./OtpInbox'));
 export const SizeSummariser = retryImport(() => import('./sizesummariser/SizeSummariser'));
 export const Attendance = retryImport(() => import('../../pages/Attendance'));
+export const StitchCalculator = retryImport(() => import('./stitch/StitchCalculator'));

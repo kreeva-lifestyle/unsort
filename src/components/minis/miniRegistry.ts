@@ -3,7 +3,7 @@
 // tool no longer grows that file. Array order is the on-screen order.
 // Ids are internal keys (saved dashboard shortcuts use them): 'ratecard' is
 // Vendor Studio, kept so pinned shortcuts keep working after the rename.
-export type MiniView = 'home' | 'utsav' | 'cbazaar' | 'odette' | 'indya' | 'address' | 'trackly' | 'return_labels' | 'ratecard' | 'dropbox_links' | 'forward_dropbox' | 'master_assistant' | 'client_finder' | 'dropbox_upload' | 'costing' | 'otp' | 'pricing' | 'size_summariser' | 'attendance';
+export type MiniView = 'home' | 'utsav' | 'cbazaar' | 'odette' | 'indya' | 'address' | 'trackly' | 'return_labels' | 'ratecard' | 'dropbox_links' | 'forward_dropbox' | 'master_assistant' | 'client_finder' | 'dropbox_upload' | 'costing' | 'otp' | 'pricing' | 'size_summariser' | 'attendance' | 'stitch';
 
 /** Breadcrumb text per view; null hides the crumb. Record<> so a new view
  *  without a label is a compile error. */
@@ -12,7 +12,7 @@ export const MINI_LABELS: Record<MiniView, string | null> = {
   trackly: 'Trackly', return_labels: 'Product QC Labels', ratecard: 'Vendor Studio', dropbox_links: 'Dropbox Link Generator',
   forward_dropbox: 'Forward → Dropbox', master_assistant: 'Master Assistant', client_finder: 'Client Finder',
   dropbox_upload: 'Dropbox Uploader', costing: 'Product Costing', otp: 'OTP Inbox', pricing: 'Price Projector',
-  size_summariser: 'Size Summariser', attendance: 'Attendance',
+  size_summariser: 'Size Summariser', attendance: 'Attendance', stitch: 'Stitch Calculator',
 };
 
 /** Tools that also need their own module permission (Settings → module access)
@@ -36,6 +36,7 @@ export const MINI_TILES: { id: MiniView; title: string; desc: string }[] = [
   { id: 'dropbox_upload', title: 'Dropbox Uploader', desc: 'Send any file to Dropbox — pick the folder each time, watch the progress, get told if it fails' },
   { id: 'costing', title: 'Product Costing', desc: 'Cost a product from its components and suppliers — photo, material codes, and a purchase plan PDF for any quantity' },
   { id: 'pricing', title: 'Price Projector', desc: 'Project a selling price from fabric, material, stitching, maintenance and profit — thresholds per category and cost-cutting suggestions' },
+  { id: 'stitch', title: 'Stitch Calculator', desc: 'Cost of a design from its stitch count — rate per stitch and area 250 / 400 / 600, meter wise or piece wise, with a guide' },
   { id: 'size_summariser', title: 'Size Summariser', desc: 'Drop a customer’s stitching-measurement form PDF — one A4 Hindi tailor sheet: every measurement with its picture, every design choice, warnings, no customer details' },
   { id: 'otp', title: 'OTP Inbox', desc: 'OTPs from the owner’s phone, live — staff tap to copy, codes expire in minutes' },
 ];

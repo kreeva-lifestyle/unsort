@@ -13,7 +13,8 @@ import VirtualStock from '../components/minis/VirtualStock';
 import { exportName } from '../lib/exportName';
 import { exportUtsavXls, UTSAV_SIZE_MAP as SIZE_MAP, type UtsavRow } from '../components/minis/utsavExport';
 
-import { AddressPrinter, CbazaarImport, OdetteImport, OdetteCoverageCheck, IndyaImport, MasterLinkCheck, Trackly, ReturnLabels, VendorStudio, MasterAssistant, DropboxLinkGenerator, ForwardDropbox, ClientFinder, DropboxUploader, ProductCosting, PriceProjector, OtpInbox, SizeSummariser, Attendance } from '../components/minis/miniLazy';
+import { CbazaarImport, OdetteImport, OdetteCoverageCheck, IndyaImport, MasterLinkCheck, Trackly, MasterAssistant, PriceProjector } from '../components/minis/miniLazy';
+import { simpleMinis } from '../components/minis/miniSimple';
 const toolFallback = <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40 }}><div className="spinner" /></div>;
 
 
@@ -283,14 +284,8 @@ export default function Minis({ navigateTo, active = true }: { navigateTo?: (tab
     <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const }}><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
   </button>;
 
-  // Tools that are just the back arrow + one component share one wrapper.
-  const simple: Partial<Record<MiniView, React.ReactNode>> = {
-    address: <AddressPrinter addToast={addToast} />, return_labels: <ReturnLabels addToast={addToast} />,
-    dropbox_links: <DropboxLinkGenerator addToast={addToast} />, forward_dropbox: <ForwardDropbox addToast={addToast} onBack={goHome} />,
-    otp: <OtpInbox addToast={addToast} />, costing: <ProductCosting addToast={addToast} />, dropbox_upload: <DropboxUploader addToast={addToast} />,
-    client_finder: <ClientFinder addToast={addToast} />, ratecard: <VendorStudio addToast={addToast} />, size_summariser: <SizeSummariser addToast={addToast} />,
-    ...(canOpenMini('attendance', profile) ? { attendance: <Attendance /> } : {}),
-  };
+  // Tools that are just the back arrow + one component share one wrapper (the list: miniSimple.tsx).
+  const simple = simpleMinis(addToast, goHome, canOpenMini('attendance', profile));
   if (simple[view]) return (
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
       <div style={{ marginBottom: 14 }}>{back}</div>
