@@ -15,6 +15,7 @@ import type { JobworkSummary } from '../../types/database';
 import JobCard from './JobCard';
 import JobTable from './JobTable';
 import JobStats from './JobStats';
+import BulkPayButton from './BulkPayButton';
 import { JobForm, JobDetailView, PendingShareModal, ReceivedByDate, JobworkerLedger, prefetchJobworkParts } from './jobworkLazy';
 import { LEDGER_START, type LedgerView } from './jobworkLedger';
 import { whenIdle } from '../../lib/idle';
@@ -131,6 +132,8 @@ export default function Jobwork({ addToast }: { addToast: (m: string, t?: string
           {vendors.map(v => <option key={v} value={v}>{v}</option>)}
         </select>
       )}
+      {/* Pays one jobworker's balances together — works only with one jobworker picked above. */}
+      {boss && !onDrafts && tabOf(filter) === 'open' && <BulkPayButton vendor={vendor} version={version} onPaid={changed} addToast={addToast} />}
       <div className="jw-filters" style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
         {!onDrafts && tabOf(filter) === 'open' && FILTERS.filter(f => boss || f.id !== 'unpaid').map(f => (
           <button key={f.id} type="button" onClick={() => { setFilter(f.id); setPage(0); }} aria-pressed={filter === f.id} style={chip(filter === f.id)}>{f.label}</button>
