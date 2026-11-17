@@ -33,6 +33,7 @@
 //   save_credentials   admin|manager  { website_id, auth_mode, access_token?, client_id?, client_secret? }
 //                                                                          → { ok, shop_name, scopes, missing_scopes }
 //   test_connection    staff          { website_id }                      → { ok, shop_name, scopes, missing_scopes }
+//   store_setup        admin|manager  { website_id }                      → { ok, fields[{name, status, note?}], collections[…] } (storeSetup.ts)
 //   preview_price      staff          { website_id, cost, rule_id? }      → { ok, price, compare_at }
 //   import_check       staff          { url }                             → { ok, platform, host, origin, estimate, estimate_in_stock (n | 'n+' | null), sample[3], warnings[], vendor_suggestion }
 //   import_start       staff          { url, in_stock_only?, use_their_price?, vendor_name?, estimate? } → { ok, run_id, platform, host, warnings[] }
@@ -83,6 +84,7 @@ import { previewPrice, saveCredentials, testSite } from './siteActions.ts';
 import * as T from './tagsActions.ts';
 import { categoryMove, categoryRename } from './categoryMove.ts';
 import { fillStatus, suggestionsIds, suggestionsList, tagsAiFill } from './tagsQueue.ts';
+import { storeSetup } from './storeSetup.ts';
 import { suggestionAct } from './tagsSuggestAct.ts';
 import { suggestionsNearest } from './tagsNearest.ts';
 import { productValuesSet, retag } from './tagsProduct.ts';
@@ -110,6 +112,7 @@ const ACTIONS: Record<string, { who: Who; run: (b: A.Body, c: Caller) => Promise
   unpublish_listing: { who: 'staff', run: (b, c) => A.unpublishListing(b, userOf(c)) },
   save_credentials: { who: 'admin', run: (b, c) => saveCredentials(b, userOf(c)) },
   test_connection: { who: 'staff', run: (b) => testSite(b) },
+  store_setup: { who: 'admin', run: (b, c) => storeSetup(b, userOf(c)) },
   preview_price: { who: 'staff', run: (b) => previewPrice(b) },
   import_check: { who: 'staff', run: (b) => importCheck(b) },
   import_start: { who: 'staff', run: (b, c) => importStart(b, userOf(c)) },

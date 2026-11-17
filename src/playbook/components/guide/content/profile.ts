@@ -17,7 +17,7 @@ export const PROFILE: GuideSection[] = [
         ['**Angle**', 'What this store leads with. The description opens with it. Give each store a different one.'],
         ['**Search phrase**', 'The phrase each listing is written for, built from the product: `{color} {fabric} {category}` gives "Maroon Georgette Kurta Set". Also usable: `{work}`, `{occasion}`, `{name}`.'],
         ['**Questions in the description**', 'On: the questions and answers sit at the end of the description, so every theme shows them.'],
-        ['**Custom fields**', 'On: fabric, work, colour, occasion, what is in the set and the questions also go to Shopify as custom fields (`custom.fabric`, `custom.faq`…) for themes and filters that read them. Other apps\' fields are never touched.'],
+        ['**Custom fields**', 'On: each attribute on the Tags page (colour, fabric, work, occasion, product type…), what is in the set and the questions also go to Shopify as custom fields (`custom.fabric`, `custom.product_type`, `custom.faq`…) for themes and filters that read them — filled with the product\'s Playbook tags, or what was read from the post when it has none. **Set up on Shopify** (Connection) defines them on the store. Other apps\' fields are never touched.'],
         ['**Ordering details**', '**Delivery time**, **Stitching** and **Returns**. The writer may use one of them as the store benefit in the SEO description. They are not written into the description or the questions, which are about the product only: Shopify sends the description to shopping feeds as product details. Keep delivery and returns in your store\'s policies.'],
       ),
       h('What every listing gets'),

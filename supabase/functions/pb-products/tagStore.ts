@@ -78,3 +78,16 @@ export async function siteValueTags(productId: string, style: unknown, category:
   const chosen: ChosenTag[] = vals.map(v => ({ name: v.name, attribute: v.pb_attributes!.name, prefix: v.pb_attributes!.shopify_prefix }));
   return valueTags(chosen, style);
 }
+
+/** The product fields' values (fields.ts, owner 2026-11-17): every attribute in order, with the product's chosen values
+ *  (offered for its category, as {tags} above), an attribute without any included with none. */
+export async function attributeValues(productId: string, category: string | null): Promise<{ key: string; multi: boolean; values: string[] }[]> {
+  const [attrs, rows] = await Promise.all([
+    sel<{ id: string; key: string; multi: boolean; by_category: boolean | null }>('pb_attributes?select=id,key,multi,by_category&order=position.asc,name.asc'),
+    sel<{ pb_attribute_values: { attribute_id: string; name: string; position: number; categories: string[] | null } | null }>(
+      `pb_product_values?product_id=eq.${enc(productId)}&select=pb_attribute_values(attribute_id,name,position,categories)`),
+  ]);
+  const vals = rows.map(r => r.pb_attribute_values).filter((v): v is NonNullable<typeof v> => !!v).sort((a, b) => a.position - b.position || a.name.localeCompare(b.name));
+  return attrs.map(a => ({ key: a.key, multi: a.multi === true,
+    values: vals.filter(v => v.attribute_id === a.id && offered({ by_category: a.by_category === true }, { categories: v.categories || [] }, category)).map(v => v.name) }));
+}

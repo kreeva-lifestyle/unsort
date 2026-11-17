@@ -95,6 +95,13 @@ export const saveCredentials = (websiteId: string, c: Credentials) =>
 export const testConnection = (websiteId: string) =>
   pbCall<ConnectionResult>('test_connection', { website_id: websiteId });
 
+/** One thing store_setup looked at: made, already there (kept), there as another kind of field (clash), or refused. */
+export interface SetupItem { name: string; status: 'made' | 'kept' | 'clash' | 'failed'; note?: string }
+export interface SetupResult { fields: SetupItem[]; collections: SetupItem[] }
+/** Product fields per Playbook attribute and collections per category on the store (admin / manager; pb-products storeSetup.ts). */
+export const setupStore = (websiteId: string) =>
+  pbCall<SetupResult>('store_setup', { website_id: websiteId }).then(r => ({ fields: r.fields ?? [], collections: r.collections ?? [] }));
+
 /** Send the Ready products already in the directory that match this (active) website's saved rules. */
 /** hidden = listings a revert hid on the store: they stay off until put back from their own page. */
 export type SendResult = { queued: number; matched: number; more: boolean; hidden?: number };
