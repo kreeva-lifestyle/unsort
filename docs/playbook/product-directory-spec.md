@@ -192,7 +192,7 @@ is_active). Service role for all DB writes. CORS like listing-ai.
 | `unpublish_listing` | staff | `{ listing_id }` | claim the listing as `skipped` first (refused while a run holds it), then set Shopify status DRAFT (on failure the listing goes back) → `{ ok }` |
 | `save_credentials` | admin/manager | `{ website_id, auth_mode, access_token?, client_id?, client_secret?, shop_domain? }` | stores in pb_website_secrets, then test → `{ ok, shop_name }`. A different `shop_domain` moves the site to that store: needs full new credentials; site switched off; old secrets wiped; non-skipped listings re-queued without Shopify ids; skipped ones lose their old-store ids |
 | `test_connection` | staff | `{ website_id }` | `{ ok, shop_name, scopes[] , missing_scopes[] }`, sets connected_at / last_error |
-| `store_setup` | admin/manager | `{ website_id }` | (2026-11-17, SuratMandi) on the store: a product metafield definition (namespace `custom`, pinned, storefront PUBLIC_READ) per Playbook attribute — key = the attribute key in snake case, `list.single_line_text_field` when multi, else `single_line_text_field` — plus `set_contents` and `faq` (rich text); then a collection per category (`collectionCreate(collection:)` with one conditions source: product type EQUALS the category; handle from the name) put on the Online Store. Kept when there (definition with the same key and type; collection with the same handle or title); a same-key definition of another type → `clash`; nothing is deleted or changed. Per item `{ name, status: made/kept/clash/failed, note? }`; a store-wide refusal (credentials, permission, frozen) throws once. `storeSetup.ts`, `storeFields.ts` |
+| `store_setup` | admin/manager | `{ website_id }` | (2026-11-17, SuratMandi) on the store: a product metafield definition (namespace `custom`, pinned, storefront PUBLIC_READ) per Playbook attribute — key = the attribute key in snake case, `list.single_line_text_field` when multi, else `single_line_text_field` — plus `set_contents` and `faq` (rich text); then a collection per category (`collectionCreate(collection:)` with one conditions source: product type EQUALS the category; handle from the name) put on the Online Store. Kept when there (a definition with the same key, whatever its type — 2026-11-17 "if already made then merge with it": publishing fills a plain-text one with the values joined by commas, `sendFields` → `otherForm`; a collection with the same handle or title); nothing is deleted or changed. Per item `{ name, status: made/kept/failed, note? }`; a store-wide refusal (credentials, permission, frozen) throws once. `storeSetup.ts`, `storeFields.ts` |
 | `preview_price` | staff | `{ website_id, cost, rule_id? }` | `{ price, compare_at }` |
 | `taxonomy_get` | staff | – | categories (pb_settings), attributes with values (+ `uses`), links, per-link `stats {products, lacking}`, `category_products`, `suggestions_pending`, `fill` (latest "Let AI decide" run) |
 | `categories_save` | admin/manager | `{ categories[] }` | the reader's category list; links of removed categories are dropped and every product left off the list is re-gated (held: "Missing: Category") → `{ ok, categories, regated }` |
@@ -798,9 +798,11 @@ listing editor set the `_locked` flag (an emptied value hands it back).
   read fact (colour ← `color`, fabric ← `fabric`, else `attributes[key]`);
   then `custom.set_contents` (from the facts) and `custom.faq`
   (rich_text_field: question in bold, answer below). Empty ones are not sent.
-  `metafieldsSet` touches only those keys. A refusal is a warning on the
-  listing; the product is still published. `store_setup` defines the same
-  keys on the store.
+  `metafieldsSet` touches only those keys. A refused field is sent once more
+  in the store's other text kind (a list as one comma-joined line, a line as
+  a list of one: the store's own field is kept); still refused → left out and
+  a warning on the listing; the product is still published. `store_setup`
+  defines the same keys on the store.
 
 ### The Ready gate — necessary details
 `pb_products_refresh` (and `tagGate.ts`): Ready needs a price (cost or copied

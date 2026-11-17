@@ -84,12 +84,6 @@ are tagged.
 
 ## Playbook — things only the owner can do
 
-- **SuratMandi: set the store up.** Playbook → Websites → SuratMandi →
-  Connection → **Collections and product fields** → **Set up on Shopify**.
-  It makes a collection for each category and a product field for each
-  attribute (Colour, Fabric, Work, Occasion, Product Type, Set contents,
-  Questions) on the store. Waits on your tap (it signs in as you). Anything
-  marked **Needs you** or **Not made** in the list: tell Claude what it says.
 - **Delete the old `program-voice-notes` storage bucket.** Supabase →
   Storage: it still holds 2 files that nothing uses (security check, 13 Nov).
 - **Enter the vendor's short names.** Playbook → Vendors → Kashtbhanjan:

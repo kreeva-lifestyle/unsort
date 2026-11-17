@@ -13,6 +13,7 @@
 // tried again and does not use up the listing's attempts: temporary.
 import { enc, one, patch, publicUrl, sel, uniqueCi } from './db.ts';
 import { METAFIELDS_SET, type FieldInput } from './fields.ts';
+import { LIST, TEXT } from './storeFields.ts';
 import { HttpError, plain } from './http.ts';
 import { keptColour, PUBLISH } from './productInput.ts';
 import { gql, onlineStoreId } from './shopify.ts';
@@ -117,19 +118,43 @@ export function photoRecord(g: Gallery, paths: string[], known: Photo[], replied
 const NO_FIELDS = 'Saved on Shopify, but its custom fields (fabric, work, FAQ…) were not';
 interface FieldError { message: string; elementIndex?: number | null }
 
-/** The listing's custom fields. Returns a warning for the listing, or null when all went in. */
+/** The same value in the store's other text kind: a list as one line ("Embroidery, Sequins"), one line as a list of one.
+ *  A store whose own field is plain text where Playbook sends a list (or the other way round) keeps its field and gets
+ *  the value in its kind (owner, 2026-11-17: "if already made then merge with it"). Other kinds: no other form. */
+export function otherForm(f: FieldInput): FieldInput | null {
+  if (f.type === LIST) {
+    let vals: unknown = [];
+    try { vals = JSON.parse(f.value); } catch { return null; }
+    const text = (Array.isArray(vals) ? vals : []).map(v => String(v ?? '').trim()).filter(Boolean).join(', ').slice(0, 255);
+    return text ? { ...f, type: TEXT, value: text } : null;
+  }
+  if (f.type === TEXT) return { ...f, type: LIST, value: JSON.stringify([f.value]) };
+  return null;
+}
+
+/** The listing's custom fields. Returns a warning for the listing, or null when all went in. metafieldsSet saves all or
+ *  nothing, so a refusal is answered by sending again: the refused fields in their other text kind (otherForm), then,
+ *  if some are still refused, everything but those. */
 export async function sendFields(site: WebsiteRow, fields: FieldInput[], ms: number): Promise<string | null> {
   if (!fields.length) return null;
   const set = async (list: FieldInput[]) => (await gql<{ metafieldsSet: { userErrors: FieldError[] } | null }>(site, METAFIELDS_SET, { metafields: list }, ms)).metafieldsSet?.userErrors || [];
   const said = (ue: FieldError[]) => [...new Set(ue.map(e => e.message))].join('; ').slice(0, 200);
+  const badOf = (ue: FieldError[]) => new Set(ue.map(e => e.elementIndex).filter((i): i is number => Number.isInteger(i)));
   try {
     const ue = await set(fields);
     if (!ue.length) return null;
-    const bad = new Set(ue.map(e => e.elementIndex).filter((i): i is number => Number.isInteger(i)));
-    if (!bad.size || bad.size >= fields.length) return `${NO_FIELDS}: ${said(ue)}`;
-    const rest = await set(fields.filter((_, i) => !bad.has(i))); // one refused field must not cost the others
-    if (rest.length) return `${NO_FIELDS}: ${said(rest)}`;
-    return `Saved on Shopify, but the store did not take these custom fields: ${fields.filter((_, i) => bad.has(i)).map(f => f.key).join(', ')} (${said(ue)}).`;
+    const bad = badOf(ue);
+    if (!bad.size) return `${NO_FIELDS}: ${said(ue)}`;
+    const again = fields.map((f, i) => (bad.has(i) ? otherForm(f) : f)).filter((f): f is FieldInput => !!f);
+    const dropped = fields.filter((f, i) => bad.has(i) && !otherForm(f));
+    const ue2 = again.length ? await set(again) : [];
+    if (!ue2.length) return dropped.length ? `Saved on Shopify, but the store did not take these custom fields: ${dropped.map(f => f.key).join(', ')} (${said(ue)}).` : null;
+    const bad2 = badOf(ue2);
+    if (!bad2.size) return `${NO_FIELDS}: ${said(ue2)}`;
+    const rest = again.filter((_, i) => !bad2.has(i)); // one refused field must not cost the others
+    const ue3 = rest.length ? await set(rest) : [];
+    if (ue3.length) return `${NO_FIELDS}: ${said(ue3)}`;
+    return `Saved on Shopify, but the store did not take these custom fields: ${[...dropped, ...again.filter((_, i) => bad2.has(i))].map(f => f.key).join(', ')} (${said(ue2)}).`;
   } catch (e) {
     if (temporary(e)) throw e;
     return `${NO_FIELDS}: ${plain(e)}`;

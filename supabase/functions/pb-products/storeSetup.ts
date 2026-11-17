@@ -2,8 +2,9 @@
 // collections as per categories in playbook" and "Product Specifications & Custom Attributes (Metafields) as per
 // playbook", for SuratMandi). On the website's store, with what storeFields.ts describes:
 //   1. a product field (metafield definition, namespace `custom`, pinned, readable by the theme) for each Playbook
-//      attribute, plus set_contents and faq — one the store already has is kept; one with the same key but another
-//      kind of field is reported (Shopify cannot change a field's kind; the owner deletes it in Settings → Custom data);
+//      attribute, plus set_contents and faq — one the store already has is kept as it is, whatever its kind (owner,
+//      2026-11-17: "if already made then merge with it and continue simple!"): publishing then fills a plain-text one
+//      with the values joined by commas, a list one with a list (publishParts.ts sendFields → otherForm);
 //   2. a collection for each Playbook category, filled by Shopify from the product type (the category) and shown on
 //      the Online Store — one already there by handle or title is kept as it is.
 // Nothing is deleted or changed on the store, so tapping it again only adds what is new (a new category or
@@ -18,7 +19,7 @@ import { type FieldDef, type Have, collectionInput, fieldDefs, sameCollection } 
 import { loadTaxonomy } from './taxonomy.ts';
 import { WEBSITE_COLS, type WebsiteRow } from './types.ts';
 
-type Status = 'made' | 'kept' | 'clash' | 'failed';
+type Status = 'made' | 'kept' | 'failed';
 export interface SetupItem { name: string; status: Status; note?: string }
 
 const DEFS = `query PbDefs { metafieldDefinitions(first: 250, ownerType: PRODUCT, namespace: "custom") { nodes { key name type { name } } } }`;
@@ -30,14 +31,16 @@ const MS = 30_000;
  *  answer about one item ("Shopify said …") is that item's note. */
 const storeWide = (e: unknown) => !(e instanceof HttpError && e.status === 400 && /: Shopify said "/.test(e.message));
 
+const kindOf = (t: string) => (t === 'single_line_text_field' ? 'one line of text: several values go in joined with commas'
+  : t === 'list.single_line_text_field' ? 'a list' : t.replace(/_/g, ' '));
+
 async function fields(site: WebsiteRow, defs: FieldDef[]): Promise<SetupItem[]> {
   const have = (await gql<{ metafieldDefinitions: { nodes: { key: string; name: string; type: { name: string } }[] } }>(site, DEFS, {}, MS)).metafieldDefinitions.nodes;
   const out: SetupItem[] = [];
   for (const d of defs) {
     const there = have.find(h => h.key === d.key);
-    if (there) {
-      out.push(there.type.name === d.type ? { name: d.name, status: 'kept' }
-        : { name: d.name, status: 'clash', note: `The store already has a field custom.${d.key} of another kind (${there.type.name}). Delete it in Shopify → Settings → Custom data → Products, then tap Set up again.` });
+    if (there) { // the store's own field is used as it is: a different kind is filled in that kind
+      out.push(there.type.name === d.type ? { name: d.name, status: 'kept' } : { name: d.name, status: 'kept', note: `Used as the store has it (${kindOf(there.type.name)}).` });
       continue;
     }
     try {
@@ -88,7 +91,7 @@ export async function storeSetup(b: Body, userId: string | null) {
   const c = await collections(site, tax.categories);
   const n = (list: SetupItem[], s: Status) => list.filter(x => x.status === s).length;
   await logActivity({ website_id: site.id, action: 'store_setup', user_id: userId, details: {
-    fields_made: n(f, 'made'), fields_kept: n(f, 'kept'), fields_clash: n(f, 'clash'), fields_failed: n(f, 'failed'),
+    fields_made: n(f, 'made'), fields_kept: n(f, 'kept'), fields_failed: n(f, 'failed'),
     collections_made: n(c, 'made'), collections_kept: n(c, 'kept'), collections_failed: n(c, 'failed'),
   } });
   return { ok: true, fields: f, collections: c };
