@@ -2,8 +2,9 @@
 // in playbook" and "Product Specifications & Custom Attributes (Metafields) as per playbook"). One tap makes, on the
 // website's Shopify store, a collection for each Playbook category (Shopify fills it from the product type) and a
 // product field for each attribute on the Tags page, plus Set contents and Questions (pb-products storeSetup.ts).
-// What the store already has is left alone and nothing is deleted, so it can be tapped again after a new category
-// or attribute. The answer is listed item by item, status as a dot plus a word; a store-wide failure (credentials,
+// What the store already has is used as it is (owner, 2026-11-17: "if already made then merge with it and continue
+// simple!" — a field of another kind is filled in that kind) and nothing is deleted, so it can be tapped again after a
+// new category or attribute. The answer is listed item by item, status as a dot plus a word; a store-wide failure (credentials,
 // a missing permission) is one red line.
 import { useState } from 'react';
 import { friendlyError } from '../../../../lib/friendlyError';
@@ -16,8 +17,7 @@ import { PbButton } from '../../ui';
 import { Section } from '../ui';
 
 const LOOK: Record<SetupItem['status'], { color: string; word: string }> = {
-  made: { color: PB.live, word: 'Made' }, kept: { color: NEUTRAL, word: 'Already there' },
-  clash: { color: PB.review, word: 'Needs you' }, failed: { color: PB.failed, word: 'Not made' },
+  made: { color: PB.live, word: 'Made' }, kept: { color: NEUTRAL, word: 'Already there' }, failed: { color: PB.failed, word: 'Not made' },
 };
 const count = (list: SetupItem[], s: SetupItem['status']) => list.filter(x => x.status === s).length;
 
@@ -51,14 +51,14 @@ export default function StoreSetup({ site, addToast }: { site: PbWebsite; addToa
     try {
       const r = await setupStore(site.id);
       setRes(r);
-      const all = [...r.fields, ...r.collections], made = count(all, 'made'), bad = count(all, 'clash') + count(all, 'failed');
-      addToast(`${site.name}: ${made ? `${made} made` : 'nothing new to make'}${count(all, 'kept') ? ` · ${count(all, 'kept')} already there` : ''}${bad ? ` · ${bad} need${bad === 1 ? 's' : ''} you (see the list)` : ''}`, bad ? 'info' : 'success');
+      const all = [...r.fields, ...r.collections], made = count(all, 'made'), bad = count(all, 'failed');
+      addToast(`${site.name}: ${made ? `${made} made` : 'nothing new to make'}${count(all, 'kept') ? ` · ${count(all, 'kept')} already there` : ''}${bad ? ` · ${bad} not made (see the list)` : ''}`, bad ? 'info' : 'success');
     } catch (e) { setErr(friendlyError(e)); }
     finally { setBusy(false); }
   };
   return (
     <Section title="Collections and product fields"
-      hint="Makes on this Shopify store a collection for each Playbook category, filled by Shopify from the product type, and a product field for each attribute on the Tags page (Colour, Fabric, Work…) plus Set contents and Questions, which every product sent fills in. What the store already has is left as it is and nothing is deleted: tap again after adding a category or attribute.">
+      hint="Makes on this Shopify store a collection for each Playbook category, filled by Shopify from the product type, and a product field for each attribute on the Tags page (Colour, Fabric, Work…) plus Set contents and Questions, which every product sent fills in. What the store already has is used as it is and nothing is deleted: tap again after adding a category or attribute.">
       <PbButton icon="refresh" className="pb-phone-full" onClick={() => void run()} busy={busy} busyLabel="Setting up…" disabled={!connected}
         title={connected ? undefined : 'Connect the store first'}>Set up on Shopify</PbButton>
       {!connected && <span style={{ ...pbMeta, marginTop: 8 }}>Connect the store first (Test connection above).</span>}

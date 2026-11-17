@@ -8,6 +8,7 @@ globalThis.Deno = { env: { get: (k) => (k === 'SUPABASE_URL' ? 'https://sb.examp
 const { collectionHandle, collectionInput, fieldDefs, fieldKey, sameCollection } = await import('../storeFields.ts');
 const { fieldInputs } = await import('../fields.ts');
 const { storeSetup } = await import('../storeSetup.ts');
+const { otherForm, sendFields } = await import('../publishParts.ts');
 
 const W = 'eeeeeeee-0000-4000-8000-000000000001';
 const ATTRS = [{ key: 'colour', name: 'Colour', multi: false }, { key: 'fabric', name: 'Fabric', multi: false }, { key: 'work', name: 'Work', multi: true },
@@ -87,19 +88,21 @@ function store({ defs = [], cols = [], refuse = [], denied = false, categories =
   return w;
 }
 
-test('set up: fields and collections made where missing, the ones there kept, a clash and a refusal said, nothing stops the rest', async () => {
+test('set up: fields and collections made where missing, the ones there kept (of any kind), a refusal said, nothing stops the rest', async () => {
   const w = store({ defs: [{ key: 'colour', name: 'Color', type: { name: 'single_line_text_field' } }, { key: 'work', name: 'Work', type: { name: 'single_line_text_field' } }],
     cols: [{ id: 'gid://shopify/Collection/9', handle: 'sarees', title: 'Saree' }], refuse: ['Occasion', 'Lehenga'] });
   const r = await storeSetup({ website_id: W }, 'u1');
-  assert.deepEqual(r.fields.map(x => `${x.name}:${x.status}`), ['Colour:kept', 'Fabric:made', 'Work:clash', 'Occasion:failed', 'Product Type:made', 'Set contents:made', 'Questions:made']);
-  assert.match(r.fields[2].note, /custom\.work of another kind \(single_line_text_field\)\. Delete it in Shopify → Settings → Custom data/);
+  assert.deepEqual(r.fields.map(x => `${x.name}:${x.status}`), ['Colour:kept', 'Fabric:made', 'Work:kept', 'Occasion:failed', 'Product Type:made', 'Set contents:made', 'Questions:made']);
+  // the store's own Work is plain text: kept as it is (owner: "if already made then merge with it"), filled in that kind
+  assert.equal(r.fields[2].note, 'Used as the store has it (one line of text: several values go in joined with commas).');
+  assert.equal(r.fields[0].note, undefined);
   assert.equal(r.fields[3].note, 'Key is reserved');
   assert.deepEqual(w.made[0], { name: 'Fabric', namespace: 'custom', key: 'fabric', type: 'single_line_text_field', description: "Fabric from Playbook: the product's Fabric tags.", ownerType: 'PRODUCT', pin: true, access: { storefront: 'PUBLIC_READ' } });
   assert.deepEqual(r.collections.map(x => `${x.name}:${x.status}`), ['Saree:kept', 'Lehenga:failed', 'Kids Wear:made']);
   assert.match(r.collections[1].note, /Shopify said "Handle is invalid"/);
   assert.equal(w.cols[0].handle, 'kids-wear');
   assert.deepEqual(w.published, ['gid://shopify/Collection/1'], 'a made collection goes on the Online Store');
-  assert.deepEqual(w.activity.details, { fields_made: 4, fields_kept: 1, fields_clash: 1, fields_failed: 1, collections_made: 1, collections_kept: 1, collections_failed: 1 });
+  assert.deepEqual(w.activity.details, { fields_made: 4, fields_kept: 2, fields_failed: 1, collections_made: 1, collections_kept: 1, collections_failed: 1 });
   assert.equal(w.activity.action, 'store_setup'); assert.equal(w.activity.website_id, W);
 
   // again: everything is there now → only kept, nothing made
@@ -115,4 +118,37 @@ test('set up: a store that refuses the app (a missing permission) says so once, 
   const w = store({ denied: true });
   await assert.rejects(() => storeSetup({ website_id: W }, 'u1'), /missing a permission/);
   assert.equal(w.made.length + w.cols.length, 0);
+});
+
+test('sending fields to a store whose own field is the other text kind: the refused one goes again in that kind, the rest are not lost', async () => {
+  assert.deepEqual(otherForm({ ownerId: 'p', namespace: 'custom', key: 'work', type: 'list.single_line_text_field', value: '["Embroidery","Sequins"]' }),
+    { ownerId: 'p', namespace: 'custom', key: 'work', type: 'single_line_text_field', value: 'Embroidery, Sequins' });
+  assert.deepEqual(otherForm({ ownerId: 'p', namespace: 'custom', key: 'colour', type: 'single_line_text_field', value: 'Pink' }).value, '["Pink"]');
+  assert.equal(otherForm({ ownerId: 'p', namespace: 'custom', key: 'faq', type: 'rich_text_field', value: '{}' }), null);
+  // the store: work and occasion are plain text, faq refused whatever is sent
+  const calls = [];
+  globalThis.fetch = async (url, init = {}) => {
+    const u = decodeURIComponent(String(url)), body = init.body ? JSON.parse(init.body) : null;
+    const ok = (b) => new Response(JSON.stringify(b), { status: 200 });
+    if (u.startsWith('https://suratmandi.myshopify.com/')) {
+      const list = body.variables.metafields; calls.push(list.map(f => `${f.key}:${f.type}`));
+      const userErrors = list.flatMap((f, i) => (f.key === 'faq' || (['work', 'occasion'].includes(f.key) && f.type !== 'single_line_text_field') ? [{ message: 'Type must be single_line_text_field', elementIndex: i }] : []));
+      return ok({ data: { metafieldsSet: { userErrors } } });
+    }
+    if (u.includes('/rest/v1/pb_website_secrets?')) return ok([{ access_token: 'shpat_test' }]);
+    return ok([]);
+  };
+  const site = { id: W, name: 'SuratMandi', shop_domain: 'suratmandi.myshopify.com', auth_mode: 'token', api_version: '2026-10' };
+  const f = (key, type, value) => ({ ownerId: 'gid://shopify/Product/1', namespace: 'custom', key, type, value });
+  const warn = await sendFields(site, [f('colour', 'single_line_text_field', 'Pink'), f('work', 'list.single_line_text_field', '["Embroidery","Sequins"]'),
+    f('occasion', 'list.single_line_text_field', '["Festive"]'), f('faq', 'rich_text_field', '{}')], 30_000);
+  assert.deepEqual(calls, [
+    ['colour:single_line_text_field', 'work:list.single_line_text_field', 'occasion:list.single_line_text_field', 'faq:rich_text_field'],
+    ['colour:single_line_text_field', 'work:single_line_text_field', 'occasion:single_line_text_field'], // faq has no other kind
+  ]);
+  assert.match(warn, /did not take these custom fields: faq/);
+  // all taken in the other kind: no warning
+  calls.length = 0;
+  assert.equal(await sendFields(site, [f('work', 'list.single_line_text_field', '["Zari"]')], 30_000), null);
+  assert.deepEqual(calls, [['work:list.single_line_text_field'], ['work:single_line_text_field']]);
 });

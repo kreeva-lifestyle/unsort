@@ -95,8 +95,8 @@ export const saveCredentials = (websiteId: string, c: Credentials) =>
 export const testConnection = (websiteId: string) =>
   pbCall<ConnectionResult>('test_connection', { website_id: websiteId });
 
-/** One thing store_setup looked at: made, already there (kept), there as another kind of field (clash), or refused. */
-export interface SetupItem { name: string; status: 'made' | 'kept' | 'clash' | 'failed'; note?: string }
+/** One thing store_setup looked at: made, already there (kept, used as the store has it), or refused. */
+export interface SetupItem { name: string; status: 'made' | 'kept' | 'failed'; note?: string }
 export interface SetupResult { fields: SetupItem[]; collections: SetupItem[] }
 /** Product fields per Playbook attribute and collections per category on the store (admin / manager; pb-products storeSetup.ts). */
 export const setupStore = (websiteId: string) =>
