@@ -1,6 +1,7 @@
 // Connection: name (part of the draft), store domain + credentials (write-only
 // — sent to save_credentials, admin/manager only, never read back), Test
 // connection and the Active switch (refused until the store has connected once).
+// Below them, "Collections and product fields" (sections/StoreSetup.tsx).
 // A new domain is never written from here: it goes with fresh credentials to
 // save_credentials, which switches the site off, deletes the old store's
 // secrets and re-queues its listings for the new store.
@@ -19,6 +20,7 @@ import { PbButton } from '../ui';
 import { Field, Grid2, Section, Seg, input44 } from './ui';
 import { SectionGrid, Cell } from './sections/SectionGrid';
 import { ActiveLine, LastConnected, LastProblem, ResultBox, Scopes } from './sections/ConnectionBits';
+import StoreSetup from './sections/StoreSetup';
 import type { Draft, SetDraft } from './WebsiteEditor';
 
 const secretInput = { ...input44, fontFamily: PB.mono };
@@ -164,6 +166,7 @@ export default function ConnectionSection({ site, draft, set, creds, setCreds, o
             )}
           </Section>
         </Cell>
+        <Cell><StoreSetup site={site} addToast={addToast} /></Cell>
       </SectionGrid>
       {err && <div role="alert" style={{ ...pbErrorBox, marginBottom: 16, overflowWrap: 'anywhere' }}>{err}</div>}
       <PbConfirm {...modalProps} />

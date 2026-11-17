@@ -19,6 +19,7 @@
 import { enc, logActivity, nowIso, one, patch, sel } from './db.ts';
 import { makeHandle } from './content.ts';
 import { faqHtml, fieldInputs } from './fields.ts';
+import { attributeValues } from './tagStore.ts';
 import { HttpError, plain } from './http.ts';
 import { compareAt } from './pricing.ts';
 import { galleryOf } from './photos.ts';
@@ -157,7 +158,7 @@ export async function publishOne(l: ListingRow, o: { manual: boolean; putBack?: 
     if (site.track_inventory && !existing) warnings.push(STOCK_WARNING);
     if (noCategory) warnings.push('Saved on Shopify without its standard category (the store did not accept it): choose the category in Shopify.');
     if (noFiles) warnings.push('Saved on Shopify, but the store did not take the change to its photos: check the photos there.');
-    const fw = await sendFields(site, profile.custom_fields ? fieldInputs(prod.id, p, faq) : [], ms(30_000));
+    const fw = await sendFields(site, profile.custom_fields ? fieldInputs(prod.id, p, faq, await attributeValues(p.id, p.category)) : [], ms(30_000));
     if (fw) warnings.push(fw);
     if (owed) { // not shown to shoppers = not published: the listing fails here (owed stays → channel_due) and is tried again
       const cw = await toOnlineStore(site, prod.id, ms(30_000));
