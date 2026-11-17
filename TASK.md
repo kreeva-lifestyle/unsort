@@ -6,7 +6,7 @@ done (built, merged, deployed and checked, or done or decided by the
 owner), its entry is deleted in the same change. The rules are in
 `CLAUDE.md` → "Pending work — TASK.md".
 
-Last checked: 15 Nov 2026.
+Last checked: 17 Nov 2026.
 
 ## Playbook — decisions the owner still has to make
 
@@ -84,6 +84,12 @@ are tagged.
 
 ## Playbook — things only the owner can do
 
+- **SuratMandi: set the store up.** Playbook → Websites → SuratMandi →
+  Connection → **Collections and product fields** → **Set up on Shopify**.
+  It makes a collection for each category and a product field for each
+  attribute (Colour, Fabric, Work, Occasion, Product Type, Set contents,
+  Questions) on the store. Waits on your tap (it signs in as you). Anything
+  marked **Needs you** or **Not made** in the list: tell Claude what it says.
 - **Delete the old `program-voice-notes` storage bucket.** Supabase →
   Storage: it still holds 2 files that nothing uses (security check, 13 Nov).
 - **Enter the vendor's short names.** Playbook → Vendors → Kashtbhanjan:
