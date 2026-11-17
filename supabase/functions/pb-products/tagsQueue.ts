@@ -2,6 +2,9 @@
 //   suggestions_list { status?, attribute_id?, page? } → pending phrases by uses, each with up to 3
 //                    example product names, its closest look-alikes (tagLook.ts) and its nearest
 //                    value (tagNearest.ts: the word rules, else the AI's kept answer; null = not asked yet)
+//   suggestions_ids  { attribute_id? } → every pending id under that filter, in the list's order (up to 5,000), for
+//                    "Select all" (owner, 2026-11-17: "select all should work for all tags"): the app then answers
+//                    them 100 at a time, as one bulk change (tagsSuggestAct.ts)
 //   suggestion_act   the answers to them: tagsSuggestAct.ts
 //                    A queued "Let AI decide" is a bulk change (bulkLog.ts): Settings → Bulk changes
 //                    takes it back for 7 days
@@ -10,7 +13,7 @@
 //   tags_fill_status → the progress of the newest batch of runs, all of them together (fillProgress.ts)
 import { uuid, type Body } from './actions.ts';
 import { endRun, startRun } from './bulkLog.ts';
-import { SB_URL, enc, insert, logActivity, one, patch, sel, svcHeaders } from './db.ts';
+import { SB_URL, enc, insert, logActivity, one, patch, sel, selAll, svcHeaders } from './db.ts';
 import { HttpError, plain, usdOf } from './http.ts';
 import { routeProduct } from './route.ts';
 import { fillOne } from './tagFill.ts';
@@ -30,11 +33,14 @@ async function count(path: string): Promise<number> {
   return Number((r.headers.get('content-range') || '').split('/')[1]) || 0;
 }
 
+/** The list's filter: one status, and the attribute chip ('' = all, 'none' = no attribute). */
+const sugFilter = (status: string, attributeId: unknown) =>
+  [`status=eq.${status}`, attributeId === 'none' ? 'attribute_id=is.null' : attributeId ? `attribute_id=eq.${enc(uuid(attributeId, 'The attribute'))}` : ''].filter(Boolean).join('&');
+
 export async function suggestionsList(b: Body) {
   const status = STATUSES.includes(String(b.status)) ? String(b.status) : 'pending';
   const per = 20, page = Math.max(0, Math.floor(Number(b.page)) || 0);
-  const attr = b.attribute_id === 'none' ? 'attribute_id=is.null' : b.attribute_id ? `attribute_id=eq.${enc(uuid(b.attribute_id, 'The attribute'))}` : '';
-  const f = [`status=eq.${status}`, attr].filter(Boolean).join('&');
+  const f = sugFilter(status, b.attribute_id);
   const [rows, total, tax] = await Promise.all([
     sel<SugRow>(`pb_tag_suggestions?select=${SUG_COLS}&${f}&order=uses.desc,last_seen_at.desc&limit=${per}&offset=${page * per}`),
     count(`pb_tag_suggestions?select=id&${f}`), loadTaxonomy(),
@@ -46,6 +52,12 @@ export async function suggestionsList(b: Body) {
     ok: true, page, per, count: total,
     rows: rows.map(r => ({ ...r, example_names: r.examples.slice(0, 3).map(id => names.get(id)).filter(Boolean), matches: lookAlikes(r.phrase, values, { attributeId: r.attribute_id, max: 3 }), nearest: nearestOf(r, values) })),
   };
+}
+
+/** "Select all": every pending suggestion under the chip, ids only (cheap: no look-alikes worked out here). */
+export async function suggestionsIds(b: Body) {
+  const rows = await selAll<{ id: string }>(`pb_tag_suggestions?select=id&${sugFilter('pending', b.attribute_id)}&order=uses.desc,last_seen_at.desc,id.asc`, 5000);
+  return { ok: true, ids: rows.map(r => r.id) };
 }
 
 export { fillStatus } from './fillProgress.ts';

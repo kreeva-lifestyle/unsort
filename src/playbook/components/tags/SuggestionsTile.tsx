@@ -5,23 +5,23 @@
 // by someone who can act on them, and kept); "Same as <value>" files it there.
 // "+ Add to <Attribute>" runs the look-alike guard first (LookAlikeModal);
 // "Also known as…" files it under a value you choose; Ignore never suggests it
-// again. Bulk select: Same as nearest (each into its own nearest value, owner
-// 13 Nov) / Add (when all share one attribute) / Ignore, in a bar that sticks
-// to the top while the list scrolls.
+// again. Bulk select (SuggestionBulkBar): Same as nearest / Add / Ignore for
+// the ticked cards, or — "Select all 998" — for every suggestion under the
+// chip, in batches (useSelectAll.ts; owner, 2026-11-17).
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { friendlyError } from '../../../lib/friendlyError';
 import type { AddToast } from '../PbToasts';
 import type { SuggestionAct, TagsApi } from '../../data/tags';
-import { UNDO_HINT } from '../../data/websites';
 import type { PbAttribute, PbLookAlike, PbSuggestion } from '../../tagTypes';
-import { PB, pbErrorBox, pbMeta, pbNum } from '../../pbTheme';
+import { pbErrorBox, pbMeta, pbNum } from '../../pbTheme';
 import { PbButton, PbChip, PbChipRow, PbSection, PbTile } from '../ui';
 import AliasPicker, { type AliasTarget } from './AliasPicker';
 import LookAlikeModal from './LookAlikeModal';
+import SuggestionBulkBar from './SuggestionBulkBar';
 import SuggestionCard from './SuggestionCard';
-import TagCheck from './TagCheck';
 import { TagRowsSkeleton, TagsEmpty, TagsError } from './TagStates';
 import { plural } from './tagText';
+import { useSelectAll } from './useSelectAll';
 
 export default function SuggestionsTile({ attrs, api, addToast, version, onChanged, canEdit }: { attrs: PbAttribute[]; api: TagsApi; addToast: AddToast; version: number; onChanged: () => void; canEdit: boolean }) {
   const [rows, setRows] = useState<PbSuggestion[] | null>(null);
@@ -62,6 +62,9 @@ export default function SuggestionsTile({ attrs, api, addToast, version, onChang
   }, [api, page, attr, askNearest]);
   useEffect(() => { void load(); }, [load, version]);
   useEffect(() => { setSel(new Set()); }, [page, attr, version]);
+  const all = useSelectAll(api, addToast, onChanged);
+  const setAll = all.setIds;
+  useEffect(() => { setAll(null); }, [attr, version, setAll]); // "Select all N" is for one chip; flipping pages keeps it
 
   /** `hint`: the last part of the success toast (where a bulk change is taken back). */
   const act = async (a: SuggestionAct, key: string, ok: (n: number) => string, hint = '') => {
@@ -85,10 +88,6 @@ export default function SuggestionsTile({ attrs, api, addToast, version, onChang
   const aliasTo = (s: PbSuggestion, t: AliasTarget) => void act({ ids: [s.id], act: 'alias', value_id: t.value_id }, `alias:${s.id}`, () => `“${s.phrase}” now means ${t.value} (${t.attribute})`)
     .then(ok => { if (ok === true) { setAlias(null); setGuard(null); } });
 
-  const ids = [...sel];
-  const chosen = (rows ?? []).filter(r => sel.has(r.id));
-  const oneAttr = chosen.length && chosen.every(r => r.attribute_id && r.attribute_id === chosen[0].attribute_id) ? chosen[0].attribute_id : null;
-  const near = chosen.filter(r => r.nearest?.value_id).map(r => r.id);
   const pages = Math.max(1, Math.ceil(count / 20));
   return (
     <PbTile as="section" variant={err && !rows ? 'failed' : 'default'} aria-labelledby="pbt-sug">
@@ -108,18 +107,7 @@ export default function SuggestionsTile({ attrs, api, addToast, version, onChang
           : <TagsEmpty icon="check" title="All caught up">New words show up here as products come in from stores and Telegram.</TagsEmpty>)}
         {rows && rows.length > 0 && (
           <>
-            {canEdit && (
-              <div style={{ position: 'sticky', top: 0, zIndex: 1, background: PB.tileSolid, margin: '0 -4px', padding: '8px 4px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ display: 'inline-flex', alignItems: 'center', marginLeft: -8, ...pbMeta, color: PB.tx }}>
-                  <TagCheck checked={rows.every(r => sel.has(r.id))} onChange={on => setSel(on ? new Set(rows.map(r => r.id)) : new Set())} label="Select every suggestion on this page"
-                    text={ids.length ? <><span style={pbNum}>{ids.length}</span> selected</> : 'Select all'} />
-                </span>
-                {near.length > 0 && <PbButton icon="merge" onClick={() => void act({ ids: near, act: 'nearest' }, 'bulk:nearest', n => `Filed ${plural(n, 'suggestion')} under ${n === 1 ? 'its nearest value' : 'their nearest values'}`, near.length > 1 ? UNDO_HINT : '')}
-                  busy={busy === 'bulk:nearest'} busyLabel="Filing…" dim={!!busy && busy !== 'bulk:nearest'}>Same as nearest for {near.length}</PbButton>}
-                {ids.length > 0 && oneAttr && <PbButton icon="plus" onClick={() => void act({ ids, act: 'add' }, 'bulk:add', n => `Added ${plural(n, 'value')} to ${nameOf(oneAttr)}`)} busy={busy === 'bulk:add'} busyLabel="Adding…" dim={!!busy && busy !== 'bulk:add'}>Add {ids.length} to {nameOf(oneAttr)}</PbButton>}
-                {ids.length > 0 && <PbButton icon="eyeOff" onClick={() => void act({ ids, act: 'ignore' }, 'bulk:ignore', n => `Ignored ${plural(n, 'suggestion')}`)} busy={busy === 'bulk:ignore'} busyLabel="Ignoring…" dim={!!busy && busy !== 'bulk:ignore'}>Ignore {ids.length}</PbButton>}
-              </div>
-            )}
+            {canEdit && <SuggestionBulkBar rows={rows} sel={sel} onSel={setSel} count={count} chip={attr} nameOf={nameOf} busy={busy} act={act} all={all} />}
             {nearErr && (
               <div role="alert" style={{ ...pbErrorBox, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                 <span style={{ flex: '1 1 220px', minWidth: 0 }}>The AI could not look for the nearest values. {nearErr} Try again in a minute.</span>
@@ -128,8 +116,12 @@ export default function SuggestionsTile({ attrs, api, addToast, version, onChang
             )}
             <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 300px), 1fr))', gap: 12 }}>
               {rows.map(s => (
-                <SuggestionCard key={s.id} s={s} attrs={attrs} selected={sel.has(s.id)} busy={busy} canEdit={canEdit} asking={asking}
-                  onSelect={on => setSel(x => { const n = new Set(x); if (on) n.add(s.id); else n.delete(s.id); return n; })}
+                <SuggestionCard key={s.id} s={s} attrs={attrs} selected={!!all.ids || sel.has(s.id)} busy={busy || (all.progress ? 'all' : '')} canEdit={canEdit} asking={asking}
+                  onSelect={on => {
+                    // Unticking one out of "all": back to this page's cards, without that one.
+                    if (all.ids) { if (all.progress) return; setAll(null); setSel(new Set(rows.map(r => r.id).filter(id => on || id !== s.id))); return; }
+                    setSel(x => { const n = new Set(x); if (on) n.add(s.id); else n.delete(s.id); return n; });
+                  }}
                   onAdd={() => add(s)} onAlias={() => setAlias(s)} onUse={t => aliasTo(s, t)}
                   onIgnore={() => void act({ ids: [s.id], act: 'ignore' }, `ignore:${s.id}`, () => `Ignored “${s.phrase}” — it will not be suggested again`)}
                   onMove={to => void act({ ids: [s.id], act: 'move', attribute_id: to }, `move:${s.id}`, () => `Moved “${s.phrase}”${to ? ` to ${nameOf(to)}` : ''}`)} />

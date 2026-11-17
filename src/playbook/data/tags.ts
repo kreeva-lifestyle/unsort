@@ -50,14 +50,18 @@ export const saveLinks = (category: string, attributeIds: string[]) =>
 export type SuggestionPage = { rows: PbSuggestion[]; count: number };
 export const listSuggestions = (status: PbSuggestionStatus, page: number, attributeId = '') =>
   pbCall<SuggestionPage>('suggestions_list', { status, page, attribute_id: attributeId || undefined }).then(r => ({ rows: r.rows ?? [], count: r.count ?? 0 }));
-/** 'nearest': each into its own nearest value (the one its card shows); one without is left and counted in `skipped`. */
-export type SuggestionAct = { ids: string[]; act: 'add' | 'alias' | 'ignore' | 'move' | 'nearest'; attribute_id?: string | null; value_id?: string; name?: string; force?: boolean };
+/** 'nearest': each into its own nearest value (the one its card shows); one without is left and counted in `skipped`.
+ *  `more` / `run_id`: one batch of "Select all" — the batches make one bulk change (the first opens it, the last closes it). */
+export type SuggestionAct = { ids: string[]; act: 'add' | 'alias' | 'ignore' | 'move' | 'nearest'; attribute_id?: string | null; value_id?: string; name?: string; force?: boolean; more?: boolean; run_id?: string };
+/** "Select all": every pending suggestion under the chip ('' = all, 'none' = no attribute), in the list's order. */
+export const suggestionIds = (attributeId = '') =>
+  pbCall<{ ids: string[] }>('suggestions_ids', { attribute_id: attributeId || undefined }).then(r => r.ids ?? []);
 /** The nearest value for suggestions not looked at yet (up to 20): the word rules, else one AI call; the answer is kept. */
 export const nearestSuggestions = (ids: string[]) =>
   pbCall<{ nearest: Record<string, PbNearest> }>('suggestions_nearest', { ids }).then(r => r.nearest ?? {});
 export const actSuggestions = (a: SuggestionAct) =>
-  pbCall<{ done: number; conflicts: Record<string, PbLookAlike[]>; retagged: number; skipped?: number }>('suggestion_act', a)
-    .then(r => ({ done: r.done ?? 0, conflicts: r.conflicts ?? {}, retagged: r.retagged ?? 0, skipped: r.skipped ?? 0 }));
+  pbCall<{ done: number; conflicts: Record<string, PbLookAlike[]>; retagged: number; skipped?: number; run_id?: string | null }>('suggestion_act', a)
+    .then(r => ({ done: r.done ?? 0, conflicts: r.conflicts ?? {}, retagged: r.retagged ?? 0, skipped: r.skipped ?? 0, run_id: r.run_id ?? null }));
 
 export const retag = (dryRun: boolean) => pbCall<PbRetagResult>('retag', { dry_run: dryRun });
 export type FillScope = { product_ids?: string[]; category?: string; attribute_id?: string; needs_info?: boolean };
@@ -121,6 +125,6 @@ export async function countSuggestions(): Promise<number> {
 /** Everything the Tags page calls, as one object so the screenshot harness can pass fakes. */
 export const TAGS_API = {
   taxonomy: getTaxonomy, saveCategories, saveAttribute, deleteAttribute, orderAttributes, checkValue, saveValue, deleteValue, mergeValue,
-  linkCheck, saveLinks, listSuggestions, nearestSuggestions, actSuggestions, retag, aiFill, fillStatus, renameCategory, moveCategory,
+  linkCheck, saveLinks, listSuggestions, nearestSuggestions, actSuggestions, suggestionIds, retag, aiFill, fillStatus, renameCategory, moveCategory,
 };
 export type TagsApi = typeof TAGS_API;

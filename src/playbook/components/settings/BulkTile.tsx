@@ -3,13 +3,15 @@
 // revert did), each with "Revert" for an admin or manager while it can still
 // be taken back (owner, 2026-11-12: "log all bulk changes … with option to
 // revert them"). The button opens BulkRevertSheet, which says exactly what
-// would change before anything does. Skeleton rows while loading, the failed
-// tint with Try again on a load error, a one-line empty state.
+// would change before anything does. 10 to a page with Prev / Next (owner,
+// 2026-11-17). Skeleton rows while loading, the failed tint with Try again on
+// a load error, a one-line empty state.
 import { useCallback, useEffect, useState } from 'react';
 import { friendlyError } from '../../../lib/friendlyError';
-import { BULK_DAYS, listBulkRuns, type PbBulkRun } from '../../data/bulk';
+import { BULK_DAYS, BULK_PER_PAGE, listBulkRuns, type PbBulkRun } from '../../data/bulk';
 import { istDate } from '../../format';
 import { PB, pbBody, pbMeta } from '../../pbTheme';
+import Pager from '../product/Pager';
 import { Dot, NEUTRAL } from '../product/status';
 import { PbButton, PbSection, PbSkelBar, PbTile } from '../ui';
 import BulkRevertSheet from './BulkRevertSheet';
@@ -43,12 +45,19 @@ export default function BulkTile({ addToast, canEdit }: { addToast: AddToast; ca
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState<PbBulkRun | null>(null);
+  const [page, setPage] = useState(0);
+  const [count, setCount] = useState(0);
   const load = useCallback(async () => {
     setBusy(true);
-    try { setRuns(await listBulkRuns()); setErr(''); }
+    try {
+      const r = await listBulkRuns(page);
+      // The last one on a later page aged out of the 7 days: step back to the last page that still has some.
+      if (!r.runs.length && page > 0) { setPage(Math.max(0, Math.ceil(r.count / BULK_PER_PAGE) - 1)); return; }
+      setRuns(r.runs); setCount(r.count); setErr('');
+    }
     catch (e) { setErr(friendlyError(e)); }
     finally { setBusy(false); }
-  }, []);
+  }, [page]);
   useEffect(() => { void load(); }, [load]);
   return (
     <PbTile as="section" variant={err && !runs ? 'failed' : 'default'}>
@@ -76,6 +85,7 @@ export default function BulkTile({ addToast, canEdit }: { addToast: AddToast; ca
             <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column' }}>
               {runs.map(r => <Row key={r.id} r={r} canEdit={canEdit} onRevert={() => setOpen(r)} />)}
             </ul>
+            {count > BULK_PER_PAGE && <Pager page={page} pageSize={BULK_PER_PAGE} count={count} onPage={setPage} noun="bulk change" />}
           </>
         )}
       </PbSection>

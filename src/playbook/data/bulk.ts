@@ -34,11 +34,16 @@ export const TAKE_BACK = `If it was a mistake, Settings → Bulk changes takes i
 const COLS = 'id,kind,label,items,status,details,created_at,finished_at,reverted_at,revert_result,'
   + 'by:profiles!pb_bulk_runs_created_by_fkey(full_name),reverter:profiles!pb_bulk_runs_reverted_by_fkey(full_name)';
 
-export async function listBulkRuns(): Promise<PbBulkRun[]> {
+/** Bulk changes listed per page (owner, 2026-11-17: "add pagination 10 per view"). */
+export const BULK_PER_PAGE = 10;
+/** One page of the last BULK_DAYS days' bulk changes, newest first, and how many there are in all. */
+export async function listBulkRuns(page = 0): Promise<{ runs: PbBulkRun[]; count: number }> {
   const since = new Date(Date.now() - BULK_DAYS * 86_400_000).toISOString();
-  const { data, error } = await supabase.from('pb_bulk_runs').select(COLS).gte('created_at', since).order('created_at', { ascending: false }).limit(50);
+  const from = page * BULK_PER_PAGE;
+  const { data, error, count } = await supabase.from('pb_bulk_runs').select(COLS, { count: 'exact' }).gte('created_at', since)
+    .order('created_at', { ascending: false }).order('id').range(from, from + BULK_PER_PAGE - 1);
   if (error) throw error;
-  return (data ?? []) as unknown as PbBulkRun[];
+  return { runs: (data ?? []) as unknown as PbBulkRun[], count: count ?? 0 };
 }
 
 /** Only the numbers of a server reply (it also carries ok and the kind). */
