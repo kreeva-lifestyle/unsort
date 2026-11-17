@@ -53,7 +53,9 @@
 //   category_rename    admin|manager  { from, to }                        → { ok, renamed, run_id }  list, links, products, ticks, website rules (categoryMove.ts)
 //   category_move      admin|manager  { from, to, remove? }               → { ok, moved, to_ready, queued, removed, run_id }  then "Let AI decide" for them
 //   suggestions_list   staff          { status?, attribute_id?, page? }   → { ok, rows[{…, example_names, matches}], count, page, per }
-//   suggestion_act     admin|manager  { ids, act:add|alias|ignore|move|nearest, attribute_id?, value_id?, name?, force? } → { ok, done, conflicts{id: matches[]}, retagged, skipped? (nearest) }
+//   suggestions_ids    admin|manager  { attribute_id? }                   → { ok, ids[≤5000] } (every pending one under that filter: "Select all")
+//   suggestion_act     admin|manager  { ids[≤100], act:add|alias|ignore|move|nearest, attribute_id?, value_id?, name?, force?, more?, run_id? } → { ok, done, conflicts{id: matches[]}, retagged, skipped? (nearest), run_id }
+//                                     (more / run_id: batches of one bulk change — the first opens it, the last closes it)
 //   suggestions_nearest admin|manager { ids[≤20] } → { ok, nearest{id: {value_id, value, attribute_id, attribute, why, by}} } (rules, else one AI call, kept)
 //   product_values_set staff          { product_id, value_ids[], attribute_id? } → { ok, status, missing, locked, routed } (locks 'tags')
 //   retag              admin|manager  { dry_run (default true) }          → { ok, dry_run, products, locked, changed, to_needs_info, to_ready, sample[≤10] }
@@ -80,7 +82,7 @@ import { setStock } from './stock.ts';
 import { previewPrice, saveCredentials, testSite } from './siteActions.ts';
 import * as T from './tagsActions.ts';
 import { categoryMove, categoryRename } from './categoryMove.ts';
-import { fillStatus, suggestionsList, tagsAiFill } from './tagsQueue.ts';
+import { fillStatus, suggestionsIds, suggestionsList, tagsAiFill } from './tagsQueue.ts';
 import { suggestionAct } from './tagsSuggestAct.ts';
 import { suggestionsNearest } from './tagsNearest.ts';
 import { productValuesSet, retag } from './tagsProduct.ts';
@@ -127,6 +129,7 @@ const ACTIONS: Record<string, { who: Who; run: (b: A.Body, c: Caller) => Promise
   category_rename: { who: 'admin', run: (b, c) => categoryRename(b, userOf(c)) },
   category_move: { who: 'admin', run: (b, c) => categoryMove(b, userOf(c)) },
   suggestions_list: { who: 'staff', run: (b) => suggestionsList(b) },
+  suggestions_ids: { who: 'admin', run: (b) => suggestionsIds(b) },
   suggestion_act: { who: 'admin', run: (b, c) => suggestionAct(b, userOf(c)) },
   suggestions_nearest: { who: 'admin', run: (b, c) => suggestionsNearest(b, userOf(c)) },
   product_values_set: { who: 'staff', run: (b, c) => productValuesSet(b, userOf(c)) },
