@@ -6,9 +6,7 @@
 // They go out with metafieldsSet AFTER productSet (publish.ts): metafieldsSet
 // writes only the keys it is given, so other apps' and the merchant's fields
 // are never touched (productSet would delete every field not in its input).
-// metafieldsSet saves all or nothing: a field the store refuses (its own
-// definition has another type) is left out and the rest sent again
-// (publishParts.ts sendFields, by `elementIndex`).
+// A field the store already had goes in that field's kind (fieldsSend.ts).
 // An empty fact is not sent; a fact that went empty is left as it is on the
 // store. No I/O — tested in test/fields.test.mjs.
 // As Playbook (owner, 2026-11-17: "Product Specifications & Custom Attributes

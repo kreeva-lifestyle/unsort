@@ -8,7 +8,7 @@
 // schema even asks for at least one. An "only if it fits" attribute (required = false, Product Type) gets a value only
 // when one in its list truly fits, else none — and does not hold the product. Never a value outside the list.
 // No I/O — tested in test/tagPrompt.test.mjs.
-import { tagKey } from './tagText.ts';
+import { isNoneValue, tagKey, withoutNone } from './tagText.ts';
 
 /** `byCategory`: the attribute's values depend on the category (Product Type) — each value carries the categories it is
  *  ticked for, and the prompt lists them per category (the reader settles the category in the same call).
@@ -46,6 +46,7 @@ export function tagPromptLines(spec: TagSpec, o: { fillOnly?: boolean } = {}): s
     ...(cats.length && !o.fillOnly ? [`Which attributes apply depends on the category: ${cats.join('; ')}. Leave values [] for attributes of other categories.`] : []),
     'An attribute marked "must have" always gets a value: choose the best-fitting one in its list, judging from the photos and the text the way an experienced shop owner would (e.g. "rani pink" → Pink, "embroidered" → Embroidery; Occasion from the look of the product — a heavy bridal lehenga → Wedding, a light printed suit → Casual / Office). Never leave a must-have attribute empty.',
     'An attribute marked "only if it fits" gets a value only when one in its list truly fits this product — the same kind of thing, not a near one. When none does, leave values [] — that is the right answer, not a failure.',
+    ...(spec.attrs.some(a => a.values.some(v => isNoneValue(v.name))) ? ['A value such as "Plain" means none of the others in its list: choose it only when no other value there fits (an embroidered lehenga with a plain blouse is Embroidery, not Plain).'] : []),
     'Never invent a value that is not in a list. A word you saw that is not in the list goes in "other".',
     'An attribute marked "one value" takes at most one. other: up to 3 short phrases (1–3 words) for that attribute that are not in its list, or [].',
     ...(o.fillOnly ? [] : ['tag_other: up to 5 short phrases (1–3 words) that describe the product but fit no attribute, or [].']),
@@ -84,8 +85,8 @@ const phrase = (v: unknown) => {
   return s.length >= 2 && s.length <= 40 && s.split(' ').length <= 4 ? s : '';
 };
 
-/** The AI's answer → value ids per attribute (only names in the list; one-value attributes keep the first)
- *  and the "other" phrases. `only` limits which attributes are read (the rest are ignored). */
+/** The AI's answer → value ids per attribute (only names in the list; one-value attributes keep the first; "Plain" only
+ *  when nothing else was chosen) and the "other" phrases. `only` limits which attributes are read (the rest are ignored). */
 export function readTags(spec: TagSpec, out: TagOut | null | undefined, only?: Set<string>): ReadTags {
   const chosen: ReadTags['chosen'] = {};
   const other: ReadTags['other'] = [];
@@ -93,7 +94,7 @@ export function readTags(spec: TagSpec, out: TagOut | null | undefined, only?: S
     if (only && !only.has(a.id)) continue;
     const got = out?.tags?.[a.pk];
     const byKey = new Map(a.values.map(v => [tagKey(v.name), v.id]));
-    const ids = [...new Set((Array.isArray(got?.values) ? got.values : []).map(n => byKey.get(tagKey(n))).filter((x): x is string => !!x))];
+    const ids = withoutNone([...new Set((Array.isArray(got?.values) ? got.values : []).map(n => byKey.get(tagKey(n))).filter((x): x is string => !!x))], a.values);
     if (ids.length) chosen[a.id] = a.multi ? ids.slice(0, 10) : ids.slice(0, 1);
     for (const p of (Array.isArray(got?.other) ? got.other : []).map(phrase).filter(Boolean).slice(0, 3)) {
       if (!byKey.has(tagKey(p))) other.push({ attribute_id: a.id, phrase: p });

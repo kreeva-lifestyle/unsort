@@ -114,3 +114,18 @@ test('a fabric or a work before a colour keeps both ("Georgette Pink", "Embroide
 test('"Digitally Printed" is Digital Print', () => {
   assert.deepEqual(matchProduct({ text: 'Digitally Printed georgette kurta' }, [WORK2]).chosen.work, ['dp']);
 });
+
+test('Plain (owner, 18 Nov 2026): kept only when no other work is found; "plain blouse" in the text leaves Work to the photo', () => {
+  const W = { id: 'work', name: 'Work', multi: true, values: [v('emb', 'Embroidery', ['sequence work']), v('plain', 'Plain')] };
+  // an embroidered lehenga with a plain blouse: Embroidery only
+  assert.deepEqual(matchProduct({ text: 'Lehenga Work : Sequence Work\nBlouse Work : Plain' }, [W]).chosen.work, ['emb']);
+  // labelled plain and nothing else: Plain
+  assert.deepEqual(matchProduct({ text: 'Fabric : Georgette\nWork : Plain' }, [W]).chosen.work, ['plain']);
+  // named plain: Plain
+  assert.deepEqual(matchProduct({ name: 'Plain Georgette Saree' }, [W]).chosen.work, ['plain']);
+  // "plain" only in the running text (one piece of the set): not settled by the words, the AI looks at the photo
+  assert.equal(matchProduct({ text: 'Comes with a plain blouse and dupatta' }, [W]).chosen.work, undefined);
+  // a store tag or a read fact counts
+  assert.deepEqual(matchProduct({ storeTags: ['plain'] }, [W]).chosen.work, ['plain']);
+  assert.deepEqual(matchProduct({ facts: ['Plain'], text: 'Heavy embroidery on the lehenga' }, [W]).chosen.work, ['emb']);
+});
