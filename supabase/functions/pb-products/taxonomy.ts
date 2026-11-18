@@ -17,13 +17,13 @@ import { tagKey } from './tagText.ts';
 /** `required`: false = "only if it fits" (owner, 18 Nov 2026: Product Type) — filled when a value truly fits, never
  *  holds a product (pb_products_refresh, tagGate.ts missingAttrs). */
 export interface AttrRow { id: string; name: string; key: string; multi: boolean; position: number; shopify_prefix: string | null; by_category: boolean; required: boolean }
-export interface ValueRow { id: string; attribute_id: string; name: string; key: string; aliases: string[]; position: number; categories: string[] }
+export interface ValueRow { id: string; attribute_id: string; name: string; key: string; aliases: string[]; position: number; categories: string[]; created_at?: string }
 export interface LinkRow { category: string; attribute_id: string; position: number }
 export interface Taxonomy { attrs: AttrRow[]; values: ValueRow[]; links: LinkRow[]; categories: string[] }
 export type AttrWithValues = AttrRow & { values: ValueRow[] };
 
 export const ATTR_COLS = 'id,name,key,multi,position,shopify_prefix,by_category,required';
-export const VALUE_COLS = 'id,attribute_id,name,key,aliases,position,categories';
+export const VALUE_COLS = 'id,attribute_id,name,key,aliases,position,categories,created_at';
 const MAX_VALUES = 20000;
 
 export async function loadTaxonomy(categories?: string[]): Promise<Taxonomy> {

@@ -121,8 +121,10 @@ export async function fillQueued(c: { id: string; tag_fill_run: string }, tax: T
     left = 1;
     console.error(`pb-products tag fill ${c.id}: ${plain(e)}`);
     await logActivity({ product_id: c.id, action: 'failed', details: { step: 'tags_fill', error: plain(e), ...(usdOf(e) ? { usd: usdOf(e) } : {}) }, user_id: userId });
-    // The gate again (no AI), as the automatic fill does (fillAuto.ts): what is no longer a must does not hold it.
-    await rpc('pb_products_refresh', { p_ids: [c.id] }).catch(r => console.error(`pb-products tag fill ${c.id}: gate not checked again: ${plain(r)}`));
+    // The gate again (no AI), as the automatic fill does (fillAuto.ts): what is no longer a must does not hold it. A
+    // product the words' values made Ready does not "need you" in the batch's count.
+    const [g] = (await rpc<Refreshed[]>('pb_products_refresh', { p_ids: [c.id] }).catch(r => { console.error(`pb-products tag fill ${c.id}: gate not checked again: ${plain(r)}`); return null; })) ?? [];
+    if (g && !g.missing?.length) left = 0;
   } finally {
     await rpc('pb_tag_fill_tick', { p_run: c.tag_fill_run, p_filled: filled, p_left: left });
   }
