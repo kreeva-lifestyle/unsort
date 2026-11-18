@@ -72,7 +72,9 @@ export function checkCopy(i: CheckInput): Problem[] {
 
   const facts = factWords(i.facts);
   const theirs = [i.source, ...i.others.flatMap(o => [o.description_html, o.seo_description])];
-  const runs = [...new Set([ai.desc ? desc : '', ai.metaDesc ? c.seo_description : '', faq].flatMap(t => copiedRuns(t, theirs, facts)))].slice(0, 4);
+  // Longest first: a copied sentence is never pushed out of the list (and out of the hold) by shorter runs before it.
+  const runs = [...new Set([ai.desc ? desc : '', ai.metaDesc ? c.seo_description : '', faq].flatMap(t => copiedRuns(t, theirs, facts)))]
+    .sort((x, y) => wordsOf(y).length - wordsOf(x).length).slice(0, 4);
   // Held only for a copied sentence (8 words or more); a shorter shared run is a fact said the usual way ("in mustard teal
   // pink and blue"), asked of the rewrite but never a reason to hold the listing.
   if (runs.length) add('copied', runs.some(r => wordsOf(r).length >= COPIED_SENTENCE), `Copies wording from the supplier's text or another store's version: ${runs.map(q).join(', ')}.`,

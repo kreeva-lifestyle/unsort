@@ -200,9 +200,9 @@ test('a brand too long for the SEO title is left out whole, and then not asked f
 
 test('search phrase (owner, 18 Nov 2026: "fix it directly"): Playbook\'s own tag values, one per part, short enough for the SEO title beside the brand', () => {
   const PAT = '{color} {work} {fabric} {category} {occasion}';
-  assert.equal(phraseMax('SuratMandi', 70, 60), 47);                       // 60 − " | SuratMandi"
-  assert.equal(phraseMax('Svaraa Ethnic Wear Online Store India', 70, 60), 20); // a long brand that still fits leaves 20
-  assert.equal(phraseMax('Svaraa Ethnic Wear Online Store India and Far Beyond', 70, 60), 60); // one left out of SEO titles leaves them whole
+  assert.equal(phraseMax('SuratMandi', 70, 60), 35);                       // 60 − 12 to spare − " | SuratMandi": room for what sets the product apart
+  assert.equal(phraseMax('Svaraa Ethnic Wear Online Store India', 70, 60), 20); // a long brand that still fits: never under 20
+  assert.equal(phraseMax('Svaraa Ethnic Wear Online Store India and Far Beyond', 70, 60), 48); // one left out of SEO titles leaves them whole
   assert.equal(phraseMax('', undefined, undefined), 80);
   const lehenga = { name: 'Lehenga', category: 'Lehenga', fabric: 'Banarasi Silk', color: 'Cream', attributes: { work: 'Zari embroidery, Embroidery Work', occasion: 'Wedding, Reception, Festive' } };
   const values = { colour: ['Cream'], work: ['Digital Print', 'Embroidery'], fabric: ['Banarasi Silk'], occasion: ['Festival', 'Wedding', 'Cocktail / Reception'] };
@@ -215,5 +215,18 @@ test('search phrase (owner, 18 Nov 2026: "fix it directly"): Playbook\'s own tag
   assert.equal(keywordOf('{name}', { ...suit, name: 'A very long product name that goes on and on beyond any limit' }, { max: 30 }), 'A very long product name that');
   // no tags yet: the first item of each read fact; "Cocktail / Reception" gives Cocktail
   assert.equal(keywordOf(PAT, lehenga, { max: 47 }), 'Cream Zari embroidery Banarasi Silk Lehenga');
-  assert.equal(keywordOf('{occasion} {category}', lehenga, { values: { occasion: ['Cocktail / Reception'] } }), 'Cocktail Lehenga');
+  assert.equal(keywordOf('{occasion} {category}', { ...lehenga, attributes: {} }, { values: { occasion: ['Cocktail / Reception'] } }), 'Cocktail Lehenga');
+  // a tag the product's own facts do not name is never used: a Light Yellow lehenga tagged Navy Blue stays Light Yellow
+  const yellow = { name: 'Lehenga', category: 'Lehenga', fabric: 'Kanchipuram Silk', color: 'Light Yellow', attributes: {} };
+  assert.equal(keywordOf('{color} {fabric} {category}', yellow, { values: { colour: ['Navy Blue'], fabric: ['Kanjivaram'] } }), 'Light Yellow Kanchipuram Silk Lehenga');
+});
+
+test('copied: a copied sentence is never pushed out of the hold by shorter copied runs before it', () => {
+  const source = 'Soft flowing drape feels light on skin. Bright festive colours glow under evening lamps. Neat finishing on seams lasts many washes. Elegant silhouette flatters every body shape. Lovely outfit will surely make heads turn at every single celebration this season.';
+  const desc = '<p>Maroon georgette kurta set. Soft flowing drape feels light here too. Then bright festive colours glow under it all. Again neat finishing on seams lasts long. Also elegant silhouette flatters every body nicely.</p>';
+  const seo_description = 'Maroon georgette kurta set: lovely outfit will surely make heads turn at every single celebration this season, at a Surat factory price.';
+  const p = checkCopy(input({ copy: { ...GOOD, description_html: desc, seo_description }, source, limits: { ...LIMITS, metaDescMin: 50, metaDescMax: 200, wordsMin: 10, wordsMax: 400 } }));
+  const c = p.find(x => x.code === 'copied');
+  assert.equal(c.hard, true);
+  assert.match(c.say, /lovely outfit will surely make heads turn/);
 });

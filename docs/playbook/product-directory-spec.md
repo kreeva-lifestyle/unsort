@@ -762,8 +762,11 @@ AI's extra tags are an enum of it.
   typed for that listing (kept: `keyword_locked`). Since 18 Nov 2026
   (`profile.ts keywordOf`): each part is the product's own tag value (the one
   its facts name first, "Cocktail / Reception" → Cocktail), else the first
-  item of the read fact, and the phrase is no longer than `phraseMax` (the SEO
-  title beside "| Brand", and the title; SuratMandi 47): the occasion is left
+  item of the read fact — a tag the product's own colour / fabric / work fact
+  does not name is never used, so the phrase never contradicts the product's
+  facts — and the phrase is no longer than `phraseMax` (the SEO title beside
+  "| Brand" with `SEO_ROOM` 12 characters to spare, so two products with the
+  same phrase still get their own SEO titles; and the title; SuratMandi 35): the occasion is left
   out first, then pattern, work, fabric, colour — never the category or the
   name — then it is cut at a word. Before, raw facts were joined and sliced at
   80 characters mid-word ("…Festival Sange"), which no description could hold
@@ -868,9 +871,6 @@ AI's extra tags are an enum of it.
   of the limit; repeated alt texts; keyword more than 3 times; the humanCopy
   tells. `keyword_fit` ("shorten one of them in the store profile") is gone:
   the phrase is built to fit.
-- **The program fixes** what it safely can before the checks: the SEO title
-  gets the phrase as "phrase | Brand" when the AI's has it missing or twice
-  and it fits (`generate.ts seoTitleOf`).
 - **Up to two rewrites** (`genWrite.ts`, `MAX_REWRITES`): any problem → one
   more call with the draft and the list of fixes (text only, no photos;
   needs 45 s left); a second only while a HARD problem is still there,

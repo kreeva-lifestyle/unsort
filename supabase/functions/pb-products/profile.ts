@@ -49,11 +49,14 @@ export const hasOrdering = (p: Profile) => !!(p.delivery || p.stitching || p.ret
 const DROP = ['occasion', 'pattern', 'work', 'fabric', 'colour', 'color'];
 
 /** Of a product's values for one attribute, the one its own words name first ("Zari embroidery, Embroidery Work" →
- *  Embroidery; "Wedding, Reception" → Wedding), else the first. */
+ *  Embroidery; "Wedding, Reception" → Wedding); the first only when the product has no such fact. A value its facts do
+ *  not name is never used: the phrase must not say a colour or fabric the product's own facts contradict (a "Light
+ *  Yellow" lehenga tagged Navy Blue keeps Light Yellow). */
 function mainValue(values: string[] | undefined, fact: unknown): string {
   if (!values?.length) return '';
   const fw = words(fact);
-  let best = values[0], at = Infinity;
+  if (!fw.length) return values[0];
+  let best = '', at = Infinity;
   for (const v of values) {
     const vw = words(v);
     for (let i = 0; vw.length && i + vw.length <= fw.length && i < at; i++) if (vw.every((w, j) => fw[i + j] === w)) { at = i; best = v; break; }
@@ -61,9 +64,12 @@ function mainValue(values: string[] | undefined, fact: unknown): string {
   return best;
 }
 
-/** The longest phrase the SEO title holds beside "| Brand", and the title too (at most 80; never under 20). */
+/** Characters of the SEO title left beside the phrase, so each product's SEO title can say what sets it apart (two
+ *  products with the same phrase must not get the same SEO title). */
+export const SEO_ROOM = 12;
+/** The longest phrase the SEO title holds beside "| Brand" with SEO_ROOM to spare, and the title too (20 to 80). */
 export function phraseMax(brand: string, titleMax?: number, metaTitleMax?: number): number {
-  const meta = metaTitleMax ? metaTitleMax - (brandFits(brand, metaTitleMax) ? String(brand).replace(/\s+/g, ' ').trim().length + 3 : 0) : 80;
+  const meta = metaTitleMax ? metaTitleMax - SEO_ROOM - (brandFits(brand, metaTitleMax) ? String(brand).replace(/\s+/g, ' ').trim().length + 3 : 0) : 80;
   return Math.max(20, Math.min(80, titleMax || 80, meta));
 }
 

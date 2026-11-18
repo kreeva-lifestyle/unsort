@@ -84,7 +84,7 @@ export default function ProfileSection({ draft, set, siteName }: { draft: Draft;
 
       <Cell span={6}>
         <Section title="Search phrase" hint="The phrase each listing is written for, made from the product's tags (the main one of each). It goes once in the title, once near the top of the description and once in the SEO title.">
-          <Field label="Pattern" htmlFor="pbp-kw" hint={<>Build it from: {mono(KEYWORD_PH)}. Kept to <span style={pbNum}>{kwMax}</span> characters so it fits the SEO title with your brand: the occasion is left out first, then the work. You can change the phrase for one listing in its editor.</>}>
+          <Field label="Pattern" htmlFor="pbp-kw" hint={<>Build it from: {mono(KEYWORD_PH)}. Kept to <span style={pbNum}>{kwMax}</span> characters, so the SEO title holds it, your brand and a few words of its own: the occasion is left out first, then the work. You can change the phrase for one listing in its editor.</>}>
             <input id="pbp-kw" value={p.keyword_pattern} onChange={e => put({ keyword_pattern: e.target.value })} maxLength={120} spellCheck={false}
               aria-describedby="pbp-kw-hint" className="pb-input" style={{ ...input44, fontFamily: PB.mono }} />
           </Field>

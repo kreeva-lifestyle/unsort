@@ -19,12 +19,11 @@ import { writeCopy } from './genWrite.ts';
 import { HttpError, plain, usdOf } from './http.ts';
 import { aiPhotos, galleryOf } from './photos.ts';
 import { compareAt, listingPrice } from './pricing.ts';
-import { brandFits, cleanKeyword, keywordOf, phraseMax, profileOf } from './profile.ts';
+import { cleanKeyword, keywordOf, phraseMax, profileOf } from './profile.ts';
 import { checkCopy, hardOf, type Version } from './seoCheck.ts';
 import { seoGet, seoPut } from './seoStore.ts';
 import { buildTags, vendorCode } from './tags.ts';
 import { attributeValues, siteValueTags } from './tagStore.ts';
-import { countPhrase } from './seoText.ts';
 import { PERM_NOTE } from './stockSend.ts';
 import { ARCHIVED, LISTING_COLS, MAX_ATTEMPTS, NEEDS_INFO, PRODUCT_COLS, STALE_MS, WEBSITE_COLS, hasPrice, permOut, type Budget, type ListingRow, type ProductRow, type WebsiteRow } from './types.ts';
 
@@ -98,9 +97,7 @@ export async function generateOne(l: ListingRow, o: { manual: boolean; prevStatu
     // The phrase from the product's own tags, short enough for the SEO title beside the brand (profile.ts keywordOf).
     const keyword = seo?.keyword_locked && seo.keyword ? cleanKeyword(seo.keyword) : keywordOf(profile.keyword_pattern, p, {
       values: Object.fromEntries((await attributeValues(p.id, p.category)).map(x => [x.key, x.values])), max: phraseMax(profile.brand, L.titleMax, L.metaTitleMax) });
-    // A phrase that fits beside the brand: an SEO title the AI wrote without it (or with it twice) becomes "phrase | Brand".
-    const metaFits = !!keyword && keyword.length + (brandFits(profile.brand, L.metaTitleMax) ? profile.brand.length + 3 : 0) <= L.metaTitleMax;
-    const seoTitleOf = (t: string) => { const w = withBrand(t, profile.brand, L.metaTitleMax); return metaFits && countPhrase(w, keyword) !== 1 ? withBrand(keyword, profile.brand, L.metaTitleMax) : w; };
+
     const others: Version[] = sibs.filter(isVersion).map(x => ({ title: x.title || '', description_html: x.description_html || '', seo_title: x.seo_title || '', seo_description: x.seo_description || '', image_alts: x.image_alts || [] }));
     const photos = await aiPhotos(imgs.slice(0, MAX_PHOTOS).map(i => i.path));
     const extraMax = tr.ai_extra ? Math.max(0, Math.floor(Number(tr.ai_extra_max) || 0)) : 0;
@@ -114,7 +111,7 @@ export async function generateOne(l: ListingRow, o: { manual: boolean; prevStatu
       const title = locked.has('title') && l.title ? l.title : fresh;
       const description_html = locked.has('description_html') && l.description_html !== null ? l.description_html : cleanHtml(g.description_html);
       const done: GenOut = { ...g, title, description_html,
-        seo_title: locked.has('seo_title') && l.seo_title !== null ? l.seo_title : seoTitleOf(g.seo_title || title),
+        seo_title: locked.has('seo_title') && l.seo_title !== null ? l.seo_title : withBrand(g.seo_title || title, profile.brand, L.metaTitleMax),
         seo_description: locked.has('seo_description') && l.seo_description !== null ? l.seo_description : cut(g.seo_description || stripTags(description_html), L.metaDescMax),
         faq: seo?.faq_locked ? seo.faq : g.faq };
       return { g: done, problems: checkCopy({ copy: done, keyword, brand: profile.brand, aiTitle, kept: [...locked], source: p.raw_text || '', others, facts,

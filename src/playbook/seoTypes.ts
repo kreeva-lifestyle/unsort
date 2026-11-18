@@ -40,11 +40,11 @@ export interface PbAiCost { product_id: string; read_usd: number; tag_usd: numbe
 /** The parts a pattern may use, least important first: left out first when the phrase is too long (profile.ts DROP). */
 const DROP = ['occasion', 'pattern', 'work', 'fabric', 'colour', 'color'];
 
-/** The longest search phrase the SEO title holds beside "| Brand" (profile.ts phraseMax's twin): a brand that leaves the
- *  product fewer than 12 characters is left out of SEO titles, so it takes no room. */
+/** The longest search phrase the SEO title holds beside "| Brand" with 12 characters to spare for what sets each product
+ *  apart (profile.ts phraseMax's twin): a brand that leaves the product fewer than 12 is left out of SEO titles. */
 export function phraseMax(brand: string, titleMax?: number, metaTitleMax?: number): number {
   const b = brand.replace(/\s+/g, ' ').trim();
-  const meta = metaTitleMax ? metaTitleMax - (b && metaTitleMax - b.length - 3 >= 12 ? b.length + 3 : 0) : 80;
+  const meta = metaTitleMax ? metaTitleMax - 12 - (b && metaTitleMax - b.length - 3 >= 12 ? b.length + 3 : 0) : 80;
   return Math.max(20, Math.min(80, titleMax || 80, meta));
 }
 
