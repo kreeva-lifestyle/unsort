@@ -539,9 +539,18 @@ per read for a Needs-info product with a tag missing (`fillAuto.ts`, owner 18
 Nov 2026: "AI should auto select. No user inputs required"):
 `pb_tags_auto_claim` takes up to 5 at a time (30 a run) whose `tags_ai_at` is
 empty or older than `ai_read_at`, stamping it, so a product is never paid for
-twice per read; not a bulk change (it finishes the read); paused / the day's
-AI limit → nothing taken; `trigger_pb_worker` wakes for them
-(`pb_tags_auto_due`). Also queued by `tags_ai_fill`, run by the worker after
+twice per read; only products held for nothing but tags (not a copy, not
+"Missing: Category", with a photo); a tag newly missing (`pb_products_refresh`
+clears `tags_ai_at` when `missing_attrs` gains a name) gives a new try; not a
+bulk change (it finishes the read); one product per claim, while 35 s are left;
+paused → nothing taken; the day's AI limit → `pb_tags_auto_hold` holds the
+waiting ones until the next IST day (`tags_ai_retry_at`); an AI that cannot be
+reached gives the try back and holds the product 30 minutes; any failure runs
+the gate again; `trigger_pb_worker` wakes for them (`pb_tags_auto_due`). A
+category move asks the AI for every moved product not waiting for a category
+(`missing_only: false`), and `tags_ai_fill` for an "only if it fits" attribute
+takes the category's products, so a Product Type is still chosen where one
+fits. Also queued by `tags_ai_fill`, run by the worker after
 read / write / publish (5 at a time while 35 s are left, up to 60 a run —
 most are settled by the word rules in a fraction of a second; the day's AI
 limit is asked before each 5), or at once from the product page. Progress

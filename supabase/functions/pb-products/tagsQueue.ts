@@ -40,12 +40,15 @@ export async function tagsAiFill(b: Body, userId: string | null) {
   }
   // Waiting only for a category the list no longer has ("Missing: Category"): the AI chooses tags, not categories.
   const f = ['status=in.(ready,needs_info)', 'tag_fill_run=is.null', 'locked=not.cs.{tags}', b.missing_only === false ? '' : 'missing_attrs=neq.{}', 'missing_attrs=neq.{Category}'];
+  const anyGap = () => { f[3] = ''; }; // products with no missing must-have still go (fillOne fills only what is empty)
   let aim = '';
   if (ids.length) { f.push(`id=in.(${ids.map(enc).join(',')})`); aim = `${ids.length} chosen ${ids.length === 1 ? 'product' : 'products'}`; }
   else if (b.attribute_id) {
-    const a = await one<{ name: string }>(`pb_attributes?id=eq.${enc(uuid(b.attribute_id, 'The attribute'))}&select=name`);
+    const a = await one<{ name: string; required: boolean | null }>(`pb_attributes?id=eq.${enc(uuid(b.attribute_id, 'The attribute'))}&select=name,required`);
     if (!a) throw new HttpError(404, 'That attribute no longer exists.');
-    f.push(`missing_attrs=cs.${enc(`{"${a.name.replace(/"/g, '')}"}`)}`);
+    // "Only if it fits" (Product Type): never in missing_attrs, so the category's products go, and the AI picks where one fits.
+    if (a.required === false) { if (!b.category) throw new HttpError(400, 'Say which category.'); anyGap(); }
+    else f.push(`missing_attrs=cs.${enc(`{"${a.name.replace(/"/g, '')}"}`)}`);
     if (b.category) f.push(`category=eq.${enc(displayName(b.category))}`);
     aim = `${a.name}${b.category ? ` for ${displayName(b.category)}` : ''}`;
   } else if (b.category) { f.push(`category=eq.${enc(displayName(b.category))}`); aim = displayName(b.category); }

@@ -478,7 +478,7 @@ insert into public.pb_category_attributes (category, attribute_id, position) val
 select t_is('a must-have attribute with no value holds the product', (select g.status || '/' || array_to_string(g.missing, ',') from public.pb_products_refresh(array[t_id(130)]) g), 'needs_info/Type,Occasion');
 update public.pb_attributes set required = false where id = :A_T13;
 select t_is('"only if it fits" never holds it: only the must-have one is missing', (select g.status || '/' || array_to_string(g.missing, ',') from public.pb_products_refresh(array[t_id(130)]) g), 'needs_info/Occasion');
-select t_is('… nor counts as lacking when linking', public.pb_category_lacking('Saree', :A_T13)::text, '0');
+select t_is('… but linking it still counts the products without one (the AI may give one where it fits)', public.pb_category_lacking('Saree', :A_T13)::text, '1');
 select t_is('… nor on the link', (select lacking::text from public.pb_tag_link_stats() where attribute_id = :A_T13), '0');
 select t_is('a must-have one still lacks', public.pb_category_lacking('Saree', :A_O13)::text, '1');
 select t_is('due: a Needs-info product missing a tag, never filled by itself', public.pb_tags_auto_due()::text, 'true');
@@ -486,6 +486,22 @@ select t_is('taken once', (select count(*)::text from public.pb_tags_auto_claim(
 select t_is('… not again for the same read', (select count(*)::text from public.pb_tags_auto_claim(50) where id = t_id(130)), '0');
 update public.pb_products set ai_read_at = now() + interval '1 second' where id = t_id(130);
 select t_is('read again: taken again', (select count(*)::text from public.pb_tags_auto_claim(50) where id = t_id(130)), '1');
+\set A_W13 '''e0000000-0000-4000-8000-000000000015'''
+insert into public.pb_attributes (id, name, key, multi, position) values (:A_W13, 'Work', 'work', true, 11);
+insert into public.pb_category_attributes (category, attribute_id, position) values ('Saree', :A_W13, 3);
+select count(*) from public.pb_products_refresh(array[t_id(130)]);
+select t_is('a tag newly missing (a must-have linked) gives a new try', (select count(*)::text from public.pb_tags_auto_claim(50) where id = t_id(130)), '1');
+delete from public.pb_category_attributes where attribute_id = :A_W13;
+select count(*) from public.pb_products_refresh(array[t_id(130)]);
+update public.pb_products set tags_ai_at = null where id = t_id(130);
+select t_is('the day''s AI limit: the waiting product is held', public.pb_tags_auto_hold(now() + interval '1 day')::text, '1');
+select t_is('… and is not due or taken meanwhile', public.pb_tags_auto_due()::text || '/' || (select count(*) from public.pb_tags_auto_claim(50) where id = t_id(130)), 'false/0');
+update public.pb_products set tags_ai_retry_at = null, copy_of = t_id(95) where id = t_id(130);
+select t_is('a copy waiting for a person is not taken', (select count(*)::text from public.pb_tags_auto_claim(50) where id = t_id(130)), '0');
+update public.pb_products set copy_of = null where id = t_id(130);
+delete from public.pb_product_images where product_id = t_id(130);
+select t_is('… nor a product with no photo yet', (select count(*)::text from public.pb_tags_auto_claim(50) where id = t_id(130)), '0');
+insert into public.pb_product_images (product_id, path, position) values (t_id(130), 'p130.jpg', 0);
 update public.pb_products set tags_ai_at = null, locked = '{tags}' where id = t_id(130);
 select t_is('tags a person locked: never taken', (select count(*)::text from public.pb_tags_auto_claim(50) where id = t_id(130)), '0');
 update public.pb_products set locked = '{}' where id = t_id(130);
@@ -504,6 +520,6 @@ select set_config('request.jwt.claims', '{}', false);
 rollback;
 
 -- Every check above printed a line: a part that silently printed nothing would be a failure too.
-select case when last_value = 225 then 'ok   every check ran (225)' else 'FAIL the number of checks is ' || last_value || ', not 225: a part printed fewer lines than it has, or this number was not updated' end from public.t_checks;
+select case when last_value = 230 then 'ok   every check ran (230)' else 'FAIL the number of checks is ' || last_value || ', not 230: a part printed fewer lines than it has, or this number was not updated' end from public.t_checks;
 drop function public.t_refused(text, text); drop function public.t_is(text, text, text); drop function public.t_rel(uuid, uuid); drop function public.t_product(int, uuid, text, text, int, numeric, text); drop function public.t_id(int);
 drop sequence public.t_checks;

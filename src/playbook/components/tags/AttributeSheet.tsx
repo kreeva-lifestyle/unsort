@@ -89,7 +89,7 @@ export default function AttributeSheet({ open, attr, uses = [], api, addToast, o
           <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
             <span style={{ ...pbBody, color: PB.tx, fontWeight: 600 }}>Must have</span>
             <span style={{ ...pbBody, color: PB.tx2 }}>{must
-              ? 'The AI always chooses one, and a product without it waits in Needs info (Colour, Occasion).'
+              ? `The AI always chooses one, and a product without it waits in Needs info (Colour, Occasion).${attr && attr.required === false ? ' Turning it on sends the products without one to Needs info until the AI has chosen one for them.' : ''}`
               : 'Only if it fits: the AI chooses one only when a value truly fits. A product without it still goes to websites (Product Type).'}</span>
           </span>
           <PbSwitch on={must} label="Must have" onToggle={() => setMust(x => !x)} />

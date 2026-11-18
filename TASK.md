@@ -29,6 +29,11 @@ are tagged.
   product goes out without one. Lehenga has just 3 types (Bridal Lehenga,
   South Indian Lehenga, Crop Top & Skirt), so most lehengas get none. Add
   the kinds you sell under Settings → Tags → Product Type if you want them.
+- **Work has no "Plain" value.** Since 18 Nov the AI always picks a value
+  for a must-have attribute, so a plain outfit gets the nearest work
+  (e.g. Digital Print). Add "Plain" (or "No work") to Work, or turn Work's
+  **Must have** off in Settings → Tags → Work so it is filled only when a
+  work truly fits.
 - **Two colours ("Pink and White"):** Multicolour, or the main colour?
   Colour takes one value.
 - **Wrong "also known as" words left by the old word rules:** Back → Black,

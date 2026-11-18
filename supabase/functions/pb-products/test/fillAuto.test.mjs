@@ -16,18 +16,21 @@ const VALUES = [{ id: 'pink', attribute_id: 'col', name: 'Pink', key: 'pink', al
 const LINKS = [{ category: 'Lehenga', attribute_id: 'col', position: 1 }, { category: 'Lehenga', attribute_id: 'type', position: 2 }];
 const P = (id) => ({ id, name: 'Lehenga choli', category: 'Lehenga', status: 'needs_info', locked: [], attributes: {}, raw_text: 'Lovely lehenga', source: 'telegram', missing_attrs: ['Colour'] });
 
-function world({ claims = [['p1']], aiStatus = 200, ai = { tags: { colour: { values: ['Pink'], other: [] }, product_type: { values: [], other: [] } } } } = {}) {
-  const calls = { claims: 0, ai: [], set: [], activity: [] };
+function world({ claims = [['p1']], aiStatus = 200, aiError = 'busy', ai = { tags: { colour: { values: ['Pink'], other: [] }, product_type: { values: [], other: [] } } } } = {}) {
+  const calls = { claims: 0, ai: [], set: [], activity: [], holds: [], refresh: [], patches: [] };
   const queue = [...claims];
   globalThis.fetch = async (url, init = {}) => {
     const u = decodeURIComponent(String(url)), method = init.method || 'GET';
     const ok = (b, s = 200) => new Response(JSON.stringify(b), { status: s });
     if (u.startsWith('https://api.anthropic.com/')) {
       calls.ai.push(JSON.parse(init.body));
-      return aiStatus === 200 ? ok({ content: [{ type: 'text', text: JSON.stringify(ai) }], usage: {} }) : ok({ error: { message: 'busy' } }, aiStatus);
+      return aiStatus === 200 ? ok({ content: [{ type: 'text', text: JSON.stringify(ai) }], usage: {} }) : ok({ error: { message: aiError } }, aiStatus);
     }
     const path = u.replace('https://sb.example/rest/v1/', '');
-    if (path === 'rpc/pb_tags_auto_claim') { calls.claims++; return ok((queue.shift() ?? []).map(id => ({ id }))); }
+    if (path === 'rpc/pb_tags_auto_claim') { calls.claims++; assert.equal(JSON.parse(init.body).p_limit, 1); return ok((queue.shift() ?? []).map(id => ({ id }))); }
+    if (path === 'rpc/pb_tags_auto_hold') { calls.holds.push(JSON.parse(init.body).p_until); return ok(3); }
+    if (path === 'rpc/pb_products_refresh') { calls.refresh.push(JSON.parse(init.body).p_ids); return ok([]); }
+    if (path.startsWith('pb_products?id=eq.') && method === 'PATCH') { calls.patches.push([path, JSON.parse(init.body)]); return ok([{ id: 'x' }]); }
     if (path.startsWith('pb_attributes?')) return ok(ATTRS);
     if (path.startsWith('pb_attribute_values?')) return ok(VALUES);
     if (path.startsWith('pb_category_attributes?')) return ok(LINKS);
@@ -59,17 +62,33 @@ test('taken products are filled with no person: the colour must be chosen, Produ
   assert.equal(done.details.auto, true); assert.equal(done.details.manual, false); assert.equal(done.user_id, null);
 });
 
-test('paused, the day\'s AI limit, or no time: nothing is taken (the claim stamps nothing, so they wait)', async () => {
+test('paused or no time: nothing is taken; the day\'s AI limit: the waiting ones are held until the next day in India', async () => {
   for (const o of [{ stopped: async () => true }, { capped: async () => true }, { left: () => false }]) {
     const c = world();
     assert.equal(await autoFill(opts(o)), 0);
     assert.equal(c.claims, 0);
+    if (!o.capped) { assert.equal(c.holds.length, 0); continue; }
+    const IST = 5.5 * 3600_000, day = 86_400_000;
+    assert.deepEqual(c.holds.map(Date.parse), [(Math.floor((Date.now() + IST) / day) + 1) * day - IST]);
   }
 });
 
-test('a failure is logged as an automatic fill that failed, and the next product still goes', async () => {
-  const c = world({ claims: [['p1', 'p2']], aiStatus: 529 });
+test('an AI that cannot be reached: the try is given back with a 30-minute wait, the gate runs again, and the rest wait', async () => {
+  const c = world({ claims: [['p1'], ['p2']], aiStatus: 529 });
+  const before = Date.now();
   assert.equal(await autoFill(opts()), 0);
-  const failed = c.activity.filter(a => a.action === 'failed');
-  assert.deepEqual(failed.map(a => [a.product_id, a.details.step, a.details.auto]), [['p1', 'tags_fill', true], ['p2', 'tags_fill', true]]);
+  assert.equal(c.claims, 1, 'p2 is not taken while the AI is down');
+  assert.deepEqual(c.activity.filter(a => a.action === 'failed').map(a => [a.product_id, a.details.step, a.details.auto]), [['p1', 'tags_fill', true]]);
+  assert.deepEqual(c.refresh, [['p1']]);
+  const [path, body] = c.patches[0];
+  assert.ok(path.startsWith('pb_products?id=eq.p1')); assert.equal(body.tags_ai_at, null);
+  assert.ok(Date.parse(body.tags_ai_retry_at) >= before + 30 * 60_000 - 1000);
+});
+
+test('a request that went wrong (refused) keeps the try used, runs the gate again, and the next product still goes', async () => {
+  const c = world({ claims: [['p1'], ['p2']], aiStatus: 400, aiError: 'prompt is too long' });
+  assert.equal(await autoFill(opts()), 0);
+  assert.equal(c.claims, 3);
+  assert.deepEqual(c.refresh, [['p1'], ['p2']]);
+  assert.equal(c.patches.length, 0);
 });

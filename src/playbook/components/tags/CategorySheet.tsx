@@ -65,14 +65,14 @@ export default function CategorySheet({ category, categories, products, attrs, l
   const link = async (ai: boolean) => {
     if (!ask0) return;
     const { attr: a, lacking: n } = ask0;
-    const ok = await save([...ids, a.id], ai ? 'link-ai' : 'link', r => `${category} now needs ${a.name} — ${plural(r.to_needs_info, 'product')} wait in Needs info`);
+    const ok = await save([...ids, a.id], ai ? 'link-ai' : 'link', r => (a.required === false ? `${category} now uses ${a.name}` : `${category} now needs ${a.name} — ${plural(r.to_needs_info, 'product')} wait in Needs info`));
     if (!ok) return;
     setAsk0(null);
     if (!ai) return;
     try {
       const q = await api.aiFill({ category, attribute_id: a.id });
       // q can be fewer than the products lacking it (n), or none: the AI leaves products whose tags a person chose.
-      if (q) addToast(`AI is choosing a ${a.name} for ${plural(q, 'product')} — they move to Ready as it goes`, 'success');
+      if (q) addToast(a.required === false ? `AI is choosing a ${a.name} where one fits, for ${plural(q, 'product')}` : `AI is choosing a ${a.name} for ${plural(q, 'product')} — they move to Ready as it goes`, 'success');
       else addToast(`The AI took none of the ${plural(n, 'product')}: they already wait for it, or their tags were chosen by hand. Choose ${a.name} on those yourself.`, 'info');
       onChanged();
     }
@@ -128,8 +128,10 @@ export default function CategorySheet({ category, categories, products, attrs, l
         </ol>
         {ask0 && (
           <div role="alertdialog" aria-labelledby="pbc-warn" style={{ ...pbTileReview, backdropFilter: 'none', WebkitBackdropFilter: 'none', borderRadius: PB.r.input, padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <Dot color={PB.review} label={<span id="pbc-warn">{plural(ask0.lacking, 'product')} will need a {ask0.attr.name}</span>} style={{ color: PB.tx, fontWeight: 600, fontSize: 13, whiteSpace: 'normal' }} />
-            <span style={pbBody}>Until they have one they wait in Needs info and are not sent to websites. The AI can choose one from your {ask0.attr.name} list for each.
+            <Dot color={PB.review} label={<span id="pbc-warn">{plural(ask0.lacking, 'product')} {ask0.attr.required === false ? `have no ${ask0.attr.name} yet` : `will need a ${ask0.attr.name}`}</span>} style={{ color: PB.tx, fontWeight: 600, fontSize: 13, whiteSpace: 'normal' }} />
+            <span style={pbBody}>{ask0.attr.required === false
+              ? <>{ask0.attr.name} is “only if it fits”: they still go to websites. The AI can choose one from your list for each, where one truly fits.</>
+              : <>Until they have one they wait in Needs info and are not sent to websites. The AI can choose one from your {ask0.attr.name} list for each.</>}
               {here(ask0.attr) === 0 && <> But no {ask0.attr.name} value is ticked for {category} yet: tick some first, or nothing can be chosen.</>}</span>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <PbButton kind="primary" icon="sparkles" onClick={() => void link(true)} busy={busy === 'link-ai'} busyLabel="Linking…" dim={busy === 'link'}>Link and let AI decide</PbButton>

@@ -78,7 +78,7 @@ export default function ProductValues({ product, addToast, onSaved, load = produ
                   aria-label={`${a.name}: ${vs.length ? vs.map(v => v.name).join(', ') : none ? 'none fits' : 'not chosen'}. Change`}>
                   <span style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
                     <span style={{ ...pbMeta, fontWeight: 600, color: PB.tx2 }}>{a.name}</span>
-                    <span style={{ color: vs.length ? PB.tx : none ? PB.tx3 : PB.review, overflowWrap: 'anywhere' }}>{vs.length ? vs.map(v => v.name).join(', ') : none ? 'None fits — only if one does' : 'Choose…'}</span>
+                    <span style={{ color: vs.length ? PB.tx : none ? PB.tx2 : PB.review, overflowWrap: 'anywhere' }}>{vs.length ? vs.map(v => v.name).join(', ') : none ? 'None fits — only if one does' : 'Choose…'}</span>
                   </span>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                     {src.map(s => <PbTag key={s}>{SOURCE_LABEL[s]}</PbTag>)}

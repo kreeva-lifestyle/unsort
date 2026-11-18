@@ -40,22 +40,23 @@ test('rename: one database call inside a bulk change named after both names', as
   assert.deepEqual(calls.find(([m, p]) => m === 'PATCH' && p.startsWith('pb_bulk_runs'))[2].details, { from: 'Anarkali', to: 'Anarkali Suit', unit: 'products' }); // what the revert needs
 });
 
-test('move: the products go, the old name leaves the list, and the AI is asked only for those missing a tag', async () => {
+test('move: the products go, the old name leaves the list, and the AI may choose tags for every one not waiting for a category', async () => {
   const [p1, p2, p3] = [1, 2, 3].map(n => `a0000000-0000-4000-8000-00000000000${n}`);
   const moved = [
-    { id: p1, status: 'needs_info', was: 'needs_info', missing: ['Product Type'] }, // Salwar Suit needs one: AI
-    { id: p2, status: 'ready', was: 'needs_info', missing: [] },                     // complete there: Ready
+    { id: p1, status: 'needs_info', was: 'needs_info', missing: ['Occasion'] },     // a must-have missing: AI
+    { id: p2, status: 'ready', was: 'needs_info', missing: [] },                     // Ready; the AI may still give it a Product Type where one fits
     { id: p3, status: 'needs_info', was: 'needs_info', missing: ['Category'] },     // not for the AI
   ];
   const calls = world({ 'rpc/pb_category_move': moved, 'pb_settings?key=eq.categories': [{ value: ['Saree', 'Anarkali', 'Salwar Suit'] }], 'rpc/pb_categories_prune': 0,
-    'pb_products?status=in.(ready,needs_info)&tag_fill_run': (p) => (p.includes(`id=in.(${p1})`) ? [{ id: p1 }] : []) });
+    'pb_products?status=in.(ready,needs_info)&tag_fill_run': (p) => (p.includes(`id=in.(${p1},${p2})`) ? [{ id: p1 }, { id: p2 }] : []) });
   const r = await categoryMove({ from: 'Anarkali', to: 'Salwar Suit', remove: true }, 'u1');
-  assert.deepEqual({ moved: r.moved, to_ready: r.to_ready, queued: r.queued, removed: r.removed }, { moved: 3, to_ready: 1, queued: 1, removed: true });
+  assert.deepEqual({ moved: r.moved, to_ready: r.to_ready, queued: r.queued, removed: r.removed }, { moved: 3, to_ready: 1, queued: 2, removed: true });
   const order = rpcs(calls).map(([f]) => f);
   assert.ok(order.indexOf('pb_category_move') < order.indexOf('pb_categories_prune'), 'moved first, then taken off the list');
   assert.deepEqual(calls.find(([m, p]) => m === 'POST' && p.startsWith('pb_settings'))[2], [{ key: 'categories', value: ['Saree', 'Salwar Suit'] }]);
   const fill = calls.find(([m, p]) => m === 'PATCH' && p.includes('tag_fill_run=is.null'));
-  assert.ok(fill[1].includes(`id=in.(${p1})`) && !fill[1].includes(p3) && !fill[1].includes(p2), 'only p1 is queued for the AI');
+  assert.ok(fill[1].includes(`id=in.(${p1},${p2})`) && !fill[1].includes(p3), 'p1 and p2 are queued for the AI, not p3');
+  assert.ok(!fill[1].includes('missing_attrs=neq.{}'), 'a product with no must-have missing still goes (Product Type only if it fits)');
 });
 
 test('move: refused onto the same category; nothing is called', async () => {
