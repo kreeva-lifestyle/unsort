@@ -5,8 +5,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-globalThis.Deno ??= { env: { get: () => '' } }; // db.ts reads Deno.env
-const { sumFill } = await import('../fillProgress.ts');
+globalThis.Deno ??= { env: { get: (k) => (k === 'SUPABASE_URL' ? 'https://sb.example' : 'test') } }; // db.ts reads Deno.env
+const { fillStatus, sumFill } = await import('../fillProgress.ts');
 
 const at = (min) => new Date(Date.UTC(2026, 10, 13, 21, 0) + min * 60_000).toISOString();
 const run = (id, total, filled, created, finished = null, left_empty = 0) => ({ id, total, filled, left_empty, created_at: at(created), finished_at: finished === null ? null : at(finished) });
@@ -33,4 +33,17 @@ test('not started yet: no pace, no estimate; a reason is given only while produc
   r = sumFill([run('a', 12, 12, 0, 5)], 0, 0, 'limit');
   assert.equal(r.blocked, null);
   assert.equal(sumFill([], 0, 0), null);
+});
+
+test('a request that queued nothing is no batch: the finished batch before it still shows its "Done" (18 Nov 2026)', async () => {
+  const now = Date.now(), iso = (m) => new Date(now - m * 60_000).toISOString();
+  const rows = [{ id: 'empty', total: 0, filled: 0, left_empty: 0, created_at: iso(1), finished_at: iso(1) },
+    { id: 'big', total: 128, filled: 85, left_empty: 1, created_at: iso(40), finished_at: iso(5) }];
+  globalThis.fetch = async (url) => {
+    const u = decodeURIComponent(String(url));
+    if (u.includes('/rest/v1/pb_tag_fill_runs?')) return new Response(JSON.stringify(rows), { status: 200 });
+    throw new Error(`unexpected ${u}`);
+  };
+  const f = await fillStatus();
+  assert.equal(f.id, 'big'); assert.equal(f.total, 128); assert.equal(f.filled, 85); assert.ok(f.finished_at);
 });

@@ -1,7 +1,7 @@
 // One product on one website: edit title / description / SEO / handle / tags /
 // price (each edit joins listing.locked so Regenerate keeps it), the search
 // phrase it is written for and its questions (detail/ListingSeo.tsx), with
-// what the checks found at the top; plus the actions in ListingActions
+// the reason at the top when a listing is held; plus the actions in ListingActions
 // (Regenerate, Approve, Publish / Update, Remove): the gradient one in the
 // sheet footer, the others and Remove in the body.
 import { useEffect, useRef, useState } from 'react';

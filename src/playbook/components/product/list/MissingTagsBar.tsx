@@ -2,10 +2,12 @@
 // (owner, 18 Nov 2026: "the queue on refresh vanishes and does not give clarity whether its done or not").
 //   • The "Let AI decide" batch (FillProgress, as on the Tags page): done of total with a bar, what is left and about
 //     how long, or why it waits; once over, "Done" with how many got their tags and when it finished, for 12 hours.
-//     Read from the server (tags_fill_status), so a refresh shows it again; asked again every 8 s while it runs, and
-//     the list reloads when it ends.
-//   • "N products wait for a required tag" with "Let AI decide for N products": only the ones not already in a batch
-//     (the ones the button takes). Two signals: "Queuing…" on the button, then a toast and the batch's progress.
+//     Read from the server (tags_fill_status), so a refresh shows it again; asked again every 8 s while it runs and for
+//     a minute after "Done" (the last product taken may still be saving its tags), then it counts again and the list
+//     reloads, once.
+//   • "N products wait for a required tag" with "Let AI decide for N products": only once no batch runs (one the batch
+//     took and left would otherwise be paid for again), and only the ones not in a batch (the ones the button takes).
+//     Two signals: "Queuing…" on the button, then a toast and the batch's progress.
 // Hidden when nothing waits and no batch ran in the last 12 hours.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { friendlyError } from '../../../../lib/friendlyError';
@@ -20,6 +22,8 @@ import { Dot } from '../status';
 
 const SHOW_DONE_MS = 12 * 3600_000;
 const POLL_MS = 8000;
+/** After "Done", the last product taken may still be saving its tags: asked again until then. */
+const SETTLE_MS = 60_000;
 
 /** The server calls (a fake one for the screenshot harness). */
 export interface MissingTagsApi { count: () => Promise<number>; status: () => Promise<PbFillRun | null>; queue: () => Promise<number> }
@@ -35,16 +39,19 @@ export default function MissingTagsBar({ addToast, onQueued, api = LIVE }: { add
   const status = useCallback(() => api.status().then(f => { setFill(f); return f; }).catch(e => { logSwallowed('tags_fill_status', e); return null; }), [api]);
   useEffect(() => { void count(); void status(); }, [count, status]);
   const running = !!fill && !fill.finished_at;
+  const settling = !!fill?.finished_at && Date.now() - Date.parse(fill.finished_at) < SETTLE_MS;
   useEffect(() => {
-    if (!running) return;
+    if (!running && !settling) return;
     const t = setInterval(() => {
-      void status().then(f => { if (f?.finished_at) { void count(); reload.current(); } });
+      void status().then(f => {
+        if (f?.finished_at && Date.now() - Date.parse(f.finished_at) >= SETTLE_MS) { void count(); reload.current(); } // settled: once
+      });
     }, POLL_MS);
     return () => clearInterval(t);
-  }, [running, status, count]);
+  }, [running, settling, status, count]);
 
   const shown = !!fill && fill.total > 0 && (running || Date.now() - Date.parse(fill.finished_at as string) < SHOW_DONE_MS);
-  if (!n && !shown) return null;
+  if (!shown && (!n || running || settling)) return null;
   const go = async () => {
     setBusy(true);
     try {
@@ -55,12 +62,12 @@ export default function MissingTagsBar({ addToast, onQueued, api = LIVE }: { add
     } catch (e) { addToast(friendlyError(e), 'error'); } finally { setBusy(false); }
   };
   return (
-    <PbTile variant={n ? 'review' : undefined} style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
+    <PbTile variant={n && !running && !settling ? 'review' : undefined} style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
       {shown && <FillProgress fill={fill as PbFillRun} />}
-      {!!n && (
+      {!!n && !running && !settling && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <Dot color={PB.review} style={{ color: PB.tx, fontSize: 13, fontWeight: 600, whiteSpace: 'normal', flex: '1 1 220px' }}
-            label={<span><span style={pbNum}>{n.toLocaleString('en-IN')}</span> {n === 1 ? 'product waits' : 'products wait'} for a required tag{running ? ' (not in the batch above)' : ''}</span>} />
+            label={<span><span style={pbNum}>{n.toLocaleString('en-IN')}</span> {n === 1 ? 'product waits' : 'products wait'} for a required tag</span>} />
           <PbButton icon="sparkles" style={{ whiteSpace: 'normal', padding: '8px 16px' }} onClick={() => void go()} busy={busy} busyLabel="Queuing…">
             Let AI decide for {n.toLocaleString('en-IN')} {n === 1 ? 'product' : 'products'}
           </PbButton>

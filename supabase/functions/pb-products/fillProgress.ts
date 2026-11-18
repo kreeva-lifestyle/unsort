@@ -45,7 +45,10 @@ export function sumFill(all: FillRunRow[], waiting: number, recent: number, bloc
 /** The batch from the database. A run whose products are all gone from the queue (archived meanwhile) but that no tick
  *  closed is closed here — not in its first minutes: a run is created before its products are marked. */
 export async function fillStatus(): Promise<FillProgress | null> {
-  const rows = await sel<FillRunRow>('pb_tag_fill_runs?select=id,total,filled,left_empty,created_at,finished_at&order=created_at.desc&limit=30');
+  // A request that queued nothing (all were in a batch or done already) is no batch: it must not hide the last one's
+  // progress or its "Done" (18 Nov 2026: 13 of 28 runs were empty).
+  const rows = (await sel<FillRunRow>('pb_tag_fill_runs?select=id,total,filled,left_empty,created_at,finished_at&order=created_at.desc&limit=30'))
+    .filter(r => r.total > 0 || !r.finished_at);
   const open = rows.filter(r => !r.finished_at);
   const queued = (ids: string[]) => (ids.length ? count(`pb_products?select=id&tag_fill_run=in.(${ids.map(enc).join(',')})&status=in.(ready,needs_info)`) : Promise.resolve(0));
   for (const r of open) {
