@@ -10,8 +10,9 @@
 --                   worker moves it on to hold words back longer: 30 minutes after an AI call that failed (no key, no
 --                   credit, the AI down), the next IST day when the day's AI limit is used up — so neither wakes the
 --                   worker every minute all day.
---   tries           AI answers that left the word out (the worker counts them); after 3 the word is ignored. A failed
---                   call, the daily limit or the clock does not use one up, so an outage never ignores the backlog.
+--   tries           AI answers that left the word out, or requests that went wrong (cut off, refused, too slow): the
+--                   worker counts them; after 3 the word is ignored. An outage (no key, no credit, the AI down), the
+--                   daily limit or the clock does not use one up, so an outage never ignores the backlog.
 --   pb_tag_file_due  words go in batches: only when 20 wait, or one has waited 15 minutes since it was first seen. A
 --                   pass is one row in Settings → Bulk changes; without this an import gave one row a minute.
 --   pb_tag_file_claim  claims up to p_limit words in one statement (FOR UPDATE SKIP LOCKED), when due: overlapping
