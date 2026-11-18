@@ -24,7 +24,7 @@
 --                            gives the try back), the next IST day while the day's AI limit is used up
 --                            (pb_tags_auto_hold) — so neither wakes the worker every minute.
 --   trigger_pb_worker        also wakes the worker while such a product waits (pb_tags_auto_due).
--- Additive: four columns (defaulted / nullable, no backfill), four new functions (service role only), three functions
+-- Additive: three columns (defaulted / nullable, no backfill), four new functions (service role only), four functions
 -- replaced with the same signatures, one trigger re-created, one setting (Product Type → only if it fits). The products
 -- held only for Product Type (~117) keep their "Missing: Product Type" for now, so the worker's automatic "Let AI
 -- decide" takes each of them once: the AI picks a type where one truly fits, and that fill's Ready check releases them
