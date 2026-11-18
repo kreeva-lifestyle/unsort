@@ -1,5 +1,5 @@
 // Pure: the AI's half of filing new tag words (tagsFile.ts; owner, 2026-11-17: "merged automatic with the best possible
-// AI suggestion rest should be automatically ignore"). One call files up to 20 words. It sees the lists with the words
+// AI suggestion rest should be automatically ignore"). One call files up to 10 words. It sees the lists with the words
 // already filed under each value, the words a PERSON ignored (never the worker's own, so it does not learn from its
 // guesses), and each new word with where it was seen and example products. For every word it names a listed value (or
 // none) and how close it is:

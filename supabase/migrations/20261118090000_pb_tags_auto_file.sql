@@ -29,6 +29,10 @@
 --                   change left it — the aliases word by word, a product's tags only where unchanged, a suggestion
 --                   only while its status is as left (pb_bulk_tags_apply) — so the order does not matter for them.
 --                   Patched in place from the live definition, so nothing else in it changes.
+--   bulk capture    filed_by is recorded with a suggestion row and put back when a revert re-inserts a row the change
+--                   deleted (an attribute delete takes a word's twin with it): without it a word Playbook ignored would
+--                   come back as ignored by a person, and a word taken back would be filed again. A revert that only
+--                   UPDATES a row still leaves filed_by as it is (that is what marks a word taken back).
 -- Additive: three columns (nullable or defaulted, no backfill), one partial index, three new functions (service role
 -- only), two functions replaced with the same signature. RLS on pb_tag_suggestions is unchanged (staff read; writes
 -- only through the edge function).
@@ -152,4 +156,19 @@ begin
   end if;
   execute replace(d, 'where x.kind = any(family) and x.created_at > r.created_at',
     'where x.kind = any(family) and x.created_at > r.created_at and not (x.kind = ''suggestions'' and x.created_by is null)');
+end $do$;
+
+-- filed_by travels with a suggestion row through the bulk-change log (see the header).
+create or replace trigger pb_bulk_capture after insert or update or delete on public.pb_tag_suggestions
+  for each row execute function public.pb_bulk_capture('id', 'id,phrase,key,attribute_id,status,uses,examples,source,resolved_value_id,first_seen_at,last_seen_at,filed_by');
+do $do$
+declare d text := pg_get_functiondef('public.pb_bulk_tags_apply(uuid)'::regprocedure);
+  ins constant text := 'insert into pb_tag_suggestions (id, phrase, key, attribute_id, status, uses, examples, source, resolved_value_id, first_seen_at, last_seen_at)';
+  val constant text := 'b ->> ''source'', v.id, (b ->> ''first_seen_at'')::timestamptz, (b ->> ''last_seen_at'')::timestamptz';
+begin
+  if position(ins in d) = 0 and position('last_seen_at, filed_by)' in d) > 0 then return; end if; -- done before
+  if position(ins in d) = 0 or position(val in d) = 0 then
+    raise exception 'pb_bulk_tags_apply is not the version this migration expects (20261113090000_pb_bulk_log_tags_stock.sql).';
+  end if;
+  execute replace(replace(d, ins, replace(ins, 'last_seen_at)', 'last_seen_at, filed_by)')), val, val || ', b ->> ''filed_by''');
 end $do$;

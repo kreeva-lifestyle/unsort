@@ -570,24 +570,30 @@ is not paused:
    same / same_word / word_order / translation / shade. Typo and
    "spelled almost the same" hits are not trusted (they made Back → Black,
    Brunches → Art Silk, Koti → Khatli Work) and go to the AI.
-3. The AI (`claude-sonnet-5-5`, effort medium; ≤ 20 words a call, while the
+3. The AI (`claude-sonnet-5-5`, effort medium; ≤ 10 words a call, so one answer
+   stays well inside its 45 s; while the
    day's AI limit allows): the lists with up to 120 aliases per value, the 40
    latest words a PERSON ignored (never the worker's own), each word with its
    source, attribute and two example products. It answers an enum of
    "Attribute: Value" labels or "none", a match (`same` / `kind` / `related` /
    `none`) and a ≤ 14-word why. Same or kind → "also known as" that value;
    related or none → ignored. A word the answer leaves out (or names a label
-   not on the lists), or an answer that was paid for but unusable (cut off,
-   refused), uses a try (`tries`, guarded by the old count); after 3 it is
-   ignored. A call that FAILED (no key, no credit, the AI busy or down) uses
-   no try: the rest of the pass waits 30 minutes (`tried_at` moved on), so an
+   not on the lists), or a request that went wrong (cut off, refused,
+   unreadable, too slow: `failureOf` 'answer'), uses a try (`tries`, guarded
+   by the old count); after 3 it is ignored. A call that found no AI to ask
+   (no key, key rejected, no credit, rate limit, overloaded, unreachable:
+   'outage') uses no try: the rest of the pass waits 30 minutes (`tried_at` moved on), so an
    outage never ignores the backlog (`failed`, step `tags_file`). The day's
    AI limit used up → those words are held until the next IST day and do not
    wake the worker meanwhile. The cost is a `tags_matched` row that
    `pb_ai_cost_since` counts. A word that names two values of the chosen
-   value's attribute (the matcher, `namesTwo`: "Sequins Embroidery") is
-   ignored, never filed under one of them — the matcher takes the longest
-   phrase first, so its products would lose the other value.
+   value's attribute, each on its own (the matcher, `namesTwo`: "Sequins
+   Embroidery" → Embroidery), is ignored, never filed under one of them — the
+   matcher takes the longest phrase first, so its products would lose the
+   other value. Only for attributes that take several values; "Faux Silk" →
+   Art Silk or "Off White" → Cream (the other value only part of a longer
+   name) is filed; values that depend on the category count only when they
+   share one with the chosen value.
 4. `pb_tag_file(id, value?, why, match)` files ONE word in one transaction:
    the alias appended in place (a word another value of the same attribute
    already has goes to that value), status aliased / ignored, `filed_by`
@@ -595,7 +601,8 @@ is not paused:
    row is locked; a value deleted or merged away meanwhile, or another value
    taking the word meanwhile, leaves the word pending (`filed: false`).
 5. The example products (up to 5) of every aliased word are retagged by the
-   rules (chunks of 50; "Retag all" brings the value to the rest); a word the AI read from a product for one attribute also
+   rules (chunks of 50, while 15 s are left; "Retag all" brings the value to
+   the rest); a word the AI read from a product for one attribute also
    gives that value to the example products with none for it (`writeValues`
    'add'; open and unlocked products only).
 6. A pass is ONE bulk change (kind `suggestions`, no person): "Filed 40 new
@@ -606,7 +613,10 @@ is not paused:
    a wrong "also known as" can always be taken back, and it never stops an
    earlier tag change from being reverted (`pb_bulk_revert`'s "later change
    goes first" check skips it: the tag revert is row by row on what is still
-   as the change left it, so the order does not matter).
+   as the change left it. One gap: reverting an earlier merge after a pass
+   filed a word under the kept value can leave a product without that value
+   until "Retag all"). `filed_by` is recorded with the row in the log and put
+   back when a revert re-inserts a deleted row.
 `trigger_pb_worker` also wakes the worker while words are due.
 
 **Values that depend on the category — Product Type** (owner, 2026-11-13: "the
@@ -1555,7 +1565,8 @@ A **bulk change** is one tap that changes many products or listings.
 - "Only those which are done in bulk": a tag-list change or a stock notice
   stays in the log only when it reached **two or more products**, or (tag
   lists) took two or more entries out of the lists at once (an attribute goes
-  with its values and links) or filed two or more new words at once
+  with its values and links) or filed two or more new words at once — or
+  one, when Playbook filed it by itself (a run with no person)
   (`endRun` → `sizeOf`; `details.unit` says what `items` counts). Below that
   it is an ordinary edit and leaves the log.
 - An import's run has the import's own id; the runner asks for it on every

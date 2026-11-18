@@ -8,14 +8,15 @@
 //   2. the word rules file a word only when they are sure: the same word, another form or order, the Hindi word, a
 //      shade (tagLook.ts). A typo or "spelled almost the same" match is NOT trusted — it made wrong aliases (Back →
 //      Black, Brunches → Art Silk, Koti → Khatli Work) — so those words go to the AI;
-//   3. the rest goes to the AI, 20 at a time (tagFilePrompt.ts), while the clock and the day's AI limit allow: same or
+//   3. the rest goes to the AI, 10 at a time (tagFilePrompt.ts; one answer stays well inside 45 s), while the clock and the day's AI limit allow: same or
 //      kind → "also known as" that value; related or none → ignored. A word the AI answered around is asked again
-//      later and ignored after 3 tries. A call that FAILED (no key, no credit, the AI busy or down) uses no try: the
-//      words wait 30 minutes, so an outage never ignores the backlog. The day's AI limit used up → the words wait for
+//      later and ignored after 3 tries; so does a request that went wrong (cut off, refused, too slow). A call that
+//      found no AI to ask (no key, no credit, the AI busy or down) uses no try: the words wait 30 minutes, so an
+//      outage never ignores the backlog. The day's AI limit used up → the words wait for
 //      the next day (they do not wake the worker meanwhile). Cost is logged as 'tags_matched' (pb_ai_cost_since);
-//   4. a word that names two values of one attribute ("Sequins Embroidery") is never filed under one of them: the
-//      matcher takes the longest phrase first, so the products would lose the other value. It is ignored — the text
-//      already gives both;
+//   4. a word that names two values of one attribute, each on its own ("Sequins Embroidery"), is never filed under
+//      one of them: the matcher takes the longest phrase first, so the products would lose the other value. It is
+//      ignored — the text already gives both (namesTwo);
 //   5. each word in one transaction (pb_tag_file: the alias appended in place); a whole pass is ONE bulk change, so
 //      Settings → Bulk changes takes it back for 7 days, and a word taken back stays marked and is not filed again;
 //   6. the products: the example products of each filed word (up to 5) are tagged again by the rules; a word the AI
@@ -25,7 +26,7 @@ import { askClaude } from './ai.ts';
 import { istDayStart } from './brake.ts';
 import { asBulk } from './bulkLog.ts';
 import { enc, logActivity, patch, rpc, sel } from './db.ts';
-import { plain, usdOf } from './http.ts';
+import { HttpError, plain, usdOf } from './http.ts';
 import { type FileAnswer, decide, filePrompt, readFile } from './tagFilePrompt.ts';
 import { type LookReason, lookAlikes } from './tagLook.ts';
 import { matchProduct } from './tagMatch.ts';
@@ -34,22 +35,30 @@ import { retagProducts } from './tagsProduct.ts';
 import { type Taxonomy, loadTaxonomy, shadesOf, taxValues } from './taxonomy.ts';
 import type { Budget } from './types.ts';
 
-/** The model that files words (owner: "the best possible AI suggestion"); about 2 US cents for 20 words. */
+/** The model that files words (owner: "the best possible AI suggestion"); about 3 US cents for 10 words. */
 export const FILE_MODEL = 'claude-sonnet-5-5';
 /** Time a pass needs left before it starts: one AI answer and the writes. */
 export const FILE_NEEDS_MS = 50_000;
-const TAKE = 40, ASK = 20, TRIES = 3, FAILED_WAIT_MS = 30 * 60_000;
+const TAKE = 40, ASK = 10, TRIES = 3, FAILED_WAIT_MS = 30 * 60_000;
 const SURE: Partial<Record<LookReason, string>> = {
   same: 'The same word.', same_word: 'The same word in another form.', word_order: 'The same words in another order.',
   translation: 'The Hindi or Hinglish word for it.', shade: 'A shade of it.',
 };
 const TWO = 'It names two values; each is found on its own.';
+const RETAG_NEEDS_MS = 15_000;
 
 export interface Word { id: string; phrase: string; key: string; attribute_id: string | null; source: string; examples: string[]; tries: number }
 interface Choice { w: Word; value_id: string | null; why: string; match: string }
 export interface FileResult { aliased: number; ignored: number; retagged: number; waiting: number }
-/** The AI's answer: picks by word number; `failed` = no answer at all ('paid' = it answered but unusably, e.g. cut off). */
-type Asked = { got: Map<number, FileAnswer> } | { failed: 'paid' | 'free' };
+/** The AI's answer: picks by word number, or `failed`: 'outage' = no AI to ask (no key, key rejected, no credit, rate
+ *  limit, overloaded, unreachable) — uses no try; 'answer' = this request went wrong (cut off, refused, unreadable, too
+ *  slow) — uses a try, so a request that always fails ends in "ignored" instead of being asked forever. */
+type Asked = { got: Map<number, FileAnswer> } | { failed: 'outage' | 'answer' };
+export function failureOf(e: unknown): 'outage' | 'answer' {
+  if (usdOf(e) || !(e instanceof HttpError)) return 'answer';
+  const m = e.message;
+  return e.status === 409 || e.status === 503 || (e.status === 502 && /key was rejected|credit/i.test(m)) || (e.status === 504 && /could not reach/i.test(m)) ? 'outage' : 'answer';
+}
 
 /** The word rules' sure answer, or null (then the AI decides). */
 export function surely(w: Pick<Word, 'phrase' | 'attribute_id'>, values: Parameters<typeof lookAlikes>[1]): { value_id: string; why: string } | null {
@@ -58,13 +67,18 @@ export function surely(w: Pick<Word, 'phrase' | 'attribute_id'>, values: Paramet
   return top && why ? { value_id: top.value_id, why } : null;
 }
 
-/** Does the phrase already name another value of the chosen value's attribute ("Sequins Embroidery" → Embroidery)? */
+/** Does the phrase already name the chosen value AND another value of its attribute, each on its own ("Sequins
+ *  Embroidery" → Embroidery)? Then its products get both from the text, and an alias would take the other away.
+ *  Only for attributes that take several values (one that takes one keeps one anyway); a phrase where the other value
+ *  is only part of a longer name ("Faux Silk" → Art Silk, "Off White" → Cream) is not two values: the alias corrects
+ *  it. Values that depend on the category count only when they share one with the chosen value. */
 export function namesTwo(phrase: string, valueId: string, tax: Taxonomy): boolean {
   const v = tax.values.find(x => x.id === valueId), a = v && tax.attrs.find(x => x.id === v.attribute_id);
-  if (!a) return false;
-  const values = tax.values.filter(x => x.attribute_id === a.id).map(x => ({ id: x.id, name: x.name, key: x.key, aliases: x.aliases }));
-  const r = matchProduct({ name: phrase }, [{ id: a.id, name: a.name, multi: true, values }], { shades: shadesOf(tax) });
-  return (r.chosen[a.id] ?? []).some(id => id !== valueId);
+  if (!v || !a?.multi) return false;
+  const values = tax.values.filter(x => x.attribute_id === a.id && (!a.by_category || x.id === v.id || (x.categories || []).some(c => (v.categories || []).includes(c))))
+    .map(x => ({ id: x.id, name: x.name, key: x.key, aliases: x.aliases }));
+  const ids = matchProduct({ name: phrase }, [{ id: a.id, name: a.name, multi: true, values }], { shades: shadesOf(tax) }).chosen[a.id] ?? [];
+  return ids.includes(valueId) && ids.some(id => id !== valueId);
 }
 
 /** The words a PERSON ignored (never the worker's own, so it does not learn from its guesses), less those merged into a
@@ -73,7 +87,8 @@ async function personIgnored(): Promise<string[]> {
   const rows = await sel<{ phrase: string; key: string }>('pb_tag_suggestions?status=eq.ignored&filed_by=is.null&select=phrase,key&order=updated_at.desc&limit=60');
   if (!rows.length) return [];
   const list = [...new Set(rows.map(r => r.key))].map(k => `"${k.replace(/["\\]/g, '\\$&')}"`).join(',');
-  const kept = new Set((await sel<{ key: string }>(`pb_tag_suggestions?key=in.(${enc(list)})&status=neq.ignored&select=key`)).map(r => r.key));
+  // a twin that is not a person's ignore (waiting, filed, or ignored by Playbook itself) marks a merged duplicate
+  const kept = new Set((await sel<{ key: string }>(`pb_tag_suggestions?key=in.(${enc(list)})&or=(status.neq.ignored,filed_by.eq.auto)&select=key`)).map(r => r.key));
   return rows.filter(r => !kept.has(r.key)).slice(0, 40).map(r => r.phrase);
 }
 
@@ -100,7 +115,7 @@ async function askAi(part: Word[], tax: Taxonomy, budget: Budget): Promise<Asked
   } catch (e) {
     const usd = usdOf(e);
     await logActivity({ action: 'failed', details: { step: 'tags_file', error: plain(e), ...(usd ? { usd } : {}) } });
-    return { failed: usd ? 'paid' : 'free' };
+    return { failed: failureOf(e) };
   }
 }
 
@@ -131,7 +146,7 @@ export async function fileWords(o: { budget: Budget; left: (ms: number) => boole
     if (await o.capped()) { waiting += rest.length; await holdUntil(rest, Date.parse(istDayStart()) + 86_400_000); break; } // the next day
     if (!o.left(FILE_NEEDS_MS) || await o.stopped()) { waiting += rest.length; break; } // taken again in 10 minutes
     const r = await askAi(part, tax, o.budget);
-    if ('failed' in r && r.failed === 'free') { waiting += rest.length; await holdUntil(rest, Date.now() + FAILED_WAIT_MS); break; }
+    if ('failed' in r && r.failed === 'outage') { waiting += rest.length; await holdUntil(rest, Date.now() + FAILED_WAIT_MS); break; }
     const got = 'got' in r ? r.got : new Map<number, FileAnswer>();
     for (const [j, w] of part.entries()) {
       const a = got.get(j + 1);
@@ -143,11 +158,11 @@ export async function fileWords(o: { budget: Budget; left: (ms: number) => boole
   }
   for (const c of choices) if (c.value_id && namesTwo(c.w.phrase, c.value_id, tax)) Object.assign(c, { value_id: null, why: TWO, match: 'related' });
   if (!choices.length) return { aliased: 0, ignored: 0, retagged: 0, waiting };
-  return { ...await asBulk('suggestions', labelOf(choices), null, run => apply(choices, run)), waiting };
+  return { ...await asBulk('suggestions', labelOf(choices), null, run => apply(choices, run, o.left)), waiting };
 }
 
 /** Write the choices (one transaction each) and bring the products up to date, all in the bulk change `run`. */
-async function apply(choices: Choice[], run: string): Promise<Omit<FileResult, 'waiting'>> {
+async function apply(choices: Choice[], run: string, left: (ms: number) => boolean): Promise<Omit<FileResult, 'waiting'>> {
   let aliased = 0, ignored = 0;
   const filed: { w: Word; value_id: string; attribute_id: string }[] = [];
   for (const c of choices) {
@@ -157,13 +172,14 @@ async function apply(choices: Choice[], run: string): Promise<Omit<FileResult, '
   }
   const ids = [...new Set(filed.flatMap(f => f.w.examples))];
   let retagged = 0;
-  for (let i = 0; i < ids.length; i += 50) retagged += await retagProducts(ids.slice(i, i + 50), run);
+  // The products only while the clock allows (the run stays inside the worker's 140 s): "Retag all" does the rest.
+  for (let i = 0; i < ids.length && left(RETAG_NEEDS_MS); i += 50) retagged += await retagProducts(ids.slice(i, i + 50), run);
   // A word the AI read from the product for one attribute: the product gets that value where it has none for it.
   const direct = filed.filter(f => f.w.source === 'ai' && f.w.attribute_id === f.attribute_id);
   const pids = [...new Set(direct.flatMap(f => f.w.examples))];
   const open = new Set((pids.length ? await sel<{ id: string; locked: string[] | null }>(`pb_products?id=in.(${pids.map(enc).join(',')})&status=in.(ready,needs_info)&select=id,locked`) : [])
     .filter(p => !tagsLocked(p)).map(p => p.id));
-  for (const f of direct) for (const pid of f.w.examples) if (open.has(pid)) await writeValues(pid, [{ value_id: f.value_id, source: 'ai' }], 'add', [f.attribute_id], run);
+  for (const f of direct) for (const pid of f.w.examples) if (open.has(pid) && left(5_000)) await writeValues(pid, [{ value_id: f.value_id, source: 'ai' }], 'add', [f.attribute_id], run);
   await logActivity({ action: 'tags_edited', details: { what: 'auto_file', aliased, ignored, retagged, run_id: run } });
   return { aliased, ignored, retagged };
 }

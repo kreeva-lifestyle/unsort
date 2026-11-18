@@ -52,21 +52,43 @@ test('the word rules file only what they are sure of; a typo or a near spelling 
   assert.equal(surely({ phrase: 'Premium Finishing', attribute_id: null }, VALUES), null);
 });
 
-test('a word that names two values of one attribute is never filed under one of them (the products would lose the other)', () => {
-  assert.equal(namesTwo('Sequins Embroidery', 'emb', TAX), true);
+test('a word that names two values of one attribute, each on its own, is never filed under one of them', () => {
+  assert.equal(namesTwo('Sequins Embroidery', 'emb', TAX), true); // Work takes several: the products would lose Sequins
+  assert.equal(namesTwo('Sequins and Zari Work', 'emb', TAX), true);
   assert.equal(namesTwo('Heavy Zari Work', 'emb', TAX), false); // only Embroidery's own word
-  assert.equal(namesTwo('Rani Pink', 'pink', TAX), false);
+  assert.equal(namesTwo('Heavy Sequins', 'emb', TAX), false); // Embroidery is not in it: the alias is the AI's call
   assert.equal(namesTwo('Pink Silk', 'silk', TAX), false); // Pink is another attribute: still found as a Colour
-  assert.equal(namesTwo('Black and Pink', 'black', TAX), true);
+  // an attribute that takes one value keeps one anyway; the longer name corrects the shorter one
+  const fab = { ...TAX, attrs: TAX.attrs, values: [...TAX.values, { id: 'plain', attribute_id: 'fab', name: 'Silk', key: 'silk', aliases: [], position: 9, categories: [] }] };
+  assert.equal(namesTwo('Faux Silk', 'silk', fab), false);
+  assert.equal(namesTwo('Black and Pink', 'black', TAX), false);
+  // values that depend on the category count only when they share one with the chosen value
+  const types = { attrs: [{ id: 'type', name: 'Product Type', key: 'product type', multi: true, position: 4, by_category: true }], links: [], categories: [],
+    values: [{ id: 'sal', attribute_id: 'type', name: 'Salwar Suit', key: 'salwar suit', aliases: [], position: 1, categories: ['Salwar Suit'] },
+      { id: 'ana', attribute_id: 'type', name: 'Anarkali', key: 'anarkali', aliases: [], position: 2, categories: ['Kurti'] },
+      { id: 'ana2', attribute_id: 'type', name: 'Anarkali', key: 'anarkali', aliases: [], position: 3, categories: ['Salwar Suit'] }] };
+  assert.equal(namesTwo('Anarkali Salwar Suit', 'sal', { ...types, values: types.values.slice(0, 2) }), false);
+  assert.equal(namesTwo('Anarkali Salwar Suit', 'sal', types), true);
+});
+
+test('which failures use a try: an outage never does, a request that went wrong does', async () => {
+  const { failureOf } = await import('../tagsFile.ts');
+  const { HttpError } = await import('../http.ts');
+  const E = (s, m, usd) => Object.assign(new HttpError(s, m), usd ? { usd } : {});
+  assert.deepEqual([E(409, 'No Anthropic API key is saved yet'), E(503, 'The AI is busy right now (rate limit)'), E(503, 'The AI service is overloaded'),
+    E(502, 'The Anthropic API key was rejected'), E(502, 'The AI request was refused (400): Your credit balance is too low'), E(504, 'Could not reach the AI service')].map(failureOf),
+    ['outage', 'outage', 'outage', 'outage', 'outage', 'outage']);
+  assert.deepEqual([E(504, 'The AI took too long to answer'), E(502, 'The AI request was refused (400): prompt is too long'), E(502, 'The AI answer was cut off', 0.01),
+    E(422, 'The AI declined', 0.01), new Error('x')].map(failureOf), ['answer', 'answer', 'answer', 'answer', 'answer']);
 });
 
 /** A fake database and AI for one pass: `words` are what the claim returns; `ai` the AI's picks (or a status). */
-function world({ words, ai = { picks: [] }, aiStatus = 200, stop = 'end_turn', products = [] } = {}) {
+function world({ words, ai = { picks: [] }, aiStatus = 200, aiError = 'busy', stop = 'end_turn', products = [] } = {}) {
   const calls = { ai: [], filed: [], patches: [], add: [], activity: [], runs: [], tagged: [] };
   const ok = (b, s = 200) => new Response(JSON.stringify(b), { status: s });
   globalThis.fetch = async (url, init = {}) => {
     const u = decodeURIComponent(String(url)), method = init.method || 'GET', body = init.body ? JSON.parse(init.body) : null;
-    if (u.startsWith('https://api.anthropic.com/')) { calls.ai.push(body); return aiStatus === 200 ? ok({ content: [{ type: 'text', text: JSON.stringify(ai) }], stop_reason: stop, usage: { input_tokens: 1000, output_tokens: 100 } }) : ok({ error: { message: 'busy' } }, aiStatus); }
+    if (u.startsWith('https://api.anthropic.com/')) { calls.ai.push(body); return aiStatus === 200 ? ok({ content: [{ type: 'text', text: JSON.stringify(ai) }], stop_reason: stop, usage: { input_tokens: 1000, output_tokens: 100 } }) : ok({ error: { message: aiError } }, aiStatus); }
     const path = u.replace('https://sb.example/rest/v1/', '');
     const run = Object.entries(init.headers || {}).find(([k]) => k.toLowerCase() === 'x-pb-bulk')?.[1];
     if (run) calls.tagged.push(path.split('?')[0]);
@@ -127,8 +149,8 @@ test('a pass: sure words by the rules, the rest by the AI (same/kind filed, rela
   assert.equal(cost.details.phrases, 4); assert.equal(cost.details.matched, 1); assert.ok(cost.details.usd > 0);
 });
 
-test('a pass: a word the AI answers around is ignored at its third try; so is one after an answer it paid for but cut off', async () => {
-  for (const o of [{ ai: { picks: [] } }, { stop: 'max_tokens' }]) {
+test('a pass: a word the AI answers around is ignored at its third try; so after a request that went wrong (cut off, refused)', async () => {
+  for (const o of [{ ai: { picks: [] } }, { stop: 'max_tokens' }, { aiStatus: 400, aiError: 'prompt is too long' }]) {
     const calls = world({ words: [W('w1', 'Odd Word', null, 'store', [], 2), W('w2', 'Odder Word', null, 'store', [], 0)], ...o });
     const r = await fileWords(opts());
     assert.deepEqual(calls.filed.map(f => [f.p_id, f.p_value, f.p_why]), [['w1', null, 'No answer from the AI after three tries.']]);
@@ -138,8 +160,8 @@ test('a pass: a word the AI answers around is ignored at its third try; so is on
 });
 
 test('a pass: an AI call that fails (busy, no key, no credit) uses no try — the words wait 30 minutes, even at their third try', async () => {
-  for (const aiStatus of [529, 401, 400]) {
-    const calls = world({ words: [W('w1', 'Odd Word', null, 'store', [], 2), W('w2', 'Kala', 'col')], aiStatus });
+  for (const [aiStatus, aiError] of [[529, 'Overloaded'], [401, 'invalid x-api-key'], [400, 'Your credit balance is too low to access the API']]) {
+    const calls = world({ words: [W('w1', 'Odd Word', null, 'store', [], 2), W('w2', 'Kala', 'col')], aiStatus, aiError });
     const before = Date.now();
     const r = await fileWords(opts());
     assert.deepEqual(r, { aliased: 1, ignored: 0, retagged: 0, run_id: 'run1', waiting: 1 });

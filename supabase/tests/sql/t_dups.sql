@@ -404,6 +404,7 @@ rollback;
 \set V_MI '''a7000000-0000-4000-8000-000000000012'''
 \set R10 '''d9000000-0000-4000-8000-000000000004'''
 \set R11 '''d9000000-0000-4000-8000-000000000003'''
+\set R12 '''d9000000-0000-4000-8000-000000000005'''
 begin;
 insert into public.pb_attributes (id, name, key, multi, position) values (:A_W, 'Work', 'work', true, 1);
 insert into public.pb_attribute_values (id, attribute_id, name, key, aliases, position) values
@@ -450,12 +451,20 @@ select t_is('reverted: the word is off the value again', (select array_to_string
 select t_is('… the word waits again, still marked, so Playbook does not file it again', (select status || '/' || filed_by from pb_tag_suggestions where key = 'mirror gamthi'), 'pending/auto');
 update public.pb_tag_suggestions set tried_at = null where key = 'mirror gamthi';
 select t_is('… the claim never takes it', (select count(*)::text from public.pb_tag_file_claim(10) where key = 'mirror gamthi'), '0');
+insert into public.pb_tag_suggestions (phrase, key, status, filed_by) values ('Gone Word', 'gone word', 'ignored', 'auto');
+insert into pb_bulk_runs (id, kind, label, status) values (:R12, 'attribute_delete', 'Deleted an attribute', 'running');
+select set_config('request.headers', json_build_object('x-pb-bulk', :R12)::text, false);
+delete from public.pb_tag_suggestions where key = 'gone word';
+select set_config('request.headers', '{}', false);
+update pb_bulk_runs set status = 'done' where id = :R12;
+select public.pb_bulk_revert(:R12, true) is not null;
+select t_is('a revert that brings a deleted word back keeps who filed it', (select status || '/' || filed_by from pb_tag_suggestions where key = 'gone word'), 'ignored/auto');
 insert into public.pb_tag_suggestions (phrase, key) select 'Word ' || i, 'word ' || i from generate_series(1, 20) i;
 select t_is('twenty new words are due at once, without waiting 15 minutes', public.pb_tag_file_due()::text, 'true');
 select set_config('request.jwt.claims', '{}', false);
 rollback;
 
 -- Every check above printed a line: a part that silently printed nothing would be a failure too.
-select case when last_value = 211 then 'ok   every check ran (211)' else 'FAIL the number of checks is ' || last_value || ', not 211: a part printed fewer lines than it has, or this number was not updated' end from public.t_checks;
+select case when last_value = 212 then 'ok   every check ran (212)' else 'FAIL the number of checks is ' || last_value || ', not 212: a part printed fewer lines than it has, or this number was not updated' end from public.t_checks;
 drop function public.t_refused(text, text); drop function public.t_is(text, text, text); drop function public.t_rel(uuid, uuid); drop function public.t_product(int, uuid, text, text, int, numeric, text); drop function public.t_id(int);
 drop sequence public.t_checks;
