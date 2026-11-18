@@ -2,10 +2,12 @@
 // its category: "Colour: Black · Work: Embroidery, Sequins". Each attribute
 // is one row button that opens its sheet (ValuesSheet: chips of the allowed
 // values; one or several). A hint says who chose them (Auto = found in the
-// text, AI, You). Every attribute is required: missing ones show a
-// review-tinted line "Choose Colour and Work to finish this product" with
-// "Let AI decide" (two signals: "AI is choosing…", then what it chose or
-// "AI couldn't tell — please choose"). Not a <form>: it sits inside the
+// text, AI, You). A must-have attribute that is empty shows a review-tinted
+// line "Choose Colour and Work to finish this product" with "Let AI decide"
+// (two signals: "AI is choosing…", then what it chose or "AI couldn't tell —
+// please choose"); since 18 Nov 2026 the AI also does this by itself after a
+// read (fillAuto.ts). An "only if it fits" attribute (Product Type) that is
+// empty reads "None fits" and never holds the product. Not a <form>: it sits inside the
 // Facts form. `load` / `save` / `fill` are swapped for fakes by the harness.
 import { useCallback, useEffect, useState } from 'react';
 import { friendlyError } from '../../../lib/friendlyError';
@@ -38,7 +40,8 @@ export default function ProductValues({ product, addToast, onSaved, load = produ
 
   const chosen = (a: PbAttribute) => a.values.filter(v => data?.values.some(x => x.value_id === v.id));
   const sourceOf = (a: PbAttribute) => [...new Set(chosen(a).map(v => data?.values.find(x => x.value_id === v.id)?.source).filter(Boolean))] as PbProductValue['source'][];
-  const missing = data ? data.attributes.filter(a => !chosen(a).length).map(a => a.name) : product.missing_attrs;
+  const optional = (a: PbAttribute) => a.required === false;
+  const missing = data ? data.attributes.filter(a => !optional(a) && !chosen(a).length).map(a => a.name) : product.missing_attrs;
   const letAi = async () => {
     setBusy(true);
     try {
@@ -68,14 +71,14 @@ export default function ProductValues({ product, addToast, onSaved, load = produ
       {data && data.attributes.length > 0 && (
         <ul aria-label="Tags by attribute" style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
           {data.attributes.map(a => {
-            const vs = chosen(a), src = sourceOf(a);
+            const vs = chosen(a), src = sourceOf(a), none = !vs.length && optional(a);
             return (
               <li key={a.id}>
-                <button type="button" className="pb-pill" style={{ ...row, ...(vs.length ? null : { borderColor: PB.reviewBd }) }} onClick={() => setOpen(a)} disabled={reading}
-                  aria-label={`${a.name}: ${vs.length ? vs.map(v => v.name).join(', ') : 'not chosen'}. Change`}>
+                <button type="button" className="pb-pill" style={{ ...row, ...(vs.length || none ? null : { borderColor: PB.reviewBd }) }} onClick={() => setOpen(a)} disabled={reading}
+                  aria-label={`${a.name}: ${vs.length ? vs.map(v => v.name).join(', ') : none ? 'none fits' : 'not chosen'}. Change`}>
                   <span style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
                     <span style={{ ...pbMeta, fontWeight: 600, color: PB.tx2 }}>{a.name}</span>
-                    <span style={{ color: vs.length ? PB.tx : PB.review, overflowWrap: 'anywhere' }}>{vs.length ? vs.map(v => v.name).join(', ') : 'Choose…'}</span>
+                    <span style={{ color: vs.length ? PB.tx : none ? PB.tx3 : PB.review, overflowWrap: 'anywhere' }}>{vs.length ? vs.map(v => v.name).join(', ') : none ? 'None fits — only if one does' : 'Choose…'}</span>
                   </span>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                     {src.map(s => <PbTag key={s}>{SOURCE_LABEL[s]}</PbTag>)}

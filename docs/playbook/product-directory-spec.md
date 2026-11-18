@@ -483,7 +483,11 @@ category list (it moved from Settings).
 **Required attributes — the gate.** `pb_products_refresh(ids)` (SQL; twin
 `tagGate.ts`): Ready needs a price (cost or copied selling price), a category
 that is on the list (pb_settings `categories`, case and spaces aside; no list
-saved → not checked) and a value for every attribute linked to the category;
+saved → not checked) and a value for every MUST-HAVE attribute linked to the
+category (`pb_attributes.required`, default true; false = "only if it fits",
+owner 18 Nov 2026: Product Type — "not necessary if AI is not able to find a
+perfect fit": never missing, never counted as lacking by `pb_category_lacking`
+/ `pb_tag_link_stats`; 20261118120000_pb_tags_auto_select.sql);
 else Needs info with `missing_attrs` ("Missing: Colour" on the product page and
 the list rows; a category the list no longer has puts 'Category' first:
 "Missing: Category" — 20261113150000_pb_gate_category_list.sql). Saving the
@@ -518,8 +522,10 @@ everything). "Retag all" and the retag after a new word is filed do the same
 (`pb_product_values_bulk` rows carry `attributes`). (2) AI (`tagPrompt.ts`): the reader's
 ONE call gets, per attribute linked to any category, an enum of allowed names
 + `other` phrases, and the category → attributes map; only attributes the
-rules left empty take the AI's choice; "pick the closest value when the
-evidence reasonably supports it, never invent one". 'manual' attributes and
+rules left empty take the AI's choice: a must-have attribute gets its
+best-judged value from the photos and text (Occasion from the look of the
+product), an "only if it fits" one a value only when one truly fits, else none;
+never a value outside the list (`tagPrompt.ts`). 'manual' attributes and
 locked `tags` are never touched. (3) "Let AI decide" (`tagFill.ts`): for the
 empty required attributes, the rules first (free, the same every time), then
 — only for what they left empty — a values-only AI pass (reader model, text +
@@ -527,7 +533,15 @@ empty required attributes, the rules first (free, the same every time), then
 ('auto' mode with their ids: an attribute holding only a value its category
 does not offer counts as empty and that value is replaced; a person's stale
 value is cleared first) — an AI failure still writes what the rules found;
-queued by `tags_ai_fill`, run by the worker after
+in "Let AI decide" the schema asks for at least one value per must-have
+attribute (`minItems: 1`), so the AI always chooses. It runs BY ITSELF once
+per read for a Needs-info product with a tag missing (`fillAuto.ts`, owner 18
+Nov 2026: "AI should auto select. No user inputs required"):
+`pb_tags_auto_claim` takes up to 5 at a time (30 a run) whose `tags_ai_at` is
+empty or older than `ai_read_at`, stamping it, so a product is never paid for
+twice per read; not a bulk change (it finishes the read); paused / the day's
+AI limit → nothing taken; `trigger_pb_worker` wakes for them
+(`pb_tags_auto_due`). Also queued by `tags_ai_fill`, run by the worker after
 read / write / publish (5 at a time while 35 s are left, up to 60 a run —
 most are settled by the word rules in a fraction of a second; the day's AI
 limit is asked before each 5), or at once from the product page. Progress

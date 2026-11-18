@@ -1,7 +1,8 @@
 // One category's sheet: the attributes it uses, in order (up / down / remove,
-// each saved at once), and "+ <attribute>" chips to link more. Every linked
-// attribute is REQUIRED ("for each attribute of its category a tag is a
-// must"), so linking first counts the products that lack it and asks:
+// each saved at once), and "+ <attribute>" chips to link more. A linked
+// MUST-HAVE attribute is required ("for each attribute of its category a tag is
+// a must"; an "only if it fits" one, owner 18 Nov 2026, never is), so linking
+// one first counts the products that lack it and asks:
 // "12 products will need a Colour" → Link and let AI decide (the sheet's one
 // gradient: links, then queues those products for the AI) / Link only /
 // Cancel. Rename at the top (everywhere: products, links, Product Type ticks,
@@ -106,13 +107,13 @@ export default function CategorySheet({ category, categories, products, attrs, l
             <span id="pbc-name-hint" style={pbMeta}>A new name follows everywhere: its products, the tags it needs, Product Type ticks and website rules.</span>
           </div>
         )}
-        <p style={{ ...pbBody, color: PB.tx2, margin: 0 }}>Every product in {category} needs a value for each attribute here before it can go to websites. Playbook fills them from the text first, then the AI.</p>
+        <p style={{ ...pbBody, color: PB.tx2, margin: 0 }}>Every product in {category} needs a value for each must-have attribute here before it can go to websites; one marked “only if it fits” is filled only when a value truly fits. Playbook fills them by itself: from the text first, then the AI.</p>
         <ol aria-label={`Attributes ${category} uses`} style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
           {linked.map((a, i) => (
             <li key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, padding: '4px 0', borderTop: i ? `1px solid ${PB.tileBd}` : 'none' }}>
               <span style={{ flex: 1, minWidth: 0 }}>
                 <span style={{ ...pbName, display: 'block' }}>{a.name}</span>
-                <span style={pbMeta}>{lacking(a.id) ? `${plural(lacking(a.id), 'product')} still need one` : 'Every product has one'}</span>
+                <span style={pbMeta}>{a.required === false ? 'Only if it fits' : lacking(a.id) ? `${plural(lacking(a.id), 'product')} still need one` : 'Every product has one'}</span>
                 {here(a) === 0 && <Dot color={PB.review} label={`No ${a.name} value is ticked for ${category} yet: open one under Attributes and tick ${category}`} style={{ ...pbMeta, color: PB.tx, whiteSpace: 'normal', display: 'flex' }} />}
                 {!!here(a) && <span style={{ ...pbMeta, display: 'block' }}>{plural(here(a) ?? 0, `${a.name} value`)} for {category}</span>}
               </span>

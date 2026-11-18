@@ -44,7 +44,7 @@ export default function AttributesTile({ attrs, categories, links, api, addToast
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <h3 id={`pbt-a-${a.id}`} style={{ ...pbName, margin: 0, overflowWrap: 'anywhere' }}>{a.name}</h3>
-                    <span style={pbMeta}>{a.multi ? 'Several values' : 'One value'}{a.by_category ? ' · Values depend on the category' : ''} · {plural(a.values.length, 'value')} · Shopify <span style={pbNum}>{(a.shopify_prefix || a.name)}_…</span></span>
+                    <span style={pbMeta}>{a.multi ? 'Several values' : 'One value'}{a.by_category ? ' · Values depend on the category' : ''}{a.required === false ? ' · Only if it fits' : ''} · {plural(a.values.length, 'value')} · Shopify <span style={pbNum}>{(a.shopify_prefix || a.name)}_…</span></span>
                   </div>
                   {canEdit && <PbButton icon="edit" onClick={() => onEdit(a)} style={{ flexShrink: 0 }}>Edit</PbButton>}
                 </div>
