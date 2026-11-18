@@ -30,7 +30,8 @@ import { HttpError, plain, usdOf } from './http.ts';
 import { type FileAnswer, decide, filePrompt, readFile } from './tagFilePrompt.ts';
 import { type LookReason, lookAlikes } from './tagLook.ts';
 import { matchProduct } from './tagMatch.ts';
-import { tagsLocked, writeValues } from './tagStore.ts';
+import { productValues, tagsLocked, writeValues } from './tagStore.ts';
+import { isNoneValue } from './tagText.ts';
 import { retagProducts } from './tagsProduct.ts';
 import { type Taxonomy, loadTaxonomy, shadesOf, taxValues } from './taxonomy.ts';
 import type { Budget } from './types.ts';
@@ -77,7 +78,7 @@ export function namesTwo(phrase: string, valueId: string, tax: Taxonomy): boolea
   if (!v || !a?.multi) return false;
   const values = tax.values.filter(x => x.attribute_id === a.id && (!a.by_category || x.id === v.id || (x.categories || []).some(c => (v.categories || []).includes(c))))
     .map(x => ({ id: x.id, name: x.name, key: x.key, aliases: x.aliases }));
-  const ids = matchProduct({ name: phrase }, [{ id: a.id, name: a.name, multi: true, values }], { shades: shadesOf(tax) }).chosen[a.id] ?? [];
+  const ids = matchProduct({ name: phrase }, [{ id: a.id, name: a.name, multi: true, values }], { shades: shadesOf(tax), keepNone: true }).chosen[a.id] ?? [];
   return ids.includes(valueId) && ids.some(id => id !== valueId);
 }
 
@@ -158,11 +159,11 @@ export async function fileWords(o: { budget: Budget; left: (ms: number) => boole
   }
   for (const c of choices) if (c.value_id && namesTwo(c.w.phrase, c.value_id, tax)) Object.assign(c, { value_id: null, why: TWO, match: 'related' });
   if (!choices.length) return { aliased: 0, ignored: 0, retagged: 0, waiting };
-  return { ...await asBulk('suggestions', labelOf(choices), null, run => apply(choices, run, o.left)), waiting };
+  return { ...await asBulk('suggestions', labelOf(choices), null, run => apply(choices, run, o.left, tax)), waiting };
 }
 
 /** Write the choices (one transaction each) and bring the products up to date, all in the bulk change `run`. */
-async function apply(choices: Choice[], run: string, left: (ms: number) => boolean): Promise<Omit<FileResult, 'waiting'>> {
+async function apply(choices: Choice[], run: string, left: (ms: number) => boolean, tax: Taxonomy): Promise<Omit<FileResult, 'waiting'>> {
   let aliased = 0, ignored = 0;
   const filed: { w: Word; value_id: string; attribute_id: string }[] = [];
   for (const c of choices) {
@@ -179,7 +180,14 @@ async function apply(choices: Choice[], run: string, left: (ms: number) => boole
   const pids = [...new Set(direct.flatMap(f => f.w.examples))];
   const open = new Set((pids.length ? await sel<{ id: string; locked: string[] | null }>(`pb_products?id=in.(${pids.map(enc).join(',')})&status=in.(ready,needs_info)&select=id,locked`) : [])
     .filter(p => !tagsLocked(p)).map(p => p.id));
-  for (const f of direct) for (const pid of f.w.examples) if (open.has(pid) && left(5_000)) await writeValues(pid, [{ value_id: f.value_id, source: 'ai' }], 'add', [f.attribute_id], run);
+  // A product that holds only "Plain" for it (no listed value fitted its work then) takes the value instead.
+  const none = new Set(tax.values.filter(v => isNoneValue(v.name)).map(v => v.id));
+  for (const f of direct) for (const pid of f.w.examples) {
+    if (!open.has(pid) || !left(5_000)) continue;
+    const mine = none.size ? (await productValues(pid)).filter(v => v.attribute_id === f.attribute_id) : [];
+    const plainOnly = mine.length > 0 && mine.every(v => v.source !== 'manual' && none.has(v.value_id));
+    await writeValues(pid, [{ value_id: f.value_id, source: 'ai' }], plainOnly ? 'auto' : 'add', [f.attribute_id], run);
+  }
   await logActivity({ action: 'tags_edited', details: { what: 'auto_file', aliased, ignored, retagged, run_id: run } });
   return { aliased, ignored, retagged };
 }

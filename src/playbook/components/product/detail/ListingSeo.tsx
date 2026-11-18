@@ -1,42 +1,17 @@
 // Listing editor parts for "one store, one voice" (owner, 2026-11-12):
-//   ListingChecks     what the program checks found and the facts the writer
-//                     missed, as a review-tinted note (nothing shown when clean)
 //   ListingKeyword    the search phrase this listing is written for
 //   ListingQuestions  the questions and answers (FAQ): two shown, up to five
-// While the extras load: bars shaped like the fields; if they cannot be read:
-// the reason with Retry (the rest of the editor still works).
-import { PB, pbBody, pbErrorBox, pbLabel, pbMeta, pbTileReview } from '../../../pbTheme';
+// The checks' notes and the facts the writer missed are no longer shown (owner, 18 Nov 2026: "donot provide
+// suggestions rather fix it directly using AI"): the writer fixes what it can itself (genWrite.ts), and only what could
+// harm the store holds a listing, with its reason in the editor (ListingEditor.tsx).
+// While the extras load: bars shaped like the fields; if they cannot be read: the reason with Retry (the rest of the
+// editor still works).
+import { pbErrorBox, pbLabel, pbMeta } from '../../../pbTheme';
 import PbButton from '../../ui/PbButton';
 import { PbSkelBar } from '../../ui/PbSkeleton';
-import { Dot } from '../status';
 import ListingField from './ListingField';
 import { useState } from 'react';
 import { FAQ_SLOTS, type FaqKey, type ListingSeoState } from './useListingSeo';
-
-const note = { ...pbTileReview, backdropFilter: undefined, WebkitBackdropFilter: undefined, borderRadius: PB.r.input, padding: '12px 14px', marginBottom: 16 } as const;
-
-/** `said`: the listing's own note ("Check before it goes out: …"); what it already says is not repeated here. */
-export function ListingChecks({ s, said }: { s: ListingSeoState; said?: string | null }) {
-  const notes = (s.seo?.notes ?? []).filter(n => !(said || '').includes(n)), missing = s.seo?.missing ?? [];
-  if (!notes.length && !missing.length) return null;
-  return (
-    <section aria-label="What the checks found" style={{ ...note, display: 'flex', flexDirection: 'column', gap: 8 }}>
-      {notes.length > 0 && (
-        <>
-          <Dot color={PB.review} label={`${said ? 'Also worth a look' : 'Worth a look'} (${notes.length === 1 ? 'one note' : `${notes.length} notes`} from the checks)`} style={{ fontWeight: 600, color: PB.tx, fontSize: 13, whiteSpace: 'normal' }} />
-          <ul style={{ ...pbBody, margin: 0, paddingLeft: 20, display: 'flex', flexDirection: 'column', gap: 4, overflowWrap: 'anywhere' }}>
-            {notes.map(n => <li key={n}>{n}</li>)}
-          </ul>
-        </>
-      )}
-      {missing.length > 0 && (
-        <div style={{ ...pbBody, color: PB.tx2, overflowWrap: 'anywhere' }}>
-          The writer was not given: <span style={{ color: PB.tx }}>{missing.join(', ')}</span>. Add them to the product's facts and regenerate to have them written in.
-        </div>
-      )}
-    </section>
-  );
-}
 
 function Waiting({ s, what }: { s: ListingSeoState; what: string }) {
   if (s.loadErr) return (
@@ -57,7 +32,7 @@ export function ListingKeyword({ s, disabled }: { s: ListingSeoState; disabled: 
   if (!s.seo) return <Waiting s={s} what="search phrase" />;
   return (
     <ListingField id="pb-l-keyword" label="Search phrase" value={s.f.keyword} onChange={s.set('keyword')} disabled={disabled} kept={s.seo.keyword_locked} max={80}
-      hint="The phrase shoppers search for. The AI puts it once in the title, near the top of the description and in the SEO title. Change it, save, then regenerate. Empty uses the website's pattern." />
+      hint="The phrase shoppers search for, made from the product's tags and short enough for the SEO title. The AI puts it in the title, near the top of the description and in the SEO title. Change it, save, then regenerate. Empty uses the website's pattern." />
   );
 }
 

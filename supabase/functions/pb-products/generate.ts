@@ -1,7 +1,7 @@
 // Step 3 — Generate one CLAIMED listing ('generating'): price (pricing.ts),
 // content written for THIS store (genPrompt.ts: store profile, primary keyword,
 // the other stores' versions it must not copy; genWrite.ts: the call, the
-// program checks of seoCheck.ts and one rewrite), tags (tags.ts; {tags} = the
+// program checks of seoCheck.ts and up to two rewrites), tags (tags.ts; {tags} = the
 // product's chosen attribute values in the site's tag style, tagStore.ts
 // siteValueTags). Locked fields are kept. Next status: a HARD check problem →
 // 'review' with the reason, whatever the site's publish mode; otherwise
@@ -19,11 +19,12 @@ import { writeCopy } from './genWrite.ts';
 import { HttpError, plain, usdOf } from './http.ts';
 import { aiPhotos, galleryOf } from './photos.ts';
 import { compareAt, listingPrice } from './pricing.ts';
-import { cleanKeyword, keywordOf, profileOf } from './profile.ts';
+import { brandFits, cleanKeyword, keywordOf, phraseMax, profileOf } from './profile.ts';
 import { checkCopy, hardOf, type Version } from './seoCheck.ts';
 import { seoGet, seoPut } from './seoStore.ts';
 import { buildTags, vendorCode } from './tags.ts';
-import { siteValueTags } from './tagStore.ts';
+import { attributeValues, siteValueTags } from './tagStore.ts';
+import { countPhrase } from './seoText.ts';
 import { PERM_NOTE } from './stockSend.ts';
 import { ARCHIVED, LISTING_COLS, MAX_ATTEMPTS, NEEDS_INFO, PRODUCT_COLS, STALE_MS, WEBSITE_COLS, hasPrice, permOut, type Budget, type ListingRow, type ProductRow, type WebsiteRow } from './types.ts';
 
@@ -94,7 +95,12 @@ export async function generateOne(l: ListingRow, o: { manual: boolean; prevStatu
 
     // Content: this store's profile, the phrase it is written for, and what the other stores already say.
     const profile = profileOf(site), L = limitsOf(c);
-    const keyword = seo?.keyword_locked && seo.keyword ? cleanKeyword(seo.keyword) : keywordOf(profile.keyword_pattern, p);
+    // The phrase from the product's own tags, short enough for the SEO title beside the brand (profile.ts keywordOf).
+    const keyword = seo?.keyword_locked && seo.keyword ? cleanKeyword(seo.keyword) : keywordOf(profile.keyword_pattern, p, {
+      values: Object.fromEntries((await attributeValues(p.id, p.category)).map(x => [x.key, x.values])), max: phraseMax(profile.brand, L.titleMax, L.metaTitleMax) });
+    // A phrase that fits beside the brand: an SEO title the AI wrote without it (or with it twice) becomes "phrase | Brand".
+    const metaFits = !!keyword && keyword.length + (brandFits(profile.brand, L.metaTitleMax) ? profile.brand.length + 3 : 0) <= L.metaTitleMax;
+    const seoTitleOf = (t: string) => { const w = withBrand(t, profile.brand, L.metaTitleMax); return metaFits && countPhrase(w, keyword) !== 1 ? withBrand(keyword, profile.brand, L.metaTitleMax) : w; };
     const others: Version[] = sibs.filter(isVersion).map(x => ({ title: x.title || '', description_html: x.description_html || '', seo_title: x.seo_title || '', seo_description: x.seo_description || '', image_alts: x.image_alts || [] }));
     const photos = await aiPhotos(imgs.slice(0, MAX_PHOTOS).map(i => i.path));
     const extraMax = tr.ai_extra ? Math.max(0, Math.floor(Number(tr.ai_extra_max) || 0)) : 0;
@@ -108,7 +114,7 @@ export async function generateOne(l: ListingRow, o: { manual: boolean; prevStatu
       const title = locked.has('title') && l.title ? l.title : fresh;
       const description_html = locked.has('description_html') && l.description_html !== null ? l.description_html : cleanHtml(g.description_html);
       const done: GenOut = { ...g, title, description_html,
-        seo_title: locked.has('seo_title') && l.seo_title !== null ? l.seo_title : withBrand(g.seo_title || title, profile.brand, L.metaTitleMax),
+        seo_title: locked.has('seo_title') && l.seo_title !== null ? l.seo_title : seoTitleOf(g.seo_title || title),
         seo_description: locked.has('seo_description') && l.seo_description !== null ? l.seo_description : cut(g.seo_description || stripTags(description_html), L.metaDescMax),
         faq: seo?.faq_locked ? seo.faq : g.faq };
       return { g: done, problems: checkCopy({ copy: done, keyword, brand: profile.brand, aiTitle, kept: [...locked], source: p.raw_text || '', others, facts,
@@ -150,9 +156,9 @@ export async function generateOne(l: ListingRow, o: { manual: boolean; prevStatu
     }
     const saved = await patch<ListingRow>('pb_listings', `id=eq.${enc(l.id)}&status=eq.generating`, set, LISTING_COLS);
     if (!saved[0]) throw new HttpError(409, 'The listing changed while it was being written — open it again.');
-    await seoPut(l.id, { keyword, ...(seo?.faq_locked ? {} : { faq: g.faq }), missing: g.missing_facts, notes: w.problems.map(x => x.say), rewrites: w.rewrote ? 1 : 0 });
+    await seoPut(l.id, { keyword, ...(seo?.faq_locked ? {} : { faq: g.faq }), missing: g.missing_facts, notes: w.problems.map(x => x.say), rewrites: w.rewrites });
     await logActivity({ product_id: l.product_id, website_id: l.website_id, listing_id: l.id, action: 'generated', user_id: o.userId,
-      details: { model: w.model, effort: w.effort, usd: w.usd, price, next: set.status, keyword, ...(w.rewrote ? { rewrote: true } : {}), ...(w.problems.length ? { problems: w.problems.map(x => x.code) } : {}) } });
+      details: { model: w.model, effort: w.effort, usd: w.usd, price, next: set.status, keyword, ...(w.rewrote ? { rewrote: true, rewrites: w.rewrites } : {}), ...(w.problems.length ? { problems: w.problems.map(x => x.code) } : {}) } });
     return saved[0];
   } catch (e) {
     if (waited) throw e; // put back already: nothing failed

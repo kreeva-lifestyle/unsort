@@ -1,8 +1,9 @@
 // "Let AI decide" progress on the Tags page (owner, 13 Nov 2026: "should get better clarity — do not know whether its
 // completed or how much is completed, or when it will get completed. How many are remaining of the total"). Every
 // request of the newest batch together (pb-products fillProgress.ts): done of total with a bar, how many are left, the
-// minutes that leaves at the pace of the last 5 minutes, and — while nothing moves — why. Once nothing waits: done, how
-// many got their tags, how many still need a person, and when it finished. role="status": read out as it changes.
+// minutes that leaves at the pace of the last 5 minutes, and — while nothing moves — why. Once nothing waits: done, all
+// of them checked, how many got tags (the rest needed none: an "only if it fits" attribute with nothing that fits), how
+// many still need a person, and when it finished. role="status": read out as it changes.
 import type { PbFillRun } from '../../tagTypes';
 import { istTime } from '../../format';
 import { PB, pbMeta, pbNum } from '../../pbTheme';
@@ -28,8 +29,8 @@ export default function FillProgress({ fill }: { fill: PbFillRun }) {
   return (
     <div role="status" style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 }}>
       <Dot color={running ? PB.busy : need ? PB.review : PB.live} style={{ color: PB.tx, fontSize: 13, fontWeight: 600, whiteSpace: 'normal' }}
-        label={running ? <>Filling tags · {n(fill.done)} of {n(fill.total)} done · <span style={pbNum}>{pct}%</span></>
-          : <>Done · {n(fill.filled)} of {n(fill.total)} got their tags{need ? <> · {n(need)} need you</> : null}</>} />
+        label={running ? <span>Filling tags · {n(fill.done)} of {n(fill.total)} done · <span style={pbNum}>{pct}%</span></span>
+          : <span>Done · all {n(fill.total)} checked · {n(fill.filled)} got tags{need ? <> · {n(need)} need you</> : null}</span>} />
       <span aria-hidden="true" style={{ height: 8, borderRadius: PB.r.skel, background: PB.skelBar, overflow: 'hidden', display: 'block' }}>
         <span className={running ? 'pb-pulse' : undefined} style={{ display: 'block', height: '100%', width: `${running ? Math.max(4, pct) : 100}%`, background: running ? PB.busy : need ? PB.review : PB.live }} />
       </span>

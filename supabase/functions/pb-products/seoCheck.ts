@@ -39,7 +39,13 @@ export interface CheckInput {
   fabric?: string;
   limits: { metaDescMin: number; metaDescMax: number; wordsMin: number; wordsMax: number; titleMax?: number; metaTitleMax?: number };
 }
+/** `hard`: the listing waits for a person (owner, 18 Nov 2026: "donot provide suggestions rather fix it directly using
+ *  AI") — only for what could harm the store: the supplier's name, design code or contact details, a claim the facts do
+ *  not support, a copied sentence, the same title, SEO title or opening as another store. Everything else is asked of
+ *  the AI's rewrite (genWrite.ts) and the listing goes out with the better draft. */
 export interface Problem { code: string; hard: boolean; say: string; fix: string }
+/** Words in a shared run that make it a copied sentence (held), not a fact said the usual way. */
+export const COPIED_SENTENCE = 8;
 
 const q = (s: string) => `"${s.length > 90 ? `${s.slice(0, 90).trimEnd()}…` : s}"`;
 const same = (a: unknown, b: unknown) => { const x = wordsOf(a).join(' '); return !!x && x === wordsOf(b).join(' '); };
@@ -67,7 +73,9 @@ export function checkCopy(i: CheckInput): Problem[] {
   const facts = factWords(i.facts);
   const theirs = [i.source, ...i.others.flatMap(o => [o.description_html, o.seo_description])];
   const runs = [...new Set([ai.desc ? desc : '', ai.metaDesc ? c.seo_description : '', faq].flatMap(t => copiedRuns(t, theirs, facts)))].slice(0, 4);
-  if (runs.length) add('copied', true, `Copies wording from the supplier's text or another store's version: ${runs.map(q).join(', ')}.`,
+  // Held only for a copied sentence (8 words or more); a shorter shared run is a fact said the usual way ("in mustard teal
+  // pink and blue"), asked of the rewrite but never a reason to hold the listing.
+  if (runs.length) add('copied', runs.some(r => wordsOf(r).length >= COPIED_SENTENCE), `Copies wording from the supplier's text or another store's version: ${runs.map(q).join(', ')}.`,
     `These phrases are copied. Say the same facts in new words and a new sentence shape: ${runs.map(q).join('; ')}.`);
 
   if (ai.title) {
@@ -87,13 +95,12 @@ export function checkCopy(i: CheckInput): Problem[] {
     // A phrase longer than the title limit, or than the SEO title leaves beside the brand, cannot be asked for.
     const fitsTitle = !L.titleMax || i.keyword.length <= L.titleMax;
     const fitsMeta = !L.metaTitleMax || i.keyword.length + (brandFits(i.brand, L.metaTitleMax) ? i.brand.length + 3 : 0) <= L.metaTitleMax;
-    if (ai.title && fitsTitle && inTitle !== 1) add('keyword_title', true, `The search phrase ${k} ${inTitle ? 'is in the title more than once' : 'is not in the title'}.`, `Use the primary keyword ${k} exactly once in the title, word for word.`);
-    if (ai.desc && !countPhrase(wordsOf(desc).slice(0, 50).join(' '), i.keyword)) add('keyword_start', true, `The search phrase ${k} is not in the first 50 words of the description.`, `Use the primary keyword ${k} once, word for word, in the first 50 words of the description.`);
-    if (ai.metaTitle && fitsMeta && countPhrase(c.seo_title, i.keyword) !== 1) add('keyword_meta', true, `The search phrase ${k} is not in the SEO title exactly once.`, `Use the primary keyword ${k} exactly once in seo_title, word for word.`);
-    if (ai.metaTitle && !fitsMeta) add('keyword_fit', false, `The search phrase ${k} and the brand name do not fit in the SEO title together (${L.metaTitleMax} characters): shorten one of them in the store profile.`, 'Keep seo_title inside its limit; put as much of the primary keyword in it as fits.');
+    if (ai.title && fitsTitle && inTitle !== 1) add('keyword_title', false, `The search phrase ${k} ${inTitle ? 'is in the title more than once' : 'is not in the title'}.`, `Use the primary keyword ${k} exactly once in the title, word for word.`);
+    if (ai.desc && !countPhrase(wordsOf(desc).slice(0, 50).join(' '), i.keyword)) add('keyword_start', false, `The search phrase ${k} is not in the first 50 words of the description.`, `Use the primary keyword ${k} once, word for word, in the first 50 words of the description.`);
+    if (ai.metaTitle && fitsMeta && countPhrase(c.seo_title, i.keyword) !== 1) add('keyword_meta', false, `The search phrase ${k} is not in the SEO title exactly once.`, `Use the primary keyword ${k} exactly once in seo_title, word for word.`);
     if (ai.desc && countPhrase(desc, i.keyword) > 3) add('keyword_stuffed', false, `The search phrase ${k} is repeated too often in the description.`, `Use the primary keyword at most twice in the description.`);
   }
-  if (ai.metaTitle && brandFits(i.brand, i.limits.metaTitleMax) && !wordsOf(c.seo_title).join(' ').endsWith(wordsOf(i.brand).join(' '))) add('brand', true, `The SEO title does not end with ${i.brand}.`, `End seo_title with "| ${i.brand}".`);
+  if (ai.metaTitle && brandFits(i.brand, i.limits.metaTitleMax) && !wordsOf(c.seo_title).join(' ').endsWith(wordsOf(i.brand).join(' '))) add('brand', false, `The SEO title does not end with ${i.brand}.`, `End seo_title with "| ${i.brand}".`);
 
   // A supplier that is also the store's own brand name is not a leak.
   const vendor = i.vendor.trim(), ownBrand = !!vendor && wordsOf(i.brand).join(' ').includes(wordsOf(vendor).join(' '));
@@ -106,10 +113,10 @@ export function checkCopy(i: CheckInput): Problem[] {
 
   if (ai.title) {
     const bad = [...copyTells(c.title), ...(SHOUT.test(c.title) ? ['a word in ALL CAPS'] : []), ...(SYMBOLS.test(c.title) ? ['an emoji or symbol'] : [])];
-    if (bad.length) add('title', true, `The title is not plain (${bad.join(', ')}).`, `Rewrite the title in plain words: what the product is, nothing else. Remove: ${bad.join(', ')}.`);
+    if (bad.length) add('title', false, `The title is not plain (${bad.join(', ')}).`, `Rewrite the title in plain words: what the product is, nothing else. Remove: ${bad.join(', ')}.`);
   }
   const fabric = String(i.fabric ?? '').replace(/\s+/g, ' ').trim();
-  if (fabric && ai.desc && !countPhrase(desc, fabric)) add('fabric', true, `The description does not name the fabric as given (${q(fabric)}).`, `Name the fabric in the description word for word as PRODUCT FACTS gives it: ${q(fabric)}. Do not shorten it, reword it or change its spelling.`);
+  if (fabric && ai.desc && !countPhrase(desc, fabric)) add('fabric', false, `The description does not name the fabric as given (${q(fabric)}).`, `Name the fabric in the description word for word as PRODUCT FACTS gives it: ${q(fabric)}. Do not shorten it, reword it or change its spelling.`);
 
   if (ai.desc && TERMS.test(desc)) add('ordering', false, 'The description talks about delivery or returns; it should be about the product only.', 'Remove every sentence about delivery, shipping, returns or refunds from the description. It is about the product only.');
 

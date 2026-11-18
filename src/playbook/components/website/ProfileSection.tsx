@@ -7,8 +7,8 @@
 // (On Shopify 6) / (Ordering details 12); pairs stack on phone.
 import type { CSSProperties } from 'react';
 import PbSwitch from '../ui/PbSwitch';
-import { fillKeyword, type PbProfile } from '../../seoTypes';
-import { PB, pbBody, pbTextarea } from '../../pbTheme';
+import { fillKeyword, phraseMax, type PbProfile } from '../../seoTypes';
+import { PB, pbBody, pbNum, pbTextarea } from '../../pbTheme';
 import { PbTag } from '../ui';
 import { Dot } from '../product/status';
 import { Field, Grid2, Section, Seg, input44 } from './ui';
@@ -33,10 +33,12 @@ export default function ProfileSection({ draft, set, siteName }: { draft: Draft;
       <PbTag>{on ? 'On' : 'Off'}</PbTag>
     </div>
   );
-  const example = fillKeyword(p.keyword_pattern, SAMPLE);
   const brand = p.brand_name.trim() || siteName;
   // Same rule as the server (profile.ts brandFits): "| Brand" must leave the product 12 of the SEO title's characters.
   const seoMax = Number(draft.content.meta_title_max) || 60, brandMax = seoMax - 15;
+  // The phrase is kept short enough for the SEO title beside the brand, as the server does (profile.ts phraseMax).
+  const kwMax = phraseMax(brand, Number(draft.content.title_max) || 70, seoMax);
+  const example = fillKeyword(p.keyword_pattern, SAMPLE, kwMax);
 
   return (
     <SectionGrid>
@@ -81,8 +83,8 @@ export default function ProfileSection({ draft, set, siteName }: { draft: Draft;
       </Cell>
 
       <Cell span={6}>
-        <Section title="Search phrase" hint="The phrase each listing is written for. It goes once in the title, once near the top of the description and once in the SEO title.">
-          <Field label="Pattern" htmlFor="pbp-kw" hint={<>Build it from: {mono(KEYWORD_PH)}. You can change the phrase for one listing in its editor.</>}>
+        <Section title="Search phrase" hint="The phrase each listing is written for, made from the product's tags (the main one of each). It goes once in the title, once near the top of the description and once in the SEO title.">
+          <Field label="Pattern" htmlFor="pbp-kw" hint={<>Build it from: {mono(KEYWORD_PH)}. Kept to <span style={pbNum}>{kwMax}</span> characters so it fits the SEO title with your brand: the occasion is left out first, then the work. You can change the phrase for one listing in its editor.</>}>
             <input id="pbp-kw" value={p.keyword_pattern} onChange={e => put({ keyword_pattern: e.target.value })} maxLength={120} spellCheck={false}
               aria-describedby="pbp-kw-hint" className="pb-input" style={{ ...input44, fontFamily: PB.mono }} />
           </Field>

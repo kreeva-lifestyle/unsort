@@ -13,6 +13,7 @@ import { routeProduct } from './route.ts';
 import { autoValues, type ValueSet } from './tagAuto.ts';
 import { categoryGone, gateMoves, gateStatus, missingAttrs } from './tagGate.ts';
 import { type Refreshed, writeValues } from './tagStore.ts';
+import { withoutNone } from './tagText.ts';
 import { type Taxonomy, attrsFor, loadTaxonomy, matchAttrs, shadesOf } from './taxonomy.ts';
 import { PRODUCT_COLS, type ProductRow } from './types.ts';
 
@@ -35,7 +36,9 @@ export async function productValuesSet(b: Body, userId: string | null) {
   if (attributeId && !attrs.length) throw new HttpError(400, 'That attribute is not used by this product\'s category.');
   for (const v of want) if (!attrs.some(a => a.values.some(x => x.id === v))) throw new HttpError(400, 'One of those values is not allowed for this product\'s category — reload and choose again.');
   for (const a of attrs) if (!a.multi && want.filter(v => a.values.some(x => x.id === v)).length > 1) throw new HttpError(400, `${a.name} takes one value only.`);
-  const fin = await writeValues(id, want.map(value_id => ({ value_id, source: 'manual' })), 'manual', attributeId ? [attributeId] : undefined);
+  // "Plain" beside another value of its attribute says nothing: only the other is kept (tagText.ts withoutNone).
+  const keep = new Set(attrs.flatMap(a => withoutNone(want.filter(v => a.values.some(x => x.id === v)), a.values)));
+  const fin = await writeValues(id, want.filter(v => keep.has(v)).map(value_id => ({ value_id, source: 'manual' })), 'manual', attributeId ? [attributeId] : undefined);
   const locked = [...new Set([...(p.locked || []), 'tags'])];
   await patch('pb_products', `id=eq.${enc(id)}`, { locked });
   let routed = 0;
@@ -59,7 +62,10 @@ function next(p: P, have: Pv[], tax: Taxonomy): { rows: ValueSet[]; missing: str
   // Only values the category offers count or stay (a Product Type ticked for another category does neither).
   const ok = new Set(attrs.flatMap(a => a.values.map(v => v.id)));
   const manual = new Set(have.filter(v => v.source === 'manual').map(attrOf));
-  const r = autoValues(p, matchAttrs(attrs), { manualAttrIds: manual, categories: tax.categories, shades: shadesOf(tax) });
+  // The AI's earlier choices go in as its answer: one it made from the photo beats a "Plain" the words find (tagAuto.ts).
+  const aiChosen: Record<string, string[]> = {};
+  for (const v of have) if (v.source === 'ai' && ok.has(v.value_id) && !manual.has(attrOf(v))) (aiChosen[attrOf(v)] ||= []).push(v.value_id);
+  const r = autoValues(p, matchAttrs(attrs), { manualAttrIds: manual, categories: tax.categories, shades: shadesOf(tax), ai: { chosen: aiChosen, other: [] } });
   const inScope = new Set(attrs.map(a => a.id));
   const keepAi = have.filter(v => v.source === 'ai' && ok.has(v.value_id) && !manual.has(attrOf(v)) && !r.filled.has(attrOf(v)));
   const rows: ValueSet[] = [...r.rows, ...keepAi.map(v => ({ value_id: v.value_id, source: 'ai' as const }))];

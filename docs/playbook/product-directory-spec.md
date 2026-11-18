@@ -527,11 +527,20 @@ rules left empty take the AI's choice: a must-have attribute gets its
 best-judged value from the photos and text (Occasion from the look of the
 product), an "only if it fits" one a value only when one truly fits, else none;
 never a value outside the list (`tagPrompt.ts`). A value meaning "none of the
-others" (`isNoneValue`: Plain, No Work, None, Solid; Work's Plain added 18 Nov
-2026) is kept only when no other value of its attribute is chosen, by the
+others" (`isNoneValue`: Plain, No Work, None, Solid; owner, 18 Nov 2026: "add
+Plain to Work values") is kept only when no other value of its attribute is chosen, by the
 rules and the AI alike (`withoutNone`), and the rules take it only from a
 label, the name, a store tag or a fact — "plain blouse" in the running text is
-one piece of a set, so the photo (the AI) decides. 'manual' attributes and
+one piece of a set, so the photo (the AI) decides. A Plain the words find alone
+does not settle the attribute either ("Blouse Work : Plain" beside a work not
+on the list): the AI's value wins, the words' Plain stands only when the AI
+has none (`tagAuto.ts` `weak`; "Let AI decide" asks the AI for such an
+attribute, `tagFill.ts`; a retag passes the AI's earlier choices,
+`tagsProduct.ts`). The prompt says a work not in the list takes the nearest
+listed value, never Plain. A word filed later replaces a product's lone Plain
+(`tagsFile.ts`); `namesTwo` still sees Plain beside another value
+(`keepNone`). A person's Plain beside another value keeps only the other
+(`product_values_set`); the values sheet clears one when the other is tapped. 'manual' attributes and
 locked `tags` are never touched. (3) "Let AI decide" (`tagFill.ts`): for the
 empty required attributes, the rules first (free, the same every time), then
 — only for what they left empty — a values-only AI pass (reader model, text +
@@ -750,7 +759,16 @@ AI's extra tags are an enum of it.
   failed-after-writing), PRIMARY KEYWORD, IMAGE COUNT, the photos (≤ 8).
 - **Primary keyword**: the site's `keyword_pattern` filled from the product
   (`{color} {fabric} {category} {work} {occasion} {name}`), or the phrase
-  typed for that listing (kept: `keyword_locked`).
+  typed for that listing (kept: `keyword_locked`). Since 18 Nov 2026
+  (`profile.ts keywordOf`): each part is the product's own tag value (the one
+  its facts name first, "Cocktail / Reception" → Cocktail), else the first
+  item of the read fact, and the phrase is no longer than `phraseMax` (the SEO
+  title beside "| Brand", and the title; SuratMandi 47): the occasion is left
+  out first, then pattern, work, fabric, colour — never the category or the
+  name — then it is cut at a word. Before, raw facts were joined and sliced at
+  80 characters mid-word ("…Festival Sange"), which no description could hold
+  and which held listings in review. The app's preview (`seoTypes.ts
+  fillKeyword`) is its twin.
 - **Output**: `{ title, handle, seo_title, seo_description, description_html,
   faq[{q,a}] (≤ 2), image_alts[] (≤ 110 chars), extra_tags[], missing_facts[] }`.
   Description: `wordsMin`–`wordsMax` words (`description_words`, min = 65%):
@@ -834,23 +852,34 @@ AI's extra tags are an enum of it.
   out (`cleanHandle`), a 4-character suffix only when another listing on the
   same website has it (the store itself is checked at publish).
 - **Program checks** (`seoCheck.ts`, in place of the writer's self check).
-  HARD: a run of 5+ words shared with the source text or another version (a
-  run counts only with ≥ 3 words that are neither the product's fact words,
-  numbers nor joining words, so "comes with Kurta, Pant and Dupatta" may
-  repeat); same title / SEO title / first four words as another version;
-  keyword not exactly once in the AI title, missing from the first 50 words,
-  or not exactly once in the SEO title; SEO title not ending with the brand;
-  supplier name, design code, link, email, phone; "No. 1", scarcity, review
-  claims; a number in "Ordering from" that the profile does not give; the
-  description does not name the product's fabric word for word (`fabric`,
-  English listings only; owner, 2026-11-12).
-  SOFT (noted only): SEO description outside min–max, description over
-  115% of the limit, repeated alt texts, keyword more than 3 times, the
-  humanCopy tells.
-- **One rewrite**: any problem → one more call with the draft and the list
-  of fixes (text only, no photos; needs 45 s left). The better draft is kept
-  (fewer hard problems, then fewer in all); both calls are paid for
-  (`ai_cost_usd`, activity `generated` `details.usd`, `rewrote`, `problems`).
+  Owner, 18 Nov 2026: "donot provide suggestions rather fix it directly using
+  AI" — HARD (holds the listing) only for what could harm the store: a
+  copied sentence (a shared run of 8+ words, `COPIED_SENTENCE`; a run counts
+  only with ≥ 3 words that are neither the product's fact words, numbers nor
+  joining words); same title / SEO title / first four words as another
+  version; supplier name, design code, link, email, phone; "No. 1",
+  scarcity, review claims.
+  SOFT (sent to the rewrite, never a stop): a shorter shared run (5–7
+  words: a fact said the usual way); keyword not exactly once in the AI
+  title, missing from the first 50 words, not exactly once in the SEO title;
+  SEO title not ending with the brand; a title that is not plain; the
+  description not naming the fabric word for word (English only); delivery
+  or returns talk; SEO description outside min–max; description over 115%
+  of the limit; repeated alt texts; keyword more than 3 times; the humanCopy
+  tells. `keyword_fit` ("shorten one of them in the store profile") is gone:
+  the phrase is built to fit.
+- **The program fixes** what it safely can before the checks: the SEO title
+  gets the phrase as "phrase | Brand" when the AI's has it missing or twice
+  and it fits (`generate.ts seoTitleOf`).
+- **Up to two rewrites** (`genWrite.ts`, `MAX_REWRITES`): any problem → one
+  more call with the draft and the list of fixes (text only, no photos;
+  needs 45 s left); a second only while a HARD problem is still there,
+  asking only for those. The better draft is kept each time (fewer hard
+  problems, then fewer in all); every call is paid for (`ai_cost_usd`,
+  activity `generated` `details.usd`, `rewrote`, `rewrites`, `problems`).
+- **The listing editor** shows a held listing's reason only. The checks'
+  notes and the writer's missing facts are still stored
+  (`pb_listing_seo.notes` / `missing`) but no longer shown.
 - **Next status**: a HARD problem → `review` with
   `error = 'Check before it goes out: …'` whatever the publish mode;
   otherwise as before (review → `review`, live / draft → `publishing`).
@@ -885,7 +914,7 @@ listing editor set the `_locked` flag (an emptied value hands it back).
   (`metafieldDefinitions`, namespace `custom`, read once per store every 10
   minutes) decide the kind each field is sent in: a list as one comma-joined
   line where the store's field is one line of text (SuratMandi's Work and
-  Occasion), a line as a list of one, lines for multi-line text; a field of a
+  Occasion) or multi-line text, a line as a list of one; a field of a
   kind no text goes in (a number, a reference) is left out with a warning
   (`fieldsSend.ts`). A field still refused (its kind changed meanwhile) is
   found by its place in the error's `field` path (`["metafields", "2", …]`;
@@ -1241,7 +1270,7 @@ report (Q1 to Q20) are the owner's and are not built here.
   must leave the product 12 of the SEO title's characters (60 → a brand of up
   to 45). A longer brand is left out of the SEO title (`content.ts
   withBrand`, never cut part-way), not asked of the writer (`genPrompt.ts`)
-  and not checked (`seoCheck.ts` `brand`, `keyword_fit`). The profile editor
+  and not checked (`seoCheck.ts` `brand`). The profile editor
   says so under Brand name.
 - **D3** the default title formula, above.
 - **D4 a busy AI is not a failed try** (`aiRetry.ts`). `ai.ts` throws 503

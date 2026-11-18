@@ -42,7 +42,7 @@ export const DAILY: GuideSection[] = [
       table(['You see', 'Internal name', 'What it means', 'What you do'],
         ['**Queued**', '`queued`', 'Waiting to be written', 'Nothing'],
         ['**Writing**', '`generating`', 'The AI is writing title, description, SEO and tags', 'Wait; editing is off'],
-        ['**Needs review**', '`review`', 'Written; this website is on **Review first** — or a check found something ("Check before it goes out: …")', 'Open, read the reason, edit or **Regenerate**, then **Approve**'],
+        ['**Needs review**', '`review`', 'Written; this website is on **Review first** — or something that could harm the store is still there after the AI\'s own fixes ("Check before it goes out: …")', 'Open, read the reason, edit or **Regenerate**, then **Approve**'],
         ['**Publishing**', '`publishing`', 'Being sent to Shopify', 'Wait; editing is off'],
         ['**Published**', '`published`', 'On Shopify', '**Shopify** opens it in the Shopify admin'],
         ['**Failed**', '`failed`', 'Shopify or the AI refused; the red text says why', 'See "Fixing a failed listing"'],

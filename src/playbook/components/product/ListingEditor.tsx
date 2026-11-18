@@ -16,7 +16,7 @@ import { PB, pbBtnSecondary, pbErrorBox, pbNum, pbTileReview } from '../../pbThe
 import PbModal from './PbModal';
 import ListingActions, { listingPrimary } from './ListingActions';
 import ListingField from './detail/ListingField';
-import { ListingChecks, ListingKeyword, ListingQuestions } from './detail/ListingSeo';
+import { ListingKeyword, ListingQuestions } from './detail/ListingSeo';
 import { useListingSeo } from './detail/useListingSeo';
 import { aiRupees } from '../../format';
 import PbIcon from '../ui/PbIcon';
@@ -130,7 +130,6 @@ export default function ListingEditor({ listing, site, onClose, onChanged, addTo
           Being {l.status === 'generating' ? 'written' : 'published'} right now — editing is off. Close and reopen in a minute.
         </div>
       )}
-      <ListingChecks s={seo} said={l.error} />
       {field('price', 'Price (₹)', { num: true })}
       <ListingKeyword s={seo} disabled={locked} />
       {field('title', 'Title', { max: site?.content?.title_max })}
