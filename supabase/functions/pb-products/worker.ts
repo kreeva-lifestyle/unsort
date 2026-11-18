@@ -28,6 +28,7 @@
 //   * the photos of freshly published listings are looked at (mediaCheck.ts).
 import { overLimit, pauseWatch } from './brake.ts';
 import { getSettings } from './db.ts';
+import { autoFill } from './fillAuto.ts';
 import { claimGenerate, genCandidates, generateOne } from './generate.ts';
 import { advanceImport } from './import/runner.ts';
 import { plain } from './http.ts';
@@ -161,6 +162,8 @@ export async function work(userId: string | null, manual = false): Promise<WorkR
     }
   } catch (e) { failed('tags_fill', 'run', e); }
   try { await closeFills(); } catch (e) { failed('tags_fill', 'close', e); } // its bulk change, once the queue is over
+  // Tags a read left empty: "Let AI decide" by itself, once per read (fillAuto.ts, owner 18 Nov 2026).
+  try { const n = await autoFill({ budget, left, capped, stopped }); if (n) out.tagged = (out.tagged ?? 0) + n; } catch (e) { failed('tags_fill', 'auto', e); }
   // New tag words: filed by themselves, as "also known as" of their nearest value or ignored (tagsFile.ts, owner 17 Nov).
   try { if (left(FILE_NEEDS_MS) && !(await stopped())) { const f = await fileWords({ budget, left, capped, stopped }); if (f?.aliased || f?.ignored) out.filed = f.aliased + f.ignored; } }
   catch (e) { failed('tags_file', 'run', e); }

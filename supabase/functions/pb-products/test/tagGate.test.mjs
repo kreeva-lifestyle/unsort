@@ -25,6 +25,13 @@ test('manual fill of the last one → ready again', () => {
   assert.deepEqual([before, after], ['needs_info', 'ready']);
 });
 
+test('an "only if it fits" attribute (Product Type) never holds a product', () => {
+  const linked = [...LINKED, { id: 'type', name: 'Product Type', required: false }];
+  assert.deepEqual(missingAttrs(linked, ['col', 'work']), []);
+  assert.deepEqual(missingAttrs(linked, ['col']), ['Work']);
+  assert.equal(gateStatus(P({ status: 'needs_info' }), missingAttrs(linked, ['col', 'work'])), 'ready');
+});
+
 test('unlinking an attribute frees products', () => {
   assert.equal(gateStatus(P({ status: 'needs_info' }), missingAttrs([{ id: 'col', name: 'Colour' }], ['col'])), 'ready');
 });

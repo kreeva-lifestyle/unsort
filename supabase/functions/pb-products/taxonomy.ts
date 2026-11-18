@@ -14,13 +14,15 @@ import type { TaxValue } from './tagLook.ts';
 import { type TagSpec, tagSpec } from './tagPrompt.ts';
 import { tagKey } from './tagText.ts';
 
-export interface AttrRow { id: string; name: string; key: string; multi: boolean; position: number; shopify_prefix: string | null; by_category: boolean }
+/** `required`: false = "only if it fits" (owner, 18 Nov 2026: Product Type) — filled when a value truly fits, never
+ *  holds a product (pb_products_refresh, tagGate.ts missingAttrs). */
+export interface AttrRow { id: string; name: string; key: string; multi: boolean; position: number; shopify_prefix: string | null; by_category: boolean; required: boolean }
 export interface ValueRow { id: string; attribute_id: string; name: string; key: string; aliases: string[]; position: number; categories: string[] }
 export interface LinkRow { category: string; attribute_id: string; position: number }
 export interface Taxonomy { attrs: AttrRow[]; values: ValueRow[]; links: LinkRow[]; categories: string[] }
 export type AttrWithValues = AttrRow & { values: ValueRow[] };
 
-export const ATTR_COLS = 'id,name,key,multi,position,shopify_prefix,by_category';
+export const ATTR_COLS = 'id,name,key,multi,position,shopify_prefix,by_category,required';
 export const VALUE_COLS = 'id,attribute_id,name,key,aliases,position,categories';
 const MAX_VALUES = 20000;
 
@@ -31,7 +33,7 @@ export async function loadTaxonomy(categories?: string[]): Promise<Taxonomy> {
     sel<LinkRow>('pb_category_attributes?select=category,attribute_id,position&order=position.asc'),
     categories ? Promise.resolve(categories) : getSettings().then(s => s.categories),
   ]);
-  return { attrs: attrs.map(a => ({ ...a, by_category: a.by_category === true })), values: values.map(v => ({ ...v, aliases: v.aliases || [], categories: v.categories || [] })), links, categories: cats };
+  return { attrs: attrs.map(a => ({ ...a, by_category: a.by_category === true, required: a.required !== false })), values: values.map(v => ({ ...v, aliases: v.aliases || [], categories: v.categories || [] })), links, categories: cats };
 }
 
 const sameCat = (a: string | null | undefined, b: string) => !!tagKey(a) && tagKey(a) === tagKey(b);
@@ -80,7 +82,7 @@ export function readerSpec(tax: Taxonomy): TagSpec {
   const byCategory: Record<string, string[]> = {};
   for (const c of tax.categories) byCategory[c] = attrsFor(tax, c).map(a => a.id);
   const attrs = tax.attrs.filter(a => linked.has(a.id)).map(a => ({
-    id: a.id, name: a.name, multi: a.multi, byCategory: a.by_category,
+    id: a.id, name: a.name, multi: a.multi, byCategory: a.by_category, required: a.required,
     values: tax.values.filter(v => v.attribute_id === a.id && (!a.by_category || v.categories.length))
       .map(v => ({ id: v.id, name: v.name, ...(a.by_category ? { categories: v.categories } : {}) })),
   }));

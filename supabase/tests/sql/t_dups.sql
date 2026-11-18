@@ -464,7 +464,46 @@ select t_is('twenty new words are due at once, without waiting 15 minutes', publ
 select set_config('request.jwt.claims', '{}', false);
 rollback;
 
+-- ── 13. tags chosen by themselves; "only if it fits" attributes (20261118120000_pb_tags_auto_select.sql) ──
+begin;
+\set A_T13 '''e0000000-0000-4000-8000-000000000013'''
+\set A_O13 '''e0000000-0000-4000-8000-000000000014'''
+\set V_O13 '''e1000000-0000-4000-8000-000000000013'''
+\set R13 '''d9000000-0000-4000-8000-000000000006'''
+insert into public.pb_settings (key, value) values ('categories', '["Saree"]');
+select t_product(130, :V1, 'KX 1301', 'Pink', 1) is not null;
+insert into public.pb_attributes (id, name, key, multi, position, by_category) values (:A_T13, 'Type', 'type', false, 9, true), (:A_O13, 'Occasion', 'occasion', true, 10, false);
+insert into public.pb_attribute_values (id, attribute_id, name, key, aliases, position, categories) values (:V_O13, :A_O13, 'Wedding', 'wedding', '{}', 1, '{}');
+insert into public.pb_category_attributes (category, attribute_id, position) values ('Saree', :A_T13, 1), ('Saree', :A_O13, 2);
+select t_is('a must-have attribute with no value holds the product', (select g.status || '/' || array_to_string(g.missing, ',') from public.pb_products_refresh(array[t_id(130)]) g), 'needs_info/Type,Occasion');
+update public.pb_attributes set required = false where id = :A_T13;
+select t_is('"only if it fits" never holds it: only the must-have one is missing', (select g.status || '/' || array_to_string(g.missing, ',') from public.pb_products_refresh(array[t_id(130)]) g), 'needs_info/Occasion');
+select t_is('… nor counts as lacking when linking', public.pb_category_lacking('Saree', :A_T13)::text, '0');
+select t_is('… nor on the link', (select lacking::text from public.pb_tag_link_stats() where attribute_id = :A_T13), '0');
+select t_is('a must-have one still lacks', public.pb_category_lacking('Saree', :A_O13)::text, '1');
+select t_is('due: a Needs-info product missing a tag, never filled by itself', public.pb_tags_auto_due()::text, 'true');
+select t_is('taken once', (select count(*)::text from public.pb_tags_auto_claim(50) where id = t_id(130)), '1');
+select t_is('… not again for the same read', (select count(*)::text from public.pb_tags_auto_claim(50) where id = t_id(130)), '0');
+update public.pb_products set ai_read_at = now() + interval '1 second' where id = t_id(130);
+select t_is('read again: taken again', (select count(*)::text from public.pb_tags_auto_claim(50) where id = t_id(130)), '1');
+update public.pb_products set tags_ai_at = null, locked = '{tags}' where id = t_id(130);
+select t_is('tags a person locked: never taken', (select count(*)::text from public.pb_tags_auto_claim(50) where id = t_id(130)), '0');
+update public.pb_products set locked = '{}' where id = t_id(130);
+insert into public.pb_product_values (product_id, value_id, source) values (t_id(130), :V_O13, 'ai');
+select t_is('the must-have one filled: Ready without a Type', (select g.status || '/' || array_to_string(g.missing, ',') from public.pb_products_refresh(array[t_id(130)]) g), 'ready/');
+select t_is('… and a Ready product is never taken', (select count(*)::text from public.pb_tags_auto_claim(50) where id = t_id(130)), '0');
+select set_config('request.jwt.claims', '{"role":"service_role"}', false);
+insert into pb_bulk_runs (id, kind, label, status) values (:R13, 'attribute_delete', 'Deleted the attribute Type', 'running');
+select set_config('request.headers', json_build_object('x-pb-bulk', :R13)::text, false);
+select public.pb_attribute_delete(:A_T13) >= 0;
+select set_config('request.headers', '{}', false);
+update pb_bulk_runs set status = 'done', items = pb_bulk_products(:R13) where id = :R13;
+select public.pb_bulk_revert(:R13, true) is not null;
+select t_is('a reverted delete brings it back "only if it fits"', (select required::text from pb_attributes where id = :A_T13), 'false');
+select set_config('request.jwt.claims', '{}', false);
+rollback;
+
 -- Every check above printed a line: a part that silently printed nothing would be a failure too.
-select case when last_value = 212 then 'ok   every check ran (212)' else 'FAIL the number of checks is ' || last_value || ', not 212: a part printed fewer lines than it has, or this number was not updated' end from public.t_checks;
+select case when last_value = 225 then 'ok   every check ran (225)' else 'FAIL the number of checks is ' || last_value || ', not 225: a part printed fewer lines than it has, or this number was not updated' end from public.t_checks;
 drop function public.t_refused(text, text); drop function public.t_is(text, text, text); drop function public.t_rel(uuid, uuid); drop function public.t_product(int, uuid, text, text, int, numeric, text); drop function public.t_id(int);
 drop sequence public.t_checks;

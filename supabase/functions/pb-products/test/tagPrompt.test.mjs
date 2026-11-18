@@ -22,13 +22,26 @@ test('only attributes with values; safe property names; enum per attribute', () 
   assert.equal(tagSchema(tagSpec([])), null);
 });
 
-test('prompt: lists, the category map, closest-value rule, never invent', () => {
+test('prompt: lists, the category map, must-have always chosen, "only if it fits" left empty when nothing fits, never invent', () => {
   const t = tagPromptLines(spec).join('\n');
-  assert.match(t, /Colour \(one or several\): Pink, Wine/);
-  assert.match(t, /Fabric \(one value\): Organza, Silk/);
+  assert.match(t, /Colour \(one or several; must have\): Pink, Wine/);
+  assert.match(t, /Fabric \(one value; must have\): Organza, Silk/);
   assert.match(t, /Lehenga → Colour, Fabric/);
-  assert.match(t, /CLOSEST value/);
+  assert.match(t, /"must have" always gets a value: choose the best-fitting one .* Never leave a must-have attribute empty\./);
+  assert.match(t, /Occasion from the look of the product/);
+  assert.match(t, /"only if it fits" gets a value only when one in its list truly fits .* leave values \[\]/);
   assert.match(t, /Never invent/);
+  const opt = tagSpec([{ id: 'type', name: 'Product Type', multi: false, required: false, values: [{ id: 'bl', name: 'Bridal Lehenga' }] }]);
+  assert.match(tagPromptLines(opt).join('\n'), /Product Type \(one value; only if it fits\): Bridal Lehenga/);
+});
+
+test('schema: in "Let AI decide" a must-have attribute takes at least one value, an "only if it fits" one may stay empty; the read asks for none', () => {
+  const s = tagSpec([{ id: 'col', name: 'Colour', multi: false, values: [{ id: 'p', name: 'Pink' }] },
+    { id: 'type', name: 'Product Type', multi: false, required: false, values: [{ id: 'bl', name: 'Bridal Lehenga' }] }]);
+  const fill = tagSchema(s, { fillOnly: true }).tags.properties;
+  assert.equal(fill.colour.properties.values.minItems, 1);
+  assert.equal(fill.product_type.properties.values.minItems, undefined);
+  assert.equal(tagSchema(s).tags.properties.colour.properties.values.minItems, undefined);
 });
 
 test('readTags: unknown names dropped, one-value keeps the first, other phrases kept, `only` respected', () => {

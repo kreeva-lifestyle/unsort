@@ -47,8 +47,11 @@ test('the reader\'s list: each Product Type value under its categories, one tick
   const type = spec.attrs.find(a => a.id === 'type');
   assert.deepEqual(type.values.map(v => v.name), ['Anarkali', 'Bridal Lehenga']);
   const line = tagPromptLines(spec).find(l => l.startsWith('Product Type'));
-  assert.equal(line, 'Product Type (one value; depends on the category — choose only from the product\'s category, none if it has none): Salwar Suit: Anarkali; Lehenga: Bridal Lehenga');
-  assert.ok(tagPromptLines(spec).some(l => l === 'Colour (one value): Pink'), 'other attributes as before');
+  assert.equal(line, 'Product Type (one value; must have; depends on the category — choose only from the product\'s category, none if it has none): Salwar Suit: Anarkali; Lehenga: Bridal Lehenga');
+  assert.ok(tagPromptLines(spec).some(l => l === 'Colour (one value; must have): Pink'), 'other attributes as before');
+  // the owner's Product Type: only if it fits (18 Nov 2026)
+  const opt = readerSpec({ ...TAX, attrs: TAX.attrs.map(a => (a.id === 'type' ? { ...a, required: false } : a)) });
+  assert.match(tagPromptLines(opt).find(l => l.startsWith('Product Type')), /^Product Type \(one value; only if it fits; depends on the category/);
 });
 
 test('the AI\'s pick from another category is dropped; the word rules use only the category\'s values', () => {
