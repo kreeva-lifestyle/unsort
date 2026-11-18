@@ -57,6 +57,10 @@ test('a word that names two values of one attribute, each on its own, is never f
   assert.equal(namesTwo('Sequins and Zari Work', 'emb', TAX), true);
   assert.equal(namesTwo('Heavy Zari Work', 'emb', TAX), false); // only Embroidery's own word
   assert.equal(namesTwo('Heavy Sequins', 'emb', TAX), false); // Embroidery is not in it: the alias is the AI's call
+  // Plain is seen beside the other value: "Plain Sequins" filed under Plain would take Sequins away
+  const PLAIN = { ...TAX, values: [...TAX.values, { ...V('plain', 'work', 'Work', 'Plain'), position: 9, categories: [] }] };
+  assert.equal(namesTwo('Plain Sequins', 'plain', PLAIN), true);
+  assert.equal(namesTwo('Plain Work', 'plain', PLAIN), false);
   assert.equal(namesTwo('Pink Silk', 'silk', TAX), false); // Pink is another attribute: still found as a Colour
   // an attribute that takes one value keeps one anyway; the longer name corrects the shorter one
   const fab = { ...TAX, attrs: TAX.attrs, values: [...TAX.values, { id: 'plain', attribute_id: 'fab', name: 'Silk', key: 'silk', aliases: [], position: 9, categories: [] }] };

@@ -28,8 +28,9 @@ const valuesOf = (f: FieldInput): string[] => {
   try { const v: unknown = JSON.parse(f.value); return (Array.isArray(v) ? v : []).map(x => String(x ?? '').trim()).filter(Boolean); } catch { return []; }
 };
 
-/** The same value in another text kind: a list as one line ("Embroidery, Sequins") or as lines, one line as a list of
- *  one. null when the value cannot go in that kind (a number, a reference…): the field is left out. */
+/** The same value in another text kind: a list as one comma-joined line ("Embroidery, Sequins", also into a multi-line
+ *  text field), one line as a list of one. null when the value cannot go in that kind (a number, a reference…): the
+ *  field is left out. */
 export function inKind(f: FieldInput, kind: string): FieldInput | null {
   if (kind === f.type) return f;
   if (f.type !== TEXT && f.type !== LIST) return null;

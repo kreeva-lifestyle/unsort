@@ -4,7 +4,7 @@
 // replace the writer's self check (seoCheck.ts).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { brandFits, DEFAULT_KEYWORD, hasOrdering, keywordOf, profileOf } from '../profile.ts';
+import { brandFits, DEFAULT_KEYWORD, hasOrdering, keywordOf, phraseMax, profileOf } from '../profile.ts';
 import { withBrand } from '../content.ts';
 import { copiedRuns, countPhrase, dropSection, factWords, opening, sectionAfter, wordsOf } from '../seoText.ts';
 import { better, checkCopy, hardOf } from '../seoCheck.ts';
@@ -68,7 +68,7 @@ test('a clean listing passes every check', () => {
   assert.deepEqual(checkCopy(input()), []);
 });
 
-test('title: a sales word, shouting, an emoji or a symbol stops an AI title (research, 2026-11-12)', () => {
+test('title: a sales word, shouting, an emoji or a symbol is sent back to the AI, never a stop (owner, 18 Nov 2026)', () => {
   const t = (title, o = {}) => checkCopy(input({ copy: { ...GOOD, title }, ...o })).filter(p => p.code === 'title');
   assert.deepEqual(t('Maroon Georgette Kurta Set with Zari Work'), []);
   assert.deepEqual(t('Maroon Georgette Kurta Set with Zari Work, Sizes M to XXXL'), []);   // a size is not shouting
@@ -76,7 +76,7 @@ test('title: a sales word, shouting, an emoji or a symbol stops an AI title (res
   for (const [bad, why] of [['Stunning Maroon Georgette Kurta Set', 'sales word'], ['Maroon Georgette KURTA Set', 'ALL CAPS'], ['Maroon Georgette Kurta Set ✨', 'emoji or symbol'], ['Maroon Georgette Kurta Set!', 'emoji or symbol']]) {
     const p = t(bad);
     assert.equal(p.length, 1, bad);
-    assert.ok(p[0].hard && p[0].say.includes(why), `${bad}: ${p[0]?.say}`);
+    assert.ok(!p[0].hard && p[0].say.includes(why), `${bad}: ${p[0]?.say}`);
   }
   assert.deepEqual(t('STUNNING Kurta Set!', { aiTitle: false }), []);                        // a title pattern the owner chose is theirs
   assert.deepEqual(t('STUNNING Kurta Set!', { kept: ['title'] }), []);                       // and so is a title a person typed
@@ -89,22 +89,24 @@ test('alt text: never begins with "image of" (noted, not a stop)', () => {
   assert.deepEqual(codes({ copy: { ...GOOD, image_alts: ['Maroon kurta, front view', 'Photo studio backdrop behind the dupatta'] } }), []);
 });
 
-test('fabric: the description must name it word for word (owner, 2026-11-12)', () => {
+test('fabric: the description must name it word for word (owner, 2026-11-12) — sent back to the AI, never a stop', () => {
   assert.deepEqual(codes({ fabric: 'Georgette' }), []);                       // "georgette" is there: case and punctuation do not matter
   assert.deepEqual(codes({ fabric: '' }), []);                                // no fabric, or a listing not in English: not checked
   const p = checkCopy(input({ fabric: 'Pure Soft Fox Georgette' }));          // shortened to "georgette"
-  assert.deepEqual(p.map(x => [x.code, x.hard]), [['fabric', true]]);
+  assert.deepEqual(p.map(x => [x.code, x.hard]), [['fabric', false]]);
   assert.ok(p[0].say.includes('"Pure Soft Fox Georgette"') && p[0].fix.includes('word for word'));
   const named = { ...GOOD, description_html: GOOD.description_html.replace('<li>Fabric: georgette</li>', '<li>Fabric: Pure Soft Fox Georgette</li>') };
   assert.deepEqual(codes({ copy: named, fabric: 'pure soft  fox georgette', facts: [...input().facts, 'Pure Soft Fox Georgette'] }), []);
   assert.deepEqual(codes({ fabric: 'Pure Soft Fox Georgette', kept: ['description_html'] }), []); // a description a person typed is theirs
 });
 
-test('copying the supplier or another store is a hard problem with the phrase named', () => {
+test('copying the supplier or another store: a copied sentence (8 words or more) holds the listing, a short run is only sent back', () => {
   const p = checkCopy(input({ source: 'Zari runs along the yoke of this lovely piece' }));
-  assert.deepEqual(p.map(x => [x.code, x.hard]), [['copied', true]]);
+  assert.deepEqual(p.map(x => [x.code, x.hard]), [['copied', false]]);                      // 7 words: a fact said the usual way
   assert.match(p[0].say, /"zari runs along the yoke of this"/);
   assert.match(p[0].fix, /new words/);
+  const long = checkCopy(input({ source: 'Zari runs along the yoke of this maroon georgette kurta set, a classic' }));
+  assert.deepEqual(long.map(x => [x.code, x.hard]), [['copied', true]]);                    // a copied sentence: held
 });
 
 test('same title, same SEO title and same opening as another store', () => {
@@ -146,12 +148,11 @@ test('a field typed by hand is the owner\'s: only what the AI wrote is checked',
   assert.deepEqual(codes({ copy: bad, kept: ['seo_title', 'seo_description'] }), ['keyword_title', 'keyword_start', 'names']);
 });
 
-test('a phrase that cannot fit is not demanded: long brand, short SEO title', () => {
+test('a phrase that cannot fit is not demanded, and nobody is asked to shorten the store profile (owner, 18 Nov 2026)', () => {
   const copy = { ...GOOD, seo_title: 'Kurta Set | Svaraa Ethnic Wear Online Store India' };
   const limits = { ...LIMITS, titleMax: 70, metaTitleMax: 60 };
   const p = checkCopy(input({ copy, brand: 'Svaraa Ethnic Wear Online Store India', limits })); // 26 + 3 + 37 characters > 60
-  assert.deepEqual(p.map(x => [x.code, x.hard]), [['keyword_fit', false]]);
-  assert.match(p[0].say, /do not fit in the SEO title together \(60 characters\)/);
+  assert.deepEqual(p.map(x => [x.code, x.hard]), []);
   assert.deepEqual(codes({ limits }), []);                            // the usual brand: the phrase fits and is checked
   assert.deepEqual(codes({ limits, copy: { ...GOOD, seo_title: 'Zari Kurta Set | Kreeva' } }), ['keyword_meta']);
 });
@@ -195,4 +196,37 @@ test('a brand too long for the SEO title is left out whole, and then not asked f
     assert.equal(codes({ brand: b, limits, copy: { ...GOOD, seo_title: t } }).includes('keyword_fit'), false, 'the phrase alone fits');
   }
   assert.ok(codes({ limits: { ...LIMITS, metaTitleMax: 60 }, copy: { ...GOOD, seo_title: 'Maroon Georgette Kurta Set with Zari' } }).includes('brand'), 'a brand that fits is still asked for');
+});
+
+test('search phrase (owner, 18 Nov 2026: "fix it directly"): Playbook\'s own tag values, one per part, short enough for the SEO title beside the brand', () => {
+  const PAT = '{color} {work} {fabric} {category} {occasion}';
+  assert.equal(phraseMax('SuratMandi', 70, 60), 35);                       // 60 − 12 to spare − " | SuratMandi": room for what sets the product apart
+  assert.equal(phraseMax('Svaraa Ethnic Wear Online Store India', 70, 60), 20); // a long brand that still fits: never under 20
+  assert.equal(phraseMax('Svaraa Ethnic Wear Online Store India and Far Beyond', 70, 60), 48); // one left out of SEO titles leaves them whole
+  assert.equal(phraseMax('', undefined, undefined), 80);
+  const lehenga = { name: 'Lehenga', category: 'Lehenga', fabric: 'Banarasi Silk', color: 'Cream', attributes: { work: 'Zari embroidery, Embroidery Work', occasion: 'Wedding, Reception, Festive' } };
+  const values = { colour: ['Cream'], work: ['Digital Print', 'Embroidery'], fabric: ['Banarasi Silk'], occasion: ['Festival', 'Wedding', 'Cocktail / Reception'] };
+  // was "Cream Zari embroidery Embroidery Work Banarasi Silk Lehenga Wedding Reception Fe" (80, cut mid-word)
+  assert.equal(keywordOf(PAT, lehenga, { values, max: 47 }), 'Cream Embroidery Banarasi Silk Lehenga Wedding'); // the value the product's own words name first
+  // too long: the occasion goes first, then the work; never the category; and no word is cut
+  const suit = { name: 'Suit', category: 'Suits & Dresses', fabric: 'Pure Georgette', color: 'Purple', attributes: {} };
+  assert.equal(keywordOf(PAT, suit, { values: { colour: ['Purple'], work: ['Embroidery'], fabric: ['Georgette'], occasion: ['Festival'] }, max: 47 }), 'Purple Embroidery Georgette Suits & Dresses');
+  assert.equal(keywordOf(PAT, suit, { values: { colour: ['Purple'], work: ['Embroidery'], fabric: ['Georgette'] }, max: 30 }), 'Purple Suits & Dresses'); // then the fabric
+  assert.equal(keywordOf('{name}', { ...suit, name: 'A very long product name that goes on and on beyond any limit' }, { max: 30 }), 'A very long product name that');
+  // no tags yet: the first item of each read fact; "Cocktail / Reception" gives Cocktail
+  assert.equal(keywordOf(PAT, lehenga, { max: 47 }), 'Cream Zari embroidery Banarasi Silk Lehenga');
+  assert.equal(keywordOf('{occasion} {category}', { ...lehenga, attributes: {} }, { values: { occasion: ['Cocktail / Reception'] } }), 'Cocktail Lehenga');
+  // a tag the product's own facts do not name is never used: a Light Yellow lehenga tagged Navy Blue stays Light Yellow
+  const yellow = { name: 'Lehenga', category: 'Lehenga', fabric: 'Kanchipuram Silk', color: 'Light Yellow', attributes: {} };
+  assert.equal(keywordOf('{color} {fabric} {category}', yellow, { values: { colour: ['Navy Blue'], fabric: ['Kanjivaram'] } }), 'Light Yellow Kanchipuram Silk Lehenga');
+});
+
+test('copied: a copied sentence is never pushed out of the hold by shorter copied runs before it', () => {
+  const source = 'Soft flowing drape feels light on skin. Bright festive colours glow under evening lamps. Neat finishing on seams lasts many washes. Elegant silhouette flatters every body shape. Lovely outfit will surely make heads turn at every single celebration this season.';
+  const desc = '<p>Maroon georgette kurta set. Soft flowing drape feels light here too. Then bright festive colours glow under it all. Again neat finishing on seams lasts long. Also elegant silhouette flatters every body nicely.</p>';
+  const seo_description = 'Maroon georgette kurta set: lovely outfit will surely make heads turn at every single celebration this season, at a Surat factory price.';
+  const p = checkCopy(input({ copy: { ...GOOD, description_html: desc, seo_description }, source, limits: { ...LIMITS, metaDescMin: 50, metaDescMax: 200, wordsMin: 10, wordsMax: 400 } }));
+  const c = p.find(x => x.code === 'copied');
+  assert.equal(c.hard, true);
+  assert.match(c.say, /lovely outfit will surely make heads turn/);
 });

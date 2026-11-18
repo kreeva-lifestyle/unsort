@@ -20,15 +20,15 @@ const P = (o = {}) => ({ id: 'p1', name: 'Pink anarkali for a party', sku: 'KB 1
   status: 'ready', cost_price: 900, sell_price: null, ai_read_at: '2026-11-12T00:00:00Z', ai_error: null, pb_product_images: [{ id: 'i1' }], ...o });
 
 /** `products`: what the retag reads; `values`: the products' value rows. */
-function world({ products = [P()], values = [] } = {}) {
+function world({ products = [P()], values = [], tax = TAX } = {}) {
   const calls = { set: [], bulk: [] };
   globalThis.fetch = async (url, init = {}) => {
     const path = decodeURIComponent(String(url)).replace('https://sb.example/rest/v1/', '');
     const ok = (b) => new Response(JSON.stringify(b), { status: 200 });
-    if (path.startsWith('pb_attributes?')) return ok(TAX.attrs);
-    if (path.startsWith('pb_attribute_values?')) return ok(TAX.values);
-    if (path.startsWith('pb_category_attributes?')) return ok(TAX.links);
-    if (path.startsWith('pb_settings?')) return ok([{ key: 'categories', value: TAX.categories }]);
+    if (path.startsWith('pb_attributes?')) return ok(tax.attrs);
+    if (path.startsWith('pb_attribute_values?')) return ok(tax.values);
+    if (path.startsWith('pb_category_attributes?')) return ok(tax.links);
+    if (path.startsWith('pb_settings?')) return ok([{ key: 'categories', value: tax.categories }]);
     if (path.startsWith('pb_products?')) return ok(path.includes('offset=0') || !path.includes('offset=') ? products : []);
     if (path.startsWith('pb_product_values?')) return ok(values);
     if (path.startsWith('rpc/pb_product_values_set')) { calls.set.push(JSON.parse(init.body)); return ok([{ id: 'p1', status: 'ready', was: 'ready', missing: [] }]); }
@@ -83,4 +83,21 @@ test('Retag all sends the attributes it checked with each product, and projects 
   world({ products: [P({ category: 'Indo-Western' })], values: [pv('party', 'occ')] });
   const dry = await retag({ dry_run: true }, 'u1');
   assert.deepEqual([dry.changed, dry.to_needs_info], [0, 1]); // nothing to rewrite, but the Ready check will hold it
+});
+
+test('Plain on retag: an AI pick made before Plain was on the list gives way to the words\' Plain; one made after it stands', async () => {
+  const TAXW = { ...TAX,
+    attrs: [TAX.attrs[0], { id: 'work', name: 'Work', key: 'work', multi: true, position: 2, shopify_prefix: null }],
+    values: [TAX.values[0], { id: 'emb', attribute_id: 'work', name: 'Embroidery', key: 'embroidery', aliases: [], position: 1 },
+      { id: 'plain', attribute_id: 'work', name: 'Plain', key: 'plain', aliases: [], position: 2, created_at: '2026-11-19T00:00:00Z' }],
+    links: [TAX.links[0], { category: 'Anarkali', attribute_id: 'work', position: 2 }] };
+  const plainTop = P({ raw_text: 'Top Work : Plain\nBottom Work : Plain' });
+  const ai = (at) => ({ ...pv('emb', 'work', 'ai'), created_at: at });
+  // chosen when Work could not stay empty and had no Plain: the words' Plain replaces it
+  let c = world({ tax: TAXW, products: [plainTop], values: [pv('pink', 'col'), ai('2026-11-15T00:00:00Z')] });
+  assert.equal(await retagProducts(['p1']), 1);
+  assert.deepEqual(c.set[0].p_rows.filter(r => r.value_id !== 'pink'), [{ value_id: 'plain', source: 'rules' }]);
+  // chosen with Plain on the list: the AI saw a work in the photo, and that stands
+  c = world({ tax: TAXW, products: [plainTop], values: [pv('pink', 'col'), ai('2026-11-20T00:00:00Z')] });
+  assert.equal(await retagProducts(['p1']), 0);
 });

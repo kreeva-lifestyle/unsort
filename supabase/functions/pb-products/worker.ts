@@ -1,4 +1,4 @@
-// The automation run ('work'): read → route → generate → publish, oldest
+// The automation run ('work'): read → route → (publish 2) → generate → publish, oldest
 // first. Stops STARTING new items after ~100 s (every outside call also ends
 // by ~140 s, under the edge runtime's wall clock; a publish starts only while
 // 70 s are left, see PUBLISH_NEEDS_MS; a read only while READ_NEEDS_MS and a
@@ -47,6 +47,8 @@ import type { Budget } from './types.ts';
 export interface WorkResult { read: number; routed: number; generated: number; published: number; failed: number; imported?: number; tagged?: number; filed?: number; stock?: number; taken_off?: number; paused?: boolean; limit?: boolean }
 
 const CAPS = { read: 6, generate: 8, publish: 10, route: 10, fill: 5, stock: 10, media: 5, retire: 5, takeOff: 10 };
+/** Listings already written that go out before any writing in a run (the rest after it, up to CAPS.publish). */
+const PUBLISH_FIRST = 2;
 /** "Let AI decide" products one run may take, CAPS.fill at a time. */
 const FILL_MAX = 60;
 /** The slice of each run that stock sends may use. */
@@ -117,6 +119,30 @@ export async function work(userId: string | null, manual = false): Promise<WorkR
     } catch (e) { failed('read', c.id, e); }
   }
 
+  // A publish is started only with time to finish it (a slow productSet may take up to 90 s).
+  const pubTime = () => left(PUBLISH_NEEDS_MS + 10_000);
+  const busyStores = new Set<string>(); // a store that asked for a pause: its other listings wait for the next run, the other stores go on
+  let sentNow = 0;
+  const send = async (max: number) => {
+    for (const c of pubTime() ? await pubCandidates(CAPS.publish * 3) : []) {
+      if (!pubTime() || sentNow >= max || await stopped()) break;
+      if (busyStores.has(c.website_id)) continue;
+      const l = await claimPublish(c.id, false);
+      if (!l) continue;
+      sentNow++;
+      try {
+        const r = await publishOne(l, { manual: false, userId, budget });
+        if (r.status === 'published') out.published++;
+      } catch (e) {
+        failed('publish', c.id, e);
+        if (temporary(e)) busyStores.add(c.website_id);
+      }
+    }
+  };
+  // A few listings already written go out FIRST (no AI, no cost), so a long writing queue never holds them back:
+  // 18 Nov 2026, 19 written listings waited while every run spent its time writing new ones.
+  await send(PUBLISH_FIRST);
+
   for (const c of left(GEN_NEEDS_MS) && !(await capped()) ? await genCandidates(CAPS.generate) : []) {
     if (!left(GEN_NEEDS_MS) || await stopped()) break;
     const l = await claimGenerate(c.id, false);
@@ -124,24 +150,7 @@ export async function work(userId: string | null, manual = false): Promise<WorkR
     try { await generateOne(l, { manual: false, userId, budget }); out.generated++; } catch (e) { failed('generate', c.id, e); }
   }
 
-  // A publish is started only with time to finish it (a slow productSet may take up to 90 s).
-  const pubTime = () => left(PUBLISH_NEEDS_MS + 10_000);
-  const busyStores = new Set<string>(); // a store that asked for a pause: its other listings wait for the next run, the other stores go on
-  let sentNow = 0;
-  for (const c of pubTime() ? await pubCandidates(CAPS.publish * 3) : []) {
-    if (!pubTime() || sentNow >= CAPS.publish || await stopped()) break;
-    if (busyStores.has(c.website_id)) continue;
-    const l = await claimPublish(c.id, false);
-    if (!l) continue;
-    sentNow++;
-    try {
-      const r = await publishOne(l, { manual: false, userId, budget });
-      if (r.status === 'published') out.published++;
-    } catch (e) {
-      failed('publish', c.id, e);
-      if (temporary(e)) busyStores.add(c.website_id);
-    }
-  }
+  await send(CAPS.publish); // then the rest, with the time the writing left
 
   try { if (inTime() && !(await stopped())) await checkMedia(CAPS.media, inTime); } catch (e) { failed('media', 'run', e); }
   try { if (inTime() && !(await stopped())) out.routed += await routeDue(CAPS.route, userId, inTime); } catch (e) { failed('route_due', 'run', e); }

@@ -1,7 +1,7 @@
 // One product on one website: edit title / description / SEO / handle / tags /
 // price (each edit joins listing.locked so Regenerate keeps it), the search
 // phrase it is written for and its questions (detail/ListingSeo.tsx), with
-// what the checks found at the top; plus the actions in ListingActions
+// the reason at the top when a listing is held; plus the actions in ListingActions
 // (Regenerate, Approve, Publish / Update, Remove): the gradient one in the
 // sheet footer, the others and Remove in the body.
 import { useEffect, useRef, useState } from 'react';
@@ -16,7 +16,7 @@ import { PB, pbBtnSecondary, pbErrorBox, pbNum, pbTileReview } from '../../pbThe
 import PbModal from './PbModal';
 import ListingActions, { listingPrimary } from './ListingActions';
 import ListingField from './detail/ListingField';
-import { ListingChecks, ListingKeyword, ListingQuestions } from './detail/ListingSeo';
+import { ListingKeyword, ListingQuestions } from './detail/ListingSeo';
 import { useListingSeo } from './detail/useListingSeo';
 import { aiRupees } from '../../format';
 import PbIcon from '../ui/PbIcon';
@@ -130,7 +130,6 @@ export default function ListingEditor({ listing, site, onClose, onChanged, addTo
           Being {l.status === 'generating' ? 'written' : 'published'} right now — editing is off. Close and reopen in a minute.
         </div>
       )}
-      <ListingChecks s={seo} said={l.error} />
       {field('price', 'Price (₹)', { num: true })}
       <ListingKeyword s={seo} disabled={locked} />
       {field('title', 'Title', { max: site?.content?.title_max })}

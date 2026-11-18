@@ -86,8 +86,9 @@ function phrasesOf(a: MatchAttr) {
 }
 
 /** `shades`: the Colour values of the whole list (also when Colour is not being looked for), so a word that is part of
- *  a colour's name ("Mehendi Green", "Haldi Yellow") is not taken for another attribute (the Mehendi occasion). */
-export function matchProduct(input: MatchInput, attrs: MatchAttr[], o: { shades?: MatchValue[] } = {}): MatchResult {
+ *  a colour's name ("Mehendi Green", "Haldi Yellow") is not taken for another attribute (the Mehendi occasion).
+ *  `keepNone`: a "none" value (Plain) is kept beside the others it was found with. */
+export function matchProduct(input: MatchInput, attrs: MatchAttr[], o: { shades?: MatchValue[]; keepNone?: boolean } = {}): MatchResult {
   const shadePh = (o.shades ?? attrs.find(isColour)?.values ?? []).flatMap(v => [v.name, ...v.aliases].map(words).filter(p => p.length));
   const srcs: Src[] = [];
   const cands: Candidate[] = [];
@@ -151,7 +152,8 @@ export function matchProduct(input: MatchInput, attrs: MatchAttr[], o: { shades?
   for (const a of attrs) {
     const m = best[a.id];
     if (!m?.size) continue;
-    const ids = withoutNone([...m.entries()].sort((x, y) => y[1].w - x[1].w || x[1].order - y[1].order).map(([id]) => id), a.values);
+    const found = [...m.entries()].sort((x, y) => y[1].w - x[1].w || x[1].order - y[1].order).map(([id]) => id);
+    const ids = o.keepNone ? found : withoutNone(found, a.values); // keepNone: what a phrase names, Plain too (tagsFile.ts namesTwo)
     chosen[a.id] = a.multi ? ids.slice(0, MAX_MULTI) : [mostSpecific(a, ids)];
   }
   const out: Candidate[] = cands.filter(c => !hitKeys.has(`${c.attribute_id}:${stemKey(c.key)}`));

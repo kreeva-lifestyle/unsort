@@ -158,6 +158,18 @@ test('a rewrite that is worse, fails or has no time left keeps the first draft a
   assert.deepEqual([calls.length, late.rewrote, late.problems.length], [1, false, 1]);
 });
 
+test('a second rewrite only while something would hold the listing, asking only for that (owner, 18 Nov 2026: "fix it directly using AI")', async () => {
+  const calls = ai([DRAFT, { ...DRAFT, title: 'Two' }, { ...DRAFT, title: 'Three' }]);
+  const w = await ask(g => ({ g, problems: g.title === 'Three' ? [] : g.title === 'Two' ? [problem('names', true)] : [problem('copied', true), problem('tells', false)] }));
+  assert.deepEqual([calls.length, w.rewrites, w.g.title, w.problems.length], [3, 2, 'Three', 0]);
+  const third = calls[2].messages[0].content[1].text;
+  assert.ok(third.includes('1. fix names') && !third.includes('fix tells') && third.includes('"title":"Two"'));
+  // only notes left after the first rewrite: no second call, the listing goes out
+  const two = ai([DRAFT, { ...DRAFT, title: 'Two' }, { ...DRAFT, title: 'Three' }]);
+  const soft = await ask(g => ({ g, problems: g.title === 'Two' ? [problem('tells', false)] : [problem('copied', true)] }));
+  assert.deepEqual([two.length, soft.rewrites, soft.g.title], [2, 1, 'Two']);
+});
+
 test('a rewrite never changes how many photos are described', async () => {
   ai([DRAFT, { ...DRAFT, title: 'Better', image_alts: ['only one'] }]);
   const w = await ask(g => ({ g, problems: g.title === 'Better' ? [] : [problem('tells', false)] }));

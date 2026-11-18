@@ -16,3 +16,6 @@ export const attrNames = (ids: string[], attrs: PbAttribute[]) => ids.map(id => 
 
 /** A button whose label may be long (an attribute or value name): it wraps instead of clipping. */
 export const WRAP: CSSProperties = { whiteSpace: 'normal', padding: '8px 16px', textAlign: 'center' };
+
+/** "Plain", "No Work", "None", "Solid": a value that means none of the others (the server's tagText.ts isNoneValue twin). */
+export const isNoneValue = (name: string) => /^(?:plain|none|solid|no [a-z]+)(?: work)?$/.test(name.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim());

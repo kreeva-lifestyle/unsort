@@ -177,6 +177,24 @@ test('the AI refuses: what the words found is still written, and the product cou
   assert.deepEqual(c.ticks, [{ p_run: 'run1', p_filled: 0, p_left: 1 }]);
 });
 
+// Plain (owner, 18 Nov 2026): a Plain the words found for one piece ("Blouse Work : Plain") does not settle Work.
+const TAXP = { ...TAX, values: [...TAX.values, { id: 'plain', attribute_id: 'work', name: 'Plain', key: 'plain', aliases: [], position: 2 }] };
+const PLAIN_TEXT = { ...PRODUCT, raw_text: 'Pink lehenga\nLehenga Work : Aari Work\nBlouse Work : Plain', missing_attrs: ['Work'] };
+
+test('the words found only Plain: the AI is asked for Work too, and its value from the photo wins', async () => {
+  const c = world({ product: PLAIN_TEXT, values: [], ai: { tags: { work: { values: ['Embroidery'], other: ['Aari Work'] } } } });
+  await fillQueued({ id: 'p1', tag_fill_run: 'run1' }, TAXP, null, budget());
+  assert.equal(c.ai.length, 1);
+  assert.deepEqual(Object.keys(c.ai[0].output_config.format.schema.properties.tags.properties), ['work']); // Colour came from the words
+  assert.deepEqual(c.set[0].p_rows, [{ value_id: 'pink', source: 'rules' }, { value_id: 'emb', source: 'ai' }]);
+});
+
+test('the words found only Plain and the AI sees none either: the words\' Plain stands', async () => {
+  const c = world({ product: PLAIN_TEXT, values: [], ai: { tags: { work: { values: ['Plain'], other: [] } } } });
+  await fillQueued({ id: 'p1', tag_fill_run: 'run1' }, TAXP, null, budget());
+  assert.deepEqual(c.set[0].p_rows, [{ value_id: 'pink', source: 'rules' }, { value_id: 'plain', source: 'rules' }]);
+});
+
 // Values that depend on the category (owner, 13 Nov 2026: Product Type — "so no mistake can happen").
 const TAXT = {
   ...TAX,

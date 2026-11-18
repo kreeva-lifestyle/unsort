@@ -37,15 +37,39 @@ export interface PbListingSeo {
 /** What the AI cost for one product, in dollars as recorded (format.ts aiRupees shows rupees). */
 export interface PbAiCost { product_id: string; read_usd: number; tag_usd: number; write_usd: number; writes: number }
 
-/** The pattern filled for a sample or a real product: "Maroon Georgette Kurta Set". */
-export function fillKeyword(pattern: string, p: { name?: string | null; category?: string | null; fabric?: string | null; color?: string | null; attributes?: Record<string, string> | null }): string {
+/** The parts a pattern may use, least important first: left out first when the phrase is too long (profile.ts DROP). */
+const DROP = ['occasion', 'pattern', 'work', 'fabric', 'colour', 'color'];
+
+/** The longest search phrase the SEO title holds beside "| Brand" with 12 characters to spare for what sets each product
+ *  apart (profile.ts phraseMax's twin): a brand that leaves the product fewer than 12 is left out of SEO titles. */
+export function phraseMax(brand: string, titleMax?: number, metaTitleMax?: number): number {
+  const b = brand.replace(/\s+/g, ' ').trim();
+  const meta = metaTitleMax ? metaTitleMax - 12 - (b && metaTitleMax - b.length - 3 >= 12 ? b.length + 3 : 0) : 80;
+  return Math.max(20, Math.min(80, titleMax || 80, meta));
+}
+
+/** The pattern filled for a sample product (the server's keywordOf twin, without the tag lists): one item of each fact,
+ *  and no longer than `max` — the least important part left out first, then cut at a word.
+ *  "{color} {fabric} {category}" → "Maroon Georgette Kurta Set". */
+export function fillKeyword(pattern: string, p: { name?: string | null; category?: string | null; fabric?: string | null; color?: string | null; attributes?: Record<string, string> | null }, max = 80): string {
   const a = p.attributes || {};
+  const one = (s: unknown) => String(s ?? '').split(/\s*[,;|/]\s*/)[0].replace(/\s+/g, ' ').trim().slice(0, 40);
   const vars: Record<string, string> = {
-    color: p.color || '', colour: p.color || '', fabric: p.fabric || '', category: p.category || '', name: p.name || '',
-    work: a.work || '', occasion: a.occasion || '', pattern: a.pattern || '',
+    color: one(p.color), colour: one(p.color), fabric: one(p.fabric), work: one(a.work), occasion: one(a.occasion), pattern: one(a.pattern),
+    category: (p.category || '').trim().slice(0, 60), name: (p.name || '').trim().slice(0, 60),
   };
-  return (pattern || DEFAULT_KEYWORD).replace(/\{\s*([a-z_]+)\s*\}/gi, (_m, k: string) => (vars[k.toLowerCase()] ?? '').trim())
-    .replace(/[^\p{L}\p{N}' &-]+/gu, ' ').replace(/\s+/g, ' ').trim().slice(0, 80);
+  const pieces = (pattern || DEFAULT_KEYWORD).split(/(\{\s*[a-z_]+\s*\})/i).map(t => {
+    const m = /^\{\s*([a-z_]+)\s*\}$/i.exec(t), key = m ? m[1].toLowerCase() : '';
+    return { key, text: m ? vars[key] ?? '' : t };
+  });
+  const joined = () => pieces.map(x => x.text).join('').replace(/[^\p{L}\p{N}' &-]+/gu, ' ').replace(/\s+/g, ' ').trim();
+  const cap = Math.max(20, Math.min(80, max));
+  for (const k of DROP) {
+    if (joined().length <= cap) break;
+    for (const x of pieces) if (x.key === k) x.text = '';
+  }
+  const s = joined();
+  return s.length <= cap ? s : (s.slice(0, cap + 1).replace(/\s+\S*$/, '') || s.slice(0, cap)).trim();
 }
 
 /** What a product still needs before it can be Ready, besides its required tags (the gate's twin,

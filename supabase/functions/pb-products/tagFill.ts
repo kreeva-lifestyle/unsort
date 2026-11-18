@@ -25,7 +25,7 @@ import { routeProduct } from './route.ts';
 import { cleanStoreTags } from './tagClean.ts';
 import { readTags, tagPromptLines, tagSchema, tagSpec } from './tagPrompt.ts';
 import { type Refreshed, productValues, suggestFor, writeValues } from './tagStore.ts';
-import { tagKey } from './tagText.ts';
+import { isNoneValue, tagKey } from './tagText.ts';
 import { autoValues } from './tagAuto.ts';
 import { type AttrWithValues, type Taxonomy, attrsFor, matchAttrs, shadesOf } from './taxonomy.ts';
 import { PRODUCT_COLS, type Budget, type ProductRow } from './types.ts';
@@ -59,17 +59,23 @@ export async function fillOne(p: ProductRow, tax: Taxonomy, o: { manual: boolean
   const stale = [...new Set(pv.filter(v => v.source === 'manual' && !ok.has(v.value_id) && target.some(a => a.id === v.attribute_id)).map(v => v.attribute_id))];
   if (stale.length) await writeValues(p.id, [], 'manual', stale, o.run);
   // The word rules first (owner, 13 Nov 2026: rules, then AI, then a person): what the product's own words settle
-  // costs nothing and comes out the same every time. The AI is asked only for the attributes still empty.
+  // costs nothing and comes out the same every time. The AI is asked for the attributes still empty, and for one the
+  // words settled only with "Plain" (`weak`: "Blouse Work : Plain" says one piece; the photo shows the work).
   const byRules = autoValues(p, matchAttrs(target), { categories: tax.categories, shades: shadesOf(tax) });
-  const rest = target.filter(a => !byRules.filled.has(a.id));
+  const rest = target.filter(a => !byRules.filled.has(a.id) || byRules.weak.has(a.id));
   let ai: Awaited<ReturnType<typeof askFor>> | null = null;
   try { if (rest.length) ai = await askFor(p, tax, rest, o.budget); }
   catch (e) { if (byRules.rows.length) await writeValues(p.id, byRules.rows, 'auto', [...byRules.filled], o.run); throw e; } // the words' values are kept
-  const rows = [...byRules.rows, ...rest.flatMap(a => (ai?.chosen[a.id] ?? []).map(value_id => ({ value_id, source: 'ai' as const })))];
+  // The AI's answer counts for an empty attribute; for a "weak" one only when it is a value other than Plain.
+  const isNone = (a: AttrWithValues, id: string) => a.values.some(v => v.id === id && isNoneValue(v.name));
+  const aiWins = new Set(rest.filter(a => (ai?.chosen[a.id] ?? []).some(id => !byRules.weak.has(a.id) || !isNone(a, id))).map(a => a.id));
+  const attrOf = new Map(target.flatMap(a => a.values.map(v => [v.id, a.id] as const)));
+  const rows = [...byRules.rows.filter(r => !aiWins.has(attrOf.get(r.value_id) ?? '')),
+    ...rest.filter(a => aiWins.has(a.id)).flatMap(a => (ai?.chosen[a.id] ?? []).map(value_id => ({ value_id, source: 'ai' as const })))];
   // Only the attributes it filled are replaced: their rules / AI rows (none, or a value from another category).
   const refreshed = await writeValues(p.id, rows, 'auto', target.map(a => a.id), o.run);
-  const byWords = target.filter(a => byRules.filled.has(a.id)).map(a => a.name);
-  const filled = [...byWords, ...rest.filter(a => ai?.chosen[a.id]?.length).map(a => a.name)];
+  const byWords = target.filter(a => byRules.filled.has(a.id) && !aiWins.has(a.id)).map(a => a.name);
+  const filled = [...byWords, ...rest.filter(a => aiWins.has(a.id)).map(a => a.name)];
   if (ai) await suggestFor(p.id, ai.other.map(x => ({ phrase: x.phrase, key: tagKey(x.phrase), attribute_id: x.attribute_id, source: 'ai' as const })), tax, o.run);
   const left = refreshed?.missing ?? target.filter(a => !filled.includes(a.name)).map(a => a.name);
   const usd = ai?.usd ?? 0;
@@ -115,6 +121,10 @@ export async function fillQueued(c: { id: string; tag_fill_run: string }, tax: T
     left = 1;
     console.error(`pb-products tag fill ${c.id}: ${plain(e)}`);
     await logActivity({ product_id: c.id, action: 'failed', details: { step: 'tags_fill', error: plain(e), ...(usdOf(e) ? { usd: usdOf(e) } : {}) }, user_id: userId });
+    // The gate again (no AI), as the automatic fill does (fillAuto.ts): what is no longer a must does not hold it. A
+    // product the words' values made Ready does not "need you" in the batch's count.
+    const [g] = (await rpc<Refreshed[]>('pb_products_refresh', { p_ids: [c.id] }).catch(r => { console.error(`pb-products tag fill ${c.id}: gate not checked again: ${plain(r)}`); return null; })) ?? [];
+    if (g && !g.missing?.length) left = 0;
   } finally {
     await rpc('pb_tag_fill_tick', { p_run: c.tag_fill_run, p_filled: filled, p_left: left });
   }

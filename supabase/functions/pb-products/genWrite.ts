@@ -1,22 +1,26 @@
 // The writer's call(s) for one listing: ask, tidy what a program can tidy
 // safely (humanCopy.ts), check (seoCheck.ts, through the caller's `check`),
-// and when the checks find anything, ask ONCE more with the draft and the
-// list of fixes (text only: the photos are not sent twice). The better of the
-// two drafts is kept (fewer hard problems, then fewer in all), with what both
-// calls cost. A rewrite that fails or has no time left keeps the first draft:
-// the listing is never lost to its own second pass.
+// and when the checks find anything, ask again with the draft and the list of
+// fixes (text only: the photos are not sent twice) — a second time only while
+// something that would hold the listing is still there (owner, 18 Nov 2026:
+// "donot provide suggestions rather fix it directly using AI"). The better
+// draft is kept each time (fewer hard problems, then fewer in all), with what
+// every call cost. A rewrite that fails or has no time left keeps the draft
+// before it: the listing is never lost to its own rewrite.
 import { askClaude, type Block } from './ai.ts';
 import { fixAsk, type GenOut } from './genPrompt.ts';
 import { tidyCopy } from './humanCopy.ts';
 import { plain, usdOf } from './http.ts';
-import { better, type Problem } from './seoCheck.ts';
+import { better, hardOf, type Problem } from './seoCheck.ts';
 import { dropSection } from './seoText.ts';
 import type { Budget } from './types.ts';
 
 /** Time a rewrite needs left; with less the first draft stands. */
 export const REWRITE_NEEDS_MS = 45_000;
 
-export interface Written { g: GenOut; usd: number; model: string; effort: string; problems: Problem[]; rewrote: boolean }
+export interface Written { g: GenOut; usd: number; model: string; effort: string; problems: Problem[]; rewrote: boolean; rewrites: number }
+/** Rewrites at most: the first for anything the checks found, the second only for what would hold the listing. */
+export const MAX_REWRITES = 2;
 
 const list = (v: unknown, max: number, len: number) => (Array.isArray(v) ? v : []).map(x => tidyCopy(x).replace(/\s+/g, ' ').trim().slice(0, len)).filter(Boolean).slice(0, max);
 
@@ -43,19 +47,23 @@ export async function writeCopy(a: {
   const ask = (content: Block[]) => askClaude<GenOut>({ model: a.model, effort: a.effort, system: a.system, content, schema: a.schema, maxTokens: 16000, timeoutMs: a.budget.hard - Date.now() });
   const first = await ask([...a.photos, { type: 'text', text: a.facts }]);
   const one = a.check(tidyOut(first.data));
-  const out: Written = { ...one, usd: first.usd, model: first.model, effort: first.effort, rewrote: false };
-  if (!one.problems.length || a.budget.hard - Date.now() < REWRITE_NEEDS_MS) return out;
-  try {
-    const second = await ask([{ type: 'text', text: a.facts }, { type: 'text', text: fixAsk(one.g, one.problems) }]);
-    out.usd += second.usd; out.rewrote = true;
-    const draft = tidyOut(second.data);
-    // The rewrite did not see the photos: its alt texts are kept only where it was given the same number.
-    if (draft.image_alts.length !== one.g.image_alts.length) draft.image_alts = one.g.image_alts;
-    const two = a.check(draft);
-    if (better(two.problems, one.problems) <= 0) { out.g = two.g; out.problems = two.problems; }
-  } catch (e) {
-    out.usd += usdOf(e); // a rewrite that was cut off or unreadable was still paid for
-    console.error(`pb-products rewrite: ${plain(e)}`); // the first draft stands; its problems decide what happens next
+  const out: Written = { ...one, usd: first.usd, model: first.model, effort: first.effort, rewrote: false, rewrites: 0 };
+  for (let n = 0; n < MAX_REWRITES; n++) {
+    const fix = n === 0 ? out.problems : hardOf(out.problems);
+    if (!fix.length || a.budget.hard - Date.now() < REWRITE_NEEDS_MS) break;
+    try {
+      const again = await ask([{ type: 'text', text: a.facts }, { type: 'text', text: fixAsk(out.g, fix) }]);
+      out.usd += again.usd; out.rewrote = true; out.rewrites = n + 1;
+      const draft = tidyOut(again.data);
+      // The rewrite did not see the photos: its alt texts are kept only where it was given the same number.
+      if (draft.image_alts.length !== out.g.image_alts.length) draft.image_alts = out.g.image_alts;
+      const two = a.check(draft);
+      if (better(two.problems, out.problems) <= 0) { out.g = two.g; out.problems = two.problems; }
+    } catch (e) {
+      out.usd += usdOf(e); // a rewrite that was cut off or unreadable was still paid for
+      console.error(`pb-products rewrite: ${plain(e)}`); // the draft before it stands; its problems decide what happens next
+      break;
+    }
   }
   return out;
 }

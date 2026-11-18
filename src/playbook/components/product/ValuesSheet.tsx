@@ -1,6 +1,6 @@
 // One attribute's values for a product (from ProductValues): the allowed
 // values of the product's category as chips — tap to choose; a "one value"
-// attribute keeps only the last tap. Save (the sheet's gradient) sends staff's
+// attribute keeps only the last tap, and so does "Plain" (none of the others). Save (the sheet's gradient) sends staff's
 // choice (product_values_set: 'manual', 'tags' locked); saving the last
 // missing attribute re-runs the gate, so the product turns Ready and goes to
 // its websites — the toast says so.
@@ -14,6 +14,7 @@ import { useIsPhone } from '../../hooks/useIsPhone';
 import PbModal from './PbModal';
 import PbButton from '../ui/PbButton';
 import PbIcon from '../ui/PbIcon';
+import { isNoneValue } from '../tags/tagText';
 
 export default function ValuesSheet({ attr, chosen, productId, save, addToast, onClose, onSaved }: {
   attr: PbAttribute | null; chosen: string[]; productId: string; save: typeof setProductValues; addToast: AddToast; onClose: () => void; onSaved: () => void;
@@ -27,7 +28,9 @@ export default function ValuesSheet({ attr, chosen, productId, save, addToast, o
   useEffect(() => { setSel(key ? key.split('|') : []); setQ(''); setErr(''); }, [attr, key]);
   if (!attr) return null;
   const dirty = [...sel].sort().join('|') !== [...chosen].sort().join('|');
-  const toggle = (id: string) => setSel(s => (s.includes(id) ? s.filter(x => x !== id) : attr.multi ? [...s, id] : [id]));
+  // "Plain" means none of the others (owner, 18 Nov 2026): choosing it clears the rest, choosing another clears it.
+  const none = new Set(attr.values.filter(v => isNoneValue(v.name)).map(v => v.id));
+  const toggle = (id: string) => setSel(s => (s.includes(id) ? s.filter(x => x !== id) : !attr.multi || none.has(id) ? [id] : [...s.filter(x => !none.has(x)), id]));
   const k = q.trim().toLowerCase();
   const list = k ? attr.values.filter(v => v.name.toLowerCase().includes(k) || v.aliases.some(a => a.includes(k))) : attr.values;
   const doSave = async () => {

@@ -129,3 +129,20 @@ test('Plain (owner, 18 Nov 2026): kept only when no other work is found; "plain 
   assert.deepEqual(matchProduct({ storeTags: ['plain'] }, [W]).chosen.work, ['plain']);
   assert.deepEqual(matchProduct({ facts: ['Plain'], text: 'Heavy embroidery on the lehenga' }, [W]).chosen.work, ['emb']);
 });
+
+test('Plain from the words does not settle Work: the AI\'s value (it saw the photo) wins; the words\' Plain stands when the AI has none', () => {
+  const W = { id: 'work', name: 'Work', multi: true, values: [v('emb', 'Embroidery'), v('print', 'Printed'), v('plain', 'Plain')] };
+  const text = 'Lehenga Work : Aari Work\nBlouse Work : Plain'; // "Aari Work" is not on the list; the blouse is plain
+  // the reader's own answer is there: its Embroidery wins over the label's Plain
+  const read = autoValues({ raw_text: text }, [W], { ai: { chosen: { work: ['emb'] }, other: [] } });
+  assert.deepEqual(read.rows, [{ value_id: 'emb', source: 'ai' }]);
+  assert.equal(read.weak.size, 0);
+  // the AI says Plain too (or nothing): the words' Plain stands
+  assert.deepEqual(autoValues({ raw_text: text }, [W], { ai: { chosen: { work: ['plain'] }, other: [] } }).rows, [{ value_id: 'plain', source: 'rules' }]);
+  // no AI answer yet ("Let AI decide" runs the words first): Plain stands for now, marked weak so the AI is asked
+  const words = autoValues({ raw_text: text }, [W], {});
+  assert.deepEqual(words.rows, [{ value_id: 'plain', source: 'rules' }]);
+  assert.deepEqual([...words.weak], ['work']);
+  // a real work in the words settles it as before: never weak
+  assert.equal(autoValues({ raw_text: 'Work : Printed' }, [W], {}).weak.size, 0);
+});
