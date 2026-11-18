@@ -29,6 +29,10 @@ are tagged.
   product goes out without one. Lehenga has just 3 types (Bridal Lehenga,
   South Indian Lehenga, Crop Top & Skirt), so most lehengas get none. Add
   the kinds you sell under Settings → Tags → Product Type if you want them.
+- **Work's "Plain" value is not added yet.** The rule is built (Plain is
+  kept only when no other work is found), but a "plain blouse" in the
+  text must not stop the AI from choosing the real work from the photo.
+  Claude fixes that first, then adds Plain to Work.
 - **SuratMandi's own product fields that Playbook does not fill.** The
   store already had these fields, and every product leaves them empty:
   Generic name, Net quantity, Country of origin, HSN code, Fabric & care,
