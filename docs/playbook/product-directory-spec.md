@@ -194,17 +194,13 @@ is_active). Service role for all DB writes. CORS like listing-ai.
 | `test_connection` | staff | `{ website_id }` | `{ ok, shop_name, scopes[] , missing_scopes[] }`, sets connected_at / last_error |
 | `store_setup` | admin/manager | `{ website_id }` | (2026-11-17, SuratMandi) on the store: a product metafield definition (namespace `custom`, pinned, storefront PUBLIC_READ) per Playbook attribute — key = the attribute key in snake case, `list.single_line_text_field` when multi, else `single_line_text_field` — plus `set_contents` and `faq` (rich text); then a collection per category (`collectionCreate(collection:)` with one conditions source: product type EQUALS the category; handle from the name) put on the Online Store. Kept when there (a definition with the same key, whatever its type — 2026-11-17 "if already made then merge with it": publishing fills a plain-text one with the values joined by commas, `sendFields` → `otherForm`; a collection with the same handle or title); nothing is deleted or changed. Per item `{ name, status: made/kept/failed, note? }`; a store-wide refusal (credentials, permission, frozen) throws once. `storeSetup.ts`, `storeFields.ts` |
 | `preview_price` | staff | `{ website_id, cost, rule_id? }` | `{ price, compare_at }` |
-| `taxonomy_get` | staff | – | categories (pb_settings), attributes with values (+ `uses`), links, per-link `stats {products, lacking}`, `category_products`, `suggestions_pending`, `fill` (latest "Let AI decide" run) |
+| `taxonomy_get` | staff | – | categories (pb_settings), attributes with values (+ `uses`), links, per-link `stats {products, lacking}`, `category_products`, `fill` (latest "Let AI decide" run) |
 | `categories_save` | admin/manager | `{ categories[] }` | the reader's category list; links of removed categories are dropped and every product left off the list is re-gated (held: "Missing: Category") → `{ ok, categories, regated }` |
 | `attribute_save` / `attribute_delete` / `attribute_order` | admin/manager | `{ id?, name, multi?, shopify_prefix? }` / `{ id }` / `{ ids[] }` | create / rename (products of its categories re-gated: "Missing: …" holds the name) / delete (values, links and product values cascade; products re-gated) / order |
 | `value_check` | staff | `{ attribute_id, name, exclude_id? }` | live look-alike check → `{ ok, matches[LookAlike], exists }` |
 | `value_save` | admin/manager | `{ attribute_id, id?, name, aliases?, force? }` | a new name (or rename) with look-alikes → **409** `{ error, matches }` unless `force`; an alias another value of the same attribute uses → 409 → `{ ok, value }` |
 | `value_delete` / `value_merge` | admin/manager | `{ id }` / `{ from, into }` | `pb_value_delete` / `pb_value_merge` (same attribute; products move, from's key + aliases become into's aliases) |
 | `category_link_check` / `category_link_save` | staff / admin | `{ category, attribute_id }` / `{ category, attribute_ids[] }` | products lacking it → `{ lacking }`; replace the category's attributes in order and re-gate → `{ to_needs_info, to_ready }` |
-| `suggestions_list` | staff | `{ status?, attribute_id? ('none'), page? }` | 20 a page by uses → rows `{ …, example_names[≤3], matches[≤3], nearest }`, `count` (`nearest`: `{ value_id, value, attribute_id, attribute, why, by: rules/ai }`, `value_id` null = none close; null = not asked yet) |
-| `suggestions_nearest` | admin/manager | `{ ids[≤20] }` | pending rows without a `nearest`: the word rules, else ONE AI call for all (reader model), kept in `pb_tag_suggestions.nearest` → `{ nearest{id: …} }`; cost logged as `tags_matched` |
-| `suggestion_act` | admin/manager | `{ ids[≤100], act: add/alias/ignore/move/nearest, attribute_id?, value_id?, name?, force? }` | add runs the look-alike check first: rows with look-alikes come back in `conflicts {id: matches}` (not added) unless `force`; add / alias / nearest re-run the rules for the example products → `{ done, conflicts, retagged }`. `nearest` (2026-11-13, "bulk same as nearest") files each row under its own `nearestOf` value (rules, else the AI's kept answer); a row without one, or whose word that attribute already uses for another value, is left → `skipped`. Two or more at once are one bulk change (`tagsSuggestAct.ts`). Batches (2026-11-17, "select all should work for all tags"): `more: true` opens the bulk change and leaves it open, `run_id` joins one (still running, kind `suggestions`, opened by the same person — else 409), the last batch (no `more`) relabels it with the count of every suggestion the batches changed and closes it; a failing batch closes it there; in a batch, rows already gone are not an error → `run_id` |
-| `suggestions_ids` | admin/manager | `{ attribute_id? }` ('' all, 'none', or an id) | every pending id under that chip in the list's order (`uses desc, last_seen_at desc, id`), up to 5,000 → `{ ids }`. "Select all 998": the app then sends them to `suggestion_act` 100 at a time as one bulk change (no look-alikes worked out here: the word rules take ~5 ms a phrase, too slow for 1,000 in one request) |
 | `product_values_set` | staff | `{ product_id, value_ids[], attribute_id? }` | staff's choice ('manual') for one attribute or all; checked against the category's allowed values and one-value attributes; locks `tags`; gate; routes it when it became Ready → `{ status, missing, locked, routed }` |
 | `retag` | admin/manager | `{ dry_run (default true) }` | the rules again for every unlocked product, for its category's attributes only (AI rows kept where the rules find nothing; 'manual' never touched; other attributes' values stay) → `{ products, locked, changed, to_needs_info, to_ready, sample[≤10] }`; apply in batches of 100 (`pb_product_values_bulk`, each row with its `attributes`) |
 | `tags_ai_fill` | staff | `{ product_ids? / category? / attribute_id? / needs_info?, missing_only?, now? }` | queue (status ready/needs_info, not locked, missing ≠ {} and ≠ {Category}) → `{ run_id, queued }`; `now` + one product: fill it at once → `{ filled, left, status, missing, routed }` |
@@ -247,7 +243,7 @@ use `useBackClose` so device Back closes them.
   Content & AI (model, effort, language, brand voice, title template,
   limits, extra instructions, alt text).
 - **Vendors** — list, add, edit, deactivate; product count per vendor.
-- **Settings** — reader model/effort, the Tags page (categories, attributes, values, suggestions), pause automation,
+- **Settings** — reader model/effort, the Tags page (categories, attributes, values), pause automation,
   "Run now" (calls `work`).
 - **Guide** — the user guide in the app + "Download PDF"
   (`/playbook/product-directory-guide.pdf` in `public/`).
@@ -478,8 +474,9 @@ choices: `pb_product_values` (product, value, source `rules` | `ai` |
 Ready by a tag change", `tag_fill_run` the "Let AI decide" queue
 (`pb_tag_fill_runs` counts progress). `pb_tag_suggestions` (phrase, key,
 attribute?, status pending/added/aliased/ignored, uses, ≤ 5 example product
-ids, source store/ai/text; unique (key, attribute) via an expression index;
-an ignored key is never suggested again). RLS: staff read; every write goes
+ids, source store/ai/text, `filed_by` 'auto' when the worker filed it,
+`tries` / `tried_at` for the worker; unique (key, attribute) via an expression
+index; an ignored key is never suggested again). RLS: staff read; every write goes
 through the edge function (service role). The Tags page also owns the
 category list (it moved from Settings).
 
@@ -517,7 +514,7 @@ rules run over every attribute (category unknown); the reader then replaces
 the rules / AI rows of its category's attributes only (`pb_product_values_set`
 gets their ids: before 13 Nov 2026 it got none and cleared every attribute,
 so what the import found for the others was lost — with nothing linked,
-everything). "Retag all" and the retag after a suggestion do the same
+everything). "Retag all" and the retag after a new word is filed do the same
 (`pb_product_values_bulk` rows carry `attributes`). (2) AI (`tagPrompt.ts`): the reader's
 ONE call gets, per attribute linked to any category, an enum of allowed names
 + `other` phrases, and the category → attributes map; only attributes the
@@ -540,34 +537,60 @@ done of total, left, the pace of the last 5 minutes (`tags_filled` rows) and
 the minutes that leaves, or `blocked` (paused / limit) while nothing can
 move; once nothing waits, filled, still-need-you and the finish time.
 
-**Suggestions and the look-alike guard.** Candidates: store tags matching
-nothing (after the junk filter `tagClean.ts`: `_…`, SIZE_CHART, label_…,
-codes, a category's own name), unmatched label-line items (with that
-attribute), the AI's `other` phrases; anything already a value / alias is
-dropped; an unassigned one takes its closest look-alike's attribute.
+**New words and the look-alike guard.** Candidates (`pb_tag_suggestions`,
+written by ingest, the reader and "Let AI decide" through `pb_tag_suggest`):
+store tags matching nothing (after the junk filter `tagClean.ts`: `_…`,
+SIZE_CHART, label_…, codes, a category's own name), unmatched label-line items
+(with that attribute), the AI's `other` phrases; anything already a value /
+alias is dropped; an unassigned one takes its closest look-alike's attribute.
 `lookAlikes` (`tagLook.ts`) compares a phrase with every value + alias of
 every attribute: same key, same stem, same words in another order, the Hindi
 / Hinglish list (`tagDict.ts`: kala → black, kadhai → embroidery, gota →
 gota patti…), a colour shade (rani pink → pink), Damerau–Levenshtein ≤ 1
 (≤ 6 letters) / ≤ 2, Jaro–Winkler ≥ 0.92; a hit in another attribute is
-flagged (`other_attribute`: "Silk" under Work is a Fabric value).
+flagged (`other_attribute`: "Silk" under Work is a Fabric value). The guard
+runs on "Add a value" (`value_check` / `value_save`): new values come only
+from a person.
 
-**Nearest match** (2026-11-13, `tagNearest.ts` / `tagsNearest.ts`). Each
-pending suggestion shows the closest value already in the lists, with
-"Same as <value>" (= `suggestion_act` alias). Word rules first: the best
-look-alike, else a name or alias of TWO words or more inside the phrase,
-whole words in order (own attribute first, then all; two values as long →
-none). Single words are left to the AI: replaying the owner's 57 choices of
-13 Nov, "contains Silk" was wrong for five silks (filed under Art Silk,
-Cotton Silk, Organza) while every look-alike agreed. The rest goes to the
-AI in one call per page (≤ 20 phrases): the lists with each value's aliases
-(the owner's earlier filings), the 40 latest ignored phrases, each phrase
-with its source, attribute and two example products; the answer is an enum
-of "Attribute: Value" labels or "none" plus a ≤ 14-word why, kept in
-`pb_tag_suggestions.nearest` `{ value_id | null, why, at }` (a value deleted
-since → asked again). Asked only from the Tags page by an admin / manager,
-so not held by the daily AI limit; the cost is a `tags_matched` activity
-row that `pb_ai_cost_since` counts (20261113190000_pb_tag_nearest.sql).
+**Filed by themselves** (owner, 2026-11-17: "The whole purpose was to automate
+tag and not complicate the work of user. It should be merged automatic with
+the best possible AI suggestion rest should be automatically ignore." — the
+review screen, its actions and `tagNearest.ts` / `tagsNearest.ts` /
+`tagsSuggestAct.ts` are gone). A worker step after `closeFills`
+(`tagsFile.ts`, prompt `tagFilePrompt.ts`, migration
+20261118090000_pb_tags_auto_file.sql), while 50 s are left and automation
+is not paused:
+1. `pb_tag_file_claim(40)`: pending words never filed by the worker
+   (`filed_by` null), fewer than 3 unanswered AI tries, not taken in the last
+   10 minutes (FOR UPDATE SKIP LOCKED; taking only stamps `tried_at`).
+2. The word rules file a word only when sure: the best look-alike's reason is
+   same / same_word / word_order / translation / shade. Typo and
+   "spelled almost the same" hits are not trusted (they made Back → Black,
+   Brunches → Art Silk, Koti → Khatli Work) and go to the AI.
+3. The AI (`claude-sonnet-5-5`, effort medium; ≤ 20 words a call, while the
+   day's AI limit allows): the lists with up to 120 aliases per value, the 40
+   latest words a PERSON ignored (never the worker's own), each word with its
+   source, attribute and two example products. It answers an enum of
+   "Attribute: Value" labels or "none", a match (`same` / `kind` / `related` /
+   `none`) and a ≤ 14-word why. Same or kind → "also known as" that value;
+   related or none → ignored. A label not on the lists is no answer: the
+   word's `tries` goes up (guarded by the old count) and after 3 it is
+   ignored; an AI failure leaves the words for the next pass (`failed`,
+   step `tags_file`). The cost is a `tags_matched` row that `pb_ai_cost_since`
+   counts.
+4. `pb_tag_file(id, value?, why, match)` files ONE word in one transaction:
+   the alias appended in place (a word another value of the same attribute
+   already has goes to that value), status aliased / ignored, `filed_by`
+   'auto', `nearest` `{ value_id, why, at, match, by: 'auto' }`.
+5. The example products of every aliased word are retagged by the rules
+   (chunks of 50); a word the AI read from a product for one attribute also
+   gives that value to the example products with none for it (`writeValues`
+   'add'; open and unlocked products only).
+6. A pass is ONE bulk change (kind `suggestions`, no person): "Filed 40 new
+   words by itself: 28 also known as their nearest values, 12 ignored (…)".
+   A revert puts status, attribute and value back but not `filed_by`, so a
+   word taken back stays pending and marked and is never filed again.
+`trigger_pb_worker` also wakes the worker while a fileable word waits.
 
 **Values that depend on the category — Product Type** (owner, 2026-11-13: "the
 values are to be mapped against the category, so no mistake can happen";
@@ -1515,10 +1538,9 @@ A **bulk change** is one tap that changes many products or listings.
 - "Only those which are done in bulk": a tag-list change or a stock notice
   stays in the log only when it reached **two or more products**, or (tag
   lists) took two or more entries out of the lists at once (an attribute goes
-  with its values and links) or handled two or more suggestions at once
+  with its values and links) or filed two or more new words at once
   (`endRun` → `sizeOf`; `details.unit` says what `items` counts). Below that
-  it is an ordinary edit and leaves the log; one suggestion handled alone
-  opens no run at all.
+  it is an ordinary edit and leaves the log.
 - An import's run has the import's own id; the runner asks for it on every
   tick, and every product it adds is recorded under it (`ingest(body, run)`).
 
@@ -1543,7 +1565,7 @@ Revert can be tapped again for the rest.
 | `copies` | Archive the copies (Products → Needs info) | earliest first, a product that is still archived AND would wait as a copy again goes back to Needs info; one that is no longer a copy of anything stays archived and is counted (`not_copies`), so a revert sends nothing to a website; one somebody restored or changed since is left alone. Looking first runs the same steps and undoes them (`pb_bulk_revert_copies`) |
 | `reread` | only from the log: the re-read of all products on 12 Nov 2026 | each field that read changed goes back where the product still holds what the read wrote and the field is not locked; the gate runs and the tag rules run again. The reader's log kept the first 200 characters of each old value, so the long notes of 105 products are not put back |
 | `value_delete`, `value_merge`, `attribute_delete`, `categories`, `category_links` | Settings → Tags: delete a value, merge two values, delete an attribute, save the category list, save a category's must-have tags (`tagsBulk.ts`) | one revert for every tag kind (`pb_bulk_revert_tags`): what the change deleted comes back and what it added goes, in the order the tables depend on each other (attributes → values and their "also known as" words → category links → products' values → suggestions → the category list); a value whose name is taken again, or a single-choice attribute that has another value on the product by now, is left and counted (`left`); a product whose tags a person set (or asked the AI to fill) since is left alone (`kept`). Every product it reached is checked again (Ready / Needs info). A preview runs the same code and is rolled back. The server adds what the database's counts leave out: links, the category list, suggestions (`listCounts`) |
-| `suggestions` | Settings → Tags → Suggestions, two or more handled at once (`tagsQueue.ts`) | as above: the suggestions as they were, a value made from one out again (unless a product uses it by now), the example products' tags as before. A suggestion the change added stays in the queue |
+| `suggestions` | the worker filing new tag words by itself, one pass at a time (`tagsFile.ts`); before 18 Nov 2026 Settings → Tags → Suggestions, two or more handled at once by a person | as above: the words as they were (pending again; one the worker filed stays marked `filed_by` 'auto' and is not filed again), their "also known as" entries out of the lists again, a value made from one out again (unless a product uses it by now), the example products' tags as before |
 | `retag` | Retag all (`tagsProduct.ts`) | as above: the products' tags as before |
 | `tag_fill` | Let AI decide, queued (`tagsQueue.ts`; the run has the fill run's id; the worker writes each product as part of it and closes it 5 minutes after the queue is over, never sooner: overlapping worker runs may still be writing a product they took, `tagFill.ts closeFills`) | as above: the AI's tags come off, the suggestions it counted as before |
 | `stock_notice` | a vendor's stock notice that marks two or more products (`stockNotice.ts`) | each product gets back the stock it had, where its stock is still as the notice left it (`changed` otherwise); after a PERMANENT notice it also comes out of the archive, and the listings the notice took off are put back: one archived on Shopify is sent again and made visible (`pb_listings.put_back`, cleared by that publish), one that only waited goes back to where it waited (`pb_bulk_revert_stock`; found by their note, `PERM_NOTE`). The notice's own row is not part of it |

@@ -3,8 +3,8 @@
 // "Send matching products now", "Re-price", "Retry all", "Read again",
 // "Archive the copies"; a change to the tag lists that reaches two or more
 // products (delete or merge a value, delete an attribute, a category's
-// must-have tags, the category list, suggestions handled together, "Retag
-// all", "Let AI decide"); and a vendor's stock notice that marks two or more
+// must-have tags, the category list, "Retag all", "Let AI decide", a pass
+// of new words filed by themselves); and a vendor's stock notice that marks two or more
 // products (pb-products bulkLog.ts). The
 // server records each one with the rows it changed (pb_bulk_runs /
 // pb_bulk_items) and can take it back for 7 days: only the rows that are

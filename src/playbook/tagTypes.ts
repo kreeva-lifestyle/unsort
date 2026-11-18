@@ -46,7 +46,7 @@ export interface PbFillRun {
 
 export interface PbTaxonomy {
   categories: string[]; attributes: PbAttribute[]; links: PbCategoryLink[]; stats: PbLinkStat[];
-  category_products: { category: string; products: number }[]; suggestions_pending: number; fill: PbFillRun | null;
+  category_products: { category: string; products: number }[]; fill: PbFillRun | null;
 }
 
 export type PbLookReason = 'same' | 'same_word' | 'word_order' | 'translation' | 'shade' | 'typo' | 'similar';
@@ -54,18 +54,6 @@ export type PbLookReason = 'same' | 'same_word' | 'word_order' | 'translation' |
 export interface PbLookAlike {
   value_id: string; value: string; attribute_id: string; attribute: string; via: string;
   reason: PbLookReason; score: number; other_attribute: boolean;
-}
-
-export type PbSuggestionStatus = 'pending' | 'added' | 'aliased' | 'ignored';
-/** The nearest value already in the lists (pb-products tagNearest.ts), by the word rules or the AI; value_id null = the AI found none close. */
-export interface PbNearest { value_id: string | null; value: string | null; attribute_id: string | null; attribute: string | null; why: string; by: 'rules' | 'ai' }
-
-export interface PbSuggestion {
-  id: string; phrase: string; key: string; attribute_id: string | null; status: PbSuggestionStatus;
-  uses: number; examples: string[]; example_names: string[]; source: 'store' | 'ai' | 'text';
-  first_seen_at: string; last_seen_at: string; matches: PbLookAlike[];
-  /** null = not looked at yet: the Tags page asks the AI (nearestSuggestions). */
-  nearest: PbNearest | null;
 }
 
 export type PbValueSource = 'rules' | 'ai' | 'manual';

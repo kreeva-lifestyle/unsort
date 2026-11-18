@@ -11,7 +11,6 @@ import assert from 'node:assert/strict';
 const { RUN, closed, dropped, head, revertDb, link, opened, recorded, row, rpcCall, uid, world } = await import('./bulkWorld.mjs');
 const { endRun } = await import('../bulkLog.ts');
 const { attributeDelete, categoriesSave, categoryLinkSave, valueDelete, valueMerge } = await import('../tagsBulk.ts');
-const { suggestionAct } = await import('../tagsSuggestAct.ts');
 const { bulkPreview } = await import('../bulkRevert.ts');
 
 test('what counts as bulk: two or more products, or two entries out of the lists, or two suggestions — else it leaves the log', async () => {
@@ -141,71 +140,6 @@ test('saving the category list checks again every product left off it, also wher
   assert.deepEqual(refresh.map(c => c.body.p_ids), [[uid(3), uid(4)]]); // Gown had must-have tags: the prune checked its product
   assert.ok(refresh.every(c => c.run === RUN)); // part of the change, so a revert puts them back
   assert.equal(r.regated, 3);
-});
-
-test('suggestions: one is an edit (no change opened); two or more at once are one bulk change', async () => {
-  const sug = (n, phrase) => ({ id: uid(n), phrase, key: phrase.toLowerCase(), attribute_id: null, status: 'pending', uses: 1, examples: [], source: 'store', first_seen_at: '', last_seen_at: '' });
-  let calls = world((m, u) => (m === 'GET' && u.startsWith('/rest/v1/pb_tag_suggestions?id=in.') ? [sug(1, 'Georgette')] : undefined));
-  // The body as the app sends it: `action` names the request, `act` the choice. With the choice in `action` the
-  // app's request helper used to overwrite the request's name, so every suggestion button got "Unknown action".
-  assert.deepEqual(await suggestionAct({ action: 'suggestion_act', ids: [uid(1)], act: 'ignore' }, null), { ok: true, done: 1, conflicts: {}, retagged: 0, run_id: null });
-  await assert.rejects(() => suggestionAct({ ids: [uid(1)], action: 'ignore' }, null), /Unknown suggestion action/);
-  assert.equal(opened(calls), undefined);
-  assert.ok(calls.filter(c => c.method === 'PATCH').every(c => c.run === null));
-
-  calls = world(recorded({ kind: 'suggestions', rows: [row('pb_tag_suggestions', { id: uid(1) }, { status: 'pending' }, { status: 'ignored' }), row('pb_tag_suggestions', { id: uid(2) }, { status: 'pending' }, { status: 'ignored' })] }),
-    (m, u) => (m === 'GET' && u.startsWith('/rest/v1/pb_tag_suggestions?id=in.') ? [sug(1, 'Georgette'), sug(2, 'Wine')] : m === 'PATCH' ? [{ id: uid(1) }, { id: uid(2) }] : undefined));
-  const r = await suggestionAct({ ids: [uid(1), uid(2)], act: 'ignore' }, 'u1');
-  assert.equal(r.done, 2); assert.equal(r.run_id, RUN);
-  assert.equal(opened(calls).label, 'Ignored 2 suggestions (Georgette, Wine)');
-  assert.equal(calls.find(c => c.method === 'PATCH' && c.u.startsWith('/rest/v1/pb_tag_suggestions')).run, RUN);
-  await assert.rejects(() => suggestionAct({ ids: [uid(1), uid(2)], act: 'shred' }, null), /Unknown suggestion action/);
-  const sugs4 = [sug(1, 'Georgette'), sug(2, 'Wine'), sug(3, 'Net'), sug(4, 'Rama')];
-  calls = world((m, u) => (m === 'GET' && u.startsWith('/rest/v1/pb_tag_suggestions?id=in.') ? sugs4 : m === 'GET' && u.startsWith('/rest/v1/pb_attribute_values?id=eq.') ? [{ name: 'Pink' }]
-    : m === 'GET' && u.startsWith('/rest/v1/pb_attributes?id=eq.') ? [{ name: 'Fabric' }] : undefined));
-  await suggestionAct({ ids: sugs4.map(x => x.id), act: 'move', attribute_id: uid(9) }, null).catch(() => null);
-  assert.equal(opened(calls).label, 'Moved 4 suggestions (Georgette, Wine, Net and 1 more) to Fabric');
-  calls = world((m, u) => (m === 'GET' && u.startsWith('/rest/v1/pb_tag_suggestions?id=in.') ? sugs4 : m === 'GET' && u.startsWith('/rest/v1/pb_attribute_values?id=eq.') ? [{ name: 'Pink' }] : undefined));
-  await suggestionAct({ ids: sugs4.map(x => x.id), act: 'alias', value_id: uid(8) }, null).catch(() => null);
-  assert.equal(opened(calls).label, 'Made 4 suggestions (Georgette, Wine, Net and 1 more) also known as Pink');
-});
-
-
-test('"Same as nearest": each suggestion into its own nearest value, one bulk change; none close, gone or not looked at is left', async () => {
-  const at = '2026-11-13T19:00:00Z';
-  const sug = (n, phrase, attribute_id, nearest = null) => ({ id: uid(n), phrase, key: phrase.toLowerCase(), attribute_id, status: 'pending', uses: 2, examples: [], source: 'ai', first_seen_at: '', last_seen_at: '', nearest });
-  const rows = [
-    sug(1, 'Rani Pink', 'col'), // the word rules: a shade of Pink
-    sug(2, 'Kora Silk', 'fab', { value_id: uid(31), why: 'A kind of silk', at }), // the AI's kept answer: Art Silk
-    sug(3, 'Ideal Collection', null, { value_id: null, why: 'A store collection name', at }), // none close: left
-    sug(4, 'Dupion', 'fab', { value_id: uid(99), why: 'x', at }), // the value the AI chose was deleted since: left (asked again)
-    sug(5, 'Plus Size', null), // not looked at yet: left
-  ];
-  const attrs = [{ id: 'col', name: 'Colour', key: 'colour', multi: false, position: 1, shopify_prefix: null }, { id: 'fab', name: 'Fabric', key: 'fabric', multi: false, position: 2, shopify_prefix: null }];
-  const values = [
-    { id: uid(21), attribute_id: 'col', name: 'Pink', key: 'pink', aliases: [], position: 1 },
-    { id: uid(31), attribute_id: 'fab', name: 'Art Silk', key: 'art silk', aliases: ['crunchy silk'], position: 1 },
-    { id: uid(32), attribute_id: 'fab', name: 'Cotton', key: 'cotton', aliases: ['mulmul'], position: 2 },
-  ];
-  const kept = [row('pb_tag_suggestions', { id: uid(1) }, { status: 'pending' }, { status: 'aliased' }), row('pb_tag_suggestions', { id: uid(2) }, { status: 'pending' }, { status: 'aliased' })];
-  const calls = world(recorded({ kind: 'suggestions', rows: kept }), (m, u) => {
-    if (m === 'GET' && u.startsWith('/rest/v1/pb_tag_suggestions?id=in.')) return rows;
-    if (m === 'GET' && u.startsWith('/rest/v1/pb_attributes?select=')) return attrs;
-    if (m === 'GET' && u.startsWith('/rest/v1/pb_attribute_values?select=')) return values;
-    return undefined;
-  });
-  const r = await suggestionAct({ ids: rows.map(x => x.id), act: 'nearest' }, 'u1');
-  assert.deepEqual([r.done, r.skipped, r.run_id], [2, 3, RUN]);
-  assert.equal(opened(calls).label, 'Made 5 suggestions (Rani Pink, Kora Silk, Ideal Collection and 2 more) also known as their nearest values');
-  const aliasCalls = calls.filter(c => c.method === 'PATCH' && c.u.startsWith('/rest/v1/pb_attribute_values?id=eq.'));
-  assert.deepEqual(aliasCalls.map(c => [c.u.split('eq.')[1].split('&')[0], c.body.aliases]), [[uid(21), ['rani pink']], [uid(31), ['crunchy silk', 'kora silk']]]);
-  const filed = calls.filter(c => c.method === 'PATCH' && c.u.startsWith('/rest/v1/pb_tag_suggestions?id=eq.'));
-  assert.deepEqual(filed.map(c => [c.u.split('eq.')[1].split('&')[0], c.body.resolved_value_id]), [[uid(1), uid(21)], [uid(2), uid(31)]]);
-  assert.ok([...aliasCalls, ...filed].every(c => c.run === RUN)); // part of the change: Settings → Bulk changes takes it back
-  // One alone is an edit, and says what was left too
-  const one = world((m, u) => (m === 'GET' && u.startsWith('/rest/v1/pb_tag_suggestions?id=in.') ? [rows[2]] : m === 'GET' && u.startsWith('/rest/v1/pb_attributes?select=') ? attrs : m === 'GET' && u.startsWith('/rest/v1/pb_attribute_values?select=') ? values : undefined));
-  assert.deepEqual(await suggestionAct({ ids: [uid(3)], act: 'nearest' }, null), { ok: true, done: 0, conflicts: {}, retagged: 0, skipped: 1, run_id: null });
-  assert.equal(opened(one), undefined);
 });
 
 test('taking back a tag change also says what goes back in the lists: links, the category list, suggestions that were there', async () => {

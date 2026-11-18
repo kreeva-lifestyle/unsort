@@ -40,7 +40,7 @@
 //   import_cancel      staff          { run_id }                          → { ok }
 //   import_list        staff          –                                   → { ok, runs[≤20] }
 //   Tags (a controlled taxonomy built on the Tags page; docs/playbook/product-directory-spec.md "Tags"):
-//   taxonomy_get       staff          –                                   → { ok, categories, attributes[{…, values[{…, uses}]}], links, stats, category_products, suggestions_pending, fill }
+//   taxonomy_get       staff          –                                   → { ok, categories, attributes[{…, values[{…, uses}]}], links, stats, category_products, fill }
 //   categories_save    admin|manager  { categories[] }                    → { ok, categories, regated }
 //   attribute_save     admin|manager  { id?, name, multi?, shopify_prefix?, by_category? } → { ok, attribute }
 //   attribute_delete   admin|manager  { id }                              → { ok, regated }
@@ -53,11 +53,6 @@
 //   category_link_save admin|manager  { category, attribute_ids[] }       → { ok, to_needs_info, to_ready }
 //   category_rename    admin|manager  { from, to }                        → { ok, renamed, run_id }  list, links, products, ticks, website rules (categoryMove.ts)
 //   category_move      admin|manager  { from, to, remove? }               → { ok, moved, to_ready, queued, removed, run_id }  then "Let AI decide" for them
-//   suggestions_list   staff          { status?, attribute_id?, page? }   → { ok, rows[{…, example_names, matches}], count, page, per }
-//   suggestions_ids    admin|manager  { attribute_id? }                   → { ok, ids[≤5000] } (every pending one under that filter: "Select all")
-//   suggestion_act     admin|manager  { ids[≤100], act:add|alias|ignore|move|nearest, attribute_id?, value_id?, name?, force?, more?, run_id? } → { ok, done, conflicts{id: matches[]}, retagged, skipped? (nearest), run_id }
-//                                     (more / run_id: batches of one bulk change — the first opens it, the last closes it)
-//   suggestions_nearest admin|manager { ids[≤20] } → { ok, nearest{id: {value_id, value, attribute_id, attribute, why, by}} } (rules, else one AI call, kept)
 //   product_values_set staff          { product_id, value_ids[], attribute_id? } → { ok, status, missing, locked, routed } (locks 'tags')
 //   retag              admin|manager  { dry_run (default true) }          → { ok, dry_run, products, locked, changed, to_needs_info, to_ready, sample[≤10] }
 //   tags_ai_fill       staff          { product_ids? | category? | attribute_id? | needs_info?, missing_only?, now? } → { ok, run_id, queued } | now: { ok, filled, left, status, missing, routed }
@@ -83,10 +78,8 @@ import { setStock } from './stock.ts';
 import { previewPrice, saveCredentials, testSite } from './siteActions.ts';
 import * as T from './tagsActions.ts';
 import { categoryMove, categoryRename } from './categoryMove.ts';
-import { fillStatus, suggestionsIds, suggestionsList, tagsAiFill } from './tagsQueue.ts';
+import { fillStatus, tagsAiFill } from './tagsQueue.ts';
 import { storeSetup } from './storeSetup.ts';
-import { suggestionAct } from './tagsSuggestAct.ts';
-import { suggestionsNearest } from './tagsNearest.ts';
 import { productValuesSet, retag } from './tagsProduct.ts';
 import type { Caller } from './types.ts';
 
@@ -131,10 +124,6 @@ const ACTIONS: Record<string, { who: Who; run: (b: A.Body, c: Caller) => Promise
   category_link_save: { who: 'admin', run: (b, c) => T.categoryLinkSave(b, userOf(c)) },
   category_rename: { who: 'admin', run: (b, c) => categoryRename(b, userOf(c)) },
   category_move: { who: 'admin', run: (b, c) => categoryMove(b, userOf(c)) },
-  suggestions_list: { who: 'staff', run: (b) => suggestionsList(b) },
-  suggestions_ids: { who: 'admin', run: (b) => suggestionsIds(b) },
-  suggestion_act: { who: 'admin', run: (b, c) => suggestionAct(b, userOf(c)) },
-  suggestions_nearest: { who: 'admin', run: (b, c) => suggestionsNearest(b, userOf(c)) },
   product_values_set: { who: 'staff', run: (b, c) => productValuesSet(b, userOf(c)) },
   retag: { who: 'admin', run: (b, c) => retag(b, userOf(c)) },
   tags_ai_fill: { who: 'staff', run: (b, c) => tagsAiFill(b, userOf(c)) },
