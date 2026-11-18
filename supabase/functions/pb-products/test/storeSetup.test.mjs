@@ -128,14 +128,19 @@ function fieldStore({ kinds = null, refuse = () => null } = {}) {
   globalThis.fetch = async (url, init = {}) => {
     const u = decodeURIComponent(String(url)), body = init.body ? JSON.parse(init.body) : null;
     const ok = (b) => new Response(JSON.stringify(b), { status: 200 });
-    if (u.startsWith('https://suratmandi.myshopify.com/')) {
+    if (/^https:\/\/[a-z0-9-]+\.myshopify\.com\//.test(u)) {
       if (body.query.includes('PbFieldKinds')) {
         calls.push('kinds');
-        return kinds ? ok({ data: { metafieldDefinitions: { nodes: Object.entries(kinds).map(([key, name]) => ({ key, type: { name } })) } } })
+        const k = typeof kinds === 'function' ? kinds(u) : kinds;
+        return k ? ok({ data: { metafieldDefinitions: { nodes: Object.entries(k).map(([key, name]) => ({ key, type: { name } })) } } })
           : ok({ errors: [{ message: 'Field metafieldDefinitions is not available' }] });
       }
       const list = body.variables.metafields; calls.push(list.map(f => `${f.key}:${f.type}=${f.value}`));
-      const userErrors = list.flatMap((f, i) => { const m = refuse(f); return m ? [{ field: ['metafields', String(i), 'type'], message: m, code: 'INVALID_TYPE', elementIndex: f.type.startsWith('list.') ? 0 : null }] : []; });
+      const userErrors = list.flatMap((f, i) => {
+        const m = refuse(f); if (!m) return [];
+        const kind = /consistent with the definition/.test(m);
+        return [{ field: ['metafields', String(i), kind ? 'type' : 'value'], message: m, code: kind ? 'INVALID_TYPE' : 'INCLUSION', elementIndex: f.type.startsWith('list.') ? 0 : null }];
+      });
       return ok({ data: { metafieldsSet: { userErrors } } });
     }
     if (u.includes('/rest/v1/pb_website_secrets?')) return ok([{ access_token: 'shpat_test' }]);
@@ -143,7 +148,8 @@ function fieldStore({ kinds = null, refuse = () => null } = {}) {
   };
   return calls;
 }
-const site = (n) => ({ id: `eeeeeeee-0000-4000-8000-00000000010${n}`, name: 'SuratMandi', shop_domain: 'suratmandi.myshopify.com', auth_mode: 'token', api_version: '2026-10' });
+const site = (n, shop = 'suratmandi') => ({ id: `eeeeeeee-0000-4000-8000-00000000010${n}`, name: 'SuratMandi', shop_domain: `${shop}.myshopify.com`, auth_mode: 'token', api_version: '2026-10' });
+const KIND = (sent, want) => `Type '${sent}' must be consistent with the definition's type: '${want}'.`;
 const fld = (key, type, value) => ({ ownerId: 'gid://shopify/Product/1', namespace: 'custom', key, type, value });
 const SENT = [fld('colour', 'single_line_text_field', 'Pink'), fld('work', 'list.single_line_text_field', '["Embroidery","Sequins"]'),
   fld('occasion', 'list.single_line_text_field', '["Festive"]'), fld('faq', 'rich_text_field', '{}')];
@@ -195,4 +201,35 @@ test('a store field no text goes in (a number) is the store\'s own: left as it i
   const warn = await sendFields(site(3), [fld('colour', 'single_line_text_field', 'Pink'), fld('set_contents', 'single_line_text_field', 'Kurta and Dupatta')], 30_000);
   assert.deepEqual(calls, ['kinds', ['colour:single_line_text_field=Pink']]);
   assert.equal(warn, 'Saved on Shopify, but the store did not take these custom fields: set_contents (its own set_contents field is number integer).');
+});
+
+test('a value the store\'s own rule refuses (not in its choices) is left out with Shopify\'s reason — not sent again as a list', async () => {
+  const one = 'single_line_text_field';
+  const calls = fieldStore({ kinds: { colour: one, work: one }, refuse: f => (f.key === 'work' ? 'Value does not exist in provided choices.' : null) });
+  const warn = await sendFields(site(4), SENT.slice(0, 2), 30_000);
+  assert.deepEqual(calls, ['kinds', [`colour:${one}=Pink`, `work:${one}=Embroidery, Sequins`], [`colour:${one}=Pink`]]);
+  assert.equal(warn, 'Saved on Shopify, but the store did not take these custom fields: work (Value does not exist in provided choices.).');
+  // not a change of kind: the kinds read stays good for the next products
+  calls.length = 0;
+  await sendFields(site(4), SENT.slice(0, 1), 30_000);
+  assert.deepEqual(calls, [[`colour:${one}=Pink`]]);
+});
+
+test('the store\'s field changed kind since it was read: a converted value goes again in Playbook\'s own kind, not as a list of one line', async () => {
+  const one = 'single_line_text_field', many = 'list.single_line_text_field';
+  let now = one; // the store's Work: one line when read, a list by the next product
+  const calls = fieldStore({ kinds: () => ({ work: now }), refuse: f => (f.key === 'work' && f.type !== now ? KIND(f.type, now) : null) });
+  assert.equal(await sendFields(site(5), SENT.slice(1, 2), 30_000), null);
+  now = many; calls.length = 0;
+  assert.equal(await sendFields(site(5), SENT.slice(1, 2), 30_000), null);
+  assert.deepEqual(calls, [[`work:${one}=Embroidery, Sequins`], [`work:${many}=["Embroidery","Sequins"]`]]);
+});
+
+test('a store move (same website, another shop): that shop\'s kinds are read, not the old one\'s', async () => {
+  const one = 'single_line_text_field';
+  const calls = fieldStore({ kinds: u => (u.includes('newshop') ? { set_contents: one } : { set_contents: 'number_integer' }) });
+  const f = [fld('set_contents', one, 'Kurta and Dupatta')];
+  assert.match(await sendFields(site(6), f, 30_000), /set_contents \(its own set_contents field is number integer\)/);
+  assert.equal(await sendFields(site(6, 'newshop'), f, 30_000), null);
+  assert.deepEqual(calls, ['kinds', 'kinds', [`set_contents:${one}=Kurta and Dupatta`]]);
 });

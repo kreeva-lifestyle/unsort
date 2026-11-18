@@ -3,11 +3,13 @@
 // "if already made then merge with it"): SuratMandi's Work and Occasion were one line of text before Playbook's store
 // setup, so "Embroidery, Mirror Work" goes in as one line, not as a list. The store's field kinds are read first (once
 // per store every 10 minutes), so the fields go in on the first try.
-// metafieldsSet saves all or nothing. A field the store still refuses (its kind changed meanwhile) is sent again in its
-// other text kind, then left out, so one refused field never costs the others. Shopify names the refused field by its
-// place in `field` (["metafields", "2", "type"]); `elementIndex` is the place of an item INSIDE a list value, not
-// which field — reading it as the field's place sent nothing again, and left all 122 SuratMandi products without any
-// custom field (18 Nov 2026).
+// metafieldsSet saves all or nothing. A field refused for its kind (INVALID_TYPE: the store's field changed meanwhile)
+// is sent once more in the other kind — Playbook's own when it had been converted, else the other text kind; a field
+// refused for anything else (a value outside the store's choices, too long…) is the store's rule, left out with
+// Shopify's reason. Either way the other fields still go in. Shopify names the refused field by its place in `field`
+// (["metafields", "2", "type"]); `elementIndex` is the place of an item INSIDE a list value, not which field —
+// reading it as the field's place sent nothing again, and left all 122 SuratMandi products without any custom field
+// (18 Nov 2026).
 import { METAFIELDS_SET, type FieldInput } from './fields.ts';
 import { plain } from './http.ts';
 import { temporary } from './publishParts.ts';
@@ -19,7 +21,7 @@ const NO_FIELDS = 'Saved on Shopify, but its custom fields (fabric, work, FAQ…
 const MULTI = 'multi_line_text_field';
 const KINDS = `query PbFieldKinds { metafieldDefinitions(first: 250, ownerType: PRODUCT, namespace: "custom") { nodes { key type { name } } } }`;
 const KINDS_FOR_MS = 10 * 60_000;
-interface FieldError { message: string; field?: string[] | null }
+interface FieldError { message: string; code?: string | null; field?: string[] | null }
 
 const valuesOf = (f: FieldInput): string[] => {
   if (f.type !== LIST) return [f.value];
@@ -43,57 +45,62 @@ export function inKind(f: FieldInput, kind: string): FieldInput | null {
 export const otherForm = (f: FieldInput): FieldInput | null => (f.type === LIST ? inKind(f, TEXT) : f.type === TEXT ? inKind(f, LIST) : null);
 
 const kinds = new Map<string, { at: number; byKey: Map<string, string> }>();
+/** One store: the website, and the shop it points at now (a store move keeps the website's id). */
+const storeOf = (site: WebsiteRow) => `${site.id}|${String(site.shop_domain || '').trim().toLowerCase()}`;
 
 /** The store's own product fields in `custom`: key → kind. null when they cannot be read (the refusals then tell). */
 async function storeKinds(site: WebsiteRow, ms: number): Promise<Map<string, string> | null> {
-  const hit = kinds.get(site.id);
+  const hit = kinds.get(storeOf(site));
   if (hit && Date.now() - hit.at < KINDS_FOR_MS) return hit.byKey;
   try {
     const r = await gql<{ metafieldDefinitions: { nodes: { key: string; type: { name: string } }[] } }>(site, KINDS, {}, ms);
     const byKey = new Map(r.metafieldDefinitions.nodes.map(n => [n.key, n.type.name]));
-    kinds.set(site.id, { at: Date.now(), byKey });
+    kinds.set(storeOf(site), { at: Date.now(), byKey });
     return byKey;
   } catch (e) {
     if (temporary(e)) throw e;
-    kinds.set(site.id, { at: Date.now(), byKey: new Map() }); // not asked again for every product: the refusals tell
+    kinds.set(storeOf(site), { at: Date.now(), byKey: new Map() }); // not asked again for every product: the refusals tell
     return null;
   }
 }
 
-/** The refused fields' places in the list sent (["metafields", "2", …] → 2). */
-const placesOf = (ue: FieldError[]) => new Set(ue.flatMap(e => {
-  const f = e.field ?? [], i = f[0] === 'metafields' ? Number(f[1]) : NaN;
-  return Number.isInteger(i) ? [i] : [];
-}));
+/** The refused field's place in the list sent (["metafields", "2", …] → 2). */
+const placeOf = (e: FieldError) => { const f = e.field ?? [], i = f[0] === 'metafields' ? Number(f[1]) : NaN; return Number.isInteger(i) ? i : null; };
+const wrongKind = (e: FieldError) => e.code === 'INVALID_TYPE' || /consistent with the definition/i.test(e.message);
 
 /** The listing's custom fields. Returns a warning for the listing, or null when all went in. */
 export async function sendFields(site: WebsiteRow, fields: FieldInput[], ms: number): Promise<string | null> {
   if (!fields.length) return null;
   const set = async (list: FieldInput[]) => (await gql<{ metafieldsSet: { userErrors: FieldError[] } | null }>(site, METAFIELDS_SET, { metafields: list }, ms)).metafieldsSet?.userErrors || [];
-  const said = (ue: FieldError[]) => [...new Set(ue.map(e => e.message))].join('; ').slice(0, 200);
-  const notTaken = (keys: string[], why: string) => `Saved on Shopify, but the store did not take these custom fields: ${keys.join(', ')} (${why}).`;
+  const said = (ue: FieldError[]) => [...new Set(ue.map(e => e.message))].join('; ');
   try {
     const byKey = await storeKinds(site, ms);
-    const fitted = fields.map(f => { const k = byKey?.get(f.key); return k ? inKind(f, k) : f; });
-    const first = fitted.filter((f): f is FieldInput => !!f);
-    // A store field of a kind no text goes in (a number, a reference…) is the store's own: left as it is.
-    const unfit = fields.filter((_, i) => !fitted[i]).map(f => f.key);
-    const unfitWhy = unfit.map(k => `its own ${k} field is ${String(byKey?.get(k) ?? '').replace(/_/g, ' ')}`).join('; ');
-    const ue = first.length ? await set(first) : [];
-    if (!ue.length) return unfit.length ? notTaken(unfit, unfitWhy) : null;
-    kinds.delete(site.id); // the store's kinds changed meanwhile: read again next time
-    const bad = placesOf(ue);
-    if (!bad.size) return `${NO_FIELDS}: ${said(ue)}`;
-    const again = first.map((f, i) => (bad.has(i) ? otherForm(f) : f)).filter((f): f is FieldInput => !!f);
-    const dropped = [...unfit, ...first.filter((f, i) => bad.has(i) && !otherForm(f)).map(f => f.key)];
-    const ue2 = again.length ? await set(again) : [];
-    if (!ue2.length) return dropped.length ? notTaken(dropped, said(ue)) : null;
-    const bad2 = placesOf(ue2);
-    if (!bad2.size) return `${NO_FIELDS}: ${said(ue2)}`;
-    const rest = again.filter((_, i) => !bad2.has(i)); // one refused field must not cost the others
-    const ue3 = rest.length ? await set(rest) : [];
-    if (ue3.length) return `${NO_FIELDS}: ${said(ue3)}`;
-    return notTaken([...dropped, ...again.filter((_, i) => bad2.has(i)).map(f => f.key)], said(ue2));
+    // Each field in the store's kind; a store field no text goes in is the store's own, left as it is.
+    const left: string[] = [], why: string[] = [];
+    let list: { src: FieldInput; out: FieldInput }[] = [];
+    for (const f of fields) {
+      const k = byKey?.get(f.key), out = k ? inKind(f, k) : f;
+      if (out) list.push({ src: f, out });
+      else { left.push(f.key); why.push(`its own ${f.key} field is ${String(k).replace(/_/g, ' ')}`); }
+    }
+    for (let round = 0; list.length && round <= fields.length; round++) {
+      const ue = await set(list.map(x => x.out));
+      if (!ue.length) break;
+      const at = new Map<number, FieldError[]>();
+      for (const e of ue) { const i = placeOf(e); if (i !== null) at.set(i, [...(at.get(i) ?? []), e]); }
+      if (!at.size) return `${NO_FIELDS}: ${said(ue).slice(0, 200)}`; // not told which: nothing went in
+      if (ue.some(wrongKind)) kinds.delete(storeOf(site)); // the store's kinds changed meanwhile: read again next time
+      const next: typeof list = [];
+      list.forEach((x, i) => {
+        const errs = at.get(i);
+        if (!errs) { next.push(x); return; }
+        const alt = round === 0 && errs.every(wrongKind) ? (x.out !== x.src ? x.src : otherForm(x.src)) : null;
+        if (alt) next.push({ src: x.src, out: alt });
+        else { left.push(x.src.key); why.push(said(errs)); }
+      });
+      list = next;
+    }
+    return left.length ? `Saved on Shopify, but the store did not take these custom fields: ${left.join(', ')} (${[...new Set(why)].join('; ').slice(0, 200)}).` : null;
   } catch (e) {
     if (temporary(e)) throw e;
     return `${NO_FIELDS}: ${plain(e)}`;
