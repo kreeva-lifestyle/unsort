@@ -34,7 +34,7 @@ export const TAGS: GuideSection[] = [
         'On the Tags page the values show grouped under their categories. A value with **no category ticked is offered nowhere** until you tick one; the page marks it.',
         'Link **Product Type** to a category like any attribute. It is **only if it fits**: the AI picks a type only when one of the category\'s values truly fits the product (a plain lehenga is not made a Bridal Lehenga), else leaves it empty — and the product still goes to websites. Turn **Must have** on in its settings if every product should have one.',
         'Turning the switch on for an attribute that already has values ticks each of them for the categories that use the attribute now, so nothing changes until you untick. Turning it off offers every value everywhere again; the ticks are kept.',
-        'A value left on a product from another category (say the product moved from Lehenga to Saree) no longer counts and is not sent as a tag; the AI chooses again by itself. The Shopify **Product type** field still gets the category.',
+        'A value left on a product from another category (say the product moved from Lehenga to Saree) no longer counts and is not sent as a tag: choose again, or tap **Let AI decide** on the product (a must-have one the AI chooses again by itself). The Shopify **Product type** field still gets the category.',
       ),
       h('4 · How products get their tags'),
       table(['Step', 'What happens'],

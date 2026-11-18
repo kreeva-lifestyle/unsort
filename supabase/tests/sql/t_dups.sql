@@ -481,6 +481,7 @@ select t_is('"only if it fits" never holds it: only the must-have one is missing
 select t_is('… but linking it still counts the products without one (the AI may give one where it fits)', public.pb_category_lacking('Saree', :A_T13)::text, '1');
 select t_is('… nor on the link', (select lacking::text from public.pb_tag_link_stats() where attribute_id = :A_T13), '0');
 select t_is('a must-have one still lacks', public.pb_category_lacking('Saree', :A_O13)::text, '1');
+select t_is('"Let AI decide" for the type takes exactly the products without one', (select string_agg(id::text, ',') from public.pb_category_lacking_ids('saree', :A_T13)), t_id(130)::text);
 select t_is('due: a Needs-info product missing a tag, never filled by itself', public.pb_tags_auto_due()::text, 'true');
 select t_is('taken once', (select count(*)::text from public.pb_tags_auto_claim(50) where id = t_id(130)), '1');
 select t_is('… not again for the same read', (select count(*)::text from public.pb_tags_auto_claim(50) where id = t_id(130)), '0');
@@ -520,6 +521,6 @@ select set_config('request.jwt.claims', '{}', false);
 rollback;
 
 -- Every check above printed a line: a part that silently printed nothing would be a failure too.
-select case when last_value = 230 then 'ok   every check ran (230)' else 'FAIL the number of checks is ' || last_value || ', not 230: a part printed fewer lines than it has, or this number was not updated' end from public.t_checks;
+select case when last_value = 231 then 'ok   every check ran (231)' else 'FAIL the number of checks is ' || last_value || ', not 231: a part printed fewer lines than it has, or this number was not updated' end from public.t_checks;
 drop function public.t_refused(text, text); drop function public.t_is(text, text, text); drop function public.t_rel(uuid, uuid); drop function public.t_product(int, uuid, text, text, int, numeric, text); drop function public.t_id(int);
 drop sequence public.t_checks;

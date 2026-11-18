@@ -11,7 +11,7 @@
 // gate runs again either way, so a product held only by an "only if it fits" attribute still goes Ready.
 import { istDayStart } from './brake.ts';
 import { enc, logActivity, one, patch, rpc } from './db.ts';
-import { plain, usdOf } from './http.ts';
+import { HttpError, plain, usdOf } from './http.ts';
 import { FILL_NEEDS_MS, fillOne } from './tagFill.ts';
 import { failureOf } from './tagsFile.ts';
 import { type Taxonomy, loadTaxonomy } from './taxonomy.ts';
@@ -34,12 +34,15 @@ export async function autoFill(o: { budget: Budget; left: (ms: number) => boolea
       await fillOne(p, tax, { manual: false, auto: true, userId: null, budget: o.budget });
       done++;
     } catch (e) {
-      const outage = failureOf(e) === 'outage';
+      // No AI to ask, or no answer in time (an aborted call is not paid for): the try is given back.
+      const outage = failureOf(e) === 'outage' || (e instanceof HttpError && e.status === 504 && !usdOf(e));
       await logActivity({ product_id: c.id, action: 'failed', details: { step: 'tags_fill', auto: true, error: plain(e), ...(usdOf(e) ? { usd: usdOf(e) } : {}) } });
       // The gate again (no AI): what is no longer a must does not hold it. Best effort — the failure is logged above.
       await rpc('pb_products_refresh', { p_ids: [c.id] }).catch(r => console.error(`pb-products auto fill ${c.id}: gate not checked again: ${plain(r)}`));
-      if (outage) { // the try is given back, after a wait; the rest wait too
-        await patch('pb_products', `id=eq.${enc(c.id)}`, { tags_ai_at: null, tags_ai_retry_at: new Date(Date.now() + OUTAGE_WAIT_MS).toISOString() });
+      if (outage) { // the try is given back, after a wait; every other waiting product waits too
+        const until = new Date(Date.now() + OUTAGE_WAIT_MS).toISOString();
+        await patch('pb_products', `id=eq.${enc(c.id)}`, { tags_ai_at: null, tags_ai_retry_at: until });
+        await rpc('pb_tags_auto_hold', { p_until: until });
         break;
       }
     }

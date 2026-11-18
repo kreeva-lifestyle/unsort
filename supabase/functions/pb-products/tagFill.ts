@@ -100,7 +100,8 @@ async function askFor(p: ProductRow, tax: Taxonomy, attrs: AttrWithValues[], bud
  *  change — only while that is open: a write tagged with a change that is not in the log is refused. The change is
  *  closed by the worker once the queue is over (closeFills). */
 export async function fillQueued(c: { id: string; tag_fill_run: string }, tax: Taxonomy, userId: string | null, budget: Budget): Promise<boolean> {
-  const mine = await patch('pb_products', `id=eq.${enc(c.id)}&tag_fill_run=eq.${enc(c.tag_fill_run)}`, { tag_fill_run: null });
+  // tags_ai_at too: the automatic fill (fillAuto.ts) must not take the same product meanwhile in an overlapping run.
+  const mine = await patch('pb_products', `id=eq.${enc(c.id)}&tag_fill_run=eq.${enc(c.tag_fill_run)}`, { tag_fill_run: null, tags_ai_at: nowIso() });
   if (!mine.length) return false;
   let filled = 0, left = 0, run: string | null = null;
   try {

@@ -6,7 +6,7 @@
 // New tag words are no longer answered here: the worker files them by itself (tagsFile.ts, owner 17 Nov 2026).
 import { uuid, type Body } from './actions.ts';
 import { endRun, startRun } from './bulkLog.ts';
-import { enc, insert, logActivity, one, patch } from './db.ts';
+import { enc, insert, logActivity, one, patch, rpc } from './db.ts';
 import { HttpError, plain, usdOf } from './http.ts';
 import { routeProduct } from './route.ts';
 import { fillOne } from './tagFill.ts';
@@ -41,13 +41,19 @@ export async function tagsAiFill(b: Body, userId: string | null) {
   // Waiting only for a category the list no longer has ("Missing: Category"): the AI chooses tags, not categories.
   const f = ['status=in.(ready,needs_info)', 'tag_fill_run=is.null', 'locked=not.cs.{tags}', b.missing_only === false ? '' : 'missing_attrs=neq.{}', 'missing_attrs=neq.{Category}'];
   const anyGap = () => { f[3] = ''; }; // products with no missing must-have still go (fillOne fills only what is empty)
+  let lacking: string[] | null = null; // an "only if it fits" attribute: exactly the products without one
   let aim = '';
   if (ids.length) { f.push(`id=in.(${ids.map(enc).join(',')})`); aim = `${ids.length} chosen ${ids.length === 1 ? 'product' : 'products'}`; }
   else if (b.attribute_id) {
     const a = await one<{ name: string; required: boolean | null }>(`pb_attributes?id=eq.${enc(uuid(b.attribute_id, 'The attribute'))}&select=name,required`);
     if (!a) throw new HttpError(404, 'That attribute no longer exists.');
-    // "Only if it fits" (Product Type): never in missing_attrs, so the category's products go, and the AI picks where one fits.
-    if (a.required === false) { if (!b.category) throw new HttpError(400, 'Say which category.'); anyGap(); }
+    // "Only if it fits" (Product Type): never in missing_attrs, so the category's products that have none go, and the AI
+    // picks one where it fits.
+    if (a.required === false) {
+      if (!b.category) throw new HttpError(400, 'Say which category.');
+      lacking = ((await rpc<{ id: string }[]>('pb_category_lacking_ids', { p_category: displayName(b.category), p_attribute: uuid(b.attribute_id, 'The attribute') })) ?? []).map(r => r.id);
+      anyGap();
+    }
     else f.push(`missing_attrs=cs.${enc(`{"${a.name.replace(/"/g, '')}"}`)}`);
     if (b.category) f.push(`category=eq.${enc(displayName(b.category))}`);
     aim = `${a.name}${b.category ? ` for ${displayName(b.category)}` : ''}`;
@@ -58,7 +64,9 @@ export async function tagsAiFill(b: Body, userId: string | null) {
   // A bulk change with the fill run's id (bulkLog.ts), opened before any product is queued: the worker writes each
   // product's values as part of it, and closes it once the queue is over (tagFill.ts closeFills).
   await startRun('tag_fill', `Let AI decide the tags: ${aim}`, { id: run.id, userId });
-  const queued = (await patch('pb_products', f.filter(Boolean).join('&'), { tag_fill_run: run.id })).length;
+  let queued = 0;
+  if (lacking) for (let i = 0; i < lacking.length; i += 200) queued += (await patch('pb_products', [...f, `id=in.(${lacking.slice(i, i + 200).map(enc).join(',')})`].filter(Boolean).join('&'), { tag_fill_run: run.id })).length;
+  else queued = (await patch('pb_products', f.filter(Boolean).join('&'), { tag_fill_run: run.id })).length;
   await patch('pb_tag_fill_runs', `id=eq.${enc(run.id)}`, queued ? { total: queued } : { total: 0, finished_at: new Date().toISOString() });
   if (!queued) await endRun(run.id);
   await logActivity({ action: 'tags_fill_queued', details: { queued, category: b.category ?? null }, user_id: userId });

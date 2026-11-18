@@ -486,8 +486,9 @@ that is on the list (pb_settings `categories`, case and spaces aside; no list
 saved → not checked) and a value for every MUST-HAVE attribute linked to the
 category (`pb_attributes.required`, default true; false = "only if it fits",
 owner 18 Nov 2026: Product Type — "not necessary if AI is not able to find a
-perfect fit": never missing, never counted as lacking by `pb_category_lacking`
-/ `pb_tag_link_stats`; 20261118120000_pb_tags_auto_select.sql);
+perfect fit": never missing, never counted as lacking on the Tags page
+(`pb_tag_link_stats`); `pb_category_lacking` still counts it, for the link
+prompt; 20261118120000_pb_tags_auto_select.sql);
 else Needs info with `missing_attrs` ("Missing: Colour" on the product page and
 the list rows; a category the list no longer has puts 'Category' first:
 "Missing: Category" — 20261113150000_pb_gate_category_list.sql). Saving the
@@ -537,7 +538,7 @@ in "Let AI decide" the schema asks for at least one value per must-have
 attribute (`minItems: 1`), so the AI always chooses. It runs BY ITSELF once
 per read for a Needs-info product with a tag missing (`fillAuto.ts`, owner 18
 Nov 2026: "AI should auto select. No user inputs required"):
-`pb_tags_auto_claim` takes up to 5 at a time (30 a run) whose `tags_ai_at` is
+`pb_tags_auto_claim` takes one product at a time (30 a run) whose `tags_ai_at` is
 empty or older than `ai_read_at`, stamping it, so a product is never paid for
 twice per read; only products held for nothing but tags (not a copy, not
 "Missing: Category", with a photo); a tag newly missing (`pb_products_refresh`
@@ -545,12 +546,16 @@ clears `tags_ai_at` when `missing_attrs` gains a name) gives a new try; not a
 bulk change (it finishes the read); one product per claim, while 35 s are left;
 paused → nothing taken; the day's AI limit → `pb_tags_auto_hold` holds the
 waiting ones until the next IST day (`tags_ai_retry_at`); an AI that cannot be
-reached gives the try back and holds the product 30 minutes; any failure runs
-the gate again; `trigger_pb_worker` wakes for them (`pb_tags_auto_due`). A
+reached, or no answer in time, gives the try back and holds every waiting
+product 30 minutes; any failure runs the gate again; a queued fill stamps
+`tags_ai_at` too, so an overlapping run never fills the same product twice; `trigger_pb_worker` wakes for them (`pb_tags_auto_due`). A
 category move asks the AI for every moved product not waiting for a category
 (`missing_only: false`), and `tags_ai_fill` for an "only if it fits" attribute
-takes the category's products, so a Product Type is still chosen where one
-fits. Also queued by `tags_ai_fill`, run by the worker after
+takes the category's products that have none (`pb_category_lacking_ids`), so a
+Product Type is still chosen where one fits. At deploy the ~117 products held
+only for Product Type keep their old `missing_attrs` until this fill has
+tried them once; only those it never takes were checked again by the
+migration. Also queued by `tags_ai_fill`, run by the worker after
 read / write / publish (5 at a time while 35 s are left, up to 60 a run —
 most are settled by the word rules in a fraction of a second; the day's AI
 limit is asked before each 5), or at once from the product page. Progress

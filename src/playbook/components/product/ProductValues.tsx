@@ -3,7 +3,8 @@
 // is one row button that opens its sheet (ValuesSheet: chips of the allowed
 // values; one or several). A hint says who chose them (Auto = found in the
 // text, AI, You). A must-have attribute that is empty shows a review-tinted
-// line "Choose Colour and Work to finish this product" with "Let AI decide"
+// line "Colour and Work missing — the AI chooses it by itself after a read, or
+// choose it here" with "Let AI decide"
 // (two signals: "AI is choosing…", then what it chose or "AI couldn't tell —
 // please choose"); since 18 Nov 2026 the AI also does this by itself after a
 // read (fillAuto.ts). An "only if it fits" attribute (Product Type) that is
@@ -64,7 +65,7 @@ export default function ProductValues({ product, addToast, onSaved, load = produ
       {data && product.category && !data.attributes.length && <span style={{ ...pbBody, color: PB.tx2 }}>{product.category} needs no tags yet — choose its attributes on Settings → Tags.</span>}
       {data && data.attributes.length > 0 && missing.length > 0 && (
         <div style={{ ...pbTileReview, backdropFilter: 'none', WebkitBackdropFilter: 'none', borderRadius: PB.r.input, padding: 12, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          <Dot color={PB.review} label={`Choose ${andList(missing)} to finish this product`} style={{ color: PB.tx, fontSize: 13, fontWeight: 600, whiteSpace: 'normal', flex: '1 1 200px' }} />
+          <Dot color={PB.review} label={`${andList(missing)} missing — the AI chooses it by itself after a read, or choose it here`} style={{ color: PB.tx, fontSize: 13, fontWeight: 600, whiteSpace: 'normal', flex: '1 1 200px' }} />
           <PbButton icon="sparkles" onClick={() => void letAi()} busy={busy} busyLabel="AI is choosing…" disabled={reading}>Let AI decide</PbButton>
         </div>
       )}

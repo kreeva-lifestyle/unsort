@@ -24,10 +24,12 @@
 --                            gives the try back), the next IST day while the day's AI limit is used up
 --                            (pb_tags_auto_hold) — so neither wakes the worker every minute.
 --   trigger_pb_worker        also wakes the worker while such a product waits (pb_tags_auto_due).
--- Additive: two columns (defaulted / nullable, no backfill), two new functions (service role only), four functions
+-- Additive: four columns (defaulted / nullable, no backfill), four new functions (service role only), three functions
 -- replaced with the same signatures, one trigger re-created, one setting (Product Type → only if it fits). The products
--- held only for Product Type (~117) are checked again at the end and go Ready: the AI's read already looked for a
--- type for every one of them and found none that fits.
+-- held only for Product Type (~117) keep their "Missing: Product Type" for now, so the worker's automatic "Let AI
+-- decide" takes each of them once: the AI picks a type where one truly fits, and that fill's Ready check releases them
+-- either way. Only those it will never take (tags chosen by a person, a copy, no photo, queued, "Missing: Category")
+-- are checked again here, so none is left held by an attribute that no longer holds anything.
 
 alter table public.pb_attributes add column if not exists required boolean not null default true;
 alter table public.pb_products add column if not exists tags_ai_at timestamptz;
@@ -130,6 +132,20 @@ language sql security invoker set search_path = public as $$
   select count(*)::int from h;
 $$;
 
+-- The products of a category with no value of an attribute it uses (what pb_category_lacking counts), for "Let AI
+-- decide" on an "only if it fits" attribute (tags_ai_fill): only those are queued, not the whole category.
+create or replace function public.pb_category_lacking_ids(p_category text, p_attribute uuid)
+returns table (id uuid)
+language sql stable security invoker set search_path = public as $$
+  select p.id from pb_products p
+  where lower(p.category) = lower(p_category) and p.status in ('ready', 'needs_info')
+    and not exists (select 1 from pb_product_values pv join pb_attribute_values v on v.id = pv.value_id join pb_attributes a on a.id = v.attribute_id
+                    where pv.product_id = p.id and v.attribute_id = p_attribute and pb_tag_offered(a.by_category, v.categories, p.category))
+  order by p.id limit 2000;
+$$;
+
+revoke execute on function public.pb_category_lacking_ids(text, uuid) from public, anon, authenticated;
+grant execute on function public.pb_category_lacking_ids(text, uuid) to service_role;
 revoke execute on function public.pb_tags_auto_hold(timestamptz) from public, anon, authenticated;
 grant execute on function public.pb_tags_auto_hold(timestamptz) to service_role;
 revoke execute on function public.pb_tags_auto_due() from public, anon, authenticated;
@@ -150,8 +166,11 @@ end $do$;
 -- Owner, 18 Nov 2026: "Product Type is not necessary if AI is not able to find a perfect fit".
 update public.pb_attributes set required = false where key = 'product type' and required;
 
--- The products held only by an attribute that is "only if it fits" now go Ready (their read already looked for a
--- value); a product still missing a must-have keeps waiting, and the worker fills it by itself.
+-- Products held by an "only if it fits" attribute that the automatic fill will never take: checked again now (no AI).
+-- The rest wait for that fill (see the header).
 select count(*) from public.pb_products_refresh(array(
   select p.id from pb_products p
-  where p.status = 'needs_info' and p.missing_attrs && array(select a.name from pb_attributes a where not a.required)));
+  where p.status = 'needs_info' and p.missing_attrs && array(select a.name from pb_attributes a where not a.required)
+    and ('tags' = any(coalesce(p.locked, '{}')) or p.copy_of is not null or p.tag_fill_run is not null
+         or 'Category' = any(p.missing_attrs)
+         or not exists (select 1 from pb_product_images i where i.product_id = p.id and i.kind = 'image'))));
