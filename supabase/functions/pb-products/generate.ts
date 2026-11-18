@@ -10,6 +10,7 @@
 // notes are kept beside the listing (seoStore.ts).
 // Two versions of one product are never written at the same time: the later
 // listing waits a minute, so it can be told what the earlier one says.
+import { CUT_OFF, lowerEffort } from './ai.ts';
 import { aiBusy, freeTry } from './aiRetry.ts';
 import { cleanHandle, cleanHtml, cut, fillTitle, stripTags, withBrand } from './content.ts';
 import { ago, enc, logActivity, nowIso, one, patch, sel, uniqueCi } from './db.ts';
@@ -114,7 +115,8 @@ export async function generateOne(l: ListingRow, o: { manual: boolean; prevStatu
         vendor: vendor?.name || '', sku: p.sku || '', fabric: /^\s*english\b/i.test(String(c.language || 'English')) ? p.fabric || '' : '', limits: L }) };
     };
     const w = await writeCopy({
-      model: c.model, effort: c.effort, photos: photos.blocks, schema: genSchema(extraMax > 0 ? allowed : []), check, budget: o.budget,
+      // The last try was cut off (the thinking took the room meant for the answer): this one thinks one step less.
+      model: c.model, effort: CUT_OFF.test(l.error || '') ? lowerEffort(c.effort) : c.effort, photos: photos.blocks, schema: genSchema(extraMax > 0 ? allowed : []), check, budget: o.budget,
       system: genSystem({ c, profile, extraMax, allowed, photos: photos.blocks.length, imported: p.source === 'import' }),
       facts: genFacts(p, { keyword, photos: photos.blocks.length, others, tags: p.tags || [] }),
     });

@@ -24,6 +24,14 @@ export function pickModel(m: string | null | undefined): string {
   return MODELS[id] ? id : DEFAULT_MODEL;
 }
 export const pickEffort = (e: string | null | undefined) => (EFFORTS.includes(String(e || '')) ? String(e) : '');
+/** One step down, for the try after an answer was cut off: the thinking took the room meant for the answer (Haiku at
+ *  "high" was cut off on 85 % of listings, 17 Nov 2026, each retry paid again). '' (the model's default) → medium. */
+export const lowerEffort = (e: string | null | undefined): string => {
+  const x = pickEffort(e);
+  return x === 'max' || x === 'xhigh' ? 'high' : x === 'high' || x === '' ? 'medium' : 'low';
+};
+/** The message askClaude gives an answer cut off at max_tokens (also kept as a listing's error). */
+export const CUT_OFF = /answer was cut off/i;
 
 interface Usage { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number }
 function estUsd(model: string, u: Usage): number {
