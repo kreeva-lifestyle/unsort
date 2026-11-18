@@ -69,8 +69,9 @@ export async function netRows(id: string, tables: string[], open = false): Promi
 /** The size of a tag change or a stock notice, or null when it is not a bulk change after all (owner: "only those which
  *  are done in bulk"). Bulk = it reached two or more products (their own row or their tags), or — tag lists only — it
  *  took two or more entries out of the lists at once (an attribute goes with its values and links) or handled two or
- *  more suggestions at once. `unit` says what `items` counts (the app words the row by it). */
-async function sizeOf(id: string, kind: BulkKind): Promise<{ items: number; unit: string } | null> {
+ *  more suggestions at once — or one, when Playbook filed it by itself (`auto`: a run with no person; tagsFile.ts), so a
+ *  wrong "also known as" can always be taken back. `unit` says what `items` counts (the app words the row by it). */
+async function sizeOf(id: string, kind: BulkKind, auto = false): Promise<{ items: number; unit: string } | null> {
   const products = Number(await rpc<number>('pb_bulk_products', { p_run: id })) || 0;
   if (products >= 2) return { items: products, unit: 'products' };
   if (!['value_delete', 'value_merge', 'attribute_delete', 'categories', 'category_links', 'suggestions'].includes(kind)) return null;
@@ -80,7 +81,7 @@ async function sizeOf(id: string, kind: BulkKind): Promise<{ items: number; unit
     else if (n.before && !n.after) entries++;
   }
   if (entries >= 2) return { items: entries, unit: 'entries' };
-  if (suggestions >= 2) return { items: suggestions, unit: 'suggestions' };
+  if (suggestions >= (auto && kind === 'suggestions' ? 1 : 2)) return { items: suggestions, unit: 'suggestions' };
   return null;
 }
 
@@ -90,8 +91,8 @@ async function sizeOf(id: string, kind: BulkKind): Promise<{ items: number; unit
 export async function endRun(id: string, details?: Record<string, unknown>): Promise<number> {
   try {
     const n = await countRows(`pb_bulk_items?select=id&run_id=eq.${enc(id)}`);
-    const run = n ? await one<{ kind: BulkKind }>(`pb_bulk_runs?id=eq.${enc(id)}&select=kind`) : null;
-    const size = run && BY_PRODUCT.includes(run.kind) ? await sizeOf(id, run.kind) : n ? { items: n, unit: '' } : null;
+    const run = n ? await one<{ kind: BulkKind; created_by: string | null }>(`pb_bulk_runs?id=eq.${enc(id)}&select=kind,created_by`) : null;
+    const size = run && BY_PRODUCT.includes(run.kind) ? await sizeOf(id, run.kind, !run.created_by) : n ? { items: n, unit: '' } : null;
     if (!size) { await remove('pb_bulk_runs', `id=eq.${enc(id)}&status=eq.running`); return 0; }
     const all = { ...(details || {}), ...(size.unit ? { unit: size.unit } : {}) };
     await patch('pb_bulk_runs', `id=eq.${enc(id)}&status=eq.running`, { status: 'done', items: size.items, finished_at: nowIso(), ...(Object.keys(all).length ? { details: all } : {}) });

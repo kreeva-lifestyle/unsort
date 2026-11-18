@@ -7,7 +7,7 @@
 // changes that can be taken back: tagsBulk.ts. SQL: 20261110090000_pb_tags.sql.
 // Suggestions, product values, retag and "Let AI decide": tagsQueue.ts.
 import { uuid, type Body } from './actions.ts';
-import { SB_URL, enc, insert, logActivity, one, patch, rpc, sel, selAll, svcHeaders } from './db.ts';
+import { enc, insert, logActivity, one, patch, rpc, sel, selAll } from './db.ts';
 import { HttpError } from './http.ts';
 import { exactIn, lookAlikes } from './tagLook.ts';
 import { displayName, tagKey } from './tagText.ts';
@@ -21,23 +21,17 @@ const MAX_ALIASES = 30;
 
 export async function taxonomyGet() {
   const tax = await loadTaxonomy();
-  const [stats, counts, pending, fill] = await Promise.all([
+  const [stats, counts, fill] = await Promise.all([
     rpc<{ category: string; attribute_id: string; products: number; lacking: number }[]>('pb_tag_link_stats', {}),
     rpc<{ category: string; products: number }[]>('pb_tag_category_counts', {}),
-    fetchCount('pb_tag_suggestions?select=id&status=eq.pending'),
     fillStatus(),
   ]);
   const uses = await rpc<{ value_id: string; n: number }[]>('pb_tag_value_uses', {});
   const n = new Map(uses.map(u => [u.value_id, u.n]));
   return {
-    ok: true, categories: tax.categories, links: tax.links, stats, category_products: counts, suggestions_pending: pending, fill,
+    ok: true, categories: tax.categories, links: tax.links, stats, category_products: counts, fill,
     attributes: tax.attrs.map(a => ({ ...a, values: tax.values.filter(v => v.attribute_id === a.id).map(v => ({ ...v, uses: n.get(v.id) ?? 0 })) })),
   };
-}
-
-async function fetchCount(path: string): Promise<number> {
-  const r = await fetch(`${SB_URL}/rest/v1/${path}`, { method: 'HEAD', headers: { ...svcHeaders, prefer: 'count=exact' } });
-  return Number((r.headers.get('content-range') || '').split('/')[1]) || 0;
 }
 
 /** Check again the products an attribute's switch reaches: those of the categories that use it and those carrying one

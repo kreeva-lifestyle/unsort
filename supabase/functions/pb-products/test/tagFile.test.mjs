@@ -1,0 +1,193 @@
+// node --test --experimental-strip-types supabase/functions/pb-products/test/
+// New tag words filed by themselves (owner, 17 Nov 2026: "merged automatic with the best possible AI suggestion rest
+// should be automatically ignore"): tagFilePrompt.ts (the AI's question and how its answer is read) and tagsFile.ts
+// (one worker pass) over a fake database and a fake AI.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+
+globalThis.Deno = { env: { get: (k) => (k === 'SUPABASE_URL' ? 'https://sb.example' : 'test') } };
+const { decide, filePrompt, readFile } = await import('../tagFilePrompt.ts');
+const { FILE_MODEL, fileWords, namesTwo, surely } = await import('../tagsFile.ts');
+
+const V = (id, attribute_id, attribute, name, aliases = []) => ({ id, attribute_id, attribute, name, key: name.toLowerCase(), aliases });
+const VALUES = [V('black', 'col', 'Colour', 'Black', ['kala']), V('pink', 'col', 'Colour', 'Pink'), V('emb', 'work', 'Work', 'Embroidery', ['zari work']),
+  V('seq', 'work', 'Work', 'Sequins'), V('silk', 'fab', 'Fabric', 'Art Silk', ['crunchy silk'])];
+const ATTRS = [{ id: 'col', name: 'Colour', key: 'colour', multi: false, position: 1 }, { id: 'work', name: 'Work', key: 'work', multi: true, position: 2 }, { id: 'fab', name: 'Fabric', key: 'fabric', multi: false, position: 3 }];
+const TAX = { attrs: ATTRS, values: VALUES.map((v, i) => ({ ...v, position: i, categories: [] })), links: [], categories: [] };
+
+test('the question: every listed value and "none" are the only answers, with how close; the words a person ignored', () => {
+  const p = filePrompt(VALUES, ['Colour', 'Work', 'Fabric'], [{ phrase: 'Rani Pink', attribute: 'Colour', source: 'ai', examples: ['Pink lehenga'] }], ['Sale']);
+  const item = p.schema.properties.picks.items;
+  assert.deepEqual(item.properties.value.enum, ['Colour: Black', 'Colour: Pink', 'Work: Embroidery', 'Work: Sequins', 'Fabric: Art Silk', 'none']);
+  assert.deepEqual(item.properties.match.enum, ['same', 'kind', 'related', 'none']);
+  assert.deepEqual(item.required, ['n', 'value', 'match', 'why']);
+  assert.match(p.system, /Colour: Black \[kala\]; Pink/);
+  assert.match(p.system, /Work: Embroidery \[zari work\]; Sequins/);
+  assert.match(p.system, /names two or more listed values/);
+  assert.match(p.system, /Words the owner ignored before \(not product details\): Sale/);
+  assert.equal(p.text, '1. "Rani Pink" (noticed by the AI, seen as Colour) e.g. Pink lehenga');
+});
+
+test('the answer: same or kind files the word, related or none ignores it; a value not on the lists is no answer', () => {
+  const got = readFile({ picks: [
+    { n: 1, value: 'Colour: Pink', match: 'kind', why: 'A shade of pink' },
+    { n: 2, value: 'Colour: Black', match: 'same', why: 'Hindi for black' },
+    { n: 3, value: 'Colour: Black', match: 'related', why: 'Only the border is black' },
+    { n: 4, value: 'none', match: 'none', why: 'A sale word' },
+    { n: 5, value: 'Colour: Mauve', match: 'same', why: 'x' }, // not on the lists: asked again, never read as none
+    { n: 6, value: 'Work: Embroidery', match: 'none', why: 'x' }, // a value but no match: none
+    { n: 1, value: 'Colour: Black', match: 'same', why: 'a repeat' }, { n: 9, value: 'none', match: 'none', why: 'out of range' },
+  ] }, 6, VALUES);
+  assert.deepEqual([...got.keys()].sort(), [1, 2, 3, 4, 6]);
+  assert.deepEqual([1, 2, 3, 4, 6].map(n => decide(got.get(n))), ['pink', 'black', null, null, null]);
+  assert.equal(got.get(1).why, 'A shade of pink');
+  assert.equal(readFile(null, 3, VALUES).size, 0);
+});
+
+test('the word rules file only what they are sure of; a typo or a near spelling goes to the AI', () => {
+  assert.equal(surely({ phrase: 'Kala', attribute_id: 'col' }, VALUES)?.value_id, 'black'); // a word already filed under it
+  assert.equal(surely({ phrase: 'Blacks', attribute_id: 'col' }, VALUES)?.value_id, 'black'); // the same word in another form
+  assert.equal(surely({ phrase: 'Back', attribute_id: null }, VALUES), null); // a typo of Black: not trusted (it made Back → Black)
+  assert.equal(surely({ phrase: 'Brunchy Silk', attribute_id: 'fab' }, VALUES), null); // close to "crunchy silk": not trusted
+  assert.equal(surely({ phrase: 'Premium Finishing', attribute_id: null }, VALUES), null);
+});
+
+test('a word that names two values of one attribute, each on its own, is never filed under one of them', () => {
+  assert.equal(namesTwo('Sequins Embroidery', 'emb', TAX), true); // Work takes several: the products would lose Sequins
+  assert.equal(namesTwo('Sequins and Zari Work', 'emb', TAX), true);
+  assert.equal(namesTwo('Heavy Zari Work', 'emb', TAX), false); // only Embroidery's own word
+  assert.equal(namesTwo('Heavy Sequins', 'emb', TAX), false); // Embroidery is not in it: the alias is the AI's call
+  assert.equal(namesTwo('Pink Silk', 'silk', TAX), false); // Pink is another attribute: still found as a Colour
+  // an attribute that takes one value keeps one anyway; the longer name corrects the shorter one
+  const fab = { ...TAX, attrs: TAX.attrs, values: [...TAX.values, { id: 'plain', attribute_id: 'fab', name: 'Silk', key: 'silk', aliases: [], position: 9, categories: [] }] };
+  assert.equal(namesTwo('Faux Silk', 'silk', fab), false);
+  assert.equal(namesTwo('Black and Pink', 'black', TAX), false);
+  // values that depend on the category count only when they share one with the chosen value
+  const types = { attrs: [{ id: 'type', name: 'Product Type', key: 'product type', multi: true, position: 4, by_category: true }], links: [], categories: [],
+    values: [{ id: 'sal', attribute_id: 'type', name: 'Salwar Suit', key: 'salwar suit', aliases: [], position: 1, categories: ['Salwar Suit'] },
+      { id: 'ana', attribute_id: 'type', name: 'Anarkali', key: 'anarkali', aliases: [], position: 2, categories: ['Kurti'] },
+      { id: 'ana2', attribute_id: 'type', name: 'Anarkali', key: 'anarkali', aliases: [], position: 3, categories: ['Salwar Suit'] }] };
+  assert.equal(namesTwo('Anarkali Salwar Suit', 'sal', { ...types, values: types.values.slice(0, 2) }), false);
+  assert.equal(namesTwo('Anarkali Salwar Suit', 'sal', types), true);
+});
+
+test('which failures use a try: an outage never does, a request that went wrong does', async () => {
+  const { failureOf } = await import('../tagsFile.ts');
+  const { HttpError } = await import('../http.ts');
+  const E = (s, m, usd) => Object.assign(new HttpError(s, m), usd ? { usd } : {});
+  assert.deepEqual([E(409, 'No Anthropic API key is saved yet'), E(503, 'The AI is busy right now (rate limit)'), E(503, 'The AI service is overloaded'),
+    E(502, 'The Anthropic API key was rejected'), E(502, 'The AI request was refused (400): Your credit balance is too low'), E(504, 'Could not reach the AI service')].map(failureOf),
+    ['outage', 'outage', 'outage', 'outage', 'outage', 'outage']);
+  assert.deepEqual([E(504, 'The AI took too long to answer'), E(502, 'The AI request was refused (400): prompt is too long'), E(502, 'The AI answer was cut off', 0.01),
+    E(422, 'The AI declined', 0.01), new Error('x')].map(failureOf), ['answer', 'answer', 'answer', 'answer', 'answer']);
+});
+
+/** A fake database and AI for one pass: `words` are what the claim returns; `ai` the AI's picks (or a status). */
+function world({ words, ai = { picks: [] }, aiStatus = 200, aiError = 'busy', stop = 'end_turn', products = [] } = {}) {
+  const calls = { ai: [], filed: [], patches: [], add: [], activity: [], runs: [], tagged: [] };
+  const ok = (b, s = 200) => new Response(JSON.stringify(b), { status: s });
+  globalThis.fetch = async (url, init = {}) => {
+    const u = decodeURIComponent(String(url)), method = init.method || 'GET', body = init.body ? JSON.parse(init.body) : null;
+    if (u.startsWith('https://api.anthropic.com/')) { calls.ai.push(body); return aiStatus === 200 ? ok({ content: [{ type: 'text', text: JSON.stringify(ai) }], stop_reason: stop, usage: { input_tokens: 1000, output_tokens: 100 } }) : ok({ error: { message: aiError } }, aiStatus); }
+    const path = u.replace('https://sb.example/rest/v1/', '');
+    const run = Object.entries(init.headers || {}).find(([k]) => k.toLowerCase() === 'x-pb-bulk')?.[1];
+    if (run) calls.tagged.push(path.split('?')[0]);
+    if (path === 'rpc/pb_tag_file_claim') return ok(words);
+    if (path === 'rpc/pb_tag_file') {
+      calls.filed.push(body);
+      const v = VALUES.find(x => x.id === body.p_value);
+      return ok(body.p_value ? { filed: true, status: 'aliased', value_id: v.id, attribute_id: v.attribute_id } : { filed: true, status: 'ignored' });
+    }
+    if (path.startsWith('pb_attributes?')) return ok(ATTRS);
+    if (path.startsWith('pb_attribute_values?')) return ok(TAX.values);
+    if (path.startsWith('pb_category_attributes?')) return ok([]);
+    if (path.startsWith('pb_settings?')) return ok([{ key: 'categories', value: ['Saree'] }]);
+    if (path.startsWith('app_secrets?')) return ok([{ value: 'sk-test' }]);
+    // the words a person ignored; "Kanjivaram Silk" was only merged into a twin that is still waiting
+    if (path.startsWith('pb_tag_suggestions?status=eq.ignored') && method === 'GET') return ok([{ phrase: 'Sale', key: 'sale' }, { phrase: 'Kanjivaram Silk', key: 'kanjivaram silk' }]);
+    if (path.startsWith('pb_tag_suggestions?key=in.') && method === 'GET') return ok([{ key: 'kanjivaram silk' }]);
+    if (path.startsWith('pb_tag_suggestions?') && method === 'PATCH') { calls.patches.push([path, body]); return ok([{ id: 'x' }]); }
+    if (path.startsWith('pb_products?')) return ok(products);
+    if (path === 'rpc/pb_product_values_set') { calls.add.push(body); return ok([{ id: body.p_product, status: 'ready', was: 'needs_info', missing: [] }]); }
+    if (path.startsWith('pb_activity')) { calls.activity.push(body?.[0]); return ok([{}], 201); }
+    if (path.startsWith('pb_bulk_runs') && method === 'POST') { calls.runs.push(body[0]); return ok([{ id: 'run1' }], 201); }
+    if (path.startsWith('pb_bulk_items?') && method === 'HEAD') return new Response(null, { status: 200, headers: { 'content-range': '0-0/4' } });
+    if (path === 'rpc/pb_bulk_products') return ok(2);
+    if (path === 'rpc/pb_product_values_bulk') return ok([]);
+    return ok(method === 'GET' ? [] : [{}]);
+  };
+  return calls;
+}
+const W = (id, phrase, attribute_id = null, source = 'store', examples = [], tries = 0) => ({ id, phrase, key: phrase.toLowerCase(), attribute_id, source, examples, tries });
+const opts = (over = {}) => ({ budget: { soft: Date.now() + 100_000, hard: Date.now() + 140_000 }, left: () => true, capped: async () => false, stopped: async () => false, ...over });
+
+test('a pass: a two-value word the AI filed under one value is ignored instead', async () => {
+  const calls = world({ words: [W('w1', 'Sequins Embroidery', 'work')], ai: { picks: [{ n: 1, value: 'Work: Embroidery', match: 'kind', why: 'Sequin embroidery' }] } });
+  await fileWords(opts());
+  assert.deepEqual(calls.filed.map(f => [f.p_value, f.p_match, f.p_why]), [[null, 'related', 'It names two values; each is found on its own.']]);
+});
+
+test('a pass: sure words by the rules, the rest by the AI (same/kind filed, related/none ignored), one bulk change, products tagged', async () => {
+  const words = [W('w1', 'Kala', 'col'), W('w2', 'Kora Silk', 'fab', 'ai', ['p1', 'p2']), W('w3', 'Red Border', null), W('w4', 'Premium', null), W('w5', 'Wine Tone', 'col', 'ai', [], 1)];
+  const calls = world({ words, products: [{ id: 'p1', locked: [] }, { id: 'p2', locked: ['tags'] }], ai: { picks: [
+    { n: 1, value: 'Fabric: Art Silk', match: 'kind', why: 'A kind of silk' }, { n: 2, value: 'Colour: Black', match: 'related', why: 'Only the border' },
+    { n: 3, value: 'none', match: 'none', why: 'A marketing word' }] } }); // word 4 (Wine Tone) left unanswered
+  const r = await fileWords(opts());
+  assert.deepEqual(r, { aliased: 2, ignored: 2, retagged: 0, run_id: 'run1', waiting: 1 });
+  assert.equal(calls.ai.length, 1); assert.equal(calls.ai[0].model, FILE_MODEL);
+  assert.deepEqual(calls.filed.map(f => [f.p_id, f.p_value, f.p_match]), [['w1', 'black', 'same'], ['w2', 'silk', 'kind'], ['w3', null, 'related'], ['w4', null, 'none']]);
+  assert.deepEqual(calls.filed.map(f => f.p_why), ['The same word.', 'A kind of silk', 'Only the border', 'A marketing word']);
+  assert.match(calls.runs[0].label, /^Filed 4 new words by itself: 2 also known as their nearest values, 2 ignored \(Kala, Kora Silk, Red Border and 1 more\)$/);
+  assert.equal(calls.runs[0].kind, 'suggestions'); assert.equal(calls.runs[0].created_by, null);
+  assert.ok(calls.tagged.includes('rpc/pb_tag_file'), 'the filing is part of the bulk change');
+  // the AI read "Kora Silk" from p1 and p2 as a Fabric: p1 gets Art Silk where it has no Fabric; p2's tags are locked
+  assert.deepEqual(calls.add.map(a => [a.p_product, a.p_rows[0].value_id, a.p_mode, a.p_attributes]), [['p1', 'silk', 'add', ['fab']]]);
+  // unanswered: one more try counted (guarded by the old count), not filed
+  assert.deepEqual(calls.patches.map(([p, b]) => [p.includes('id=eq.w5') && p.includes('tries=eq.1'), b]), [[true, { tries: 2 }]]);
+  assert.match(calls.ai[0].system, /ignored before \(not product details\): Sale$/m);
+  const cost = calls.activity.find(a => a.action === 'tags_matched');
+  assert.equal(cost.details.phrases, 4); assert.equal(cost.details.matched, 1); assert.ok(cost.details.usd > 0);
+});
+
+test('a pass: a word the AI answers around is ignored at its third try; so after a request that went wrong (cut off, refused)', async () => {
+  for (const o of [{ ai: { picks: [] } }, { stop: 'max_tokens' }, { aiStatus: 400, aiError: 'prompt is too long' }]) {
+    const calls = world({ words: [W('w1', 'Odd Word', null, 'store', [], 2), W('w2', 'Odder Word', null, 'store', [], 0)], ...o });
+    const r = await fileWords(opts());
+    assert.deepEqual(calls.filed.map(f => [f.p_id, f.p_value, f.p_why]), [['w1', null, 'No answer from the AI after three tries.']]);
+    assert.deepEqual(calls.patches.map(([p, b]) => [p.includes('id=eq.w2') && p.includes('tries=eq.0'), b]), [[true, { tries: 1 }]]);
+    assert.equal(r.ignored, 1); assert.equal(r.waiting, 1);
+  }
+});
+
+test('a pass: an AI call that fails (busy, no key, no credit) uses no try — the words wait 30 minutes, even at their third try', async () => {
+  for (const [aiStatus, aiError] of [[529, 'Overloaded'], [401, 'invalid x-api-key'], [400, 'Your credit balance is too low to access the API']]) {
+    const calls = world({ words: [W('w1', 'Odd Word', null, 'store', [], 2), W('w2', 'Kala', 'col')], aiStatus, aiError });
+    const before = Date.now();
+    const r = await fileWords(opts());
+    assert.deepEqual(r, { aliased: 1, ignored: 0, retagged: 0, run_id: 'run1', waiting: 1 });
+    assert.deepEqual(calls.filed.map(f => f.p_id), ['w2']); // the rules still file theirs
+    assert.equal(calls.patches.length, 1);
+    const [path, body] = calls.patches[0];
+    assert.ok(path.startsWith('pb_tag_suggestions?id=in.(w1)&status=eq.pending'), path);
+    const free = Date.parse(body.tried_at) + 10 * 60_000; // taken again once tried_at is 10 minutes old
+    assert.ok(free >= before + 30 * 60_000 - 1000 && free <= Date.now() + 30 * 60_000 + 1000, body.tried_at);
+    assert.equal(calls.activity.find(a => a.action === 'failed').details.step, 'tags_file');
+  }
+});
+
+test('a pass: the day\'s AI limit, a pause or the clock leave the AI words waiting (no try used); the rules still file', async () => {
+  for (const o of [{ capped: async () => true }, { stopped: async () => true }, { left: () => false }]) {
+    const calls = world({ words: [W('w1', 'Kala', 'col'), W('w2', 'Odd Word')] });
+    const r = await fileWords(opts(o));
+    assert.deepEqual(r, { aliased: 1, ignored: 0, retagged: 0, run_id: 'run1', waiting: 1 });
+    assert.equal(calls.ai.length, 0);
+    assert.deepEqual(calls.filed.map(f => f.p_id), ['w1']);
+    if (!o.capped) { assert.equal(calls.patches.length, 0); continue; }
+    // the limit: held until the next day in India, so the waiting words do not wake the worker every minute meanwhile
+    const IST = 5.5 * 3600_000, day = 86_400_000, next = (Math.floor((Date.now() + IST) / day) + 1) * day - IST;
+    assert.deepEqual(calls.patches.map(([p, b]) => [p.split('&')[0], Date.parse(b.tried_at) + 10 * 60_000]), [['pb_tag_suggestions?id=in.(w2)', next]]);
+  }
+  const calls = world({ words: [] });
+  assert.equal(await fileWords(opts()), null);
+  assert.equal(calls.runs.length, 0);
+});

@@ -1,5 +1,5 @@
-// Tags data access: the taxonomy (categories → attributes → values), the
-// suggestions queue, a product's values, retag and "Let AI decide". Every
+// Tags data access: the taxonomy (categories → attributes → values),
+// a product's values, retag and "Let AI decide". Every
 // write goes through the pb-products edge function (look-alike checks,
 // admin / manager for structure); a product's values and its category's
 // attributes are read directly (RLS: staff). Contract:
@@ -8,7 +8,7 @@
 // LookAlikeError with the matches, so the UI can ask "same thing or new?".
 import { supabase } from '../../lib/supabase';
 import { pbCall } from './pbFunctions';
-import { offeredFor, type PbAttrValue, type PbAttribute, type PbFillRun, type PbLookAlike, type PbNearest, type PbProductValue, type PbRetagResult, type PbSuggestion, type PbSuggestionStatus, type PbTaxonomy } from '../tagTypes';
+import { offeredFor, type PbAttrValue, type PbAttribute, type PbFillRun, type PbLookAlike, type PbProductValue, type PbRetagResult, type PbTaxonomy } from '../tagTypes';
 
 export class LookAlikeError extends Error {
   matches: PbLookAlike[];
@@ -22,7 +22,7 @@ const lookAlike = (e: unknown): never => {
 
 export const getTaxonomy = () => pbCall<PbTaxonomy>('taxonomy_get').then(r => ({
   categories: r.categories ?? [], attributes: r.attributes ?? [], links: r.links ?? [], stats: r.stats ?? [],
-  category_products: r.category_products ?? [], suggestions_pending: r.suggestions_pending ?? 0, fill: r.fill ?? null,
+  category_products: r.category_products ?? [], fill: r.fill ?? null,
 }));
 export const saveCategories = (categories: string[]) => pbCall<{ categories: string[] }>('categories_save', { categories }).then(r => r.categories ?? categories);
 export const saveAttribute = (a: { id?: string; name: string; multi: boolean; shopify_prefix: string; by_category: boolean }) =>
@@ -46,22 +46,6 @@ export const moveCategory = (from: string, to: string, remove = false) =>
 export const linkCheck = (category: string, attributeId: string) => pbCall<{ lacking: number }>('category_link_check', { category, attribute_id: attributeId }).then(r => r.lacking ?? 0);
 export const saveLinks = (category: string, attributeIds: string[]) =>
   pbCall<{ to_needs_info: number; to_ready: number }>('category_link_save', { category, attribute_ids: attributeIds });
-
-export type SuggestionPage = { rows: PbSuggestion[]; count: number };
-export const listSuggestions = (status: PbSuggestionStatus, page: number, attributeId = '') =>
-  pbCall<SuggestionPage>('suggestions_list', { status, page, attribute_id: attributeId || undefined }).then(r => ({ rows: r.rows ?? [], count: r.count ?? 0 }));
-/** 'nearest': each into its own nearest value (the one its card shows); one without is left and counted in `skipped`.
- *  `more` / `run_id`: one batch of "Select all" — the batches make one bulk change (the first opens it, the last closes it). */
-export type SuggestionAct = { ids: string[]; act: 'add' | 'alias' | 'ignore' | 'move' | 'nearest'; attribute_id?: string | null; value_id?: string; name?: string; force?: boolean; more?: boolean; run_id?: string };
-/** "Select all": every pending suggestion under the chip ('' = all, 'none' = no attribute), in the list's order. */
-export const suggestionIds = (attributeId = '') =>
-  pbCall<{ ids: string[] }>('suggestions_ids', { attribute_id: attributeId || undefined }).then(r => r.ids ?? []);
-/** The nearest value for suggestions not looked at yet (up to 20): the word rules, else one AI call; the answer is kept. */
-export const nearestSuggestions = (ids: string[]) =>
-  pbCall<{ nearest: Record<string, PbNearest> }>('suggestions_nearest', { ids }).then(r => r.nearest ?? {});
-export const actSuggestions = (a: SuggestionAct) =>
-  pbCall<{ done: number; conflicts: Record<string, PbLookAlike[]>; retagged: number; skipped?: number; run_id?: string | null }>('suggestion_act', a)
-    .then(r => ({ done: r.done ?? 0, conflicts: r.conflicts ?? {}, retagged: r.retagged ?? 0, skipped: r.skipped ?? 0, run_id: r.run_id ?? null }));
 
 export const retag = (dryRun: boolean) => pbCall<PbRetagResult>('retag', { dry_run: dryRun });
 export type FillScope = { product_ids?: string[]; category?: string; attribute_id?: string; needs_info?: boolean };
@@ -115,16 +99,9 @@ export async function countMissingTags(): Promise<number> {
   return count ?? 0;
 }
 
-/** How many suggestions wait (the Settings tile). */
-export async function countSuggestions(): Promise<number> {
-  const { count, error } = await supabase.from('pb_tag_suggestions').select('id', { count: 'exact', head: true }).eq('status', 'pending');
-  if (error) throw error;
-  return count ?? 0;
-}
-
 /** Everything the Tags page calls, as one object so the screenshot harness can pass fakes. */
 export const TAGS_API = {
   taxonomy: getTaxonomy, saveCategories, saveAttribute, deleteAttribute, orderAttributes, checkValue, saveValue, deleteValue, mergeValue,
-  linkCheck, saveLinks, listSuggestions, nearestSuggestions, actSuggestions, suggestionIds, retag, aiFill, fillStatus, renameCategory, moveCategory,
+  linkCheck, saveLinks, retag, aiFill, fillStatus, renameCategory, moveCategory,
 };
 export type TagsApi = typeof TAGS_API;

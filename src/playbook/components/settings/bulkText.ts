@@ -14,9 +14,9 @@ const n = (k: number, one: string, many = `${one}s`) => `${count(k)} ${k === 1 ?
 const s = (k: number, one: string, many: string) => (k === 1 ? one : many);
 
 /** What the rows of a bulk change are: "136 products", "118 listings"; a tag-list change that reached fewer than two
- *  products is counted by what it changed in the lists (`unit`, from the server: "4 tag-list entries", "12 suggestions"). */
+ *  products is counted by what it changed in the lists (`unit`, from the server: "4 tag-list entries", "12 new words"). */
 export const rows = (kind: Kind, k: number, unit?: unknown) => (unit === 'entries' ? n(k, 'tag-list entry', 'tag-list entries')
-  : unit === 'suggestions' ? n(k, 'suggestion') : PRODUCTS.includes(kind) ? n(k, 'product') : n(k, 'listing'));
+  : unit === 'suggestions' ? n(k, 'new word') : PRODUCTS.includes(kind) ? n(k, 'product') : n(k, 'listing'));
 /** Retrying and reading again only repeat a step that failed: there is nothing to put back, only a queue to stop. */
 export const onlyStops = (kind: Kind) => kind === 'retry_failed' || kind === 'reread_failed';
 export const verb = (kind: Kind) => (onlyStops(kind) ? 'Stop the rest' : 'Revert');
@@ -24,7 +24,7 @@ export const verb = (kind: Kind) => (onlyStops(kind) ? 'Stop the rest' : 'Revert
 export interface Plan { lines: string[]; note: string; confirm: string; danger: boolean; todo: number }
 const TAG_CONFIRM: Partial<Record<Kind, string>> = {
   value_delete: 'Bring the value back', attribute_delete: 'Bring the attribute back', value_merge: 'Separate them again', categories: 'Put the list back',
-  category_links: 'Put the must-have tags back', suggestions: 'Put the suggestions back', retag: 'Put the tags back', tag_fill: 'Take the AI tags off',
+  category_links: 'Put the must-have tags back', suggestions: 'Put the words back', retag: 'Put the tags back', tag_fill: 'Take the AI tags off',
 };
 const busy = (k: number, what: string) => `${what} ${s(k, 'is', 'are')} being worked on right now. Tap Revert again in a few minutes for ${s(k, 'it', 'them')}.`;
 
@@ -77,7 +77,7 @@ export function plan(run: Pick<PbBulkRun, 'kind' | 'details'>, c: BulkCounts): P
     add(out, `${n(out, 'tag value')} this change added ${s(out, 'is', 'are')} taken out of the lists again.`);
     add(v('list'), 'The category list goes back to how it was.');
     add(v('links'), `The must-have tags of the categories go back to how they were (${n(v('links'), 'change')}).`);
-    add(v('suggestions'), `${n(v('suggestions'), 'suggestion')} ${s(v('suggestions'), 'goes', 'go')} back to how ${s(v('suggestions'), 'it was', 'they were')}.`);
+    add(v('suggestions'), `${n(v('suggestions'), 'new word')} ${s(v('suggestions'), 'goes', 'go')} back to how ${s(v('suggestions'), 'it was', 'they were')}.`);
     add(tin + tout, `The tags of ${n(v('products'), 'product')} go back to how they were: ${[tin ? `${n(tin, 'tag')} put back` : '', tout ? `${n(tout, 'tag')} taken off` : ''].filter(Boolean).join(', ')}.`);
     add(v('kept'), `${n(v('kept'), 'product')} had ${s(v('kept'), 'its', 'their')} tags set by hand since and ${s(v('kept'), 'stays as it is', 'stay as they are')}.`);
     add(v('left'), `${n(v('left'), 'tag')} ${s(v('left'), 'stays', 'stay')} off: the product has another value for that by now, or was edited by hand since.`);
@@ -131,7 +131,7 @@ export function done(kind: Kind, c: BulkCounts | null): string {
   else if (TAGS.includes(kind)) {
     parts.push(...[v('products') ? `Put back the tags of ${n(v('products'), 'product')}` : '', v('values_back') ? `${n(v('values_back'), 'value')} back in the lists` : '',
       v('values_gone') ? `${n(v('values_gone'), 'added value')} taken out` : '', v('list') ? 'the category list as it was' : '', v('links') ? `${n(v('links'), 'must-have tag')} as before` : '',
-      v('suggestions') ? `${n(v('suggestions'), 'suggestion')} as before` : '', v('kept') ? `${count(v('kept'))} edited by hand left as ${s(v('kept'), 'it is', 'they are')}` : ''].filter(Boolean));
+      v('suggestions') ? `${n(v('suggestions'), 'new word')} as before` : '', v('kept') ? `${count(v('kept'))} edited by hand left as ${s(v('kept'), 'it is', 'they are')}` : ''].filter(Boolean));
     if (!parts.length) parts.push('Nothing was left to put back');
   } else if (kind === 'stock_notice') parts.push(`Put back the stock of ${n(v('restored'), 'product')}`, ...(v('back') ? [`${n(v('back'), 'listing')} back on ${s(v('back'), 'its website', 'their websites')}`] : []), ...(v('changed') ? [`${count(v('changed'))} changed since left as ${s(v('changed'), 'it is', 'they are')}`] : []));
   else if (kind === 'category_rename') parts.push('Renamed it back');

@@ -28,14 +28,17 @@ are tagged.
   types now (Saree 7, Lehenga 2, Salwar Suit 9, Co-ord Set 5, Kids Wear 6,
   Pre-Stitched Saree 5, Men's Kurta 6). Remove or add what you like, then
   link Product Type to the categories that need it and tap **Link and let
-  AI decide**. Gown, Long Gown, Dress, Long Dress and Indo Western wait in
-  Tags → Suggestions: no category takes them yet.
+  AI decide**.
 - **Two colours ("Pink and White"):** Multicolour, or the main colour?
   Colour takes one value.
-- **"Wedding":** add it back as another name for Marriage? A deleted word
-  comes back as a question every time it is seen.
 - **Occasion:** let the AI judge it (suppliers never say), or set a default
   per category?
+- **Wrong "also known as" words left by the old word rules:** Back → Black,
+  Brunches → Art Silk, Light Volume → Blue, Koti → Khatli Work, Choli Set / Koti
+  Set → Dhoti Set, Printed Saree → Pant Saree, Straight pants → Straight
+  Suit, Teal/Pearl Blouse → Khatli Work, Heavy Zari/Zari Line → Stone Work.
+  New words no longer use those near-spelling matches. Say yes and these
+  are taken off and the products tagged again.
 - **Photo previews are over the monthly free quota.** Supabase "Storage
   Image Transformations" shows 125 of 100 for this billing month. Choose:
   switch the spend cap off in Supabase (about $5 for each extra 1,000

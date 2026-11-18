@@ -37,12 +37,13 @@ import { temporary } from './publishParts.ts';
 import { claimRead, readCandidates, readOne } from './reader.ts';
 import { retireDue, sendStockDue } from './stockSend.ts';
 import { takeOffDue } from './takeOff.ts';
+import { FILE_NEEDS_MS, fileWords } from './tagsFile.ts';
 import { FILL_NEEDS_MS, closeFills, fillCandidates, fillQueued, routeDue } from './tagFill.ts';
 import { loadTaxonomy } from './taxonomy.ts';
 import type { Budget } from './types.ts';
 
 /** stock = stock changes sent to stores; paused = automation is paused (the run stopped, or sent stock only); limit = the day's AI limit is used up. */
-export interface WorkResult { read: number; routed: number; generated: number; published: number; failed: number; imported?: number; tagged?: number; stock?: number; taken_off?: number; paused?: boolean; limit?: boolean }
+export interface WorkResult { read: number; routed: number; generated: number; published: number; failed: number; imported?: number; tagged?: number; filed?: number; stock?: number; taken_off?: number; paused?: boolean; limit?: boolean }
 
 const CAPS = { read: 6, generate: 8, publish: 10, route: 10, fill: 5, stock: 10, media: 5, retire: 5, takeOff: 10 };
 /** "Let AI decide" products one run may take, CAPS.fill at a time. */
@@ -160,5 +161,8 @@ export async function work(userId: string | null, manual = false): Promise<WorkR
     }
   } catch (e) { failed('tags_fill', 'run', e); }
   try { await closeFills(); } catch (e) { failed('tags_fill', 'close', e); } // its bulk change, once the queue is over
+  // New tag words: filed by themselves, as "also known as" of their nearest value or ignored (tagsFile.ts, owner 17 Nov).
+  try { if (left(FILE_NEEDS_MS) && !(await stopped())) { const f = await fileWords({ budget, left, capped, stopped }); if (f?.aliased || f?.ignored) out.filed = f.aliased + f.ignored; } }
+  catch (e) { failed('tags_file', 'run', e); }
   return out;
 }

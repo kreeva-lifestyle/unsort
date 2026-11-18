@@ -875,7 +875,6 @@ body.modal-open .pb-tabbar { visibility: hidden; }
 .pb-chiprow { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; }
 .pb-chiprow::-webkit-scrollbar { display: none; }
 /* Tags: the 44px checkbox (TagCheck) shows the focus ring on its drawn box. */
-.pb-check input:focus-visible + span { outline: 2px solid var(--pb-focus); outline-offset: 2px; }
 @media (max-width: 768px) { .pb-chiprow { margin: 0 -16px; padding: 0 16px; scroll-padding: 0 16px; } }
 .pb-skel { background: linear-gradient(90deg, oklch(1 0 0 / .08) 0%, oklch(1 0 0 / .14) 50%, oklch(1 0 0 / .08) 100%); background-size: 200% 100%; animation: shimmer 1.5s linear infinite; border-radius: 8px; }
 .pb-row-cv { content-visibility: auto; contain-intrinsic-size: auto 96px; }
