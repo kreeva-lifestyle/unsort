@@ -19,13 +19,14 @@
 import { enc, logActivity, nowIso, one, patch, sel } from './db.ts';
 import { makeHandle } from './content.ts';
 import { faqHtml, fieldInputs } from './fields.ts';
+import { sendFields } from './fieldsSend.ts';
 import { attributeValues } from './tagStore.ts';
 import { HttpError, plain } from './http.ts';
 import { compareAt } from './pricing.ts';
 import { galleryOf } from './photos.ts';
 import { profileOf } from './profile.ts';
 import { buildProductInput, PRODUCT_SET, STOCK_WARNING } from './productInput.ts';
-import { busyStreak, filesFor, FREE_RETRIES, type Gallery, keepColour, knownPhotos, leaveGallery, mergeTags, photoRecord, sendFields, skuColour, temporary, toOnlineStore } from './publishParts.ts';
+import { busyStreak, filesFor, FREE_RETRIES, type Gallery, keepColour, knownPhotos, leaveGallery, mergeTags, photoRecord, skuColour, temporary, toOnlineStore } from './publishParts.ts';
 import { seoGet } from './seoStore.ts';
 import { CURRENCY, gql, shopCurrency, wrongCurrency } from './shopify.ts';
 import { adoptable, type Existing, existingProduct } from './shopifyProduct.ts';

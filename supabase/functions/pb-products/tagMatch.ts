@@ -24,7 +24,10 @@
 // suggestions queue: store tags that matched nothing (junk filtered by the
 // caller) and, on a label line for ONE attribute, the listed items that are
 // not values yet ("Wine" under COLOUR → a Colour suggestion).
-import { displayName, editDistance, stemKey, tagKey, words } from './tagText.ts';
+// A value that means "none of the others" (Work: Plain; owner, 18 Nov 2026) counts only from a label, the name, a
+// store tag or a fact — "plain blouse" in the text describes one piece, so the photo decides (the AI) — and is kept
+// only when no other value of its attribute is found (tagText.ts withoutNone).
+import { displayName, editDistance, isNoneValue, stemKey, tagKey, withoutNone, words } from './tagText.ts';
 
 export interface MatchValue { id: string; name: string; key: string; aliases: string[] }
 export interface MatchAttr { id: string; name: string; multi: boolean; values: MatchValue[] }
@@ -78,7 +81,7 @@ function phrasesOf(a: MatchAttr) {
   return a.values.map(v => {
     const ph = [v.name, ...v.aliases].map(words).filter(p => p.length);
     const turned = ph.filter(p => p.length === 2 && singles.has(p[1])).map(p => [p[1], p[0]]);
-    return { v, ph: [...ph, ...turned] };
+    return { v, ph: [...ph, ...turned], none: isNoneValue(v.name) };
   });
 }
 
@@ -122,7 +125,7 @@ export function matchProduct(input: MatchInput, attrs: MatchAttr[], o: { shades?
     for (const { a, vs, colour } of phrases) {
       if (s.only && !s.only.has(a.id)) continue;
       const found: { id: string; i: number; len: number }[] = [];
-      for (const { v, ph } of vs) for (const p of ph) for (let i = 0; i + p.length <= s.tokens.length; i++) {
+      for (const { v, ph } of s.w < 3 ? vs.filter(x => !x.none) : vs) for (const p of ph) for (let i = 0; i + p.length <= s.tokens.length; i++) {
         if (!at(s.tokens, p, i)) continue;
         // Part of a colour's name, not this attribute: a word inside a colour name the list knows ("Mehendi Green" as
         // a Colour alias), or a shade word right before a colour ("Mehendi Green" with only Green on the list).
@@ -148,7 +151,7 @@ export function matchProduct(input: MatchInput, attrs: MatchAttr[], o: { shades?
   for (const a of attrs) {
     const m = best[a.id];
     if (!m?.size) continue;
-    const ids = [...m.entries()].sort((x, y) => y[1].w - x[1].w || x[1].order - y[1].order).map(([id]) => id);
+    const ids = withoutNone([...m.entries()].sort((x, y) => y[1].w - x[1].w || x[1].order - y[1].order).map(([id]) => id), a.values);
     chosen[a.id] = a.multi ? ids.slice(0, MAX_MULTI) : [mostSpecific(a, ids)];
   }
   const out: Candidate[] = cands.filter(c => !hitKeys.has(`${c.attribute_id}:${stemKey(c.key)}`));

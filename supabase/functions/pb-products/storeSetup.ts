@@ -4,7 +4,7 @@
 //   1. a product field (metafield definition, namespace `custom`, pinned, readable by the theme) for each Playbook
 //      attribute, plus set_contents and faq — one the store already has is kept as it is, whatever its kind (owner,
 //      2026-11-17: "if already made then merge with it and continue simple!"): publishing then fills a plain-text one
-//      with the values joined by commas, a list one with a list (publishParts.ts sendFields → otherForm);
+//      with the values joined by commas, a list one with a list (fieldsSend.ts);
 //   2. a collection for each Playbook category, filled by Shopify from the product type (the category) and shown on
 //      the Online Store — one already there by handle or title is kept as it is.
 // Nothing is deleted or changed on the store, so tapping it again only adds what is new (a new category or

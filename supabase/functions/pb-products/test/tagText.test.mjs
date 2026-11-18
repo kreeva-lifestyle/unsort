@@ -1,7 +1,7 @@
 // node --test --experimental-strip-types supabase/functions/pb-products/test/
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { displayName, editDistance, jaroWinkler, stem, stemKey, tagKey, words } from '../tagText.ts';
+import { displayName, editDistance, isNoneValue, jaroWinkler, stem, stemKey, tagKey, withoutNone, words } from '../tagText.ts';
 
 test('tagKey: lower, accents off, punctuation to spaces, Devanagari kept', () => {
   assert.equal(tagKey('Embroidery-Work!'), 'embroidery work');
@@ -41,4 +41,13 @@ test('distances', () => {
   assert.equal(editDistance('silk', 'slik'), 1); // a swap counts once
   assert.ok(jaroWinkler('organza', 'organzza') > 0.95);
   assert.ok(jaroWinkler('black', 'white') < 0.8);
+});
+
+test('a "none of the others" value (Plain): found by name, kept only when nothing else is chosen', () => {
+  for (const n of ['Plain', 'plain work', 'None', 'Solid', 'No Work', 'No Embroidery']) assert.equal(isNoneValue(n), true, n);
+  for (const n of ['Plain Georgette', 'Embroidery', 'Nonet', 'Solid Silk Border', 'Noor']) assert.equal(isNoneValue(n), false, n);
+  const vals = [{ id: 'emb', name: 'Embroidery' }, { id: 'plain', name: 'Plain' }];
+  assert.deepEqual(withoutNone(['plain', 'emb'], vals), ['emb']);
+  assert.deepEqual(withoutNone(['plain'], vals), ['plain']);
+  assert.deepEqual(withoutNone([], vals), []);
 });

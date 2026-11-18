@@ -6,7 +6,7 @@ done (built, merged, deployed and checked, or done or decided by the
 owner), its entry is deleted in the same change. The rules are in
 `CLAUDE.md` → "Pending work — TASK.md".
 
-Last checked: 17 Nov 2026.
+Last checked: 18 Nov 2026.
 
 ## Playbook — decisions the owner still has to make
 
@@ -29,11 +29,14 @@ are tagged.
   product goes out without one. Lehenga has just 3 types (Bridal Lehenga,
   South Indian Lehenga, Crop Top & Skirt), so most lehengas get none. Add
   the kinds you sell under Settings → Tags → Product Type if you want them.
-- **Work has no "Plain" value.** Since 18 Nov the AI always picks a value
-  for a must-have attribute, so a plain outfit gets the nearest work
-  (e.g. Digital Print). Add "Plain" (or "No work") to Work, or turn Work's
-  **Must have** off in Settings → Tags → Work so it is filled only when a
-  work truly fits.
+- **SuratMandi's own product fields that Playbook does not fill.** The
+  store already had these fields, and every product leaves them empty:
+  Generic name, Net quantity, Country of origin, HSN code, Fabric & care,
+  Pieces in set, Dispatch (plus Full set product, Bulk price, Lowest price
+  in 30 days, Sold in 30 days). India's e-commerce rules expect generic
+  name, net quantity and country of origin on a product page. Say which
+  ones Playbook should fill, for example Country of origin = India and
+  Generic name = the category, and Claude builds it.
 - **Two colours ("Pink and White"):** Multicolour, or the main colour?
   Colour takes one value.
 - **Wrong "also known as" words left by the old word rules:** Back → Black,

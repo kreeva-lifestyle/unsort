@@ -192,7 +192,7 @@ is_active). Service role for all DB writes. CORS like listing-ai.
 | `unpublish_listing` | staff | `{ listing_id }` | claim the listing as `skipped` first (refused while a run holds it), then set Shopify status DRAFT (on failure the listing goes back) → `{ ok }` |
 | `save_credentials` | admin/manager | `{ website_id, auth_mode, access_token?, client_id?, client_secret?, shop_domain? }` | stores in pb_website_secrets, then test → `{ ok, shop_name }`. A different `shop_domain` moves the site to that store: needs full new credentials; site switched off; old secrets wiped; non-skipped listings re-queued without Shopify ids; skipped ones lose their old-store ids |
 | `test_connection` | staff | `{ website_id }` | `{ ok, shop_name, scopes[] , missing_scopes[] }`, sets connected_at / last_error |
-| `store_setup` | admin/manager | `{ website_id }` | (2026-11-17, SuratMandi) on the store: a product metafield definition (namespace `custom`, pinned, storefront PUBLIC_READ) per Playbook attribute — key = the attribute key in snake case, `list.single_line_text_field` when multi, else `single_line_text_field` — plus `set_contents` and `faq` (rich text); then a collection per category (`collectionCreate(collection:)` with one conditions source: product type EQUALS the category; handle from the name) put on the Online Store. Kept when there (a definition with the same key, whatever its type — 2026-11-17 "if already made then merge with it": publishing fills a plain-text one with the values joined by commas, `sendFields` → `otherForm`; a collection with the same handle or title); nothing is deleted or changed. Per item `{ name, status: made/kept/failed, note? }`; a store-wide refusal (credentials, permission, frozen) throws once. `storeSetup.ts`, `storeFields.ts` |
+| `store_setup` | admin/manager | `{ website_id }` | (2026-11-17, SuratMandi) on the store: a product metafield definition (namespace `custom`, pinned, storefront PUBLIC_READ) per Playbook attribute — key = the attribute key in snake case, `list.single_line_text_field` when multi, else `single_line_text_field` — plus `set_contents` and `faq` (rich text); then a collection per category (`collectionCreate(collection:)` with one conditions source: product type EQUALS the category; handle from the name) put on the Online Store. Kept when there (a definition with the same key, whatever its type — 2026-11-17 "if already made then merge with it": publishing fills a plain-text one with the values joined by commas, `fieldsSend.ts`; a collection with the same handle or title); nothing is deleted or changed. Per item `{ name, status: made/kept/failed, note? }`; a store-wide refusal (credentials, permission, frozen) throws once. `storeSetup.ts`, `storeFields.ts` |
 | `preview_price` | staff | `{ website_id, cost, rule_id? }` | `{ price, compare_at }` |
 | `taxonomy_get` | staff | – | categories (pb_settings), attributes with values (+ `uses`), links, per-link `stats {products, lacking}`, `category_products`, `fill` (latest "Let AI decide" run) |
 | `categories_save` | admin/manager | `{ categories[] }` | the reader's category list; links of removed categories are dropped and every product left off the list is re-gated (held: "Missing: Category") → `{ ok, categories, regated }` |
@@ -526,7 +526,12 @@ ONE call gets, per attribute linked to any category, an enum of allowed names
 rules left empty take the AI's choice: a must-have attribute gets its
 best-judged value from the photos and text (Occasion from the look of the
 product), an "only if it fits" one a value only when one truly fits, else none;
-never a value outside the list (`tagPrompt.ts`). 'manual' attributes and
+never a value outside the list (`tagPrompt.ts`). A value meaning "none of the
+others" (`isNoneValue`: Plain, No Work, None, Solid; Work's Plain added 18 Nov
+2026) is kept only when no other value of its attribute is chosen, by the
+rules and the AI alike (`withoutNone`), and the rules take it only from a
+label, the name, a store tag or a fact — "plain blouse" in the running text is
+one piece of a set, so the photo (the AI) decides. 'manual' attributes and
 locked `tags` are never touched. (3) "Let AI decide" (`tagFill.ts`): for the
 empty required attributes, the rules first (free, the same every time), then
 — only for what they left empty — a values-only AI pass (reader model, text +
@@ -876,10 +881,18 @@ listing editor set the `_locked` flag (an emptied value hands it back).
   read fact (colour ← `color`, fabric ← `fabric`, else `attributes[key]`);
   then `custom.set_contents` (from the facts) and `custom.faq`
   (rich_text_field: question in bold, answer below). Empty ones are not sent.
-  `metafieldsSet` touches only those keys. A refused field is sent once more
-  in the store's other text kind (a list as one comma-joined line, a line as
-  a list of one: the store's own field is kept); still refused → left out and
-  a warning on the listing; the product is still published. `store_setup`
+  `metafieldsSet` touches only those keys. The store's own field kinds
+  (`metafieldDefinitions`, namespace `custom`, read once per store every 10
+  minutes) decide the kind each field is sent in: a list as one comma-joined
+  line where the store's field is one line of text (SuratMandi's Work and
+  Occasion), a line as a list of one, lines for multi-line text; a field of a
+  kind no text goes in (a number, a reference) is left out with a warning
+  (`fieldsSend.ts`). A field still refused (its kind changed meanwhile) is
+  found by its place in the error's `field` path (`["metafields", "2", …]`;
+  `elementIndex` is an item inside a list value, not the field — reading it
+  left all 122 SuratMandi products without custom fields until 18 Nov 2026),
+  sent once more in the other text kind; still refused → left out and a
+  warning on the listing; the product is still published. `store_setup`
   defines the same keys on the store.
 
 ### The Ready gate — necessary details
@@ -1051,8 +1064,9 @@ paid service, no library.
     Shopify at the channel step (status ≥ 500) or a 503 at the custom fields
     fails the listing (retried) instead of calling it published. After
     `productSet` went through, a failed Put back is `failed`, not `skipped`.
-    `metafieldsSet` is all-or-nothing: the refused entries (`elementIndex`)
-    are left out and the rest sent again (`sendFields`). The handle /
+    `metafieldsSet` is all-or-nothing: the refused entries (by their place
+    in the error's `field` path) are left out and the rest sent again
+    (`fieldsSend.ts sendFields`). The handle /
     category / photos refusals are each given up once, in any order; a taken
     handle is first checked for this listing's own lost product; a listing
     with no handle gets `makeHandle`. `adoptable` asks only id + marker per

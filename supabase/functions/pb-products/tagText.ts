@@ -11,6 +11,8 @@
 //            Words of 3 letters or fewer and non-Latin words are left alone.
 //   stemKey  tagKey + stem on every word ("Embroidered Sarees" → "embroider saree").
 //   words    stemmed words of a text, in order (the matcher's token stream).
+//   isNoneValue / withoutNone   a value that means "none of the others" (Work: Plain) is kept only when no other
+//            value of its attribute is chosen (owner, 18 Nov 2026: "add Plain to Work values").
 
 export const tagKey = (s: unknown): string =>
   String(s ?? '').normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase()
@@ -40,6 +42,18 @@ const undouble = (s: string) => (/([^aeioulsz])\1$/.test(s) ? s.slice(0, -1) : s
 
 export const words = (s: unknown): string[] => tagKey(s).split(' ').filter(Boolean).map(stem);
 export const stemKey = (s: unknown): string => words(s).join(' ');
+
+/** "Plain", "Plain Work", "None", "Solid", "No Work", "No Embroidery": a value that says the product has none of the
+ *  others. */
+export const isNoneValue = (name: unknown): boolean => /^(?:plain|none|solid|no [a-z]+)(?: work)?$/.test(tagKey(name));
+
+/** The chosen ids without the "none" values when another value is chosen: an embroidered lehenga with a plain blouse
+ *  is Embroidery, not Embroidery and Plain. */
+export function withoutNone(ids: string[], values: { id: string; name: string }[]): string[] {
+  const none = new Set(values.filter(v => isNoneValue(v.name)).map(v => v.id));
+  const some = ids.filter(id => !none.has(id));
+  return some.length ? some : ids;
+}
 
 /** Display form of a name staff typed: trimmed, one space, Title Case when typed all lower or all upper. */
 export function displayName(raw: unknown): string {

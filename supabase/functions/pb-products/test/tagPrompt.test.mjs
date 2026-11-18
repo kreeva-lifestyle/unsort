@@ -51,6 +51,14 @@ test('readTags: unknown names dropped, one-value keeps the first, other phrases 
   assert.deepEqual(Object.keys(readTags(spec, { tags: { colour: { values: ['Pink'] }, fabric: { values: ['Silk'] } } }, new Set(['fab'])).chosen), ['fab']);
 });
 
+test('Plain (owner, 18 Nov 2026): the AI is told it means none of the others, and it is dropped when another value is chosen', () => {
+  const s = tagSpec([{ id: 'work', name: 'Work', multi: true, values: [{ id: 'emb', name: 'Embroidery' }, { id: 'plain', name: 'Plain' }] }]);
+  assert.match(tagPromptLines(s).join('\n'), /"Plain" means none of the others in its list: choose it only when no other value there fits/);
+  assert.doesNotMatch(tagPromptLines(spec).join('\n'), /"Plain"/);
+  assert.deepEqual(readTags(s, { tags: { work: { values: ['Plain', 'Embroidery'], other: [] } } }).chosen, { work: ['emb'] });
+  assert.deepEqual(readTags(s, { tags: { work: { values: ['Plain'], other: [] } } }).chosen, { work: ['plain'] });
+});
+
 test('reader schema: tags added only when there is something to choose', () => {
   assert.equal(readerSchema(['Saree']).properties.tags, undefined);
   const s = readerSchema(['Saree'], spec);

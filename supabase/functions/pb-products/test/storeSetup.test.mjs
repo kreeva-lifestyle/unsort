@@ -8,7 +8,7 @@ globalThis.Deno = { env: { get: (k) => (k === 'SUPABASE_URL' ? 'https://sb.examp
 const { collectionHandle, collectionInput, fieldDefs, fieldKey, sameCollection } = await import('../storeFields.ts');
 const { fieldInputs } = await import('../fields.ts');
 const { storeSetup } = await import('../storeSetup.ts');
-const { otherForm, sendFields } = await import('../publishParts.ts');
+const { inKind, otherForm, sendFields } = await import('../fieldsSend.ts');
 
 const W = 'eeeeeeee-0000-4000-8000-000000000001';
 const ATTRS = [{ key: 'colour', name: 'Colour', multi: false }, { key: 'fabric', name: 'Fabric', multi: false }, { key: 'work', name: 'Work', multi: true },
@@ -120,35 +120,79 @@ test('set up: a store that refuses the app (a missing permission) says so once, 
   assert.equal(w.made.length + w.cols.length, 0);
 });
 
-test('sending fields to a store whose own field is the other text kind: the refused one goes again in that kind, the rest are not lost', async () => {
-  assert.deepEqual(otherForm({ ownerId: 'p', namespace: 'custom', key: 'work', type: 'list.single_line_text_field', value: '["Embroidery","Sequins"]' }),
-    { ownerId: 'p', namespace: 'custom', key: 'work', type: 'single_line_text_field', value: 'Embroidery, Sequins' });
-  assert.deepEqual(otherForm({ ownerId: 'p', namespace: 'custom', key: 'colour', type: 'single_line_text_field', value: 'Pink' }).value, '["Pink"]');
-  assert.equal(otherForm({ ownerId: 'p', namespace: 'custom', key: 'faq', type: 'rich_text_field', value: '{}' }), null);
-  // the store: work and occasion are plain text, faq refused whatever is sent
+/** A store for sending fields: `kinds` = its own custom product fields (key → kind), or null when they cannot be read;
+ *  `refuse(f)` = the message for a field it refuses. Shopify names a refused field by its place in `field`; elementIndex
+ *  is the place of an item inside a list value (here: set on the list's first item, to show it is not the field). */
+function fieldStore({ kinds = null, refuse = () => null } = {}) {
   const calls = [];
   globalThis.fetch = async (url, init = {}) => {
     const u = decodeURIComponent(String(url)), body = init.body ? JSON.parse(init.body) : null;
     const ok = (b) => new Response(JSON.stringify(b), { status: 200 });
     if (u.startsWith('https://suratmandi.myshopify.com/')) {
-      const list = body.variables.metafields; calls.push(list.map(f => `${f.key}:${f.type}`));
-      const userErrors = list.flatMap((f, i) => (f.key === 'faq' || (['work', 'occasion'].includes(f.key) && f.type !== 'single_line_text_field') ? [{ message: 'Type must be single_line_text_field', elementIndex: i }] : []));
+      if (body.query.includes('PbFieldKinds')) {
+        calls.push('kinds');
+        return kinds ? ok({ data: { metafieldDefinitions: { nodes: Object.entries(kinds).map(([key, name]) => ({ key, type: { name } })) } } })
+          : ok({ errors: [{ message: 'Field metafieldDefinitions is not available' }] });
+      }
+      const list = body.variables.metafields; calls.push(list.map(f => `${f.key}:${f.type}=${f.value}`));
+      const userErrors = list.flatMap((f, i) => { const m = refuse(f); return m ? [{ field: ['metafields', String(i), 'type'], message: m, code: 'INVALID_TYPE', elementIndex: f.type.startsWith('list.') ? 0 : null }] : []; });
       return ok({ data: { metafieldsSet: { userErrors } } });
     }
     if (u.includes('/rest/v1/pb_website_secrets?')) return ok([{ access_token: 'shpat_test' }]);
     return ok([]);
   };
-  const site = { id: W, name: 'SuratMandi', shop_domain: 'suratmandi.myshopify.com', auth_mode: 'token', api_version: '2026-10' };
-  const f = (key, type, value) => ({ ownerId: 'gid://shopify/Product/1', namespace: 'custom', key, type, value });
-  const warn = await sendFields(site, [f('colour', 'single_line_text_field', 'Pink'), f('work', 'list.single_line_text_field', '["Embroidery","Sequins"]'),
-    f('occasion', 'list.single_line_text_field', '["Festive"]'), f('faq', 'rich_text_field', '{}')], 30_000);
-  assert.deepEqual(calls, [
-    ['colour:single_line_text_field', 'work:list.single_line_text_field', 'occasion:list.single_line_text_field', 'faq:rich_text_field'],
-    ['colour:single_line_text_field', 'work:single_line_text_field', 'occasion:single_line_text_field'], // faq has no other kind
-  ]);
-  assert.match(warn, /did not take these custom fields: faq/);
-  // all taken in the other kind: no warning
+  return calls;
+}
+const site = (n) => ({ id: `eeeeeeee-0000-4000-8000-00000000010${n}`, name: 'SuratMandi', shop_domain: 'suratmandi.myshopify.com', auth_mode: 'token', api_version: '2026-10' });
+const fld = (key, type, value) => ({ ownerId: 'gid://shopify/Product/1', namespace: 'custom', key, type, value });
+const SENT = [fld('colour', 'single_line_text_field', 'Pink'), fld('work', 'list.single_line_text_field', '["Embroidery","Sequins"]'),
+  fld('occasion', 'list.single_line_text_field', '["Festive"]'), fld('faq', 'rich_text_field', '{}')];
+
+test('the value in another kind: a list as one line or lines, one line as a list of one; no text kind → none', () => {
+  assert.deepEqual(otherForm(SENT[1]), { ...SENT[1], type: 'single_line_text_field', value: 'Embroidery, Sequins' });
+  assert.equal(otherForm(SENT[0]).value, '["Pink"]');
+  assert.equal(otherForm(SENT[3]), null);
+  assert.equal(inKind(SENT[1], 'multi_line_text_field').value, 'Embroidery, Sequins');
+  assert.equal(inKind(SENT[1], 'list.single_line_text_field'), SENT[1]);
+  assert.equal(inKind(SENT[0], 'number_integer'), null);
+  assert.equal(inKind(fld('work', 'list.single_line_text_field', '[]'), 'single_line_text_field'), null);
+});
+
+test('SuratMandi: its own Work and Occasion are one line of text — they go in as one line on the first try (18 Nov 2026)', async () => {
+  const one = 'single_line_text_field';
+  const calls = fieldStore({ kinds: { colour: one, work: one, occasion: one, faq: 'rich_text_field', care: 'multi_line_text_field' },
+    refuse: f => (['work', 'occasion'].includes(f.key) && f.type !== one ? `Type '${f.type}' must be consistent with the definition's type: '${one}'.` : null) });
+  assert.equal(await sendFields(site(1), SENT, 30_000), null);
+  assert.deepEqual(calls, ['kinds', [`colour:${one}=Pink`, `work:${one}=Embroidery, Sequins`, `occasion:${one}=Festive`, 'faq:rich_text_field={}']]);
+  // the kinds are read once per store, not for every product
   calls.length = 0;
-  assert.equal(await sendFields(site, [f('work', 'list.single_line_text_field', '["Zari"]')], 30_000), null);
-  assert.deepEqual(calls, [['work:list.single_line_text_field'], ['work:single_line_text_field']]);
+  assert.equal(await sendFields(site(1), SENT.slice(1, 2), 30_000), null);
+  assert.deepEqual(calls, [[`work:${one}=Embroidery, Sequins`]]);
+});
+
+test('kinds that cannot be read: the refused field is found by its place in `field` (not elementIndex) and goes again in the other kind', async () => {
+  const one = 'single_line_text_field';
+  const calls = fieldStore({ refuse: f => (f.key === 'faq' ? 'Value is invalid JSON' : ['work', 'occasion'].includes(f.key) && f.type !== one ? `Type '${f.type}' must be consistent with the definition's type: '${one}'.` : null) });
+  const warn = await sendFields(site(2), SENT, 30_000);
+  assert.deepEqual(calls, ['kinds',
+    [`colour:${one}=Pink`, 'work:list.single_line_text_field=["Embroidery","Sequins"]', 'occasion:list.single_line_text_field=["Festive"]', 'faq:rich_text_field={}'],
+    [`colour:${one}=Pink`, `work:${one}=Embroidery, Sequins`, `occasion:${one}=Festive`], // faq has no other kind
+  ]);
+  assert.match(warn, /did not take these custom fields: faq \(/);
+  // all taken in the other kind: no warning (after a refusal the store's kinds are asked for again)
+  calls.length = 0;
+  assert.equal(await sendFields(site(2), SENT.slice(1, 2), 30_000), null);
+  assert.deepEqual(calls, ['kinds', ['work:list.single_line_text_field=["Embroidery","Sequins"]'], [`work:${one}=Embroidery, Sequins`]]);
+  // kinds that cannot be read and nothing refused: not asked for again with every product
+  calls.length = 0;
+  assert.equal(await sendFields(site(2), SENT.slice(0, 1), 30_000), null);
+  assert.equal(await sendFields(site(2), SENT.slice(0, 1), 30_000), null);
+  assert.deepEqual(calls, ['kinds', [`colour:${one}=Pink`], [`colour:${one}=Pink`]]);
+});
+
+test('a store field no text goes in (a number) is the store\'s own: left as it is, the rest go in, the warning names it', async () => {
+  const calls = fieldStore({ kinds: { set_contents: 'number_integer' } });
+  const warn = await sendFields(site(3), [fld('colour', 'single_line_text_field', 'Pink'), fld('set_contents', 'single_line_text_field', 'Kurta and Dupatta')], 30_000);
+  assert.deepEqual(calls, ['kinds', ['colour:single_line_text_field=Pink']]);
+  assert.equal(warn, 'Saved on Shopify, but the store did not take these custom fields: set_contents (its own set_contents field is number integer).');
 });
