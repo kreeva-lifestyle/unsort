@@ -36,6 +36,7 @@ export function filePrompt(values: TaxValue[], attrOrder: string[], phrases: Fil
     '- related: only loosely connected, not the same detail ("Red Border" → Red, "Gold Accents" → Golden, "Pearl Buttons" → a work).',
     '- none: nothing close. Use it for store collection or sale names, marketing words ("Premium", "Designer"), sizes, genders, brand names, and details the lists do not cover (sleeve or neck styles, linings).',
     'A garment type ("Long Gown", "Anarkali Suit") belongs only under a listed value of that type, never under a colour, fabric or work; a broad category name ("Sarees", "Ethnic Wear") is none.',
+    'A phrase that names two or more listed values ("Sequins Embroidery", "Pink and White") is none: each is found on its own.',
     'A phrase seen as one attribute may belong under another attribute\'s value. Be strict: when unsure between kind and related, answer related.',
     'why: at most 14 plain words for the owner.',
     'The lists:', ...lists,

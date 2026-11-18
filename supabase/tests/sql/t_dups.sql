@@ -402,6 +402,7 @@ rollback;
 \set A_W '''a7000000-0000-4000-8000-000000000001'''
 \set V_EM '''a7000000-0000-4000-8000-000000000011'''
 \set V_MI '''a7000000-0000-4000-8000-000000000012'''
+\set R10 '''d9000000-0000-4000-8000-000000000004'''
 \set R11 '''d9000000-0000-4000-8000-000000000003'''
 begin;
 insert into public.pb_attributes (id, name, key, multi, position) values (:A_W, 'Work', 'work', true, 1);
@@ -411,6 +412,8 @@ insert into public.pb_tag_suggestions (phrase, key, attribute_id, first_seen_at)
   ('Heavy Zari', 'heavy zari', :A_W, now() - interval '4 minutes'), ('Zari Work', 'zari work', null, now() - interval '3 minutes'),
   ('Sale', 'sale', null, now() - interval '2 minutes'), ('Mirror Gamthi', 'mirror gamthi', :A_W, now() - interval '1 minute');
 insert into public.pb_tag_suggestions (phrase, key, status) values ('Old Ignore', 'old ignore', 'ignored');
+select t_is('not due: four words seen minutes ago wait for a batch', (select count(*)::text from public.pb_tag_file_claim(10)), '0');
+update public.pb_tag_suggestions set first_seen_at = first_seen_at - interval '20 minutes' where status = 'pending';
 select t_is('claim: the oldest two first, only stamped (a try counts when the AI gave no answer)', (select string_agg(key || ':' || tries, ',' order by key) from public.pb_tag_file_claim(2)), 'heavy zari:0,zari work:0');
 select t_is('… then the rest: not the two just tried, never an answered word', (select string_agg(key, ',' order by key) from public.pb_tag_file_claim(10)), 'mirror gamthi,sale');
 select t_is('… and nothing again within 10 minutes', (select count(*)::text from public.pb_tag_file_claim(10)), '0');
@@ -419,6 +422,7 @@ select t_is('… after 10 minutes it is taken again', (select string_agg(key, ',
 update public.pb_tag_suggestions set tried_at = now() - interval '11 minutes', tries = 3 where key = 'heavy zari';
 select t_is('… but never after 3 tries without an answer', (select count(*)::text from public.pb_tag_file_claim(10)), '0');
 update public.pb_tag_suggestions set tries = 1 where key = 'heavy zari';
+select t_is('a value gone meanwhile: the word is left waiting', (public.pb_tag_file((select id from pb_tag_suggestions where key = 'heavy zari'), 'a7000000-0000-4000-8000-000000000099') ->> 'filed') || '/' || (select status from pb_tag_suggestions where key = 'heavy zari'), 'false/pending');
 select t_is('filed as also known as', (public.pb_tag_file((select id from pb_tag_suggestions where key = 'heavy zari'), :V_EM, 'A kind of zari embroidery', 'kind') ->> 'status'), 'aliased');
 select t_is('… the word is on the value', (select 'heavy zari' = any(aliases) from pb_attribute_values where id = :V_EM)::text, 'true');
 select t_is('… the word is marked as filed by Playbook, with why', (select filed_by || '/' || (resolved_value_id = :V_EM) || '/' || (nearest ->> 'match') || '/' || (nearest ->> 'why') from pb_tag_suggestions where key = 'heavy zari'), 'auto/true/kind/A kind of zari embroidery');
@@ -428,22 +432,30 @@ select t_is('… and is not added to the value asked for', (select array_to_stri
 select t_is('… nor twice to the one that has it', (select array_to_string(aliases, ',') from pb_attribute_values where id = :V_EM), 'zari work,heavy zari');
 select t_is('ignored', (public.pb_tag_file((select id from pb_tag_suggestions where key = 'sale'), null, 'A sale word', 'none') ->> 'status'), 'ignored');
 select t_is('… marked, and a later sighting is not suggested again', (select filed_by || '/' || public.pb_tag_suggest('[{"phrase":"Sale","key":"sale","source":"store"}]')::text || '/' || (select count(*) from pb_tag_suggestions where key = 'sale' and status = 'pending') from pb_tag_suggestions where key = 'sale'), 'auto/0/0');
-insert into pb_bulk_runs (id, kind, label, status) values (:R11, 'suggestions', 'Filed 1 new word by itself', 'running');
+insert into pb_bulk_runs (id, kind, label, status, created_at) values (:R10, 'retag', 'An earlier tag change', 'running', now() - interval '1 minute');
 select set_config('request.jwt.claims', '{"role":"service_role"}', false);
+select set_config('request.headers', json_build_object('x-pb-bulk', :R10)::text, false);
+update public.pb_attribute_values set aliases = aliases || '{shisha}'::text[] where id = :V_MI;
+update pb_bulk_runs set status = 'done' where id = :R10;
+insert into pb_bulk_runs (id, kind, label, status) values (:R11, 'suggestions', 'Filed 1 new word by itself', 'running');
 select set_config('request.headers', json_build_object('x-pb-bulk', :R11)::text, false);
 select public.pb_tag_file((select id from pb_tag_suggestions where key = 'mirror gamthi'), :V_MI, 'Mirror work by another name', 'same') ->> 'status';
 select set_config('request.headers', '{}', false);
 update pb_bulk_runs set status = 'done' where id = :R11;
-select t_is('filed in a bulk change: the word is on Mirror Work', (select array_to_string(aliases, ',') from pb_attribute_values where id = :V_MI), 'mirror gamthi');
+select t_is('filed in a bulk change: the word is on Mirror Work', (select array_to_string(aliases, ',') from pb_attribute_values where id = :V_MI), 'shisha,mirror gamthi');
+select t_is('the earlier tag change is reverted although the later Playbook pass touched the same value', (public.pb_bulk_revert(:R10, true) is not null)::text, 'true');
+select t_is('… its word goes, the pass''s word stays', (select array_to_string(aliases, ',') from pb_attribute_values where id = :V_MI), 'mirror gamthi');
 select public.pb_bulk_revert(:R11, true) is not null;
 select t_is('reverted: the word is off the value again', (select array_to_string(aliases, ',') from pb_attribute_values where id = :V_MI), '');
 select t_is('… the word waits again, still marked, so Playbook does not file it again', (select status || '/' || filed_by from pb_tag_suggestions where key = 'mirror gamthi'), 'pending/auto');
 update public.pb_tag_suggestions set tried_at = null where key = 'mirror gamthi';
 select t_is('… the claim never takes it', (select count(*)::text from public.pb_tag_file_claim(10) where key = 'mirror gamthi'), '0');
+insert into public.pb_tag_suggestions (phrase, key) select 'Word ' || i, 'word ' || i from generate_series(1, 20) i;
+select t_is('twenty new words are due at once, without waiting 15 minutes', public.pb_tag_file_due()::text, 'true');
 select set_config('request.jwt.claims', '{}', false);
 rollback;
 
 -- Every check above printed a line: a part that silently printed nothing would be a failure too.
-select case when last_value = 206 then 'ok   every check ran (206)' else 'FAIL the number of checks is ' || last_value || ', not 206: a part printed fewer lines than it has, or this number was not updated' end from public.t_checks;
+select case when last_value = 211 then 'ok   every check ran (211)' else 'FAIL the number of checks is ' || last_value || ', not 211: a part printed fewer lines than it has, or this number was not updated' end from public.t_checks;
 drop function public.t_refused(text, text); drop function public.t_is(text, text, text); drop function public.t_rel(uuid, uuid); drop function public.t_product(int, uuid, text, text, int, numeric, text); drop function public.t_id(int);
 drop sequence public.t_checks;

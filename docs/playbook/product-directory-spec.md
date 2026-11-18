@@ -561,8 +561,11 @@ review screen, its actions and `tagNearest.ts` / `tagsNearest.ts` /
 20261118090000_pb_tags_auto_file.sql), while 50 s are left and automation
 is not paused:
 1. `pb_tag_file_claim(40)`: pending words never filed by the worker
-   (`filed_by` null), fewer than 3 unanswered AI tries, not taken in the last
-   10 minutes (FOR UPDATE SKIP LOCKED; taking only stamps `tried_at`).
+   (`filed_by` null), fewer than 3 unanswered AI tries, not held back
+   (`tried_at` 10 minutes old or more), oldest first (FOR UPDATE SKIP LOCKED;
+   taking only stamps `tried_at`) — and only when due (`pb_tag_file_due`: 20
+   wait, or one was first seen 15 minutes ago), so words go in batches and
+   Bulk changes gets a few rows an hour, not one a minute.
 2. The word rules file a word only when sure: the best look-alike's reason is
    same / same_word / word_order / translation / shade. Typo and
    "spelled almost the same" hits are not trusted (they made Back → Black,
@@ -573,24 +576,38 @@ is not paused:
    source, attribute and two example products. It answers an enum of
    "Attribute: Value" labels or "none", a match (`same` / `kind` / `related` /
    `none`) and a ≤ 14-word why. Same or kind → "also known as" that value;
-   related or none → ignored. A label not on the lists is no answer: the
-   word's `tries` goes up (guarded by the old count) and after 3 it is
-   ignored; an AI failure leaves the words for the next pass (`failed`,
-   step `tags_file`). The cost is a `tags_matched` row that `pb_ai_cost_since`
-   counts.
+   related or none → ignored. A word the answer leaves out (or names a label
+   not on the lists), or an answer that was paid for but unusable (cut off,
+   refused), uses a try (`tries`, guarded by the old count); after 3 it is
+   ignored. A call that FAILED (no key, no credit, the AI busy or down) uses
+   no try: the rest of the pass waits 30 minutes (`tried_at` moved on), so an
+   outage never ignores the backlog (`failed`, step `tags_file`). The day's
+   AI limit used up → those words are held until the next IST day and do not
+   wake the worker meanwhile. The cost is a `tags_matched` row that
+   `pb_ai_cost_since` counts. A word that names two values of the chosen
+   value's attribute (the matcher, `namesTwo`: "Sequins Embroidery") is
+   ignored, never filed under one of them — the matcher takes the longest
+   phrase first, so its products would lose the other value.
 4. `pb_tag_file(id, value?, why, match)` files ONE word in one transaction:
    the alias appended in place (a word another value of the same attribute
    already has goes to that value), status aliased / ignored, `filed_by`
-   'auto', `nearest` `{ value_id, why, at, match, by: 'auto' }`.
-5. The example products of every aliased word are retagged by the rules
-   (chunks of 50); a word the AI read from a product for one attribute also
+   'auto', `nearest` `{ value_id, why, at, match, by: 'auto' }`. One value
+   row is locked; a value deleted or merged away meanwhile, or another value
+   taking the word meanwhile, leaves the word pending (`filed: false`).
+5. The example products (up to 5) of every aliased word are retagged by the
+   rules (chunks of 50; "Retag all" brings the value to the rest); a word the AI read from a product for one attribute also
    gives that value to the example products with none for it (`writeValues`
    'add'; open and unlocked products only).
 6. A pass is ONE bulk change (kind `suggestions`, no person): "Filed 40 new
    words by itself: 28 also known as their nearest values, 12 ignored (…)".
    A revert puts status, attribute and value back but not `filed_by`, so a
-   word taken back stays pending and marked and is never filed again.
-`trigger_pb_worker` also wakes the worker while a fileable word waits.
+   word taken back stays pending and marked and is never filed again. Such a
+   pass is kept in the log from ONE word (`sizeOf`, a run with no person), so
+   a wrong "also known as" can always be taken back, and it never stops an
+   earlier tag change from being reverted (`pb_bulk_revert`'s "later change
+   goes first" check skips it: the tag revert is row by row on what is still
+   as the change left it, so the order does not matter).
+`trigger_pb_worker` also wakes the worker while words are due.
 
 **Values that depend on the category — Product Type** (owner, 2026-11-13: "the
 values are to be mapped against the category, so no mistake can happen";

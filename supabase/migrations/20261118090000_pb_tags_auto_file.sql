@@ -6,18 +6,31 @@
 --   filed_by        'auto' on a word the worker filed (null: a person answered it, before this change). A revert of a
 --                   filing pass (Settings → Bulk changes) puts status, attribute and value back but not this column,
 --                   so a word taken back stays pending AND marked, and the worker never files it again (no loop).
---   tried_at        the worker's claim and back-off: a word taken is not taken again for 10 minutes, so an AI that keeps
---                   failing or a used-up daily AI limit cannot wake the worker every minute all day.
---   tries           AI attempts that brought no answer (the worker counts them); after 3 the word is ignored. A word
---                   left because of the daily limit or the clock does not use one up.
---   pb_tag_file_claim  claims up to p_limit words in one statement (FOR UPDATE SKIP LOCKED): overlapping worker ticks
---                   never take the same word.
+--   tried_at        the worker's claim and back-off: a word is taken again only once tried_at is 10 minutes old. The
+--                   worker moves it on to hold words back longer: 30 minutes after an AI call that failed (no key, no
+--                   credit, the AI down), the next IST day when the day's AI limit is used up — so neither wakes the
+--                   worker every minute all day.
+--   tries           AI answers that left the word out (the worker counts them); after 3 the word is ignored. A failed
+--                   call, the daily limit or the clock does not use one up, so an outage never ignores the backlog.
+--   pb_tag_file_due  words go in batches: only when 20 wait, or one has waited 15 minutes since it was first seen. A
+--                   pass is one row in Settings → Bulk changes; without this an import gave one row a minute.
+--   pb_tag_file_claim  claims up to p_limit words in one statement (FOR UPDATE SKIP LOCKED), when due: overlapping
+--                   worker ticks never take the same word.
 --   pb_tag_file     files ONE word in one transaction: the alias appended to the value's list in place (never a
 --                   whole-array rewrite from a snapshot, which a concurrent edit could undo), or the word ignored. A
---                   word another value of the same attribute already has goes to that value (one word, one value).
---   trigger_pb_worker  also wakes the worker while a fileable word waits.
--- Additive: three columns (nullable or defaulted, no backfill), one partial index, two new functions (service role
--- only), one function replaced with the same signature. RLS on pb_tag_suggestions is unchanged (staff read; writes
+--                   word another value of the same attribute already has goes to that value (one word, one value);
+--                   a value deleted or merged away meanwhile, or another value taking the word meanwhile, leaves the
+--                   word pending for the next pass (never "aliased" to nothing).
+--   trigger_pb_worker  also wakes the worker while words are due.
+--   pb_bulk_revert  a pass of the worker (kind 'suggestions', no person) no longer stops an EARLIER tag change from
+--                   being reverted ("A later bulk change touched some of the same items… Revert that one first"):
+--                   passes add "also known as" words to the popular values every few minutes, so the owner would have
+--                   to revert every later pass first. Safe: the tag revert works row by row on what is still as the
+--                   change left it — the aliases word by word, a product's tags only where unchanged, a suggestion
+--                   only while its status is as left (pb_bulk_tags_apply) — so the order does not matter for them.
+--                   Patched in place from the live definition, so nothing else in it changes.
+-- Additive: three columns (nullable or defaulted, no backfill), one partial index, three new functions (service role
+-- only), two functions replaced with the same signature. RLS on pb_tag_suggestions is unchanged (staff read; writes
 -- only through the edge function).
 
 alter table public.pb_tag_suggestions add column if not exists filed_by text check (filed_by in ('auto'));
@@ -26,13 +39,24 @@ alter table public.pb_tag_suggestions add column if not exists tried_at timestam
 create index if not exists pb_tag_suggestions_file_idx on public.pb_tag_suggestions (tried_at nulls first, first_seen_at)
   where status = 'pending' and filed_by is null;
 
--- The words the worker may take now: pending, never filed by it, fewer than 3 unanswered AI tries, not taken in the
--- last 10 minutes. Taking a word only stamps tried_at.
+-- Words are due when 20 wait, or the oldest has waited 15 minutes since it was first seen. A word waiting = pending,
+-- never filed by the worker, fewer than 3 unanswered AI tries, not held back (tried_at 10 minutes old or more).
+create or replace function public.pb_tag_file_due()
+returns boolean
+language sql stable security invoker set search_path = public as $$
+  select coalesce(count(*) >= 20 or bool_or(x.first_seen_at < now() - interval '15 minutes'), false)
+  from (select y.first_seen_at from pb_tag_suggestions y
+        where y.status = 'pending' and y.filed_by is null and y.tries < 3
+          and (y.tried_at is null or y.tried_at < now() - interval '10 minutes')
+        order by y.first_seen_at limit 20) x;
+$$;
+
+-- The words the worker may take now (when due), oldest first. Taking a word only stamps tried_at.
 create or replace function public.pb_tag_file_claim(p_limit int)
 returns setof public.pb_tag_suggestions
 language sql security invoker set search_path = public as $$
   update pb_tag_suggestions s set tried_at = now()
-  where s.id in (select x.id from pb_tag_suggestions x
+  where pb_tag_file_due() and s.id in (select x.id from pb_tag_suggestions x
                  where x.status = 'pending' and x.filed_by is null and x.tries < 3
                    and (x.tried_at is null or x.tried_at < now() - interval '10 minutes')
                  order by x.tried_at nulls first, x.first_seen_at
@@ -56,11 +80,17 @@ begin
     update pb_tag_suggestions set status = 'ignored', filed_by = 'auto', nearest = note where id = p_id;
     return jsonb_build_object('filed', true, 'status', 'ignored');
   end if;
-  select * into v from pb_attribute_values where id = p_value for update;
+  select * into v from pb_attribute_values where id = p_value;
   if not found then return jsonb_build_object('filed', false); end if;
   select x.id into other from pb_attribute_values x
   where x.attribute_id = v.attribute_id and x.id <> v.id and (x.key = s.key or s.key = any(x.aliases)) limit 1;
-  if other is not null then select * into v from pb_attribute_values where id = other for update; end if;
+  -- One value row locked (never two: a merge locks its two values in its own order).
+  select * into v from pb_attribute_values where id = coalesce(other, p_value) for update;
+  if not found then return jsonb_build_object('filed', false); end if; -- deleted or merged away meanwhile
+  if exists (select 1 from pb_attribute_values x where x.attribute_id = v.attribute_id and x.id <> v.id
+             and (x.key = s.key or s.key = any(x.aliases))) then
+    return jsonb_build_object('filed', false); -- another value took the word meanwhile
+  end if;
   if v.key <> s.key and not (s.key = any(v.aliases)) then
     update pb_attribute_values set aliases = aliases || s.key where id = v.id;
   end if;
@@ -69,8 +99,10 @@ begin
   return jsonb_build_object('filed', true, 'status', 'aliased', 'value_id', v.id, 'attribute_id', v.attribute_id);
 end $$;
 
+revoke execute on function public.pb_tag_file_due() from public, anon, authenticated;
 revoke execute on function public.pb_tag_file_claim(int) from public, anon, authenticated;
 revoke execute on function public.pb_tag_file(uuid, uuid, text, text) from public, anon, authenticated;
+grant execute on function public.pb_tag_file_due() to service_role;
 grant execute on function public.pb_tag_file_claim(int) to service_role;
 grant execute on function public.pb_tag_file(uuid, uuid, text, text) to service_role;
 
@@ -97,8 +129,7 @@ begin
      and not exists (select 1 from pb_products where tag_fill_run is not null and status in ('ready', 'needs_info'))
      and not exists (select 1 from pb_listings where status = 'published' and media_checked_at is null and shopify_product_id is not null
                        and published_at < now() - interval '3 minutes')
-     and not exists (select 1 from pb_tag_suggestions where status = 'pending' and filed_by is null and tries < 3
-                       and (tried_at is null or tried_at < now() - interval '10 minutes'))
+     and not pb_tag_file_due()
   then return null; end if;
   select decrypted_secret into v_secret from vault.decrypted_secrets where name = 'pb_worker_secret';
   if v_secret is null then raise warning 'pb_worker_secret missing from vault'; return null; end if;
@@ -108,3 +139,17 @@ begin
     body := jsonb_build_object('action', 'work'),
     timeout_milliseconds := 150000);
 end $function$;
+
+-- A worker pass never stops an earlier tag change from being reverted (see the header). The live entry point is
+-- 20261113090000_pb_bulk_log_tags_stock.sql's; only its "a later change of the same family goes first" condition
+-- changes. Run twice → nothing more happens.
+do $do$
+declare d text := pg_get_functiondef('public.pb_bulk_revert(uuid,boolean,uuid,text)'::regprocedure);
+begin
+  if position('x.created_by is null' in d) > 0 then return; end if;
+  if position('where x.kind = any(family) and x.created_at > r.created_at' in d) = 0 then
+    raise exception 'pb_bulk_revert is not the version this migration expects (20261113090000_pb_bulk_log_tags_stock.sql).';
+  end if;
+  execute replace(d, 'where x.kind = any(family) and x.created_at > r.created_at',
+    'where x.kind = any(family) and x.created_at > r.created_at and not (x.kind = ''suggestions'' and x.created_by is null)');
+end $do$;

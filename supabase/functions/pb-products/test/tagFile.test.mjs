@@ -7,20 +7,23 @@ import assert from 'node:assert/strict';
 
 globalThis.Deno = { env: { get: (k) => (k === 'SUPABASE_URL' ? 'https://sb.example' : 'test') } };
 const { decide, filePrompt, readFile } = await import('../tagFilePrompt.ts');
-const { FILE_MODEL, fileWords, surely } = await import('../tagsFile.ts');
+const { FILE_MODEL, fileWords, namesTwo, surely } = await import('../tagsFile.ts');
 
 const V = (id, attribute_id, attribute, name, aliases = []) => ({ id, attribute_id, attribute, name, key: name.toLowerCase(), aliases });
 const VALUES = [V('black', 'col', 'Colour', 'Black', ['kala']), V('pink', 'col', 'Colour', 'Pink'), V('emb', 'work', 'Work', 'Embroidery', ['zari work']),
-  V('silk', 'fab', 'Fabric', 'Art Silk', ['crunchy silk'])];
+  V('seq', 'work', 'Work', 'Sequins'), V('silk', 'fab', 'Fabric', 'Art Silk', ['crunchy silk'])];
+const ATTRS = [{ id: 'col', name: 'Colour', key: 'colour', multi: false, position: 1 }, { id: 'work', name: 'Work', key: 'work', multi: true, position: 2 }, { id: 'fab', name: 'Fabric', key: 'fabric', multi: false, position: 3 }];
+const TAX = { attrs: ATTRS, values: VALUES.map((v, i) => ({ ...v, position: i, categories: [] })), links: [], categories: [] };
 
 test('the question: every listed value and "none" are the only answers, with how close; the words a person ignored', () => {
   const p = filePrompt(VALUES, ['Colour', 'Work', 'Fabric'], [{ phrase: 'Rani Pink', attribute: 'Colour', source: 'ai', examples: ['Pink lehenga'] }], ['Sale']);
   const item = p.schema.properties.picks.items;
-  assert.deepEqual(item.properties.value.enum, ['Colour: Black', 'Colour: Pink', 'Work: Embroidery', 'Fabric: Art Silk', 'none']);
+  assert.deepEqual(item.properties.value.enum, ['Colour: Black', 'Colour: Pink', 'Work: Embroidery', 'Work: Sequins', 'Fabric: Art Silk', 'none']);
   assert.deepEqual(item.properties.match.enum, ['same', 'kind', 'related', 'none']);
   assert.deepEqual(item.required, ['n', 'value', 'match', 'why']);
   assert.match(p.system, /Colour: Black \[kala\]; Pink/);
-  assert.match(p.system, /Work: Embroidery \[zari work\]/);
+  assert.match(p.system, /Work: Embroidery \[zari work\]; Sequins/);
+  assert.match(p.system, /names two or more listed values/);
   assert.match(p.system, /Words the owner ignored before \(not product details\): Sale/);
   assert.equal(p.text, '1. "Rani Pink" (noticed by the AI, seen as Colour) e.g. Pink lehenga');
 });
@@ -49,13 +52,21 @@ test('the word rules file only what they are sure of; a typo or a near spelling 
   assert.equal(surely({ phrase: 'Premium Finishing', attribute_id: null }, VALUES), null);
 });
 
+test('a word that names two values of one attribute is never filed under one of them (the products would lose the other)', () => {
+  assert.equal(namesTwo('Sequins Embroidery', 'emb', TAX), true);
+  assert.equal(namesTwo('Heavy Zari Work', 'emb', TAX), false); // only Embroidery's own word
+  assert.equal(namesTwo('Rani Pink', 'pink', TAX), false);
+  assert.equal(namesTwo('Pink Silk', 'silk', TAX), false); // Pink is another attribute: still found as a Colour
+  assert.equal(namesTwo('Black and Pink', 'black', TAX), true);
+});
+
 /** A fake database and AI for one pass: `words` are what the claim returns; `ai` the AI's picks (or a status). */
-function world({ words, ai = { picks: [] }, aiStatus = 200, products = [] } = {}) {
+function world({ words, ai = { picks: [] }, aiStatus = 200, stop = 'end_turn', products = [] } = {}) {
   const calls = { ai: [], filed: [], patches: [], add: [], activity: [], runs: [], tagged: [] };
   const ok = (b, s = 200) => new Response(JSON.stringify(b), { status: s });
   globalThis.fetch = async (url, init = {}) => {
     const u = decodeURIComponent(String(url)), method = init.method || 'GET', body = init.body ? JSON.parse(init.body) : null;
-    if (u.startsWith('https://api.anthropic.com/')) { calls.ai.push(body); return aiStatus === 200 ? ok({ content: [{ type: 'text', text: JSON.stringify(ai) }], usage: { input_tokens: 1000, output_tokens: 100 } }) : ok({ error: { message: 'busy' } }, aiStatus); }
+    if (u.startsWith('https://api.anthropic.com/')) { calls.ai.push(body); return aiStatus === 200 ? ok({ content: [{ type: 'text', text: JSON.stringify(ai) }], stop_reason: stop, usage: { input_tokens: 1000, output_tokens: 100 } }) : ok({ error: { message: 'busy' } }, aiStatus); }
     const path = u.replace('https://sb.example/rest/v1/', '');
     const run = Object.entries(init.headers || {}).find(([k]) => k.toLowerCase() === 'x-pb-bulk')?.[1];
     if (run) calls.tagged.push(path.split('?')[0]);
@@ -65,12 +76,14 @@ function world({ words, ai = { picks: [] }, aiStatus = 200, products = [] } = {}
       const v = VALUES.find(x => x.id === body.p_value);
       return ok(body.p_value ? { filed: true, status: 'aliased', value_id: v.id, attribute_id: v.attribute_id } : { filed: true, status: 'ignored' });
     }
-    if (path.startsWith('pb_attributes?')) return ok([{ id: 'col', name: 'Colour', key: 'colour', multi: false, position: 1 }, { id: 'work', name: 'Work', key: 'work', multi: true, position: 2 }, { id: 'fab', name: 'Fabric', key: 'fabric', multi: false, position: 3 }]);
-    if (path.startsWith('pb_attribute_values?')) return ok(VALUES.map((v, i) => ({ ...v, position: i, categories: [] })));
+    if (path.startsWith('pb_attributes?')) return ok(ATTRS);
+    if (path.startsWith('pb_attribute_values?')) return ok(TAX.values);
     if (path.startsWith('pb_category_attributes?')) return ok([]);
     if (path.startsWith('pb_settings?')) return ok([{ key: 'categories', value: ['Saree'] }]);
     if (path.startsWith('app_secrets?')) return ok([{ value: 'sk-test' }]);
-    if (path.startsWith('pb_tag_suggestions?') && method === 'GET') return ok([{ phrase: 'Sale' }]);
+    // the words a person ignored; "Kanjivaram Silk" was only merged into a twin that is still waiting
+    if (path.startsWith('pb_tag_suggestions?status=eq.ignored') && method === 'GET') return ok([{ phrase: 'Sale', key: 'sale' }, { phrase: 'Kanjivaram Silk', key: 'kanjivaram silk' }]);
+    if (path.startsWith('pb_tag_suggestions?key=in.') && method === 'GET') return ok([{ key: 'kanjivaram silk' }]);
     if (path.startsWith('pb_tag_suggestions?') && method === 'PATCH') { calls.patches.push([path, body]); return ok([{ id: 'x' }]); }
     if (path.startsWith('pb_products?')) return ok(products);
     if (path === 'rpc/pb_product_values_set') { calls.add.push(body); return ok([{ id: body.p_product, status: 'ready', was: 'needs_info', missing: [] }]); }
@@ -85,6 +98,12 @@ function world({ words, ai = { picks: [] }, aiStatus = 200, products = [] } = {}
 }
 const W = (id, phrase, attribute_id = null, source = 'store', examples = [], tries = 0) => ({ id, phrase, key: phrase.toLowerCase(), attribute_id, source, examples, tries });
 const opts = (over = {}) => ({ budget: { soft: Date.now() + 100_000, hard: Date.now() + 140_000 }, left: () => true, capped: async () => false, stopped: async () => false, ...over });
+
+test('a pass: a two-value word the AI filed under one value is ignored instead', async () => {
+  const calls = world({ words: [W('w1', 'Sequins Embroidery', 'work')], ai: { picks: [{ n: 1, value: 'Work: Embroidery', match: 'kind', why: 'Sequin embroidery' }] } });
+  await fileWords(opts());
+  assert.deepEqual(calls.filed.map(f => [f.p_value, f.p_match, f.p_why]), [[null, 'related', 'It names two values; each is found on its own.']]);
+});
 
 test('a pass: sure words by the rules, the rest by the AI (same/kind filed, related/none ignored), one bulk change, products tagged', async () => {
   const words = [W('w1', 'Kala', 'col'), W('w2', 'Kora Silk', 'fab', 'ai', ['p1', 'p2']), W('w3', 'Red Border', null), W('w4', 'Premium', null), W('w5', 'Wine Tone', 'col', 'ai', [], 1)];
@@ -103,20 +122,35 @@ test('a pass: sure words by the rules, the rest by the AI (same/kind filed, rela
   assert.deepEqual(calls.add.map(a => [a.p_product, a.p_rows[0].value_id, a.p_mode, a.p_attributes]), [['p1', 'silk', 'add', ['fab']]]);
   // unanswered: one more try counted (guarded by the old count), not filed
   assert.deepEqual(calls.patches.map(([p, b]) => [p.includes('id=eq.w5') && p.includes('tries=eq.1'), b]), [[true, { tries: 2 }]]);
+  assert.match(calls.ai[0].system, /ignored before \(not product details\): Sale$/m);
   const cost = calls.activity.find(a => a.action === 'tags_matched');
   assert.equal(cost.details.phrases, 4); assert.equal(cost.details.matched, 1); assert.ok(cost.details.usd > 0);
 });
 
-test('a pass: a word the AI never answers is ignored at its third try; an AI failure is logged and the words wait', async () => {
-  let calls = world({ words: [W('w1', 'Odd Word', null, 'store', [], 2)], ai: { picks: [] } });
-  let r = await fileWords(opts());
-  assert.deepEqual(calls.filed.map(f => [f.p_value, f.p_why]), [[null, 'No answer from the AI after three tries.']]);
-  assert.equal(r.ignored, 1);
-  calls = world({ words: [W('w1', 'Odd Word')], aiStatus: 529 });
-  r = await fileWords(opts());
-  assert.deepEqual(r, { aliased: 0, ignored: 0, retagged: 0, waiting: 1 });
-  assert.equal(calls.filed.length, 0); assert.equal(calls.runs.length, 0);
-  assert.equal(calls.activity.find(a => a.action === 'failed').details.step, 'tags_file');
+test('a pass: a word the AI answers around is ignored at its third try; so is one after an answer it paid for but cut off', async () => {
+  for (const o of [{ ai: { picks: [] } }, { stop: 'max_tokens' }]) {
+    const calls = world({ words: [W('w1', 'Odd Word', null, 'store', [], 2), W('w2', 'Odder Word', null, 'store', [], 0)], ...o });
+    const r = await fileWords(opts());
+    assert.deepEqual(calls.filed.map(f => [f.p_id, f.p_value, f.p_why]), [['w1', null, 'No answer from the AI after three tries.']]);
+    assert.deepEqual(calls.patches.map(([p, b]) => [p.includes('id=eq.w2') && p.includes('tries=eq.0'), b]), [[true, { tries: 1 }]]);
+    assert.equal(r.ignored, 1); assert.equal(r.waiting, 1);
+  }
+});
+
+test('a pass: an AI call that fails (busy, no key, no credit) uses no try — the words wait 30 minutes, even at their third try', async () => {
+  for (const aiStatus of [529, 401, 400]) {
+    const calls = world({ words: [W('w1', 'Odd Word', null, 'store', [], 2), W('w2', 'Kala', 'col')], aiStatus });
+    const before = Date.now();
+    const r = await fileWords(opts());
+    assert.deepEqual(r, { aliased: 1, ignored: 0, retagged: 0, run_id: 'run1', waiting: 1 });
+    assert.deepEqual(calls.filed.map(f => f.p_id), ['w2']); // the rules still file theirs
+    assert.equal(calls.patches.length, 1);
+    const [path, body] = calls.patches[0];
+    assert.ok(path.startsWith('pb_tag_suggestions?id=in.(w1)&status=eq.pending'), path);
+    const free = Date.parse(body.tried_at) + 10 * 60_000; // taken again once tried_at is 10 minutes old
+    assert.ok(free >= before + 30 * 60_000 - 1000 && free <= Date.now() + 30 * 60_000 + 1000, body.tried_at);
+    assert.equal(calls.activity.find(a => a.action === 'failed').details.step, 'tags_file');
+  }
 });
 
 test('a pass: the day\'s AI limit, a pause or the clock leave the AI words waiting (no try used); the rules still file', async () => {
@@ -124,8 +158,12 @@ test('a pass: the day\'s AI limit, a pause or the clock leave the AI words waiti
     const calls = world({ words: [W('w1', 'Kala', 'col'), W('w2', 'Odd Word')] });
     const r = await fileWords(opts(o));
     assert.deepEqual(r, { aliased: 1, ignored: 0, retagged: 0, run_id: 'run1', waiting: 1 });
-    assert.equal(calls.ai.length, 0); assert.equal(calls.patches.length, 0);
+    assert.equal(calls.ai.length, 0);
     assert.deepEqual(calls.filed.map(f => f.p_id), ['w1']);
+    if (!o.capped) { assert.equal(calls.patches.length, 0); continue; }
+    // the limit: held until the next day in India, so the waiting words do not wake the worker every minute meanwhile
+    const IST = 5.5 * 3600_000, day = 86_400_000, next = (Math.floor((Date.now() + IST) / day) + 1) * day - IST;
+    assert.deepEqual(calls.patches.map(([p, b]) => [p.split('&')[0], Date.parse(b.tried_at) + 10 * 60_000]), [['pb_tag_suggestions?id=in.(w2)', next]]);
   }
   const calls = world({ words: [] });
   assert.equal(await fileWords(opts()), null);
