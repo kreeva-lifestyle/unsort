@@ -25,7 +25,7 @@ export const getTaxonomy = () => pbCall<PbTaxonomy>('taxonomy_get').then(r => ({
   category_products: r.category_products ?? [], fill: r.fill ?? null,
 }));
 export const saveCategories = (categories: string[]) => pbCall<{ categories: string[] }>('categories_save', { categories }).then(r => r.categories ?? categories);
-export const saveAttribute = (a: { id?: string; name: string; multi: boolean; shopify_prefix: string; by_category: boolean }) =>
+export const saveAttribute = (a: { id?: string; name: string; multi: boolean; shopify_prefix: string; by_category: boolean; required: boolean }) =>
   pbCall<{ attribute: PbAttribute }>('attribute_save', a).then(r => r.attribute);
 export const deleteAttribute = (id: string) => pbCall<{ regated: number }>('attribute_delete', { id });
 export const orderAttributes = (ids: string[]) => pbCall('attribute_order', { ids });
@@ -66,7 +66,7 @@ export async function productTaxonomy(productId: string, category: string | null
   const ids = (links.data ?? []).map(l => l.attribute_id as string);
   if (!ids.length) return { attributes: [], values: (vals.data ?? []) as PbProductValue[] };
   const [attrs, values] = await Promise.all([
-    supabase.from('pb_attributes').select('id,name,key,multi,position,shopify_prefix,by_category').in('id', ids),
+    supabase.from('pb_attributes').select('id,name,key,multi,position,shopify_prefix,by_category,required').in('id', ids),
     supabase.from('pb_attribute_values').select('id,attribute_id,name,key,aliases,position,categories').in('attribute_id', ids).order('position').order('name').limit(5000),
   ]);
   if (attrs.error) throw attrs.error;

@@ -43,7 +43,7 @@ export default function CategoriesTile({ tax, api, addToast, onChanged, canEdit 
     .sort((a, b) => b.products - a.products);
   return (
     <PbTile as="section" aria-labelledby="pbt-cats">
-      <PbSection title="Categories" id="pbt-cats" hint="The AI picks one for every product. Tap one to choose the attributes it needs — each one is a must before a product goes to websites.">
+      <PbSection title="Categories" id="pbt-cats" hint="The AI picks one for every product. Tap one to choose the attributes it needs — each must-have one is needed before a product goes to websites.">
         {!tax.categories.length && <TagsEmpty icon="folder" title="No categories yet">Add the kinds of product you sell — Saree, Lehenga, Kurta Set.</TagsEmpty>}
         <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
           {tax.categories.map(c => {

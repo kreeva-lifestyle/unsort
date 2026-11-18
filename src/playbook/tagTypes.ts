@@ -24,6 +24,9 @@ export interface PbAttribute {
   /** "Values depend on the category" (owner, 13 Nov 2026: Product Type): each value is offered only for the categories
    *  ticked on it, and one with none ticked nowhere — to the word rules, the AI and staff (pb_tag_offered). */
   by_category: boolean;
+  /** "Must have" (default). False = only if it fits (owner, 18 Nov 2026: Product Type — "not necessary if AI is not able
+   *  to find a perfect fit"): the AI picks a value only when one truly fits, and an empty one never holds a product. */
+  required: boolean;
   values: PbAttrValue[];
 }
 

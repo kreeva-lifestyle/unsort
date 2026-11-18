@@ -2,14 +2,20 @@
 // and the cheaper values-only pass (tagFill.ts) get, per attribute, the list
 // of allowed value names as a JSON-schema enum, so the AI can only choose
 // from the owner's taxonomy; anything it saw that fits no list comes back as
-// short "other" phrases for the suggestions queue. Required attributes:
-// "pick the closest value when the evidence reasonably supports it, never
-// invent one". No I/O — tested in test/tagPrompt.test.mjs.
+// short "other" phrases for the suggestions queue. Owner, 18 Nov 2026 ("AI should auto select. No user inputs
+// required. Product Type is not necessary if AI is not able to find a perfect fit … If not leave it."): a MUST-HAVE
+// attribute always gets the AI's best-judged value (Occasion from the look of the product); in "Let AI decide" the
+// schema even asks for at least one. An "only if it fits" attribute (required = false, Product Type) gets a value only
+// when one in its list truly fits, else none — and does not hold the product. Never a value outside the list.
+// No I/O — tested in test/tagPrompt.test.mjs.
 import { tagKey } from './tagText.ts';
 
 /** `byCategory`: the attribute's values depend on the category (Product Type) — each value carries the categories it is
- *  ticked for, and the prompt lists them per category (the reader settles the category in the same call). */
-export interface PromptAttr { id: string; name: string; multi: boolean; byCategory?: boolean; values: { id: string; name: string; categories?: string[] }[] }
+ *  ticked for, and the prompt lists them per category (the reader settles the category in the same call).
+ *  `required`: false = "only if it fits" (pb_attributes.required); missing = must have. */
+export interface PromptAttr { id: string; name: string; multi: boolean; byCategory?: boolean; required?: boolean; values: { id: string; name: string; categories?: string[] }[] }
+const must = (a: Pick<PromptAttr, 'required'>) => a.required !== false;
+const kind = (a: PromptAttr) => `${a.multi ? 'one or several' : 'one value'}; ${must(a) ? 'must have' : 'only if it fits'}`;
 export interface TagSpec { attrs: (PromptAttr & { pk: string })[]; byCategory: Record<string, string[]> }
 export interface TagOut { tags?: Record<string, { values?: unknown; other?: unknown }>; tag_other?: unknown }
 export interface ReadTags { chosen: Record<string, string[]>; other: { attribute_id: string | null; phrase: string }[] }
@@ -38,10 +44,12 @@ export function tagPromptLines(spec: TagSpec, o: { fillOnly?: boolean } = {}): s
   return [
     o.fillOnly ? 'Choose the product\'s values for the attributes below.' : 'tags: for each attribute, the values that describe this product, chosen ONLY from its list (copy the spelling exactly).',
     ...(cats.length && !o.fillOnly ? [`Which attributes apply depends on the category: ${cats.join('; ')}. Leave values [] for attributes of other categories.`] : []),
-    'Every attribute of the product\'s category needs at least one value: when the photos or text reasonably support one, pick the CLOSEST value in the list (e.g. "rani pink" → Pink, "embroidered" → Embroidery). Never invent a value that is not in the list. If truly nothing fits, leave values [] and put the word you saw in "other".',
+    'An attribute marked "must have" always gets a value: choose the best-fitting one in its list, judging from the photos and the text the way an experienced shop owner would (e.g. "rani pink" → Pink, "embroidered" → Embroidery; Occasion from the look of the product — a heavy bridal lehenga → Wedding, a light printed suit → Casual / Office). Never leave a must-have attribute empty.',
+    'An attribute marked "only if it fits" gets a value only when one in its list truly fits this product — the same kind of thing, not a near one. When none does, leave values [] — that is the right answer, not a failure.',
+    'Never invent a value that is not in a list. A word you saw that is not in the list goes in "other".',
     'An attribute marked "one value" takes at most one. other: up to 3 short phrases (1–3 words) for that attribute that are not in its list, or [].',
     ...(o.fillOnly ? [] : ['tag_other: up to 5 short phrases (1–3 words) that describe the product but fit no attribute, or [].']),
-    ...spec.attrs.map(a => (a.byCategory ? scopedLine(a) : `${a.name} (${a.multi ? 'one or several' : 'one value'}): ${a.values.map(v => v.name).join(', ')}`)),
+    ...spec.attrs.map(a => (a.byCategory ? scopedLine(a) : `${a.name} (${kind(a)}): ${a.values.map(v => v.name).join(', ')}`)),
   ];
 }
 
@@ -51,17 +59,18 @@ function scopedLine(a: PromptAttr): string {
   const by = new Map<string, string[]>();
   for (const v of a.values) for (const c of v.categories ?? []) by.set(c, [...(by.get(c) ?? []), v.name]);
   const groups = [...by].map(([c, names]) => `${c}: ${names.join(', ')}`).join('; ');
-  return `${a.name} (${a.multi ? 'one or several' : 'one value'}; depends on the category — choose only from the product's category, none if it has none): ${groups}`;
+  return `${a.name} (${kind(a)}; depends on the category — choose only from the product's category, none if it has none): ${groups}`;
 }
 
-/** The schema's "tags" property (+ "tag_other" unless fillOnly); null when there is nothing to choose. */
+/** The schema's "tags" property (+ "tag_other" unless fillOnly); null when there is nothing to choose. In "Let AI decide"
+ *  (fillOnly: only the product's own category's attributes) a must-have attribute takes at least one value. */
 export function tagSchema(spec: TagSpec, o: { fillOnly?: boolean } = {}): Record<string, unknown> | null {
   if (!spec.attrs.length) return null;
   const str = { type: 'string' };
   const props = Object.fromEntries(spec.attrs.map(a => [a.pk, {
     type: 'object',
     properties: {
-      values: { type: 'array', items: a.values.length <= ENUM_MAX ? { type: 'string', enum: a.values.map(v => v.name) } : str },
+      values: { type: 'array', items: a.values.length <= ENUM_MAX ? { type: 'string', enum: a.values.map(v => v.name) } : str, ...(o.fillOnly && must(a) ? { minItems: 1 } : {}) },
       other: { type: 'array', items: str },
     },
     required: ['values', 'other'], additionalProperties: false,

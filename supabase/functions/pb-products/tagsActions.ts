@@ -43,9 +43,11 @@ async function regateAttr(attributeId: string) {
   await refresh([...new Set([...inCats, ...carrying])]);
 }
 
-/** attribute_save { id?, name, multi?, shopify_prefix?, by_category? } → { ok, attribute }. by_category: "Values depend on
- *  the category" (Product Type, owner 13 Nov 2026). Turned on, each value with no category ticked gets the categories
- *  that use the attribute now, so no product loses a value at that moment; the owner unticks what does not belong. */
+/** attribute_save { id?, name, multi?, shopify_prefix?, by_category?, required? } → { ok, attribute }. by_category: "Values
+ *  depend on the category" (Product Type, owner 13 Nov 2026). Turned on, each value with no category ticked gets the
+ *  categories that use the attribute now, so no product loses a value at that moment; the owner unticks what does not
+ *  belong. required: "Must have" (default) or false = only if it fits (owner, 18 Nov 2026: "Product Type is not
+ *  necessary if AI is not able to find a perfect fit"); a switch checks its products again at once. */
 export async function attributeSave(b: Body, userId: string | null) {
   const name = displayName(b.name).slice(0, 60);
   const key = tagKey(name);
@@ -55,7 +57,7 @@ export async function attributeSave(b: Body, userId: string | null) {
   const clash = await one<{ id: string; name: string }>(`pb_attributes?key=eq.${enc(key)}&select=id,name`);
   if (clash && clash.id !== id) throw new HttpError(409, `There is already an attribute called “${clash.name}”.`);
   const body: Record<string, unknown> = { name, key, shopify_prefix: prefix, ...(typeof b.multi === 'boolean' ? { multi: b.multi } : {}),
-    ...(typeof b.by_category === 'boolean' ? { by_category: b.by_category } : {}) };
+    ...(typeof b.by_category === 'boolean' ? { by_category: b.by_category } : {}), ...(typeof b.required === 'boolean' ? { required: b.required } : {}) };
   let row: AttrRow;
   if (id) {
     const before = await one<AttrRow>(`pb_attributes?id=eq.${enc(id)}&select=${ATTR_COLS}`);
@@ -67,7 +69,8 @@ export async function attributeSave(b: Body, userId: string | null) {
     }
     row = (await patch<AttrRow>('pb_attributes', `id=eq.${enc(id)}`, body, ATTR_COLS))[0];
     // "Missing: Colour" holds the name, and the switch changes which values count: check the products again.
-    if (before.name !== name || switched) await regateAttr(id);
+    const must = typeof b.required === 'boolean' && b.required !== before.required;
+    if (before.name !== name || switched || must) await regateAttr(id);
   } else {
     const last = await one<{ position: number }>('pb_attributes?select=position&order=position.desc&limit=1');
     row = (await insert<AttrRow>('pb_attributes', [{ ...body, position: (last?.position ?? 0) + 1 }], { select: ATTR_COLS }))[0];

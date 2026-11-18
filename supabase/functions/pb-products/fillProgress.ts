@@ -56,7 +56,7 @@ export async function fillStatus(): Promise<FillProgress | null> {
   const still = rows.filter(r => !r.finished_at).map(r => r.id);
   if (!still.length) return sumFill(rows, 0, 0);
   const [waiting, recent, auto] = await Promise.all([queued(still),
-    count(`pb_activity?select=id&action=eq.tags_filled&details->>manual=eq.false&created_at=gte.${enc(new Date(Date.now() - PACE_MIN * 60_000).toISOString())}`),
+    count(`pb_activity?select=id&action=eq.tags_filled&details->>manual=eq.false&details->>auto=is.null&created_at=gte.${enc(new Date(Date.now() - PACE_MIN * 60_000).toISOString())}`),
     getSettings().then(s => s.automation).catch(() => null)]);
   const blocked = auto?.paused ? 'paused' : auto && await overLimit(auto.daily_limit_inr) ? 'limit' : null;
   return sumFill(rows, waiting, recent, blocked);

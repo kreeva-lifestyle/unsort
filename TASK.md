@@ -24,15 +24,18 @@ are tagged.
   move its products (Anarkali and Kurta Set → Salwar Suit). Link Product
   Type to Salwar Suit first, so the rules and the AI choose Anarkali or
   Kurta Set for them there.
-- **Product Type: check the types, then link it.** Every category has
-  types now (Saree 7, Lehenga 2, Salwar Suit 9, Co-ord Set 5, Kids Wear 6,
-  Pre-Stitched Saree 5, Men's Kurta 6). Remove or add what you like, then
-  link Product Type to the categories that need it and tap **Link and let
-  AI decide**.
+- **Product Type: check each category's types.** It is "only if it fits"
+  now (18 Nov): the AI gives a type only when one truly fits, else the
+  product goes out without one. Lehenga has just 3 types (Bridal Lehenga,
+  South Indian Lehenga, Crop Top & Skirt), so most lehengas get none. Add
+  the kinds you sell under Settings → Tags → Product Type if you want them.
+- **Work has no "Plain" value.** Since 18 Nov the AI always picks a value
+  for a must-have attribute, so a plain outfit gets the nearest work
+  (e.g. Digital Print). Add "Plain" (or "No work") to Work, or turn Work's
+  **Must have** off in Settings → Tags → Work so it is filled only when a
+  work truly fits.
 - **Two colours ("Pink and White"):** Multicolour, or the main colour?
   Colour takes one value.
-- **Occasion:** let the AI judge it (suppliers never say), or set a default
-  per category?
 - **Wrong "also known as" words left by the old word rules:** Back → Black,
   Brunches → Art Silk, Light Volume → Blue, Koti → Khatli Work, Choli Set / Koti
   Set → Dhoti Set, Printed Saree → Pant Saree, Straight pants → Straight

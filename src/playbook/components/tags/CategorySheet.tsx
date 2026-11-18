@@ -1,7 +1,8 @@
 // One category's sheet: the attributes it uses, in order (up / down / remove,
-// each saved at once), and "+ <attribute>" chips to link more. Every linked
-// attribute is REQUIRED ("for each attribute of its category a tag is a
-// must"), so linking first counts the products that lack it and asks:
+// each saved at once), and "+ <attribute>" chips to link more. A linked
+// MUST-HAVE attribute is required ("for each attribute of its category a tag is
+// a must"; an "only if it fits" one, owner 18 Nov 2026, never is), so linking
+// one first counts the products that lack it and asks:
 // "12 products will need a Colour" → Link and let AI decide (the sheet's one
 // gradient: links, then queues those products for the AI) / Link only /
 // Cancel. Rename at the top (everywhere: products, links, Product Type ticks,
@@ -64,14 +65,14 @@ export default function CategorySheet({ category, categories, products, attrs, l
   const link = async (ai: boolean) => {
     if (!ask0) return;
     const { attr: a, lacking: n } = ask0;
-    const ok = await save([...ids, a.id], ai ? 'link-ai' : 'link', r => `${category} now needs ${a.name} — ${plural(r.to_needs_info, 'product')} wait in Needs info`);
+    const ok = await save([...ids, a.id], ai ? 'link-ai' : 'link', r => (a.required === false ? `${category} now uses ${a.name}` : `${category} now needs ${a.name} — ${plural(r.to_needs_info, 'product')} wait in Needs info`));
     if (!ok) return;
     setAsk0(null);
     if (!ai) return;
     try {
       const q = await api.aiFill({ category, attribute_id: a.id });
       // q can be fewer than the products lacking it (n), or none: the AI leaves products whose tags a person chose.
-      if (q) addToast(`AI is choosing a ${a.name} for ${plural(q, 'product')} — they move to Ready as it goes`, 'success');
+      if (q) addToast(a.required === false ? `AI is choosing a ${a.name} where one fits, for ${plural(q, 'product')}` : `AI is choosing a ${a.name} for ${plural(q, 'product')} — they move to Ready as it goes`, 'success');
       else addToast(`The AI took none of the ${plural(n, 'product')}: they already wait for it, or their tags were chosen by hand. Choose ${a.name} on those yourself.`, 'info');
       onChanged();
     }
@@ -106,13 +107,13 @@ export default function CategorySheet({ category, categories, products, attrs, l
             <span id="pbc-name-hint" style={pbMeta}>A new name follows everywhere: its products, the tags it needs, Product Type ticks and website rules.</span>
           </div>
         )}
-        <p style={{ ...pbBody, color: PB.tx2, margin: 0 }}>Every product in {category} needs a value for each attribute here before it can go to websites. Playbook fills them from the text first, then the AI.</p>
+        <p style={{ ...pbBody, color: PB.tx2, margin: 0 }}>Every product in {category} needs a value for each must-have attribute here before it can go to websites; one marked “only if it fits” is filled only when a value truly fits. Playbook fills them by itself: from the text first, then the AI.</p>
         <ol aria-label={`Attributes ${category} uses`} style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
           {linked.map((a, i) => (
             <li key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, padding: '4px 0', borderTop: i ? `1px solid ${PB.tileBd}` : 'none' }}>
               <span style={{ flex: 1, minWidth: 0 }}>
                 <span style={{ ...pbName, display: 'block' }}>{a.name}</span>
-                <span style={pbMeta}>{lacking(a.id) ? `${plural(lacking(a.id), 'product')} still need one` : 'Every product has one'}</span>
+                <span style={pbMeta}>{a.required === false ? 'Only if it fits' : lacking(a.id) ? `${plural(lacking(a.id), 'product')} still need one` : 'Every product has one'}</span>
                 {here(a) === 0 && <Dot color={PB.review} label={`No ${a.name} value is ticked for ${category} yet: open one under Attributes and tick ${category}`} style={{ ...pbMeta, color: PB.tx, whiteSpace: 'normal', display: 'flex' }} />}
                 {!!here(a) && <span style={{ ...pbMeta, display: 'block' }}>{plural(here(a) ?? 0, `${a.name} value`)} for {category}</span>}
               </span>
@@ -127,8 +128,10 @@ export default function CategorySheet({ category, categories, products, attrs, l
         </ol>
         {ask0 && (
           <div role="alertdialog" aria-labelledby="pbc-warn" style={{ ...pbTileReview, backdropFilter: 'none', WebkitBackdropFilter: 'none', borderRadius: PB.r.input, padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <Dot color={PB.review} label={<span id="pbc-warn">{plural(ask0.lacking, 'product')} will need a {ask0.attr.name}</span>} style={{ color: PB.tx, fontWeight: 600, fontSize: 13, whiteSpace: 'normal' }} />
-            <span style={pbBody}>Until they have one they wait in Needs info and are not sent to websites. The AI can choose one from your {ask0.attr.name} list for each.
+            <Dot color={PB.review} label={<span id="pbc-warn">{plural(ask0.lacking, 'product')} {ask0.attr.required === false ? `have no ${ask0.attr.name} yet` : `will need a ${ask0.attr.name}`}</span>} style={{ color: PB.tx, fontWeight: 600, fontSize: 13, whiteSpace: 'normal' }} />
+            <span style={pbBody}>{ask0.attr.required === false
+              ? <>{ask0.attr.name} is “only if it fits”: they still go to websites. The AI can choose one from your list for each, where one truly fits.</>
+              : <>Until they have one they wait in Needs info and are not sent to websites. The AI can choose one from your {ask0.attr.name} list for each.</>}
               {here(ask0.attr) === 0 && <> But no {ask0.attr.name} value is ticked for {category} yet: tick some first, or nothing can be chosen.</>}</span>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <PbButton kind="primary" icon="sparkles" onClick={() => void link(true)} busy={busy === 'link-ai'} busyLabel="Linking…" dim={busy === 'link'}>Link and let AI decide</PbButton>

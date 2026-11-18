@@ -8,7 +8,7 @@ export default function TagsTile({ onOpen }: { onOpen: () => void }) {
   return (
     <PbTile as="section" aria-labelledby="pbs-tags">
       <PbSection title="Tags" id="pbs-tags"
-        hint="Categories, and the attributes and values Playbook tags products with (Colour: Black, Work: Embroidery…). Every attribute of a category is a must before a product goes to websites. Websites send the values with {tags}. A new word Playbook meets on a product is filed by itself: as another name of the nearest value you have, or left out."
+        hint="Categories, and the attributes and values Playbook tags products with (Colour: Black, Work: Embroidery…). A product needs a value for each must-have attribute of its category before it goes to websites; the AI chooses missing ones by itself, and an “only if it fits” one (Product Type) only when a value truly fits. Websites send the values with {tags}. A new word Playbook meets on a product is filed by itself: as another name of the nearest value you have, or left out."
         right={<PbButton icon="tag" onClick={onOpen}>Categories &amp; tags</PbButton>} />
     </PbTile>
   );

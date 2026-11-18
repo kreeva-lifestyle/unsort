@@ -33,9 +33,11 @@ export async function categoryRename(b: Body, userId: string | null) {
   return { ok: true, renamed: r.renamed, run_id: r.run_id };
 }
 
-/** Products the move left waiting only for a tag the AI can choose (not for a category, and not chosen by a person —
- *  tags_ai_fill leaves those out itself). */
-const toFill = (rows: Refreshed[]) => rows.filter(x => x.status === 'needs_info' && x.missing.some(m => m !== 'Category')).map(x => x.id);
+/** The moved products the AI may give tags to: every one not waiting for a category (tags chosen by a person are left
+ *  out by tags_ai_fill itself). Not only those held for a must-have tag: an "only if it fits" attribute (Product Type,
+ *  owner 18 Nov 2026) holds nothing, and the AI should still pick one where it fits. A product with nothing empty costs
+ *  nothing (fillOne asks the AI only for empty attributes). */
+const toFill = (rows: Refreshed[]) => rows.filter(x => (x.status === 'needs_info' || x.status === 'ready') && !x.missing.includes('Category')).map(x => x.id);
 
 export async function categoryMove(b: Body, userId: string | null) {
   const from = name(b.from), to = name(b.to);
@@ -52,7 +54,7 @@ export async function categoryMove(b: Body, userId: string | null) {
   }
   const ids = toFill(r.rows);
   let queued = 0;
-  for (let i = 0; i < ids.length; i += 500) queued += (await tagsAiFill({ product_ids: ids.slice(i, i + 500) }, userId)).queued ?? 0;
+  for (let i = 0; i < ids.length; i += 500) queued += (await tagsAiFill({ product_ids: ids.slice(i, i + 500), missing_only: false }, userId)).queued ?? 0;
   const toReady = r.rows.filter(x => x.was !== 'ready' && x.status === 'ready').length;
   await logActivity({ action: 'settings_edited', details: { key: 'categories', moved: { from, to, products: r.rows.length, to_ready: toReady, queued, removed }, run_id: r.run_id }, user_id: userId });
   return { ok: true, moved: r.rows.length, to_ready: toReady, queued, removed, run_id: r.run_id };

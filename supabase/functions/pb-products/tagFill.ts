@@ -1,5 +1,6 @@
 // "Let AI decide" (owner, 2026-11-10): a values-only AI pass for products
-// whose required attributes are empty. tags_ai_fill queues products
+// whose required attributes are empty. Since 18 Nov 2026 it also runs by itself
+// once after each read that left a tag empty (fillAuto.ts). tags_ai_fill queues products
 // (pb_products.tag_fill_run → a pb_tag_fill_runs row that counts progress);
 // the per-minute worker runs a few per call AFTER read / write / publish, so
 // it never starves them (worker.ts). One product = the word rules first
@@ -46,7 +47,7 @@ export interface FillResult { filled: string[]; left: string[]; refreshed: Refre
 
 /** Fill one product's empty required attributes. `manual` = a person asked on the product page. `run`: the queued
  *  "Let AI decide" this belongs to, as a bulk change (its id is the fill run's: tagsQueue.ts). */
-export async function fillOne(p: ProductRow, tax: Taxonomy, o: { manual: boolean; userId: string | null; budget: Budget; run?: string | null }): Promise<FillResult> {
+export async function fillOne(p: ProductRow, tax: Taxonomy, o: { manual: boolean; auto?: boolean; userId: string | null; budget: Budget; run?: string | null }): Promise<FillResult> {
   const pv = await productValues(p.id);
   const attrs = attrsFor(tax, p.category);
   const ok = new Set(attrs.flatMap(a => a.values.map(v => v.id))); // the values its category offers: only they count
@@ -72,7 +73,7 @@ export async function fillOne(p: ProductRow, tax: Taxonomy, o: { manual: boolean
   if (ai) await suggestFor(p.id, ai.other.map(x => ({ phrase: x.phrase, key: tagKey(x.phrase), attribute_id: x.attribute_id, source: 'ai' as const })), tax, o.run);
   const left = refreshed?.missing ?? target.filter(a => !filled.includes(a.name)).map(a => a.name);
   const usd = ai?.usd ?? 0;
-  await logActivity({ product_id: p.id, action: 'tags_filled', details: { ...(ai ? { model: ai.model, usd } : {}), filled, by_rules: byWords, left, manual: o.manual }, user_id: o.userId });
+  await logActivity({ product_id: p.id, action: 'tags_filled', details: { ...(ai ? { model: ai.model, usd } : {}), filled, by_rules: byWords, left, manual: o.manual, ...(o.auto ? { auto: true } : {}) }, user_id: o.userId });
   return { filled, left, refreshed, usd };
 }
 
@@ -99,7 +100,8 @@ async function askFor(p: ProductRow, tax: Taxonomy, attrs: AttrWithValues[], bud
  *  change — only while that is open: a write tagged with a change that is not in the log is refused. The change is
  *  closed by the worker once the queue is over (closeFills). */
 export async function fillQueued(c: { id: string; tag_fill_run: string }, tax: Taxonomy, userId: string | null, budget: Budget): Promise<boolean> {
-  const mine = await patch('pb_products', `id=eq.${enc(c.id)}&tag_fill_run=eq.${enc(c.tag_fill_run)}`, { tag_fill_run: null });
+  // tags_ai_at too: the automatic fill (fillAuto.ts) must not take the same product meanwhile in an overlapping run.
+  const mine = await patch('pb_products', `id=eq.${enc(c.id)}&tag_fill_run=eq.${enc(c.tag_fill_run)}`, { tag_fill_run: null, tags_ai_at: nowIso() });
   if (!mine.length) return false;
   let filled = 0, left = 0, run: string | null = null;
   try {
