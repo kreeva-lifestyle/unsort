@@ -9,14 +9,14 @@ export interface VendorRow { sku: string; qty: string; cat?: string }
 export interface VendorFile { name: string; rows: VendorRow[]; note?: string }
 export const MAX_FILE_BYTES = 15 * 1024 * 1024;
 
-const SKU_ALIASES = ['sku', 'skucode', 'designno', 'design', 'itemcode', 'productcode', 'stylecode', 'styleno', 'code', 'article', 'style', 'item'];
-const QTY_ALIASES = ['qty', 'quantity', 'availableqty', 'availablestock', 'qtyavailable', 'closingstock', 'stock', 'available', 'pieces', 'pcs', 'balance'];
+export const SKU_ALIASES = ['sku', 'skucode', 'designno', 'design', 'itemcode', 'productcode', 'stylecode', 'styleno', 'code', 'article', 'style', 'item'];
+export const QTY_ALIASES = ['qty', 'quantity', 'availableqty', 'availablestock', 'qtyavailable', 'closingstock', 'stock', 'available', 'pieces', 'pcs', 'balance'];
 // A header carrying one of these is descriptive, never a key or a number.
 const NEVER = ['name', 'desc', 'status', 'date', 'price', 'rate', 'colour', 'color', 'size', 'remark', 'image', 'url'];
 const BLOCKED_ALIASES = ['blockedcommitted', 'blocked', 'committed', 'reserved'];
 
 const norm = (v: unknown) => String(v ?? '').trim().toLowerCase().replace(/[^a-z]/g, '');
-const cellText = (v: unknown) => v == null ? '' : typeof v === 'number' ? String(v) : String(v).trim();
+export const cellText = (v: unknown) => v == null ? '' : typeof v === 'number' ? String(v) : String(v).trim();
 
 /** A file name short enough to sit inside a toast message. */
 const shortName = (name: string) => name.length > 28 ? `${name.slice(0, 25)}…` : name;
@@ -31,7 +31,7 @@ export async function readBytes(file: File): Promise<Uint8Array> {
   catch { throw new Error(`Could not read ${shortName(file.name)} — pick it again from Files`); }
 }
 
-async function grid(file: File): Promise<unknown[][]> {
+export async function grid(file: File): Promise<unknown[][]> {
   const XLSX = await import('xlsx');
   const wb = XLSX.read(await readBytes(file), { type: 'array' });
   const ws = wb.Sheets[wb.SheetNames[0]];
@@ -53,7 +53,7 @@ function bestCol(heads: string[], aliases: string[], skip = -1): number {
 }
 
 /** Header row index + the column indexes, or null when no header matched. */
-function findHeader(rows: unknown[][], keyAliases: string[], valAliases: string[]): { at: number; key: number; val: number } | null {
+export function findHeader(rows: unknown[][], keyAliases: string[], valAliases: string[]): { at: number; key: number; val: number } | null {
   for (let i = 0; i < Math.min(rows.length, 20); i++) {
     const heads = (rows[i] || []).map(norm);
     const key = bestCol(heads, keyAliases);

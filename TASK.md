@@ -6,7 +6,7 @@ done (built, merged, deployed and checked, or done or decided by the
 owner), its entry is deleted in the same change. The rules are in
 `CLAUDE.md` → "Pending work — TASK.md".
 
-Last checked: 18 Nov 2026.
+Last checked: 19 Nov 2026.
 
 ## Playbook — decisions the owner still has to make
 
@@ -90,6 +90,21 @@ are tagged.
 - **Q20 · Public repository.** It has to stay public while the server
   functions load their code from GitHub. Making it private first needs
   another way to deploy them; say if you want that.
+
+## Playbook — follow-ups Claude builds next
+
+Found in the overnight check of 19 Nov; built in the next Playbook change.
+
+- **"Suits & Dresses" reads badly in listings.** The search phrase uses
+  the category's name, so titles say "Purple Georgette Suits & Dresses…"
+  and descriptions "This Maroon Suits & Dresses set…". Next: the product's
+  Product Type (Gown, Anarkali…) when it has one, else a plain word for the
+  category.
+- **3 SuratMandi listings held for "copied wording" that is only the
+  product's facts** ("pure micro cotton full lining with canvas belt
+  attached"). Next: words that are the product's own facts no longer count
+  as copied, and the 3 are written again. Until then they wait in Needs
+  review; Approve them if they read well.
 
 ## Playbook — things only the owner can do
 

@@ -116,7 +116,7 @@ export default function VirtualStock({ setStock, addToast }: { stock: Record<str
 
       {expanded && <>
         {/* Add form */}
-        <div style={{ display: 'flex', gap: 6, marginTop: 12, marginBottom: rows.length > 0 ? 10 : 0 }}>
+        <div style={{ display: 'flex', gap: 6, marginTop: 12, marginBottom: 10 }}>
           <input value={sku} onChange={e => setSku(e.target.value)} onKeyDown={e => e.key === 'Enter' && add()} placeholder="SKU code" style={{ ...S.fInput, flex: 1, fontFamily: T.mono }} />
           <input type="number" min="1" step="1" value={qty} onChange={e => setQty(e.target.value)} onKeyDown={e => { numericKeyDown(e); if (e.key === 'Enter') add(); }} placeholder="Qty" style={{ ...S.fInput, width: 80, textAlign: 'right', fontFamily: T.mono }} />
           <div onClick={add} style={{ ...S.btnPrimary, flexShrink: 0, opacity: saving ? 0.5 : 1, pointerEvents: saving ? 'none' : 'auto' }}>Add</div>
@@ -128,7 +128,8 @@ export default function VirtualStock({ setStock, addToast }: { stock: Record<str
           <input value={search} onChange={e => { setSearch(e.target.value); setPage(0); }} placeholder="Search SKU..." style={S.fSearch} />
         </div>}
 
-        {rows.length > 0 && <VirtualStockBulk rows={rows} shown={filtered} selected={picked} onSelect={setPicked} onClear={() => setPicked(new Set())} onDone={fetch} ask={ask} addToast={addToast} />}
+        {/* Paste list / Import file are offered on an empty list too: that is how a whole list goes in at once. */}
+        {!loading && <VirtualStockBulk rows={rows} shown={filtered} selected={picked} onSelect={setPicked} onClear={() => setPicked(new Set())} onDone={fetch} ask={ask} addToast={addToast} />}
 
         {/* List */}
         {loading ? <div style={{ padding: 12, textAlign: 'center' }}><div className="spinner" style={{ margin: '0 auto' }} /></div> :
