@@ -198,6 +198,12 @@ product is live (checked against the code and all 504 store products,
   text. Next: it is sent again as it is.
 - **Shopify's own "category" box** (not the collection) is filled when a
   product is first sent and does not follow a later category change.
+- **A website that is switched off when a category is renamed** keeps the
+  old collection name. Once it is on, its products get the new product
+  type and a second collection is made for the new name beside the old one.
+- **Size codes from a future import.** If another store's own code ends in
+  a size written the old way ("…-38""), the size would be added a second
+  time ("…-38"-38"). No product has this today.
 - **Listing promises.** About 500 search descriptions say "Ships in 5 to 7
   days"; your answer of 20 Nov is "Delivery within 5 to 7 days". Next:
   Claude changes the store profile line and those descriptions. About 300

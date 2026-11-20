@@ -71,7 +71,8 @@ mobile". Playbook instead:
   runtime 500. The deploy workflow runs both before the build. A merge does
   not deploy the functions: see `docs/playbook/DEPLOY.md`.
 - Rules that live in the database (which product is a copy, what the Ready
-  gate holds, what a bulk change may take back) are tried on a throwaway
+  gate holds, what a bulk change may take back, which listings are owed
+  their product type, tags and fields) are tried on a throwaway
   PostgreSQL, never the live one: `bash supabase/tests/sql/run.sh`. It ends
   with status 1 when a check in `t_dups.sql` fails. The workflow **Playbook
   SQL tests** runs it on every change under `supabase/migrations/`,

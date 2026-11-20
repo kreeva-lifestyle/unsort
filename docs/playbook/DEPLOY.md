@@ -44,6 +44,12 @@ complete snapshot of its pinned commit, so a change to those shared files
 does not *break* a function that was not redeployed; redeploy it only when
 the change has to take effect there too.
 
+A change that comes with a database migration: apply the migration first,
+then deploy the loader. The server names its columns in every read
+(`types.ts LISTING_COLS`, `PRODUCT_COLS`…), so a loader that asks for a
+column the database does not have yet fails every listing read. The other
+way round is safe: the older server ignores a new column.
+
 ### Rolling back
 Deploy the loader again, pinned to the earlier commit. Database migrations
 are not rolled back by this; they are additive by rule.

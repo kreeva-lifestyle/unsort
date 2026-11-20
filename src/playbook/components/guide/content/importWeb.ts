@@ -34,6 +34,7 @@ export const IMPORT_WEB: GuideSection[] = [
       p('"In stock" means the store itself says the product (any of its sizes) can be bought right now. A product whose every size is sold out is left out while **Only in-stock products** is on.'),
       h('The details it copies'),
       p('Besides the name, description, photos, sizes and price, Playbook keeps every detail the other store shows about a product. They appear on the product page in the **From the website** tile (text only — they are never sent back to that store), and the AI reader leaves them as they are.'),
+      p('**Sizes** are the other store\'s own choices, rewritten in Playbook\'s one way of writing sizes, so products copied from different stores read the same on yours: `38"` and `38 Inch` become `38`, `2XL` becomes `XXL`, `Free` becomes `Free Size`, and `M (38)` stays `M (38)`. Nothing is added: a plain `M` never gets inches the other store did not give.'),
       table(['On the product page', 'Where it comes from'],
         ['**Uploaded on their site**, **On sale there since**', 'The dates the other store keeps for the product: when it was added there, and — only when it is a different day — since when shoppers could see it. Shopify stores give both; other stores usually give none'],
         ['**Brand**', 'The store\'s brand or vendor field'],
