@@ -91,7 +91,7 @@ export async function sendFacts(c: ListingRow, userId: string | null, cols: ColC
   try {
     const now = await listingFacts(l, p, site), was = l.sent ?? null;
     if (!l.facts_force && sameFacts(now, was)) return settled({ ...clear, ...noteAfter(l, []) }); // the store has them already
-    const old = String(was?.type ?? l.product_type ?? '');
+    const old = String(was?.type || l.product_type || ''); // an empty type on record is no type: the listing's own says what the store has
     await ensureCollection(site, now.type, old, cols, ms);
     const d = await gql<{ product: { id: string; tags: string[] } | null }>(site, READ, { id }, ms);
     if (!d.product) return settled(clear); // deleted in Shopify: the next publish says so on the listing

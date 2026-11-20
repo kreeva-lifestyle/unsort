@@ -26,6 +26,9 @@ function passes(l, path) {
   return true;
 }
 
+/** A collection's rules: the ones the test gave, else one that files its own title (as store setup makes it). */
+const rulesOf = (w, c) => w.rules[c.id] ?? [{ id: `r-${c.id}`, title: `Product type ${c.title}` }];
+
 export function world(o = {}) {
   const w = {
     product: { id: P, vendor_id: null, source: 'import', sku: 'KB 302', name: 'Maroon lehenga', category: 'Lehenga', fabric: 'Georgette', color: 'Maroon', sizes: ['M'], in_stock: true, temp_out_at: null, perm_out_at: null,
@@ -41,7 +44,7 @@ export function world(o = {}) {
     attrs: o.attrs ?? [{ id: 'a1', key: 'Colour', multi: false, by_category: false }, { id: 'a2', key: 'Work', multi: true, by_category: false }],
     store: o.store === undefined ? { id: GID, tags: ['Saree', 'Red', 'Typed In Shopify'], productType: 'Saree' } : o.store,
     collections: o.collections ?? [{ id: 'gid://shopify/Collection/1', handle: 'saree', title: 'Saree' }, { id: 'gid://shopify/Collection/2', handle: 'lehenga', title: 'Lehenga' }],
-    rules: o.rules ?? {}, // collection id → [{ id, title }]
+    rules: o.rules ?? {}, // collection id → [{ id, title, types? }]; a collection not named here files its own title
     categories: o.categories ?? ['Saree', 'Lehenga'],
     published: o.published ?? [], activity: [], calls: [], refuse: o.refuse ?? null, down: !!o.down, noCollection: o.noCollection ?? null, onUpdate: o.onUpdate ?? null,
   };
@@ -72,19 +75,21 @@ export function world(o = {}) {
       if (name === 'PbFieldKinds') return ok({ data: { metafieldDefinitions: { nodes: [] } } });
       if (name === 'PbFields') return ok({ data: { metafieldsSet: { userErrors: [] } } });
       if (name === 'PbFieldsDrop') return ok({ data: { metafieldsDelete: { deletedMetafields: v.metafields.map(m => ({ key: m.key })), userErrors: [] } } });
-      if (name === 'PbCols') return ok({ data: { collections: { nodes: w.collections, pageInfo: { hasNextPage: false, endCursor: null } } } });
+      if (name === 'PbCols') return ok({ data: { collections: { nodes: w.collections.map(c => ({ ...c, sources: rulesOf(w, c).map(r => ({ id: r.id, title: r.title,
+        inclusion: { conditions: (r.types ?? [r.title.replace(/^Product type /, '')]).map(t => ({ __typename: 'CollectionSourceInclusionConditionProductType', relation: 'EQUALS', values: [t] })) } })) })),
+        pageInfo: { hasNextPage: false, endCursor: null } } } });
       if (name === 'PbCol') {
         if (w.noCollection) return ok({ data: { collectionCreate: { collection: null, userErrors: [{ field: ['title'], message: w.noCollection }] } } });
         const made = { id: `gid://shopify/Collection/${w.collections.length + 1}`, handle: v.c.handle, title: v.c.title };
         w.collections.push(made);
         return ok({ data: { collectionCreate: { collection: made, userErrors: [] } } });
       }
-      if (name === 'PbColRules') return ok({ data: { collection: { id: v.id, sources: w.rules[v.id] ?? [] } } });
       if (name === 'PbColUpdate') {
         if (w.refuse) return ok({ data: { collectionUpdate: { collection: null, userErrors: [{ field: ['title'], message: w.refuse }] } } });
         const c = w.collections.find(x => x.id === v.c.id);
-        c.title = v.c.title;
-        for (const s of v.c.sourcesToCreate || []) (w.rules[c.id] ??= []).push({ id: `rule${(w.rules[c.id] || []).length + 1}`, title: s.source.title });
+        w.rules[c.id] = rulesOf(w, c); // as they were, before the title changes
+        if ('title' in v.c) c.title = v.c.title;
+        for (const s of v.c.sourcesToCreate || []) w.rules[c.id].push({ id: `rule${w.rules[c.id].length + 1}`, title: s.source.title });
         return ok({ data: { collectionUpdate: { collection: { id: c.id, title: c.title }, userErrors: [] } } });
       }
       if (body.query.includes('publications')) return ok({ data: { publications: { nodes: [{ id: 'gid://shopify/Publication/1', catalog: { title: 'Online Store' } }] } } });
@@ -93,7 +98,10 @@ export function world(o = {}) {
     }
     const path = u.replace('https://sb.example/rest/v1/', '');
     w.calls.push({ shopify: false, name: `${method} ${path.split('?')[0]}`, path, body });
-    if (method === 'HEAD') return new Response(null, { status: 200, headers: { 'content-range': `0-0/${o.count ?? 1}` } });
+    if (method === 'HEAD') { // a count: the products filed under a category, else `o.count`
+      const cat = /^pb_products\?.*category=eq\.([^&]+)/.exec(path);
+      return new Response(null, { status: 200, headers: { 'content-range': `0-0/${cat ? (w.product.category === cat[1] ? 1 : 0) : o.count ?? 1}` } });
+    }
     if (path.startsWith('pb_products?')) return ok([w.product]);
     if (path.startsWith('pb_websites?')) return ok(path.includes('active=eq.true') && !w.site.active ? [] : [w.site]);
     if (path.startsWith('pb_website_secrets?')) return ok(method === 'GET' ? [{ access_token: 'shpat_test', online_store_publication_id: 'gid://shopify/Publication/1' }] : [{}]);

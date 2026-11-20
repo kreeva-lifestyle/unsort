@@ -85,7 +85,7 @@ export async function publishOne(l: ListingRow, o: { manual: boolean; putBack?: 
     if (currency && currency !== CURRENCY) throw new HttpError(400, wrongCurrency(site.name, currency));
     const [seoRows, facts] = await Promise.all([seoGet([l.id]), listingFacts(l, p, site)]);
     const profile = profileOf(site), faq = seoRows.get(l.id)?.faq ?? [];
-    const paths = imgs.map(i => i.path), was = last?.details ?? null, wasType = String(l.sent?.type ?? l.product_type ?? '');
+    const paths = imgs.map(i => i.path), was = last?.details ?? null, wasType = String(l.sent?.type || l.product_type || '');
     const live = site.publish_mode !== 'draft'; // review sites go live once a person approved
     const altHandle = (h: string) => `${h.slice(0, 72)}-${l.id.slice(0, 6)}`;
     const first = l.handle || makeHandle(l.title || '', p.sku, p.id); // never without one: a lost create is found again by its handle

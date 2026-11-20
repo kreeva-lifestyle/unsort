@@ -1963,11 +1963,23 @@ next small-send run finds the record equal and clears it without a call.
 (not for a listing whose tags are typed).
 
 ### Collections follow — `storeCollections.ts` (used by `storeSetup.ts` too)
+- **Which collection is a category's**: the one that *files its products* —
+  a rule "product type = the category" — whatever it is called
+  (`storeFields.ts sameCollection`; `listCollections` reads every
+  collection's rules, `Have.rules[].types`). The one that also carries the
+  name (same address or title) comes first, then any that files it, and only
+  then one that merely carries the name. Code check, 2026-11-20: SuratMandi's
+  own collection for sarees is `/collections/sarees`, titled "Sarees", filled
+  by product type Saree; matched by name only it was not recognised, so a
+  product moved into Saree would have made a second, public "Saree".
 - `ensureCollection(site, type, was, cache)`, before a product's type changes
   on a store: when the store files by type (it has a collection for the old
-  type, `storeFields.ts sameCollection`) and has none for the new one, that
-  collection is made first, exactly as store setup makes it
-  (`makeCollection`: `collectionInput`, then the Online Store). When Shopify
+  type) and has none for the new one, that collection is made first, exactly
+  as store setup makes it (`makeCollection`: `collectionInput`, then the
+  Online Store) — or, when the old name is **gone from Playbook** (off the
+  list and no product filed under it: a rename this store missed, because it
+  failed then or its website was off), the old collection takes the new name
+  as a rename gives it (`renameOn`), so no second collection is made. When Shopify
   does not make it the send fails: the product keeps its old type and its old
   collection, and is tried again. A store with no collection for the old type
   gets the new type without one. One store at a time (`turns`: two listings
@@ -1979,23 +1991,28 @@ next small-send run finds the record equal and clears it without a call.
   database call and by the revert of a rename with the names swapped
   (`categoryRevert.ts`; both through `categoryMove.ts storesThenDatabase`):
   on every website that is switched on and connected,
-  the store's collection for the old name takes the new **title** and gets a
-  second rule "product type = new name" (`collectionUpdate` with
-  `sourcesToCreate`; the old rule stays). Its page, address and menu links
+  the collection that files the old name gets a second rule "product type =
+  new name" (`collectionUpdate` with `sourcesToCreate`; the old rule stays;
+  added unless a rule names the new name exactly, capitals included) and
+  takes the new **title** when its title was the old name (a title of the
+  store's own, "Sarees", stays). Its page, address and menu links
   stay, and it holds the category's products the whole time they are re-typed
   one by one. Tried on SuratMandi, 2026-11-20: a collection's rules add up —
   a product matching either one is in it. Per website: `renamed`; `kept` (the
-  new name has a collection of its own already; products move over as they
-  are re-typed); `none` (the store has no collection for the old name);
+  new name has a collection of its own that carries the name **and** files
+  it; products move over as they are re-typed — a hand-picked collection that
+  merely carries the name does not stop the rename); `none` (the store has
+  no collection for the old name);
   `failed` + `note`. It never throws: the rename goes on, and
   `ensureCollection` makes a collection for the new name when the first
   product is re-typed. When the database then refuses the rename, the same
   call with the names swapped puts the title back (the second rule stays: a
   product type nobody has).
-- Nothing is ever deleted on a store: a category moved away leaves its
-  collection there, empty. A website that is switched off when a category is
-  renamed is not asked: once it is on again its products are re-typed, and
-  the new name gets a collection of its own beside the old one.
+- Nothing is ever deleted on a store, a rule included: a category moved away
+  leaves its collection there, empty, and a renamed collection keeps the rule
+  for its old name. A website that is switched off when a category is renamed
+  is not asked: once it is on again, the first product re-typed gives its
+  collection the new name (`ensureCollection`, above).
 
 ### The worker — `worker.ts`
 `sendFactsDue` (`CAPS.facts` = 60) runs right after the pause check, for up

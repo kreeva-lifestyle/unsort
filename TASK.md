@@ -198,9 +198,13 @@ product is live (checked against the code and all 504 store products,
   text. Next: it is sent again as it is.
 - **Shopify's own "category" box** (not the collection) is filled when a
   product is first sent and does not follow a later category change.
-- **A website that is switched off when a category is renamed** keeps the
-  old collection name. Once it is on, its products get the new product
-  type and a second collection is made for the new name beside the old one.
+- **A renamed collection keeps the rule for its old name.** If that old
+  name is used again for another category later, its products also show in
+  the renamed collection. Next: the old rule is taken off once no product
+  on the store has the old name.
+- **A new collection that Shopify would not show** (made, but the Online
+  Store step failed) stays hidden and nothing says so. Next: the step is
+  tried again and the listing says why.
 - **A product Shopify keeps refusing** (its category, tags or fields) is
   tried again every 5 minutes for as long as it takes; its listing says
   why. Next: after the third refusal it waits an hour between tries.
