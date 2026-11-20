@@ -1,25 +1,23 @@
-// Step 4 — Publish one CLAIMED listing ('publishing') to its Shopify store
-// with productSet (synchronous), then its custom fields (metafieldsSet) and the
-// Online Store channel. Never makes a second copy: before a create, a product
-// this listing made earlier (id lost to a timeout / crash) is found by handle +
-// metafield and updated instead, and the Shopify id is saved the moment
-// productSet returns. Unpublish lives in unpublish.ts; the parts in
-// publishParts.ts.
+// Step 4 — Publish one CLAIMED listing ('publishing') to its Shopify store with productSet (synchronous), then its
+// custom fields (metafieldsSet) and the Online Store channel. Never makes a second copy: before a create, a product this
+// listing made earlier (id lost to a timeout / crash) is found by handle + metafield and updated instead, and the
+// Shopify id is saved the moment productSet returns. Unpublish lives in unpublish.ts; the parts in publishParts.ts.
 // Shopify sync check, 2026-11-12:
-//   * an update keeps what people did in Shopify: their tags, their media, the
-//     channels they chose (the channel step runs on a create, on Put back and
-//     after it failed, not on every update), status and category;
-//   * a product someone deleted in Shopify is not made again by the worker
-//     (the listing is set aside with a note; "Put back on site" lists it again);
-//   * Shopify being busy does not use up the listing's three attempts, and a
-//     listing is not called published while the channel step still has to pass
-//     (pre-launch check, 2026-11-13: nor when that step is refused — saved on
-//     Shopify but shown nowhere is Failed, with the reason, not Published);
+//   * an update keeps what people did in Shopify: their tags, their media, the channels they chose (the channel step
+//     runs on a create, on Put back and after it failed, not on every update), status and category;
+//   * a product someone deleted in Shopify is not made again by the worker (the listing is set aside with a note; "Put
+//     back on site" lists it again);
+//   * Shopify being busy does not use up the listing's three attempts, and a listing is not called published while the
+//     channel step still has to pass (pre-launch check, 2026-11-13: nor when that step is refused — saved on Shopify
+//     but shown nowhere is Failed, with the reason, not Published);
 //   * a store that does not sell in rupees gets nothing (shopify.ts CURRENCY).
+// 20 Nov 2026: the tags and custom fields are the product's as it is NOW (listingFacts.ts), and what the store took is
+// recorded (pb_listings.sent). A product already on the store keeps the product type it has there: a changed category is
+// the small send's to move, because that one makes the collection first (factsSend.ts); the listing is marked for it.
 import { enc, logActivity, nowIso, one, patch, sel } from './db.ts';
 import { makeHandle } from './content.ts';
 import { faqHtml, fieldInputs } from './fields.ts';
-import { dropFields, sendFields } from './fieldsSend.ts';
+import { syncFields } from './fieldsSend.ts';
 import { emptied, listingFacts, sentOf } from './listingFacts.ts';
 import { HttpError, plain } from './http.ts';
 import { compareAt } from './pricing.ts';
@@ -34,8 +32,7 @@ import { PERM_NOTE, retire, stockMoved } from './stockSend.ts';
 import { ARCHIVED, LISTING_COLS, NEEDS_INFO, PRODUCT_COLS, WEBSITE_COLS, permOut, type Budget, type ListingRow, type ProductRow, type WebsiteRow } from './types.ts';
 
 /** Time a publish needs left before it starts: lookups + a slow productSet + the Online Store step. */
-export const PUBLISH_NEEDS_MS = 60_000;
-const SET_MS = 90_000;
+export const PUBLISH_NEEDS_MS = 60_000, SET_MS = 90_000;
 
 export { claimPublish, pubCandidates } from './publishQueue.ts';
 
@@ -86,10 +83,9 @@ export async function publishOne(l: ListingRow, o: { manual: boolean; putBack?: 
     if (!(Number(l.price) > 0)) throw new HttpError(400, 'This listing has no price — regenerate it or type one.');
     const currency = await shopCurrency(site, ms(15_000));
     if (currency && currency !== CURRENCY) throw new HttpError(400, wrongCurrency(site.name, currency));
-    // The product type, tags and custom fields are worked out from the product as it is now, at every send (listingFacts.ts).
     const [seoRows, facts] = await Promise.all([seoGet([l.id]), listingFacts(l, p, site)]);
     const profile = profileOf(site), faq = seoRows.get(l.id)?.faq ?? [];
-    const paths = imgs.map(i => i.path), was = last?.details ?? null;
+    const paths = imgs.map(i => i.path), was = last?.details ?? null, wasType = String(l.sent?.type ?? l.product_type ?? '');
     const live = site.publish_mode !== 'draft'; // review sites go live once a person approved
     const altHandle = (h: string) => `${h.slice(0, 72)}-${l.id.slice(0, 6)}`;
     const first = l.handle || makeHandle(l.title || '', p.sku, p.id); // never without one: a lost create is found again by its handle
@@ -117,7 +113,7 @@ export async function publishOne(l: ListingRow, o: { manual: boolean; putBack?: 
     // (put_back: a vendor's stock notice taken back); a plain update leaves whatever people set in Shopify (e.g. a
     // draft site's product made visible there).
     let sendStatus = false, gallery: Gallery = { files: null, fresh: [] }, known = knownPhotos(was, null, false);
-    let noCategory = false, noFiles = false, triedAlt = false;
+    let noCategory = false, noFiles = false, triedAlt = false, type = '';
     let handle = l.handle || existing?.handle || first; // a product on the store keeps the address it has
     const run = () => {
       sendStatus = !existing || !!adopted || !!o.putBack || !!l.put_back;
@@ -125,7 +121,8 @@ export async function publishOne(l: ListingRow, o: { manual: boolean; putBack?: 
       gallery = noFiles || leaveGallery(was, paths, known, !!existing, !!adopted) ? { files: null, fresh: [] }
         : filesFor({ paths, alts: l.image_alts || [], known, store: existing?.media ?? null });
       const tags = existing ? mergeTags(existing.tags, adopted ? null : l.sent?.tags ?? was?.tags ?? null, facts.tags) : facts.tags;
-      const input = buildProductInput({ l: { ...l, handle, tags, compare_at_price: compare }, p: coded, site, vendor: profile.brand, files: gallery.files, live, sendStatus, existing, tail: profile.faq_in_description ? faqHtml(faq) : '', noCategory });
+      type = existing && wasType ? wasType : facts.type || wasType; // on the store already: the type it has there (see the header)
+      const input = buildProductInput({ l: { ...l, handle, tags, compare_at_price: compare }, p: coded, site, vendor: profile.brand, files: gallery.files, live, sendStatus, existing, tail: profile.faq_in_description ? faqHtml(faq) : '', noCategory, type });
       sent.push(handle);
       return gql<SetReply>(site, PRODUCT_SET, { input, identifier: existing ? { id: existing.id } : null }, ms(SET_MS));
     };
@@ -161,7 +158,8 @@ export async function publishOne(l: ListingRow, o: { manual: boolean; putBack?: 
     if (noCategory) warnings.push('Saved on Shopify without its standard category (the store did not accept it): choose the category in Shopify.');
     if (noFiles) warnings.push('Saved on Shopify, but the store did not take the change to its photos: check the photos there.');
     // Its custom fields; and off the product any Playbook filled before whose value went empty.
-    for (const w of [await sendFields(site, profile.custom_fields ? fieldInputs(prod.id, p, faq, facts.attrs) : [], ms(30_000)), await dropFields(site, prod.id, emptied(facts, l.sent), ms(30_000))]) if (w) warnings.push(w);
+    const f = await syncFields(site, prod.id, profile.custom_fields ? fieldInputs(prod.id, p, faq, facts.attrs) : [], emptied(facts, l.sent), ms(30_000));
+    warnings.push(...f.notes);
     if (owed) { // not shown to shoppers = not published: the listing fails here (owed stays → channel_due) and is tried again
       const cw = await toOnlineStore(site, prod.id, ms(30_000));
       if (cw) throw new HttpError(400, cw);
@@ -172,12 +170,13 @@ export async function publishOne(l: ListingRow, o: { manual: boolean; putBack?: 
     const media = photoRecord(gallery, paths, known, (prod.media?.nodes || []).map(m => m.id));
     // `photos_tried`: the list the store refused, so routing does not send the same list again by itself (route.ts `behind`).
     const photos = noFiles ? { photos: was?.photos ?? [], ...(was?.media ? { media: was.media } : {}), photos_tried: paths } : { photos: paths, ...(media ? { media } : {}) };
-    const at = nowIso();
+    const at = nowIso(), owes = f.again || (!!facts.type && facts.type !== type); // fields the store did not answer for, or a category to move: the small send follows
     const saved = await patch<ListingRow>('pb_listings', mine, gone
       ? { status: 'skipped', shopify_status: prod.status, attempts: 0, error: PERM_NOTE, claimed_at: null, put_back: false } // archived on Shopify: off the website
       : { status: 'published', shopify_status: prod.status, published_at: at, ...(l.first_published_at ? {} : { first_published_at: at }), // the first time only: a re-send does not make it new again
         attempts: 0, error: warning, claimed_at: null, put_back: false, ...(gallery.fresh.length ? { media_checked_at: null } : {}),
-        tags: facts.tags, product_type: facts.type || l.product_type, sent: sentOf(facts, l.sent) }, LISTING_COLS); // what the store has now (factsSend.ts compares with it)
+        tags: facts.tags, product_type: type || l.product_type, sent: sentOf({ ...facts, type }, l.sent, f.notIn, f.stayed), // what the store took (factsSend.ts compares with it)
+        ...(owes ? { facts_due: true, facts_tried_at: null } : {}) }, LISTING_COLS);
     await logActivity({ product_id: l.product_id, website_id: l.website_id, listing_id: l.id, action: 'published', details: { shopify_product_id: prod.id, status: prod.status, update: !!existing, ...(adopted ? { adopted: true } : {}), ...photos, tags: facts.tags, sizes: p.sizes || [], sku: p.sku || '', in_stock: p.in_stock !== false, ...(warning ? { warning } : {}) }, user_id: o.userId });
     if (gone) await retire(l.product_id); else await stockMoved(l.id, p); // the stock changed while this was sent → its own send follows
     if (!saved[0]) throw new HttpError(409, 'Published on Shopify, but the listing changed meanwhile — open it again.');

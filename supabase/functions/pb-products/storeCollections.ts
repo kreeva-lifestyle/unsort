@@ -9,6 +9,8 @@
 //     new name. It is given a second rule for the new product type and keeps the old one, so it holds the category's
 //     products the whole time they are re-typed one by one, and a rename taken back only changes the title again.
 //     (Tried on SuratMandi, 20 Nov 2026: a collection's rules add up — a product matching either one is in it.)
+//     It runs BEFORE the database renames the products (categoryMove.ts): the moment a product is owed its new type,
+//     the collection for it is already there, so no send can find it missing and make a second one.
 // Nothing is ever deleted on a store.
 import { sel } from './db.ts';
 import { HttpError, plain } from './http.ts';
@@ -61,6 +63,10 @@ export function ensureCollection(site: WebsiteRow, type: string, was: string, ca
     if (!have) { have = await listCollections(site, ms); cache.set(key, have); }
     if (sameCollection(have, type)) return;
     if (!was || !sameCollection(have, was)) return; // this store does not file that type in a collection: nothing to keep whole
+    // Asked again right before one is made: this run's list can be minutes old, and a rename may have given the old
+    // collection this very name meanwhile (code check, 20 Nov 2026: a second collection of the same name).
+    have = await listCollections(site, ms); cache.set(key, have);
+    if (sameCollection(have, type) || !sameCollection(have, was)) return;
     const r = await makeCollection(site, type, ms);
     if (!r.made) throw new HttpError(400, `${site.name}: Shopify did not make the collection for ${type} (${r.note}), so the product keeps its old product type for now.`);
     have.push(r.made);
@@ -71,9 +77,9 @@ export function ensureCollection(site: WebsiteRow, type: string, was: string, ca
 
 export interface StoreRename { website: string; status: 'renamed' | 'kept' | 'none' | 'failed'; note?: string }
 
-/** A category was renamed `from` → `to`: on every website that is switched on, its collection takes the new name.
+/** A category is renamed `from` → `to`: on every website that is switched on, its collection takes the new name.
  *  'none': the store has no collection for it; 'kept': the new name has a collection of its own already (products move
- *  over as they are re-typed). Never throws: the rename itself is done, and a store that fails is said in its row —
+ *  over as they are re-typed). Never throws: a store that fails is said in its row, and the rename goes on —
  *  ensureCollection then makes a collection for the new name when the first product is re-typed. */
 export async function renameCollections(from: string, to: string): Promise<StoreRename[]> {
   const out: StoreRename[] = [];

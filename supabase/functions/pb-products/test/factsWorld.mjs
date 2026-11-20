@@ -1,9 +1,10 @@
 // A fake Supabase and a fake Shopify for the small send of a product's type, tags and custom fields (factsSend.ts,
 // storeCollections.ts, factsSite.ts) and for a full publish of the same listing (publish.ts). Not a test: shared by
 // factsSend.test.mjs, factsStore.test.mjs and publishFacts.test.mjs.
-// The listing filters the send relies on are applied for real (facts_due, the stamp facts_tried_at, tags locked, no note), and
-// `w.onUpdate` runs while the store is being updated, so a test can change the product "meanwhile" as the database
-// trigger would (pb_facts_follow wipes the stamp).
+// The listing filters the send relies on are applied for real (facts_due, the stamp facts_tried_at, tags locked, no note,
+// still the same Shopify product), a PATCH answers with the row as it is afterwards (the send works from the row its
+// stamp returns), and `w.onUpdate` runs while the store is being updated, so a test can change the product "meanwhile"
+// as the database trigger would (pb_facts_follow wipes the stamp). `w.categories` = Playbook's category list.
 globalThis.Deno = { env: { get: (k) => (k === 'SUPABASE_URL' ? 'https://sb.example' : 'test') } };
 
 export const P = 'cccccccc-0000-4000-8000-000000000001', W = 'eeeeeeee-0000-4000-8000-000000000001', L = 'dddddddd-0000-4000-8000-000000000001';
@@ -20,6 +21,8 @@ function passes(l, path) {
   if (untried && l.facts_tried_at && !(l.facts_tried_at < untried[1])) return false;
   if (q.includes('locked=not.cs.{tags}') && (l.locked || []).includes('tags')) return false;
   if (/(^|&)error=is\.null/.test(q) && l.error) return false;
+  const on = /(^|&)shopify_product_id=eq\.([^&]+)/.exec(q);
+  if (on && l.shopify_product_id !== on[2]) return false;
   return true;
 }
 
@@ -39,6 +42,7 @@ export function world(o = {}) {
     store: o.store === undefined ? { id: GID, tags: ['Saree', 'Red', 'Typed In Shopify'], productType: 'Saree' } : o.store,
     collections: o.collections ?? [{ id: 'gid://shopify/Collection/1', handle: 'saree', title: 'Saree' }, { id: 'gid://shopify/Collection/2', handle: 'lehenga', title: 'Lehenga' }],
     rules: o.rules ?? {}, // collection id → [{ id, title }]
+    categories: o.categories ?? ['Saree', 'Lehenga'],
     published: o.published ?? [], activity: [], calls: [], refuse: o.refuse ?? null, down: !!o.down, noCollection: o.noCollection ?? null, onUpdate: o.onUpdate ?? null,
   };
   const names = () => w.calls.map(c => c.name);
@@ -103,8 +107,9 @@ export function world(o = {}) {
     if (path.startsWith('pb_listings?') && method === 'PATCH') {
       if (!passes(w.listing, path)) return ok([]);
       Object.assign(w.listing, body);
-      return ok([{ id: L }]);
+      return ok([{ ...w.listing }]);
     }
+    if (path.startsWith('pb_settings?key=eq.categories')) return ok([{ value: w.categories }]);
     if (path.startsWith('pb_activity?') && method === 'GET') return ok(path.includes('action=eq.failed') ? [] : w.published);
     if (path.startsWith('pb_activity') && method === 'POST') { w.activity.push(body[0]); return ok([{}], 201); }
     return ok(method === 'GET' ? [] : [{}], method === 'POST' ? 201 : 200);

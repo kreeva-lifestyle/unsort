@@ -75,7 +75,7 @@ export function weightOf(text: unknown): { value: number; unit: 'GRAMS' | 'KILOG
 
 /** `vendor` (the store's brand) and `l.tags` are sent as given (publish.ts merges the store's own tags in);
  *  `files` = publishParts.ts filesFor, null when the photos need no change. */
-export function buildProductInput(a: { l: ListingRow; p: ProductRow; site: WebsiteRow; vendor: string; files: Record<string, unknown>[] | null; live: boolean; sendStatus: boolean; existing: Existing | null; tail?: string; noCategory?: boolean }): Record<string, unknown> {
+export function buildProductInput(a: { l: ListingRow; p: ProductRow; site: WebsiteRow; vendor: string; files: Record<string, unknown>[] | null; live: boolean; sendStatus: boolean; existing: Existing | null; tail?: string; noCategory?: boolean; type?: string }): Record<string, unknown> {
   const { l, p, site, existing } = a;
   const tracked = !!site.track_inventory, inStock = p.in_stock !== false;
   const price = money(l.price);
@@ -136,7 +136,7 @@ export function buildProductInput(a: { l: ListingRow; p: ProductRow; site: Websi
     ...(l.handle ? { handle: l.handle } : {}),
     ...(handleMoves ? { redirectNewHandle: true } : {}), // the old URL keeps working
     ...(a.vendor ? { vendor: a.vendor } : {}),
-    productType: p.category || l.product_type || '', // the category as it is NOW: a rename or move reaches the store (the listing's copy only when the product has none)
+    productType: a.type ?? (p.category || l.product_type || ''), // `type`: publish.ts decides (a product on the store keeps its type until the small send moves it with its collection)
     ...(category ? { category } : {}),
     tags: l.tags || [],
     // A permanent stock-out (stock.ts takeOffSale): the Shopify product is archived, whatever else this send says.

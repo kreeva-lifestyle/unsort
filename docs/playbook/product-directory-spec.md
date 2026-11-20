@@ -723,13 +723,16 @@ products, the Product Type ticks and `pb_routing_rules.conditions.categories`.
 `category_rename { from, to }` → `pb_category_rename` changes all five in one
 transaction (a case-only rename too; `to` already on the list is refused —
 that is a move). Since 2026-11-20 a sixth place follows, outside that
-transaction: the stores. The products on sale get the new product type one by
-one (`pb_facts_follow` marks their listings, `factsSend.ts` sends), and right
-after the database call `storeCollections.ts renameCollections(from, to)`
-gives the category's collection the new title on every website that is
-switched on and connected; the answer is `{ ok, renamed, run_id, stores:
-[{ website, status: 'renamed' | 'kept' | 'none' | 'failed', note? }] }`
-(last section). `category_move { from, to, remove? }` → `pb_category_move`
+transaction: the stores. **Before** the database call
+`storeCollections.ts renameCollections(from, to)` gives the category's
+collection the new title on every website that is switched on and connected
+(`categoryMove.ts storesThenDatabase`: only when the server's own look at the
+list says the database will take the rename, and the title is put back when
+the database still refuses); then the products on sale get the new product
+type one by one (`pb_facts_follow` marks their listings, `factsSend.ts`
+sends). Stores first, so no product is ever owed a type whose collection is
+not there yet. The answer is `{ ok, renamed, run_id, stores: [{ website,
+status: 'renamed' | 'kept' | 'none' | 'failed', note? }] }` (last section). `category_move { from, to, remove? }` → `pb_category_move`
 files every product of `from` (on the list or not, any status) under `to`
 (the list's spelling) and checks them again; `remove` then takes `from` off
 the list (`categories_save`, its own bulk change); "Let AI decide" is queued
@@ -742,7 +745,7 @@ category nobody locked (`pb_products` category is now recorded by
 `pb_bulk_capture`), then checks and retags them by the rules. Since
 2026-11-20 both reverts reach the stores as the change did: the products'
 listings are marked by the same trigger, and a rename taken back calls
-`renameCollections(to, from)`. The Tags page:
+`renameCollections(to, from)`, again before its database call. The Tags page:
 a Name field with **Rename** in the category sheet; **Remove category** with
 products opens the move box (Move to … / Remove without moving / Cancel);
 **Waiting for a category** lists names off the list that still have
@@ -1812,7 +1815,7 @@ Migration `20261120100000_pb_facts_send.sql` (additive).
 
   | table | fires when one of these changed | marks the listings of |
   |---|---|---|
-  | `pb_products` | category, fabric, color, tags, attributes, sku, sizes, vendor_id | that product |
+  | `pb_products` | category, fabric, color, tags, attributes, sku, sizes, vendor_id; or its status leaves `archived` (a restore: nothing is sent while a product is archived, so what changed meanwhile goes then) | that product |
   | `pb_attributes` | name, key, multi, shopify_prefix, by_category | the products carrying one of its values |
   | `pb_attribute_values` | name, categories | the products carrying that value |
   | `pb_vendors` | name, codes | that vendor's products |
@@ -1821,10 +1824,13 @@ Migration `20261120100000_pb_facts_send.sql` (additive).
   listings that are **on sale on Shopify** (`shopify_product_id is not null
   and not (status = 'skipped' and coalesce(shopify_status, '') in ('DRAFT',
   'ARCHIVED'))`: the rule of `pb_stock_save` and `stockSend.ts ON_SALE`),
-  whatever their website (on a switched-off website the mark waits), and
-  skips a listing already marked and never tried (no second write for one
-  change). Nothing is marked for a change of name, cost, status or text
-  only, or for a new "also known as" word.
+  whatever their website (on a switched-off website the mark waits). Every
+  change writes the row, a listing already marked included: the write holds
+  the row until the change commits, so a send's stamp waits for it and then
+  reads the product as changed (code check, 2026-11-20: leaving a marked row
+  unwritten let a send read the old product and clear the mark). Nothing is
+  marked for a change of name, cost, text or any other status change, or for
+  a new "also known as" word.
 - So no path can be missed: the product page (a write straight from the
   browser, `data/products.ts`), `pb_category_rename`, `pb_category_move`, a
   re-read, Retag all, "Let AI decide", `product_values_set` (the Ready check
@@ -1855,73 +1861,106 @@ Used by both sends, so they cannot drift apart.
   attribute values (three small reads). `sameFacts(now, was)`: no record =
   not the same; tags are compared as a set, capitals and order aside
   (`sameTags`); an empty category is never a difference, nor are the fields
-  of a website that sends none. `sentOf` = the record of a send (a website
-  that sends no fields keeps the earlier record of them). `emptied` = the
-  keys on record that the product no longer has a value for.
+  of a website that sends none. `sentOf(now, was, notIn, stayed)` = the record
+  of a send: **only what the store took**. A field it did not take keeps the
+  value it had from Playbook, or none (so the record differs and the field is
+  sent again; a field that is the store's own is never on record, so never
+  taken off); a field that could not be taken off stays on record (so it is
+  taken off again); a website that sends no fields keeps the earlier record
+  of them. `emptied` = the keys on record that the product no longer has a
+  value for.
 
 ### The small send — `factsSend.ts`
-`sendFacts(l, userId, cols, ms)` for one due listing, in this order:
-1. off sale (`stockSend.ts offSale`) → the mark is cleared, nothing sent;
-2. a run is publishing the listing right now → wait: that publish sends the
-   same facts and records them;
-3. the product or website is gone, or the product is **archived** → cleared,
-   nothing sent (its listing stays on the store as it was);
-4. the **website is switched off** → wait: the mark stays;
-5. the try is stamped (`facts_tried_at = now`), only where the listing is
-   still due and not tried in the last 5 minutes (another run has it → wait);
-6. not forced and **the record equals** what the product gives now
+`sendFacts(c, userId, cols, ms)` for one due listing (`c` = the row as the
+worker's page of candidates read it), in this order:
+1. by that row: off sale (`stockSend.ts offSale`) → the mark is cleared,
+   nothing sent; a run is publishing the listing right now → wait (that
+   publish sends the same tags and fields and records them);
+2. **the try is stamped first** (`facts_tried_at = now`), only where the
+   listing is still due and not tried in the last 5 minutes (another run has
+   it → wait), and the send works from the row the stamp returns. Everything
+   after the stamp is read fresh. A change that commits before the stamp is
+   in what is read; one that commits after it wipes the stamp. (Code check,
+   2026-11-20: reading the product before stamping lost a change that landed
+   in between, and the button's "send anyway" with it);
+3. by the fresh row: off sale → cleared; a publish holds it → the stamp is
+   handed back, wait;
+4. the product or website is gone, or the product is **archived** → cleared,
+   nothing sent (its listing stays on the store as it was; a restore marks
+   it again); the **website is switched off** → the stamp is handed back,
+   wait: the mark stays;
+5. not forced and **the record equals** what the product gives now
    (`sameFacts(now, l.sent)`) → cleared with **no call to Shopify**, so a
    mark too many costs nothing;
-7. `ensureCollection` (below), then the store's tags are read; the **product
+6. `ensureCollection` (below), then the store's tags are read; the **product
    was deleted in Shopify** → cleared (the next publish says so on the
    listing);
-8. `productUpdate { id, productType, tags }`, the tags through `mergeTags`
+7. `productUpdate { id, productType, tags }`, the tags through `mergeTags`
    (the store's tags that are not on Playbook's record — `sent.tags`, else
-   the last `published` row's — stay);
-9. on a website with custom fields: `sendFields` (`metafieldsSet`, without
-   `custom.faq`: the questions belong to the text) and `dropFields`
-   (`metafieldsDelete`) for the `emptied` keys, so a value removed in
-   Playbook does not live on at the store; a field nobody recorded is never
-   touched; their notes become the row's `warning`;
-10. `sent` and `product_type` are saved on the listing whatever happened
-    meanwhile; the mark and `facts_force` are cleared **only where the stamp
-    still stands**. A change of the product while the send was on its way
-    wipes the stamp (the trigger), so the mark stays for the next run and the
-    newer change is never lost. The listing's `tags` become the ones sent,
-    unless a person typed tags meanwhile;
-11. activity `facts_sent`: `type` and `was_type` (when the type changed),
-    `tags`, `fields` (how many), `cleared` (keys taken off), `asked: true`
-    (forced), `warning`.
+   the last `published` row's — stay). The type and tags go **on record at
+   once** (`sent`, `product_type`), before the fields: if the fields fail,
+   the next try still knows which of the store's tags are Playbook's;
+8. on a website with custom fields: `fieldsSend.ts syncFields` =
+   `sendFields` (`metafieldsSet`, without `custom.faq`: the questions belong
+   to the text) and `dropFields` (`metafieldsDelete`) for the `emptied` keys,
+   so a value removed in Playbook does not live on at the store. Both say
+   which keys they left undone (`FieldsLeft`), and whether the store simply
+   did not answer (a time-out, an empty answer): then what it took is put on
+   record and the send **fails**, so it is tried again. A field refused by
+   the store's own rules is a warning, not a failure;
+9. `sent` (only what the store took) and `product_type` are saved whatever
+   happened meanwhile; the mark and `facts_force` are cleared **only where
+   the stamp still stands**. Where it is gone — the product changed while
+   the send was on its way, or a newer send finished first and this older
+   one reached the store last — the listing is marked again with
+   `facts_force`, so the next send goes whatever the record says. The
+   listing's `tags` become the ones sent, unless a person typed tags
+   meanwhile;
+10. activity `facts_sent`: `type` and `was_type` (when the type changed),
+    `tags`, `fields` (how many are on record), `cleared` (keys taken off),
+    `asked: true` (forced), `warning`.
 
-A **failure** (Shopify refuses this product, or a collection could not be
-made) leaves the stamp, so it is tried again 5 minutes later (`RETRY_MS`),
-for as long as it takes; only the first failure in a row goes on the
-timeline (`failed`, `details.step = 'facts'`). It is seen in the app too: a
-listing with no note of its own gets `error` = `FACTS_NOTE` ("Its category,
-tags and custom fields could not be sent to Shopify yet, and Playbook tries
-again every 5 minutes: …") + the reason, so it counts as "Published with a
-note"; a send that goes through clears that note, or leaves the fields'
-warning there. A note that is not this file's own (a publish's warning) is
-never replaced. Shopify only being busy writes no note: the store's other
-listings wait for the next run.
+A **failure** (Shopify refuses this product, a collection could not be made,
+the store did not answer for the fields) leaves the stamp, so it is tried
+again 5 minutes later (`RETRY_MS`), for as long as it takes; only the first
+failure in a row goes on the timeline (`failed`, `details.step = 'facts'`).
+It is seen in the app too: a listing with no note of its own gets `error` =
+`FACTS_NOTE` ("Its category, tags and custom fields could not be sent to
+Shopify yet, and Playbook tries again every 5 minutes: …") + the reason, so
+it counts as "Published with a note". A send that goes through takes away
+its own earlier notes — `FACTS_NOTE`, and an old custom-field warning the
+store has since taken the field for (`fieldsSend.ts withoutFieldNotes`) —
+and writes this send's field warnings, if any. Any other note (a publish's
+warning, a person's reason) is never replaced or added to. Shopify only
+being busy writes no note: the store's other listings wait for the next run.
+A store that refuses **three products in a row** in one run (its key was
+rejected, it is frozen) is left for the next run too (`STORE_FAILS`), so a
+store that refuses everything is not asked for every product it is owed.
 No title, description, price, size or photo is touched and no AI is used, so
 the send needs no approval on a "Review first" website and also goes for a
 product held in Needs info.
 
 ### The full send — `publish.ts`, `productInput.ts`, `generate.ts`
-`publishOne` calls `listingFacts` and sends the type, tags and fields worked
+`publishOne` calls `listingFacts` and sends the **tags and fields** worked
 out fresh (before: the copies saved when the AI wrote, so "Update on
-Shopify", a re-price or a photo change put a renamed category and corrected
-tags back). `productInput.ts`: `productType: p.category || l.product_type ||
-''` — the category as it is now; the listing's copy only when the product has
-none. Tags: `mergeTags(existing.tags, l.sent?.tags ?? the last published
-row's, facts.tags)`. After `productSet`: `sendFields` as before, then
-`dropFields(emptied(facts, l.sent))`. The save writes `tags`, `product_type`
-and `sent: sentOf(facts, l.sent)`, and the `published` row's `tags` are the
-fresh ones. A full publish never clears `facts_due`: the next small-send run
-finds the record equal and clears it without a call. `generate.ts` builds
-the listing's tags through `ownTags` and saves `ai_tags` (not for a listing
-whose tags are typed).
+Shopify", a re-price or a photo change put corrected tags back). The
+**product type**: a create sends the category as it is now; a product
+**already on the store keeps the type it has there** (`l.sent.type`, else the
+listing's `product_type`; `buildProductInput`'s `type`), because a changed
+category is the small send's to move — that one makes the collection first —
+and the save marks the listing for it (`facts_due`). Code check, 2026-11-20:
+a full publish that re-typed a product put it in no collection when the new
+category had none on the store yet. Tags: `mergeTags(existing.tags,
+l.sent?.tags ?? the last published row's, facts.tags)`. After `productSet`:
+`syncFields` (fill, then take off the `emptied(facts, l.sent)` keys). The
+save writes `tags`, `product_type` (what was sent) and `sent` = only what the
+store took (`sentOf` with the keys left undone), and the `published` row's
+`tags` are the fresh ones. When the store did not answer for the fields the
+publish still stands, with its warning, and the listing is marked so the
+small send tries them again. A full publish never clears `facts_due`: the
+next small-send run finds the record equal and clears it without a call.
+`generate.ts` builds the listing's tags through `ownTags` and saves `ai_tags`
+(not for a listing whose tags are typed).
 
 ### Collections follow — `storeCollections.ts` (used by `storeSetup.ts` too)
 - `ensureCollection(site, type, was, cache)`, before a product's type changes
@@ -1933,10 +1972,13 @@ whose tags are typed).
   collection, and is tried again. A store with no collection for the old type
   gets the new type without one. One store at a time (`turns`: two listings
   sent side by side must not make it twice); a store's collections are read
-  once per worker run (`ColCache`, keyed by website and shop).
-- `renameCollections(from, to)`, called by `category_rename` after the
+  once per worker run (`ColCache`, keyed by website and shop), and **read
+  again right before one is made**: the run's list can be minutes old, and a
+  rename may have given the old collection that very name meanwhile.
+- `renameCollections(from, to)`, called by `category_rename` **before** the
   database call and by the revert of a rename with the names swapped
-  (`categoryRevert.ts`): on every website that is switched on and connected,
+  (`categoryRevert.ts`; both through `categoryMove.ts storesThenDatabase`):
+  on every website that is switched on and connected,
   the store's collection for the old name takes the new **title** and gets a
   second rule "product type = new name" (`collectionUpdate` with
   `sourcesToCreate`; the old rule stays). Its page, address and menu links
@@ -1945,9 +1987,11 @@ whose tags are typed).
   a product matching either one is in it. Per website: `renamed`; `kept` (the
   new name has a collection of its own already; products move over as they
   are re-typed); `none` (the store has no collection for the old name);
-  `failed` + `note`. It never throws: the rename itself is done, and
+  `failed` + `note`. It never throws: the rename goes on, and
   `ensureCollection` makes a collection for the new name when the first
-  product is re-typed.
+  product is re-typed. When the database then refuses the rename, the same
+  call with the names swapped puts the title back (the second rule stays: a
+  product type nobody has).
 - Nothing is ever deleted on a store: a category moved away leaves its
   collection there, empty. A website that is switched off when a category is
   renamed is not asked: once it is on again its products are re-typed, and
@@ -2051,8 +2095,11 @@ collection its old title back.
 product type at the send), `listingFacts` (tags without the AI, the
 comparison, the record), `factsSend` and `factsStore` (one listing end to end
 over a fake Supabase and a fake Shopify, `factsWorld.mjs`: every outcome
-above, the collections, the button), `publishFacts` (the full send),
-`categoryMove` (a rename and its revert call the stores after the database).
+above, the collections, the button), `factsRaces` (the cases of the code
+check: a change between the worker's page and the try, an older send landing
+last, the record holding only what the store took, a store that refuses
+everything), `publishFacts` (the full send), `categoryMove` (a rename and its
+revert call the stores before the database).
 SQL: `t_dups.sql` part 14 (which listings each change marks, the write with
 the owner's rights, the stamp, reverts, no listing row in the log) and 14b
 (the worker's wake-up line); the migration is in both lists of `run.sh`, and

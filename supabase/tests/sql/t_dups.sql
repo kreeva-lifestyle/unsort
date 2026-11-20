@@ -568,6 +568,8 @@ select t_is('its ' || x.what || ' changes: the same four listings', pg_temp.mark
 select t_is(x.what || ': nothing is marked', pg_temp.marks('update pb_products set ' || x.set || ' where id = t_id(140)'), 'none') from (values
   ('only its name changes', $$name = 'Renamed'$$), ('only its cost changes', 'cost_price = 650'), ('only its status changes', $$status = 'needs_info'$$),
   ('it is saved again with nothing changed', 'category = category, fabric = fabric, tags = tags, sizes = sizes')) x(what, set);
+select t_is('it is archived: nothing is marked (nothing is sent for an archived product)', pg_temp.marks($$update pb_products set status = 'archived' where id = t_id(140)$$), 'none');
+select t_is('it is restored from the archive: its listings are marked, so what changed meanwhile reaches the store', pg_temp.marks($$update pb_products set status = 'needs_info' where id = t_id(140)$$), 'aside, draft, live, off');
 -- the mark is made with the owner's rights: a signed-in person who may not write a single listing still saves the product
 grant select, update on public.pb_products to authenticated;
 set local role authenticated;
@@ -581,8 +583,8 @@ select ctid as aside_row from pb_listings where title = 'aside' \gset
 update pb_products set color = 'Navy' where id = t_id(140);
 select t_is('the product changes again while a send is on its way: the stamp is wiped (the mark stays for the next run), "send anyway" is kept',
   (select facts_due::text || '/' || coalesce(facts_tried_at::text, 'no stamp') || '/' || facts_force::text from pb_listings where title = 'live'), 'true/no stamp/true');
-select t_is('a listing already marked and never tried is left as it is: not written a second time',
-  (select facts_due::text || '/' || coalesce(facts_tried_at::text, 'no stamp') || '/' || (ctid = :'aside_row'::tid)::text from pb_listings where title = 'aside'), 'true/no stamp/true');
+select t_is('a listing already marked and never tried is written again all the same: the change holds its row until it commits, so a send''s stamp waits for it',
+  (select facts_due::text || '/' || coalesce(facts_tried_at::text, 'no stamp') || '/' || (ctid = :'aside_row'::tid)::text from pb_listings where title = 'aside'), 'true/no stamp/false');
 -- changes that reach a product through the Ready check (it rewrites the product's tags), and a bulk change that is taken back
 select t_is('a person corrects a product''s chosen value (Zari becomes Mirror; the Ready check rewrites its tags): its listing',
   pg_temp.marks(format('select * from pb_product_values_set(t_id(143), %L, ''manual'')', jsonb_build_array(jsonb_build_object('value_id', :V_MR)))), 'p3');
@@ -644,6 +646,6 @@ select t_is('… (a stock change still wakes it then, as before)', pg_temp.worke
 rollback;
 
 -- Every check above printed a line: a part that silently printed nothing would be a failure too.
-select case when last_value = 277 then 'ok   every check ran (277)' else 'FAIL the number of checks is ' || last_value || ', not 277: a part printed fewer lines than it has, or this number was not updated' end from public.t_checks;
+select case when last_value = 279 then 'ok   every check ran (279)' else 'FAIL the number of checks is ' || last_value || ', not 279: a part printed fewer lines than it has, or this number was not updated' end from public.t_checks;
 drop function public.t_refused(text, text); drop function public.t_is(text, text, text); drop function public.t_rel(uuid, uuid); drop function public.t_product(int, uuid, text, text, int, numeric, text); drop function public.t_id(int);
 drop sequence public.t_checks;

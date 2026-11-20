@@ -8,6 +8,7 @@ import { GID, W, world } from './factsWorld.mjs';
 
 const { sendFacts } = await import('../factsSend.ts');
 const { renameCollections } = await import('../storeCollections.ts');
+const { storesThenDatabase } = await import('../categoryMove.ts');
 const { resendWebsite } = await import('../factsSite.ts');
 const send = (w) => sendFacts({ ...w.listing }, 'u1', new Map());
 const SAREE = { id: 'gid://shopify/Collection/1', handle: 'saree', title: 'Saree' };
@@ -74,6 +75,39 @@ test('renaming on a store with nothing to rename, with a collection for the new 
   assert.equal(r[0].status, 'failed');
   world({ site: { active: false } });
   assert.deepEqual(await renameCollections('Saree', 'Silk Saree'), [], 'a website that is off is sent nothing');
+});
+
+test('a rename: the store\'s collection first, then the database; no send in between can find it missing and make a second one', async () => {
+  const w = world({ categories: ['Saree', 'Lehenga'], collections: one(SAREE), product: { category: 'Silk Saree' }, values: [], site: { tag_rules: { templates: ['{category}'], max_tags: 8, case: 'title' } } });
+  const order = [];
+  const { r, stores } = await storesThenDatabase('Saree', 'Silk Saree', async () => {
+    order.push(...w.shopify().map(c => c.name)); // what the store was asked before the database was
+    return send(w);                              // the worker gets to a product the moment the database has renamed it
+  });
+  assert.ok(order.includes('PbColUpdate'), 'the collection has the new name before any product is owed it');
+  assert.deepEqual([r, stores], ['done', [{ website: 'Kreeva', status: 'renamed' }]]);
+  assert.ok(!w.names().includes('PbCol'), 'no second collection');
+  assert.deepEqual(w.collections.map(c => [c.handle, c.title]), [['saree', 'Silk Saree']]);
+  assert.equal(w.store.productType, 'Silk Saree');
+});
+
+test('a rename the database refuses after the stores: the collection gets its title back', async () => {
+  const w = world({ categories: ['Saree', 'Lehenga'], collections: one(SAREE) });
+  await assert.rejects(storesThenDatabase('Saree', 'Silk Saree', async () => { throw new Error('Tags are still linked to the name Silk Saree.'); }), /still linked/);
+  assert.deepEqual(w.shopify().filter(c => c.name === 'PbColUpdate').map(c => c.v.c.title), ['Silk Saree', 'Saree']);
+  assert.equal(w.collections[0].title, 'Saree');
+  // One the database will refuse for its list (the new name is taken) never reaches a store.
+  const taken = world({ categories: ['Saree', 'Lehenga'], collections: one(SAREE) });
+  await assert.rejects(storesThenDatabase('Saree', 'Lehenga', async () => { throw new Error('Lehenga is already in the list.'); }));
+  assert.equal(taken.shopify().length, 0);
+});
+
+test('this run\'s list of collections is minutes old and the collection was renamed meanwhile: asked again before one is made, none is made', async () => {
+  const w = world({ collections: [{ id: SAREE.id, handle: 'saree', title: 'Lehenga' }] }); // renamed Saree → Lehenga a moment ago
+  const stale = new Map([[`${W}|kreeva.myshopify.com`, one(SAREE)]]);                      // what the run read before that
+  assert.equal(await sendFacts({ ...w.listing }, 'u1', stale), 'done');
+  assert.ok(!w.names().includes('PbCol'), 'no second "Lehenga"');
+  assert.equal(w.store.productType, 'Lehenga');
 });
 
 test('"Send tags and fields again": first only the number, then every product of the website on Shopify is marked', async () => {

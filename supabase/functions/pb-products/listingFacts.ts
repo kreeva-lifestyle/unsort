@@ -72,9 +72,18 @@ export function sameFacts(now: Facts, was: SentFacts | null | undefined): boolea
 }
 
 /** The record of a send: what the store has of Playbook's now. A website that sends no fields keeps the earlier
- *  record of them, so switching fields on again knows what is there. */
-export const sentOf = (now: Facts, was: SentFacts | null | undefined): SentFacts =>
-  ({ type: now.type || String(was?.type ?? ''), tags: now.tags, fields: now.fields ?? was?.fields ?? {} });
+ *  record of them, so switching fields on again knows what is there. Only what the store took goes on record
+ *  (fieldsSend.ts FieldsLeft): a field it did not take (`notIn`) keeps the value it had from Playbook, or none — so
+ *  the record differs from the product and the field is sent again, and a field that is the store's own is never
+ *  Playbook's to take off; one that could not be taken off (`stayed`) is still there, so it is taken off again. */
+export function sentOf(now: Facts, was: SentFacts | null | undefined, notIn: string[] = [], stayed: string[] = []): SentFacts {
+  const old = was?.fields || {}, fields = { ...(now.fields ?? old) };
+  if (now.fields) {
+    for (const k of notIn) { if (k in old) fields[k] = old[k]; else delete fields[k]; }
+    for (const k of stayed) if (k in old) fields[k] = old[k];
+  }
+  return { type: now.type || String(was?.type ?? ''), tags: now.tags, fields };
+}
 
 /** Fields Playbook filled last time that the product no longer has a value for: taken off the store, so a value
  *  removed in Playbook does not live on there. Only keys on record: a field someone else filled is never touched. */

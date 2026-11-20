@@ -12,6 +12,8 @@
 --     move, a re-read, retag, "Let AI decide" and every revert all end in an UPDATE of pb_products. An attribute's
 --     name / key / prefix / "takes several values", a value's name or its category ticks, and a vendor's name or
 --     short names change tags and fields without touching a product row: they mark the products that carry them.
+--     A product restored from the archive is marked too: nothing is sent while it is archived, so what changed
+--     meanwhile goes then.
 --   * the worker's small send (factsSend.ts) sends only the product type, Playbook's own tags and the custom
 --     fields — no title, text, price, size or photo — and writes what it sent to pb_listings.sent. A listing whose
 --     record already equals what its product gives now is cleared without a call to the store, so marking too often
@@ -56,11 +58,12 @@ begin
   end if;
   if ids is null then return null; end if;
   -- On sale on Shopify, by the rule pb_stock_save uses: it has a Shopify product that was not hidden or archived
-  -- there. A listing already marked and never tried is left as it is (no second write for the same change).
+  -- there. EVERY change writes the row, a listing already marked included: the write holds the row until this change
+  -- commits, so a send's stamp (factsSend.ts stamps before it reads) waits for it and then reads the product as
+  -- changed. Leaving a marked row unwritten let a send read the old product and clear the mark (code check, 20 Nov 2026).
   update public.pb_listings l set facts_due = true, facts_tried_at = null
   where l.product_id = any(ids) and l.shopify_product_id is not null
-    and not (l.status = 'skipped' and coalesce(l.shopify_status, '') in ('DRAFT', 'ARCHIVED'))
-    and (not l.facts_due or l.facts_tried_at is not null);
+    and not (l.status = 'skipped' and coalesce(l.shopify_status, '') in ('DRAFT', 'ARCHIVED'));
   return null;
 end $$;
 
@@ -68,7 +71,8 @@ create or replace trigger pb_facts_follow after update on public.pb_products
   for each row when (new.category is distinct from old.category or new.fabric is distinct from old.fabric
     or new.color is distinct from old.color or new.tags is distinct from old.tags
     or new.attributes is distinct from old.attributes or new.sku is distinct from old.sku
-    or new.sizes is distinct from old.sizes or new.vendor_id is distinct from old.vendor_id)
+    or new.sizes is distinct from old.sizes or new.vendor_id is distinct from old.vendor_id
+    or (old.status = 'archived' and new.status is distinct from 'archived'))
   execute function public.pb_facts_follow();
 
 create or replace trigger pb_facts_follow after update on public.pb_attributes

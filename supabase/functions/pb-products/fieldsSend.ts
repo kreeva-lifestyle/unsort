@@ -11,8 +11,11 @@
 // reading it as the field's place sent nothing again, and left all 122 SuratMandi products without any custom field
 // (18 Nov 2026).
 // A field Playbook filled before whose value went empty is taken off the product: dropFields (20 Nov 2026).
+// Both say which keys they left undone (FieldsLeft), so the record of what the store has (listingFacts.ts sentOf) only
+// ever holds what the store took: a field left out is sent again, one that stayed is taken off again, and a field that
+// is the store's own is never on record, so never taken off.
 import { FIELD_NS, METAFIELDS_SET, type FieldInput } from './fields.ts';
-import { plain } from './http.ts';
+import { HttpError, plain } from './http.ts';
 import { temporary } from './publishParts.ts';
 import { gql } from './shopify.ts';
 import { LIST, TEXT } from './storeFields.ts';
@@ -23,6 +26,12 @@ const MULTI = 'multi_line_text_field';
 const KINDS = `query PbFieldKinds { metafieldDefinitions(first: 250, ownerType: PRODUCT, namespace: "custom") { nodes { key type { name } } } }`;
 const KINDS_FOR_MS = 10 * 60_000;
 interface FieldError { message: string; code?: string | null; field?: string[] | null }
+/** What a call left undone: `left` = the keys that did not go in (dropFields: did not come off); `again` = the store
+ *  did not answer (a time-out, an empty answer), which is worth another try — a field refused by the store's own rules
+ *  is not. */
+export interface FieldsLeft { left: string[]; again: boolean }
+/** Shopify did not answer, as opposed to saying no. */
+const noAnswer = (e: unknown) => e instanceof HttpError && e.status >= 500;
 
 const valuesOf = (f: FieldInput): string[] => {
   if (f.type !== LIST) return [f.value];
@@ -70,9 +79,10 @@ async function storeKinds(site: WebsiteRow, ms: number): Promise<Map<string, str
 const placeOf = (e: FieldError) => { const f = e.field ?? [], i = f[0] === 'metafields' ? Number(f[1]) : NaN; return Number.isInteger(i) ? i : null; };
 const wrongKind = (e: FieldError) => e.code === 'INVALID_TYPE' || /consistent with the definition/i.test(e.message);
 
-/** The listing's custom fields. Returns a warning for the listing, or null when all went in. */
-export async function sendFields(site: WebsiteRow, fields: FieldInput[], ms: number): Promise<string | null> {
+/** The listing's custom fields. Returns a warning for the listing, or null when all went in. `out`: the keys left out. */
+export async function sendFields(site: WebsiteRow, fields: FieldInput[], ms: number, out?: FieldsLeft): Promise<string | null> {
   if (!fields.length) return null;
+  const none = (again: boolean) => { if (out) { out.left.push(...fields.map(f => f.key)); out.again ||= again; } };
   const set = async (list: FieldInput[]) => (await gql<{ metafieldsSet: { userErrors: FieldError[] } | null }>(site, METAFIELDS_SET, { metafields: list }, ms)).metafieldsSet?.userErrors || [];
   const said = (ue: FieldError[]) => [...new Set(ue.map(e => e.message))].join('; ');
   try {
@@ -90,7 +100,7 @@ export async function sendFields(site: WebsiteRow, fields: FieldInput[], ms: num
       if (!ue.length) break;
       const at = new Map<number, FieldError[]>();
       for (const e of ue) { const i = placeOf(e); if (i !== null) at.set(i, [...(at.get(i) ?? []), e]); }
-      if (!at.size) return `${NO_FIELDS}: ${said(ue).slice(0, 200)}`; // not told which: nothing went in
+      if (!at.size) { none(false); return `${NO_FIELDS}: ${said(ue).slice(0, 200)}`; } // not told which: nothing went in
       if (ue.some(wrongKind)) kinds.delete(storeOf(site)); // the store's kinds changed meanwhile: read again next time
       const next: typeof list = [];
       list.forEach((x, i) => {
@@ -102,9 +112,11 @@ export async function sendFields(site: WebsiteRow, fields: FieldInput[], ms: num
       });
       list = next;
     }
+    out?.left.push(...left);
     return left.length ? `Saved on Shopify, but the store did not take these custom fields: ${left.join(', ')} (${[...new Set(why)].join('; ').slice(0, 200)}).` : null;
   } catch (e) {
     if (temporary(e)) throw e;
+    none(noAnswer(e));
     return `${NO_FIELDS}: ${plain(e)}`;
   }
 }
@@ -113,15 +125,37 @@ const FIELDS_DROP = `mutation PbFieldsDrop($metafields: [MetafieldIdentifierInpu
 
 /** Take Playbook's own fields off a product whose value went empty in Playbook (listingFacts.ts `emptied`: only keys
  *  Playbook is on record as having filled), so a value removed there does not live on at the store (owner, 20 Nov 2026:
- *  "Corrected tags and fields"). A field already gone is fine. Returns a warning for the listing, or null. */
-export async function dropFields(site: WebsiteRow, ownerId: string, keys: string[], ms: number): Promise<string | null> {
+ *  "Corrected tags and fields"). A field already gone is fine. Returns a warning for the listing, or null. `out`: the
+ *  keys that stayed on the store. */
+export async function dropFields(site: WebsiteRow, ownerId: string, keys: string[], ms: number, out?: FieldsLeft): Promise<string | null> {
   if (!keys.length) return null;
+  const stayed = (list: string[], why: string, again: boolean) => {
+    if (!list.length) return null; // Shopify complained, yet took every one off
+    if (out) { out.left.push(...list); out.again ||= again; }
+    return `Saved on Shopify, but these emptied custom fields stayed there: ${list.join(', ')} (${why.slice(0, 200)}).`;
+  };
   try {
-    const r = await gql<{ metafieldsDelete: { userErrors: FieldError[] } | null }>(site, FIELDS_DROP, { metafields: keys.map(key => ({ ownerId, namespace: FIELD_NS, key })) }, ms);
+    const r = await gql<{ metafieldsDelete: { deletedMetafields?: ({ key: string } | null)[] | null; userErrors: FieldError[] } | null }>(site, FIELDS_DROP, { metafields: keys.map(key => ({ ownerId, namespace: FIELD_NS, key })) }, ms);
     const ue = r.metafieldsDelete?.userErrors || [];
-    return ue.length ? `Saved on Shopify, but these emptied custom fields stayed there: ${keys.join(', ')} (${[...new Set(ue.map(e => e.message))].join('; ').slice(0, 200)}).` : null;
+    if (!ue.length) return null;
+    const gone = new Set((r.metafieldsDelete?.deletedMetafields || []).map(d => d?.key));
+    return stayed(keys.filter(k => !gone.has(k)), [...new Set(ue.map(e => e.message))].join('; '), false);
   } catch (e) {
     if (temporary(e)) throw e;
-    return `Saved on Shopify, but these emptied custom fields stayed there: ${keys.join(', ')} (${plain(e).slice(0, 200)}).`;
+    return stayed(keys, plain(e), noAnswer(e));
   }
 }
+
+/** Both steps for one product: its fields filled, and the emptied ones taken off. `notIn` / `stayed`: what the store
+ *  did not take; `again`: it did not answer for one of them, so the send is worth another try. */
+export async function syncFields(site: WebsiteRow, ownerId: string, fields: FieldInput[], emptied: string[], ms: number) {
+  const put: FieldsLeft = { left: [], again: false }, off: FieldsLeft = { left: [], again: false };
+  const notes = [await sendFields(site, fields, ms, put), await dropFields(site, ownerId, emptied, ms, off)].filter((x): x is string => !!x);
+  return { notes, notIn: put.left, stayed: off.left, again: put.again || off.again };
+}
+
+const FIELD_NOTE = /^Saved on Shopify, but (its custom fields|the store did not take these custom fields|these emptied custom fields)/;
+/** A listing's note without its custom-field warnings above (each starts "Saved on Shopify, but"): a send that puts
+ *  the fields in takes its own old warning away, and leaves any other part of the note. */
+export const withoutFieldNotes = (note: string | null | undefined): string =>
+  String(note ?? '').split(/(?=Saved on Shopify, but )/).filter(s => !FIELD_NOTE.test(s)).join('').trim();

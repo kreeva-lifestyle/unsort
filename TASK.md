@@ -201,6 +201,12 @@ product is live (checked against the code and all 504 store products,
 - **A website that is switched off when a category is renamed** keeps the
   old collection name. Once it is on, its products get the new product
   type and a second collection is made for the new name beside the old one.
+- **A product Shopify keeps refusing** (its category, tags or fields) is
+  tried again every 5 minutes for as long as it takes; its listing says
+  why. Next: after the third refusal it waits an hour between tries.
+- **AI tags before approval.** On a "Review first" website, the extra tags
+  of a rewrite that still waits for your approval can reach the store with
+  the next tag update. Next: they wait for the approval too.
 - **Size codes from a future import.** If another store's own code ends in
   a size written the old way ("…-38""), the size would be added a second
   time ("…-38"-38"). No product has this today.
