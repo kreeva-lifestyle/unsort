@@ -310,12 +310,6 @@ tags research report of 13 Nov, "Scrape mapping to Playbook taxonomy").
   live listings; one tap for a bigger change.
 - **Q9 · A re-post after a permanent stock-out.** Today a new product is
   made. Recommended: bring the old product back (same page and address).
-- **Q10 · "New arrival" tag.** You asked for it on 12 Nov (products of the
-  last 30 days). The upload date is recorded now; the tag is not built. To
-  settle first, recommended: 30 days from when a product first goes live on
-  a store (a setting per store), no tag for the 136 imported products, a new
-  colour counts as new, a restock does not. Until it is built, the store's
-  New arrivals page lists every product, newest first (set on 20 Nov).
 - **Q14 · One post showing several colours.** Today it becomes one
   product. Recommended: one product per colour when the post names its
   colours; decide after the first week of real Telegram posts.

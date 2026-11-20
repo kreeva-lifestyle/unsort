@@ -10,7 +10,7 @@ export const WRITING: GuideSection[] = [
     blocks: [
       list(
         '**Tag templates** — each line becomes one tag. Type it and press Enter. Words in curly brackets are filled from the product.',
-        '**Fixed tags** — added to every product sent to this store, e.g. `New Arrival`.',
+        '**Fixed tags** — added to every product sent to this store, e.g. `Factory Price`. (`New Arrival` is not one: Playbook adds it by itself, below.)',
         '**How {tags} is written** — **Plain** sends the value as it is (`Maroon`); **Prefixed** puts the attribute in front (`Colour_Maroon`, or the attribute\'s own Shopify prefix from the Tags page).',
         '**Letter case** — **As written**, **lowercase** or **Title Case**.',
         '**AI extra tags** — switch on to let the AI add style / occasion tags it sees in the photos and text, up to **At most** tags. Fill **Only from these tags** and it picks from that list and adds nothing else.',
@@ -29,8 +29,10 @@ export const WRITING: GuideSection[] = [
         ['`{attr:store_tags}`', 'The other store\'s tags, raw (Import from website) — usually `{tags}` is what you want', 'Ideal Collection'],
       ),
       h('Example'),
-      p('Templates `{category}`, `Fabric_{fabric}`, `Color_{color}`, `Size_{size}`, `Vendor_{vendor_code}`, `Occasion_{attr:occasion}` and the fixed tag `New Arrival`, for a maroon Banarasi silk saree from Rangoli (RG), Free Size, festive, give:'),
-      p('`Saree` `Fabric_Banarasi Silk` `Color_Maroon` `Size_Free Size` `Vendor_RG` `Occasion_Festive` `New Arrival`'),
+      p('Templates `{category}`, `Fabric_{fabric}`, `Color_{color}`, `Size_{size}`, `Vendor_{vendor_code}`, `Occasion_{attr:occasion}` and the fixed tag `Factory Price`, for a maroon Banarasi silk saree from Rangoli (RG), Free Size, festive, uploaded 10 days ago, give:'),
+      p('`New Arrival` `Saree` `Fabric_Banarasi Silk` `Color_Maroon` `Size_Free Size` `Vendor_RG` `Occasion_Festive` `Factory Price`'),
+      h('New Arrival'),
+      p('A product **uploaded in the last 30 days** gets the tag `New Arrival` by itself, on every website, and loses it by itself when the 30 days are over (checked every hour). The upload date is the day the supplier put it on their website (it shows on the product page as "Uploaded on their site"); for a product from Telegram or added by hand, the day it came into Playbook. It always comes first, so the tag limit never cuts it, and the words never make an older product new, even if a rule, a fixed tag or a person writes them. Your store\'s **New arrivals** page and its **New arrival** badge use this tag.'),
       list(
         'If a placeholder is empty for a product, that tag is skipped — you never get a half tag like "Fabric_".',
         'Commas inside a tag become spaces (Shopify splits tags at commas). Repeats are removed, whatever the capital letters.',

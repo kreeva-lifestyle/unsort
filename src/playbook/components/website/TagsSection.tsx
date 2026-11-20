@@ -79,7 +79,7 @@ export default function TagsSection({ siteId, dirty, draft, set, addToast }: { s
 
       <Cell span={6}>
         <Section title="Fixed tags" hint="Added to every product sent to this store.">
-          <ChipsInput label="Fixed tags" values={r.static} onChange={v => put({ static: v })} placeholder="e.g. New Arrival" maxLen={255} />
+          <ChipsInput label="Fixed tags" values={r.static} onChange={v => put({ static: v })} placeholder="e.g. Factory Price" maxLen={255} />
         </Section>
       </Cell>
       <Cell span={6}>
