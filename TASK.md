@@ -17,46 +17,35 @@ shopper has seen any of this. The theme is also kept in the private
 
 ### Your answers (Claude does the rest the same day)
 
-- **S1 · Publish the saved theme version.** On 20 Nov Claude saved a new
-  version of the theme: the home page shows your real categories and price
-  bands, product pages show the description and questions, and the sample
-  reviews, sample products and "Ships today" labels are gone. It is not
-  live yet. Say yes and Claude publishes it. Whoever works in the
-  `suratmandi-theme` repository must take these 13 changed files in first,
-  or a later upload from there can undo them.
-- **S2 · Contact and legal details.** Every page's footer still shows
-  blanks ("+91 98XXX XXXXX", "[Legal name]", "GSTIN [24XXX…]", "Grievance
-  officer: [Name]"), and every WhatsApp button opens a number that does not
-  exist. Give: WhatsApp number, support email, short address, support
-  hours, registered name and address, GSTIN, grievance officer's name and
-  email. Shopify holds two different street addresses: say which is the
-  registered one. Each product's legal details also print this name as
-  "Manufacturer": if you do not make the product, say so and Claude changes
-  the word (for example "Marketed by").
-- **S3 · Delivery charge.** Shopify charges ₹379 on every order (one rate,
-  named in Hindi). The site says "free shipping above ₹999, otherwise ₹79".
-  Decide: free, one flat charge, or free above an amount. Claude sets the
-  rate, names it in English and makes the site say the same.
-- **S4 · Cash on delivery.** The site promises COD on every page, "up to
-  ₹10,000" with a "₹49 fee" and a WhatsApp confirmation. Payment settings
-  cannot be read from outside. Say: is COD on, any limit, is a fee really
-  charged (Shopify needs an app for that), do you confirm on WhatsApp.
-- **S5 · Dispatch and delivery time.** Every product said "Ships today" and
-  showed delivery dates, while your Playbook store profile says "Ships in
-  5 to 7 days". The saved version takes both off the products; the footer
-  still says "Ready stock in 24 hours". Give the real dispatch days (one
-  for all, or by product) and the courier days. Claude puts them in the
-  theme, the listings and the shipping policy.
-- **S6 · Exchange and returns.** "7-day exchange" is promised on every page
-  and in about 300 listings, but the store has no returns, shipping or
-  terms policy: those three footer links open "page not found". Give the
-  rule (how many days, exchange or refund, who pays the courier, what is
-  excluded). Claude writes the policies and matches the site to them.
-- **S7 · "Made in our Surat unit", "factory price", "every piece checked by
-  hand".** These lines are on every page and in about 140 listings, while
-  every product so far was imported from other websites. Say what is true
-  for every product; Claude rewords the rest, on the site and in Playbook's
-  writer.
+- **S1 · Publish the new theme version yourself (one tap).** The new
+  version is ready: the home page shows your real categories and price
+  bands, product pages show the description and questions, the sample
+  reviews, sample products and "Ships today" labels are gone, and your
+  answers of 20 Nov are in (Arya Designs, your WhatsApp number, delivery
+  ₹70, free delivery on prepaid orders of ₹5,000 and above, "Cash on
+  delivery available", "Delivery within 5 to 7 days"). It is not live yet.
+  Shopify's tool refused to publish it from Claude's side, twice: on the
+  live theme it wrongly said three files were changed by someone else, and
+  it only publishes themes Claude made itself. So the same changes are
+  saved on your spare theme. You: Shopify admin → Online Store → Themes →
+  **suratmandi-theme/staging** → **Publish**. That theme then becomes the
+  live one and the old one stays in the list. Then tell Claude, who checks
+  the live store. Whoever works in the `suratmandi-theme` repository must
+  know that the live theme now follows the `staging` branch.
+- **S2 · The rest of the contact and legal details.** The name and the
+  WhatsApp number are in. Still missing, and hidden on the site until you
+  give them: support email, short address, support hours, registered
+  address (Shopify holds two different street addresses: say which),
+  GSTIN, and the grievance officer's name and email.
+- **S6 · Policies copied from ethnicvilla.com.** You asked for this on
+  20 Nov. Claude could not open that website: this workspace's network
+  list does not allow it. Either add ethnicvilla.com under "Allowed
+  domains" in the cloud environment's network settings, or paste the
+  policy text into the chat. Claude then writes the shipping, exchange and
+  returns, terms and privacy policies for SuratMandi from it and makes the
+  site's promises ("7-day exchange" on every page and in about 300
+  listings) say the same. Until then those three footer links open "page
+  not found".
 - **S8 · Best Price Promise** ("Found it cheaper? We refund the
   difference"). It is on every page; its terms page holds only a writing
   instruction. Say yes with terms (which websites, how to claim, how it is
@@ -79,9 +68,13 @@ shopper has seen any of this. The theme is also kept in the private
   price alone. Confirm with your accountant, or Claude prints only
   "Inclusive of all taxes".
 - **S13 · Size guide.** The page shows sample numbers in brackets. Give real
-  bust, waist and hip per size, or say that sizes differ by supplier.
+  bust, waist and hip per size, or say that sizes differ by supplier. (See
+  also "Sizes: with or without inches" further down.)
 - **S14 · About page.** It reads "[Write your factory story here.]". Give
-  the story, a photo and real numbers, or Claude hides the page.
+  the story, a photo and real numbers, or Claude hides the page. In the
+  new theme version (S1) the two unfinished blocks under it are hidden
+  ("[Write your factory story…]" and "[0] [real number]"); the page's own
+  line still shows.
 - **S15 · Kids Wear and Men's Kurta.** Both category pages exist and are
   empty (the saved version leaves them out of the category list). Selling
   these at launch? If not, Claude hides them until the first product
@@ -100,6 +93,13 @@ shopper has seen any of this. The theme is also kept in the private
   prepaid and one COD order from the menu to the "thank you" page, and tell
   Claude: it reads the order's delivery charge, tax and GSTIN, and the
   emails the shopper gets.
+- **Free delivery for prepaid orders only.** Shopify now charges ₹70
+  ("Standard delivery"; it was still ₹379 on 20 Nov) and offers "Free
+  delivery (prepaid orders only)" on orders of ₹5,000 and above. Shopify
+  itself cannot stop a shopper from picking the free rate and then paying
+  cash. Install a payment-rules app from the Shopify App Store (search
+  "hide payment methods") and set: hide Cash on Delivery when the free
+  delivery rate is chosen. Tell Claude when it is in.
 - **Filters.** Install Shopify's free "Search & Discovery" app. Category
   pages offer only Availability and Price today; with it Claude adds size,
   colour and fabric.
@@ -133,7 +133,7 @@ shopper has seen any of this. The theme is also kept in the private
   the cart, and most failed taps show no message.
 - **Choosing a size.** The first size is picked for the shopper, and "+ Add"
   on a card puts a one-size product straight into the cart. Cards print odd
-  size text ("38"–38"", "Free Size–Free Size").
+  size text ("38–38", "Free Size–Free Size").
 - **Empty and odd pages.** An empty category says "No designs match these
   filters". The all-products page is headed "Products" and sorted A to Z.
   The blog shows a bare heading. A wishlist of removed designs is blank.
@@ -145,7 +145,8 @@ shopper has seen any of this. The theme is also kept in the private
   icon on the cart page opens the cart over itself. Page 2 of a category
   loads without moving up. The home banner may not swipe on phones. Saved
   hearts look unsaved after filtering. Dispatch dates come out a day early
-  on Sunday mornings (matters once S5 is set).
+  on Sunday mornings (matters only if products get their own dispatch
+  day).
 - **Policy pages** have no spacing; phone and email are not tappable (after
   S2).
 - **Details on the product page** lack Colour, Type and "In the set",
@@ -165,18 +166,6 @@ product is live (checked against the code and all 504 store products,
 
 ### Claude builds next (no answer needed)
 
-- **A category change does not reach products already on the store.**
-  Rename or move a category, or change a live product's category, and the
-  product stays in its old collection; only Regenerate moves it, one
-  listing at a time and with a new AI text. Next: the change is sent by
-  itself, without the AI.
-- **Tag and field changes are not sent by themselves.** A corrected colour,
-  fabric, work or occasion waits for the listing's next send ("Update on
-  Shopify" does it for one listing); tags change only when the AI writes
-  the listing again. Next: both are sent when they change, plus one button
-  per website, "Send tags and fields again".
-- **Sizes are named six ways** ("M (38)", "38"", "40 Size", "2XL"…). Next:
-  one format on every product.
 - **Another website's word in Product Type.** 34 products show "WOMEN
   FASHION". Next: a real type or nothing.
 - **Titles.** They use the category name ("…Suits & Dresses"), stack
@@ -185,19 +174,22 @@ product is live (checked against the code and all 504 store products,
 - **Care, "in the set" and net quantity.** The product page has places for
   them; Playbook writes the facts but does not send these fields.
 - **Pre-draped sarees filed under Saree** (7 products), so Pre-Stitched
-  Saree shows only 5.
+  Saree shows only 5. Change their category in Playbook and the store
+  moves them by itself.
 - **Work and Occasion go as one line of text** ("Festival, Wedding"), so
   they cannot be filters. The store's own two fields are text fields.
   Next: Claude makes them list fields; Playbook then sends lists by itself.
 - **Tags.** Raw supplier words reach the store (spelling twins, mill names,
   sentence-long tags), and the limit of 8 tags can cut an occasion.
-- **Leftovers.** A value, "set contents" or question removed in Playbook
-  stays on the store, and renaming an attribute starts a new field while
-  the old one stays.
-- **Collections.** A new category gets its collection only when "Set up on
-  Shopify" is tapped again. Collections get no description or picture, an
-  empty one stays public, and no menu link is added. Next: Playbook also
-  keeps each collection's lowest price for the "from ₹…" labels.
+- **Leftovers.** From 20 Nov a value removed in Playbook is taken off the
+  store too, for every field Playbook has sent since then. What was left
+  behind earlier stays: an old value, "set contents" or a question that was
+  removed before that day.
+- **Collections.** A new category gets its collection when "Set up on
+  Shopify" is tapped again, or when a product already on the store moves
+  into it. Collections get no description or picture, an empty one stays
+  public, and no menu link is added. Next: Playbook also keeps each
+  collection's lowest price for the "from ₹…" labels.
 - **No SKU without a design code.** Such a product goes out with no SKU and
   no barcode, so an order names neither the vendor nor the design.
 - **Photos.** The AI describes the first 8 photos; the rest get the stand-in
@@ -206,33 +198,64 @@ product is live (checked against the code and all 504 store products,
 - **Weight.** 23 products weigh 0. Next: a usual weight per category when
   the source gives none.
 - **Edits made in Shopify are not noticed.** The next send replaces the
-  title, description, prices and sizes typed there. Next: a nightly check
-  that says what differs.
+  title, description, prices and sizes typed there, and the product type
+  and Playbook's own tags and fields follow Playbook by themselves (tags
+  typed in Shopify stay). Next: a nightly check that says what differs.
+- **A live listing whose re-send fails is written again by the AI** the
+  next time its product is checked, which costs money and changes its
+  text. Next: it is sent again as it is.
+- **Shopify's own "category" box** (not the collection) is filled when a
+  product is first sent and does not follow a later category change.
+- **A renamed collection keeps the rule for its old name.** If that old
+  name is used again for another category later, its products also show in
+  the renamed collection. Next: the old rule is taken off once no product
+  on the store has the old name.
+- **A new collection that Shopify would not show** (made, but the Online
+  Store step failed) stays hidden and nothing says so. Next: the step is
+  tried again and the listing says why.
+- **A product Shopify keeps refusing** (its category, tags or fields) is
+  tried again every 5 minutes for as long as it takes; its listing says
+  why. Next: after the third refusal it waits an hour between tries.
+- **AI tags before approval.** On a "Review first" website, the extra tags
+  of a rewrite that still waits for your approval can reach the store with
+  the next tag update. Next: they wait for the approval too.
+- **Size codes from a future import.** If another store's own code ends in
+  a size written the old way ("…-38""), the size would be added a second
+  time ("…-38"-38"). No product has this today.
+- **Listing promises.** About 500 search descriptions say "Ships in 5 to 7
+  days"; your answer of 20 Nov is "Delivery within 5 to 7 days". Next:
+  Claude changes the store profile line and those descriptions. About 300
+  say "exchange within 7 days": they wait for the policies (S6). Some say
+  "stitched to measure", "Swarovski" or "100% pure": from the suppliers'
+  text, checked when the listings are next written.
 
 ### Needs your decision first
 
+- **Sizes: with or without inches.** From 20 Nov every size is written one
+  way: the letter in capitals ("M"), with the inches in brackets when the
+  supplier gave them ("M (38)"), a plain number when only inches were given
+  ("38"), or "Free Size". Playbook never adds inches a supplier did not
+  give, so "M" (about 120 products) and "M (38)" (about 135) both stay.
+  Say "letters only" to drop the inches everywhere, or give your own chart
+  (XS 34 … XXL 44?) and say every M should read "M (38)".
 - **Stock.** No stock numbers are sent. A product marked In stock shows 0
   on the store and keeps selling in every size; Out of stock makes every
   size "Sold out". One switch covers all sizes, and orders never reach
   Playbook, so it does not know what sold. Decide: is everything bought
   after the order comes, or do you hold stock per size?
-- **Dispatch on each product** (after S5), and **bulk price and full sets**
-  (after S10): the theme has places for them, and Playbook sends none.
+- **Dispatch on each product** (today one line for all: "Delivery within 5
+  to 7 days"), and **bulk price and full sets** (after S10): the theme has
+  places for them, and Playbook sends none.
 - **Generic name and country of origin.** Each product's legal details
   print the category as its generic name and "India" as its country: the
   theme's own stand-ins, the same on every product. Say if that is right
   for all, or Playbook should send them per product. (HSN is under
   "later".)
-- **Listing promises.** About 500 search descriptions say "Ships in 5 to 7
-  days" and about 300 "exchange within 7 days"; some say "stitched to
-  measure", "Swarovski" or "100% pure". They come from the store profile
-  and the suppliers' text. After S5, S6 and S7 the writer uses your exact
-  words and the listings are written again.
 - **Where products are sold.** Only the Online Store. Say if the Shop app,
   Google or Instagram should get them too.
-- **Supplier tag.** Once vendor short names are entered, every new or
-  rewritten listing gets a public tag such as "Vendor_KB". Keep it or drop
-  it?
+- **Supplier tag.** Once vendor short names are entered, every listing,
+  also the ones already on the store, gets a public tag such as
+  "Vendor_KB". Keep it or drop it?
 
 ## Playbook — decisions the owner still has to make
 
@@ -274,8 +297,8 @@ tags research report of 13 Nov, "Scrape mapping to Playbook taxonomy").
   Telegram post arrives after a crawl night. (The dashboard warnings and the
   ₹500 daily AI limit are already built.)
 - **Q4 · Who may start large actions.** Today any staff member can import
-  up to 5,000 products, send or re-price a whole website, retry everything
-  and read everything again. Recommended: admins and managers only.
+  up to 5,000 products, send or re-price a whole website, send its tags
+  and fields again, retry everything and read everything again. Recommended: admins and managers only.
 - **Q5 · The crossed-out "was" price.** Each website can now show one % or
   a random % per product (13 Nov). Recommended: use it only for the true
   MRP, or leave it off, and keep a log of price changes (new rules from

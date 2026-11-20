@@ -10,6 +10,7 @@
 // facts (meta.ts) go to attributes, its SKU to the sku column; the product type
 // and material also go in raw_text so the reader can pick category and fabric.
 import { HttpError } from '../http.ts';
+import { normalizeSizes } from '../sizes.ts';
 import type { Found } from './normalize.ts';
 
 export const istDate = (d = new Date()) => d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' });
@@ -30,11 +31,12 @@ export function refList(source: string, ref: string): string {
   return [ref, ...(twin ? [twin] : [])].map(r => `"${r.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`).join(',');
 }
 
-/** A store's size choices as it writes them ("XS (34)"), cleaned: short texts, no repeats, at most 30. */
+/** A store's size choices in Playbook's one format (sizes.ts: "XS (34)" stays, "38\"" becomes "38", "2XL" becomes
+ *  "XXL"): short texts, no repeats, at most 30. */
 export const storeSizes = (v: unknown): string[] =>
-  [...new Set((Array.isArray(v) ? v : []).map(s => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, 40)).filter(Boolean))].slice(0, 30);
+  normalizeSizes((Array.isArray(v) ? v : []).map(s => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, 40)).filter(Boolean));
 
-/** The facts only a website import may hand to ingest(): the store's SKU, its size choices as written, and its
+/** The facts only a website import may hand to ingest(): the store's SKU, its size choices (in the house format), and its
  *  extra facts as short plain texts (keys a-z0-9_). Anything else that sends them is refused. */
 export function importFacts(b: { source?: unknown; sku?: unknown; sizes?: unknown; attributes?: unknown }): Record<string, unknown> {
   const out: Record<string, unknown> = {};
@@ -43,7 +45,7 @@ export function importFacts(b: { source?: unknown; sku?: unknown; sizes?: unknow
   if (!given && !sku && !sizes.length) return out;
   if (b.source !== 'import') throw new HttpError(400, "attributes, sku and sizes are taken only from a website import (source 'import').");
   if (sku) out.sku = sku.slice(0, 80);
-  if (sizes.length) out.sizes = sizes; // kept as written ("XS (34)"): the reader never retypes them
+  if (sizes.length) out.sizes = sizes; // the store's own choices, measurement kept ("XS (34)"): the reader never retypes them
   if (given) {
     if (typeof b.attributes !== 'object' || Array.isArray(b.attributes)) throw new HttpError(400, 'attributes must be an object of short texts.');
     const attrs: Record<string, string> = {};

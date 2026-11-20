@@ -4,7 +4,12 @@
 // 20261113220000_pb_category_rename_move.sql — one transaction each, the server only.
 //   category_rename { from, to }          the list, its must-have tags, its products, the Product Type ticks and the
 //                                         website rules take the new name. A bulk change when it reaches 2+ products;
-//                                         its revert renames it back (categoryRevert.ts).
+//                                         its revert renames it back (categoryRevert.ts). On the stores the category's
+//                                         collection takes the new name FIRST (storeCollections.ts; `stores` in the answer
+//                                         says what happened on each), then the database renames, and the products already
+//                                         there get the new product type one by one (factsSend.ts: the database marks them
+//                                         when their category changes). Stores first, so no product is owed a type whose
+//                                         collection is not there yet; a rename the database refuses puts the title back.
 //   category_move   { from, to, remove? } every product filed under `from` (on the list or taken off it) is filed under
 //                                         `to` and checked again — a bulk change whose revert files each product back
 //                                         that is still in `to`. remove: `from` also leaves the list (categories_save,
@@ -15,6 +20,7 @@ import type { Body } from './actions.ts';
 import { asBulk } from './bulkLog.ts';
 import { logActivity, one, rpc } from './db.ts';
 import { HttpError } from './http.ts';
+import { type StoreRename, renameCollections } from './storeCollections.ts';
 import type { Refreshed } from './tagStore.ts';
 import { displayName, tagKey } from './tagText.ts';
 import { categoriesSave } from './tagsBulk.ts';
@@ -23,14 +29,38 @@ import { tagsAiFill } from './tagsQueue.ts';
 const name = (v: unknown) => displayName(v).slice(0, 60);
 const same = (a: string, b: string) => tagKey(a) === tagKey(b);
 
+const categoryList = async (): Promise<string[]> => {
+  const v = (await one<{ value: unknown }>('pb_settings?key=eq.categories&select=value'))?.value;
+  return Array.isArray(v) ? v.map(String) : [];
+};
+/** Will the database take this rename? Its own two common refusals (pb_category_rename), asked first so that a rename
+ *  it would refuse touches no store. */
+export async function renameFits(from: string, to: string): Promise<boolean> {
+  const list = await categoryList();
+  return list.some(c => same(c, from)) && (same(from, to) || !list.some(c => same(c, to)));
+}
+
+/** The stores, then the database (see the header). `rename` = the database's part; when it fails the stores' title
+ *  goes back. Where the first check said no and the database still took it, the stores follow afterwards. */
+export async function storesThenDatabase<T>(from: string, to: string, rename: () => Promise<T>): Promise<{ r: T; stores: StoreRename[] }> {
+  const first = await renameFits(from, to);
+  const stores = first ? await renameCollections(from, to) : []; // never throws
+  let r: T;
+  try { r = await rename(); } catch (e) {
+    if (stores.some(s => s.status !== 'none')) await renameCollections(to, from);
+    throw e;
+  }
+  return { r, stores: first ? stores : await renameCollections(from, to) };
+}
+
 export async function categoryRename(b: Body, userId: string | null) {
   const from = name(b.from), to = name(b.to);
   if (!from || !to) throw new HttpError(400, 'Give the category a name.');
   if (from === to) return { ok: true, renamed: 0, run_id: null };
-  const r = await asBulk('category_rename', `Renamed the category ${from} to ${to}`, userId,
-    async (run) => ({ renamed: Number(await rpc<number>('pb_category_rename', { p_from: from, p_to: to }, run)) || 0 }), () => ({ from, to }));
-  await logActivity({ action: 'settings_edited', details: { key: 'categories', renamed: { from, to }, products: r.renamed, run_id: r.run_id }, user_id: userId });
-  return { ok: true, renamed: r.renamed, run_id: r.run_id };
+  const { r, stores } = await storesThenDatabase(from, to, () => asBulk('category_rename', `Renamed the category ${from} to ${to}`, userId,
+    async (run) => ({ renamed: Number(await rpc<number>('pb_category_rename', { p_from: from, p_to: to }, run)) || 0 }), () => ({ from, to })));
+  await logActivity({ action: 'settings_edited', details: { key: 'categories', renamed: { from, to }, products: r.renamed, run_id: r.run_id, stores }, user_id: userId });
+  return { ok: true, renamed: r.renamed, run_id: r.run_id, stores };
 }
 
 /** The moved products the AI may give tags to: every one not waiting for a category (tags chosen by a person are left
@@ -48,8 +78,7 @@ export async function categoryMove(b: Body, userId: string | null) {
     (x) => ({ from, to, moved: x.rows.length }));
   let removed = false;
   if (b.remove === true) {
-    const was = (await one<{ value: unknown }>('pb_settings?key=eq.categories&select=value'))?.value;
-    const list = Array.isArray(was) ? was.map(String) : [];
+    const list = await categoryList();
     if (list.some(c => same(c, from))) { await categoriesSave({ categories: list.filter(c => !same(c, from)) }, userId); removed = true; }
   }
   const ids = toFill(r.rows);

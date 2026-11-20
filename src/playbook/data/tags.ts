@@ -8,7 +8,7 @@
 // LookAlikeError with the matches, so the UI can ask "same thing or new?".
 import { supabase } from '../../lib/supabase';
 import { pbCall } from './pbFunctions';
-import { offeredFor, type PbAttrValue, type PbAttribute, type PbFillRun, type PbLookAlike, type PbProductValue, type PbRetagResult, type PbTaxonomy } from '../tagTypes';
+import { offeredFor, type PbAttrValue, type PbAttribute, type PbFillRun, type PbLookAlike, type PbProductValue, type PbRetagResult, type PbStoreRename, type PbTaxonomy } from '../tagTypes';
 
 export class LookAlikeError extends Error {
   matches: PbLookAlike[];
@@ -37,8 +37,10 @@ export const saveValue = (v: { attribute_id: string; id?: string; name: string; 
   pbCall<{ value: PbAttrValue }>('value_save', v).then(r => r.value).catch(lookAlike);
 export const deleteValue = (id: string) => pbCall<{ regated: number }>('value_delete', { id });
 export const mergeValue = (from: string, into: string) => pbCall<{ moved: number }>('value_merge', { from, into });
-/** A new name everywhere: the list, its must-have tags, its products, the Product Type ticks and the website rules. */
-export const renameCategory = (from: string, to: string) => pbCall<{ renamed: number; run_id: string | null }>('category_rename', { from, to });
+/** A new name everywhere: the list, its must-have tags, its products, the Product Type ticks and the website rules. The stores
+ *  follow by themselves: `stores` (absent from a server that does not do this yet) says what became of the category's collection
+ *  on each website that is switched on, and the products already there get the new product type one by one. */
+export const renameCategory = (from: string, to: string) => pbCall<{ renamed: number; run_id: string | null; stores?: PbStoreRename[] }>('category_rename', { from, to });
 /** Every product of `from` goes to `to` (on the list); `remove` takes `from` off the list too. Then "Let AI decide"
  *  for the ones missing a must-have tag of `to` (`queued`). */
 export const moveCategory = (from: string, to: string, remove = false) =>

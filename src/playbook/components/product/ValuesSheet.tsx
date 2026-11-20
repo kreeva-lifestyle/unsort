@@ -3,11 +3,13 @@
 // attribute keeps only the last tap, and so does "Plain" (none of the others). Save (the sheet's gradient) sends staff's
 // choice (product_values_set: 'manual', 'tags' locked); saving the last
 // missing attribute re-runs the gate, so the product turns Ready and goes to
-// its websites — the toast says so.
+// its websites — the toast says so. On a product already on a website, the
+// new tag reaches that website by itself (20 Nov 2026): the toast says that too.
 import { useEffect, useState } from 'react';
 import { friendlyError } from '../../../lib/friendlyError';
 import type { AddToast } from '../PbToasts';
 import type { setProductValues } from '../../data/tags';
+import { withFollow } from '../../data/listings';
 import type { PbAttribute } from '../../tagTypes';
 import { PB, pbActive, pbBody, pbBtnSecondary, pbErrorBox, pbInput } from '../../pbTheme';
 import { useIsPhone } from '../../hooks/useIsPhone';
@@ -16,8 +18,8 @@ import PbButton from '../ui/PbButton';
 import PbIcon from '../ui/PbIcon';
 import { isNoneValue } from '../tags/tagText';
 
-export default function ValuesSheet({ attr, chosen, productId, save, addToast, onClose, onSaved }: {
-  attr: PbAttribute | null; chosen: string[]; productId: string; save: typeof setProductValues; addToast: AddToast; onClose: () => void; onSaved: () => void;
+export default function ValuesSheet({ attr, chosen, productId, onSites = 0, save, addToast, onClose, onSaved }: {
+  attr: PbAttribute | null; chosen: string[]; productId: string; onSites?: number; save: typeof setProductValues; addToast: AddToast; onClose: () => void; onSaved: () => void;
 }) {
   const phone = useIsPhone();
   const [sel, setSel] = useState<string[]>([]);
@@ -38,8 +40,8 @@ export default function ValuesSheet({ attr, chosen, productId, save, addToast, o
     try {
       const r = await save(productId, sel, attr.id);
       const names = attr.values.filter(v => sel.includes(v.id)).map(v => v.name).join(', ');
-      addToast(r.status === 'ready' && r.routed ? `Saved ${attr.name}: ${names} — the product is ready and went to ${r.routed} website${r.routed === 1 ? '' : 's'}`
-        : r.missing?.length ? `Saved ${attr.name} — still needs ${r.missing.join(', ')}` : `Saved ${attr.name}${names ? `: ${names}` : ''}`, r.missing?.length ? 'info' : 'success');
+      addToast(withFollow(r.status === 'ready' && r.routed ? `Saved ${attr.name}: ${names} — the product is ready and went to ${r.routed} website${r.routed === 1 ? '' : 's'}`
+        : r.missing?.length ? `Saved ${attr.name} — still needs ${r.missing.join(', ')}` : `Saved ${attr.name}${names ? `: ${names}` : ''}`, onSites), r.missing?.length ? 'info' : 'success');
       onSaved(); onClose();
     } catch (e) { setErr(friendlyError(e)); } finally { setBusy(false); }
   };

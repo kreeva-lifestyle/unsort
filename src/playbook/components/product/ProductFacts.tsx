@@ -16,6 +16,7 @@ import { friendlyError } from '../../../lib/friendlyError';
 import type { AddToast } from '../PbToasts';
 import type { PbProduct } from '../../types';
 import { pbCall } from '../../data/pbFunctions';
+import { withFollow } from '../../data/listings';
 import { updateProduct, type ProductDetail, type VendorLite } from '../../data/products';
 import { pbErrorBox, pbInput, pbLabel, pbMeta, pbNum, pbTextarea, pbTile, pbTileTitle } from '../../pbTheme';
 import { useDirty } from '../../hooks/useDirty';
@@ -45,9 +46,9 @@ const toForm = (p: ProductDetail): Form => ({
 const carry = (typed: Form, was: Form, now: Form): Form =>
   Object.fromEntries((Object.keys(now) as (keyof Form)[]).map(k => [k, typed[k].trim() !== was[k].trim() ? typed[k] : now[k]])) as Form;
 
-export default function ProductFacts({ product, vendors, categories, onVendorCreated, onSaved, addToast, className, primary = true }: {
+export default function ProductFacts({ product, vendors, categories, onVendorCreated, onSaved, addToast, className, primary = true, onSites = 0 }: {
   product: ProductDetail; vendors: VendorLite[]; categories: string[]; onVendorCreated: (v: VendorLite) => void;
-  onSaved: () => void; addToast: AddToast; className?: string; primary?: boolean;
+  onSaved: () => void; addToast: AddToast; className?: string; primary?: boolean; /** Websites (switched on) it is on sale on. */ onSites?: number;
 }) {
   const [f, setF] = useState<Form>(() => toForm(product));
   const [base, setBase] = useState(product); // the product `f` is lined up with
@@ -100,6 +101,8 @@ export default function ProductFacts({ product, vendors, categories, onVendorCre
       const costChanged = was === 'ready' && changed.includes('cost_price') && !lostInfo;
       const miss = missingAll(lacks, g?.missing);
       const still = (lostInfo || g?.status === 'needs_info') && miss.length ? ` — still needs ${miss.join(', ')}` : '';
+      // A new category, fabric, colour, size list, SKU or vendor: the websites it is on follow by themselves (the database marks its listings).
+      const on = changed.some(k => !['cost_price', 'name', 'raw_text'].includes(k)) ? onSites : 0;
       if ((nowReady || reroute) && !lostInfo) {
         try {
           // New sizes or a new SKU: the server sends listings already on Shopify again, so the choices and codes there follow.
@@ -107,9 +110,9 @@ export default function ProductFacts({ product, vendors, categories, onVendorCre
           const done = nowReady ? 'Saved — sent to the matching websites'
             : `Saved — websites checked again${r.repriced ? ` (${r.repriced} published listing${r.repriced > 1 ? 's' : ''} re-priced and sent to Shopify)` : ''}${r.resent ? ` (${r.resent} published listing${r.resent > 1 ? 's' : ''} sent to Shopify again)` : ''}`
               + (costChanged && kept ? `. ${kept} listing${kept > 1 ? 's have' : ' has'} a price typed by hand and keep${kept > 1 ? '' : 's'} it` : '');
-          if (r.warning) addToast(`${done}, but: ${r.warning}`, 'error'); else addToast(done, 'success');
+          if (r.warning) addToast(withFollow(`${done}, but: ${r.warning}`, on), 'error'); else addToast(withFollow(done, on), 'success');
         } catch (e2) { addToast(`Saved, but checking the websites failed: ${friendlyError(e2)}`, 'error'); }
-      } else addToast(lostInfo ? `Saved — back to Needs info${still || ': a necessary detail is missing'}` : `Saved${still}`, still ? 'info' : 'success');
+      } else addToast(withFollow(lostInfo ? `Saved — back to Needs info${still || ': a necessary detail is missing'}` : `Saved${still}`, on), still ? 'info' : 'success');
       setResync(true);
       onSaved();
     } catch (e2) { setErr(friendlyError(e2)); } finally { setSaving(false); }
@@ -171,7 +174,7 @@ export default function ProductFacts({ product, vendors, categories, onVendorCre
         <GrowArea id="pb-f-raw" value={f.raw_text} onChange={set('raw_text')} rows={4} maxLength={8000} autoCapitalize="sentences" className="pb-input" style={pbTextarea} />
       </div>
       {/* Its own saves (product_values_set): the values are not part of the facts patch above. */}
-      <ProductValues product={product} addToast={addToast} onSaved={onSaved} />
+      <ProductValues product={product} onSites={onSites} addToast={addToast} onSaved={onSaved} />
       {err && <div role="alert" style={pbErrorBox}>{err}</div>}
       {reading && <div style={pbMeta}>The AI is reading this product — wait a moment, then reload to edit.</div>}
       {phone && changed.length > 0 ? (

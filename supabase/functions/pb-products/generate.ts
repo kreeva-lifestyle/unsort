@@ -22,7 +22,7 @@ import { compareAt, listingPrice } from './pricing.ts';
 import { cleanKeyword, keywordOf, phraseMax, profileOf } from './profile.ts';
 import { checkCopy, hardOf, type Version } from './seoCheck.ts';
 import { seoGet, seoPut } from './seoStore.ts';
-import { buildTags, vendorCode } from './tags.ts';
+import { ownTags } from './listingFacts.ts';
 import { attributeValues, siteValueTags } from './tagStore.ts';
 import { PERM_NOTE } from './stockSend.ts';
 import { ARCHIVED, LISTING_COLS, MAX_ATTEMPTS, NEEDS_INFO, PRODUCT_COLS, STALE_MS, WEBSITE_COLS, hasPrice, permOut, type Budget, type ListingRow, type ProductRow, type WebsiteRow } from './types.ts';
@@ -133,7 +133,9 @@ export async function generateOne(l: ListingRow, o: { manual: boolean; prevStatu
     if (handle !== l.handle && await one(`pb_listings?website_id=eq.${enc(l.website_id)}&handle=eq.${enc(handle)}&id=neq.${enc(l.id)}&select=id`)) handle = `${handle.slice(0, 74)}-${l.id.slice(0, 4)}`;
     const set: Record<string, unknown> = {
       price, compare_at_price: compare, title: g.title, description_html: g.description_html, seo_title: g.seo_title, seo_description: g.seo_description, handle,
-      tags: locked.has('tags') ? l.tags : buildTags(tr, { ...vars, vendor_code: vendorCode(vendor?.codes, p.sku), sizes: p.sizes || [], attributes: p.attributes || {}, tags: valueTags }, extra),
+      // The website's tag rules over the product, plus the AI's extra tags — kept apart too (ai_tags), so every later send
+      // can work the tags out again without the AI (listingFacts.ts). Tags a person typed stay as typed.
+      tags: ownTags({ l: { tags: l.tags, ai_tags: extra, locked: l.locked }, p, rules: tr, vendor, valueTags }), ...(locked.has('tags') ? {} : { ai_tags: extra }),
       product_type: p.category || null,
       image_alts: c.alt_text === false ? [] : imgs.map((_, i) => cut(String(g.image_alts?.[photos.sent.indexOf(i)] || '') || `${g.title} - view ${i + 1}`, 110)),
       ai_model: w.model, ai_effort: w.effort || null, ai_cost_usd: w.usd, generated_at: nowIso(),

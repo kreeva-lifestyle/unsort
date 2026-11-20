@@ -119,6 +119,21 @@ export const repricedMessage = (r: RepriceResult) =>
   `${r.repriced ? `${r.repriced.toLocaleString('en-IN')} listing${r.repriced > 1 ? 's' : ''} re-priced — the ones on Shopify are updated about ten a minute` : 'Every listing already has this price'}`
   + `${r.kept ? `. ${r.kept.toLocaleString('en-IN')} keep${r.kept > 1 ? '' : 's'} a price typed by hand` : ''}${r.more ? ' — there are more: tap "Update prices on Shopify" again' : ''}${r.repriced ? `. ${UNDO_HINT}` : ''}`;
 
+/** "Send tags and fields again" (pb-products factsSite.ts): every product of this website that is on Shopify is sent its product type,
+ *  tags and custom fields as Playbook has them now. `dry`: only count them, nothing changes (`active` false = the website is switched off). */
+export type ResendResult = { listings: number; active?: boolean };
+export const resendWebsite = (websiteId: string, dry = false) => pbCall<ResendResult>('resend_website', { website_id: websiteId, ...(dry ? { dry: true } : {}) });
+/** How long the re-send takes: the server sends 30 to 100 products a minute, so about a minute or two for each hundred. */
+export function resendTime(n: number): string {
+  if (n < 150) return 'about a minute or two';
+  const lo = Math.round(n / 100); // minutes at the faster pace; twice that at the slower one
+  if (lo * 2 <= 90) return `about ${lo} to ${lo * 2} minutes`;
+  const h = Math.max(1, Math.round(lo / 60));
+  return `about ${h} to ${Math.max(Math.round(lo / 30), h + 1)} hours`;
+}
+export const resentMessage = (n: number) =>
+  `${n.toLocaleString('en-IN')} product${n === 1 ? ' is' : 's are'} being sent ${n === 1 ? 'its' : 'their'} tags and fields again — ${resendTime(n)}`;
+
 // ── routing rules ──
 const RULE_COLS = 'id,website_id,position,name,enabled,action,conditions,price_override,created_at,updated_at';
 export type RuleDraft = Pick<PbRoutingRule, 'name' | 'enabled' | 'action' | 'conditions' | 'price_override'>;

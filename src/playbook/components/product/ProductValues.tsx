@@ -15,6 +15,7 @@ import { friendlyError } from '../../../lib/friendlyError';
 import type { AddToast } from '../PbToasts';
 import type { PbProduct } from '../../types';
 import { aiFillNow, productTaxonomy, setProductValues } from '../../data/tags';
+import { withFollow } from '../../data/listings';
 import { SOURCE_LABEL, type PbAttribute, type PbProductValue } from '../../tagTypes';
 import { PB, pbBody, pbBtnSecondary, pbLabel, pbMeta, pbTileReview } from '../../pbTheme';
 import PbButton from '../ui/PbButton';
@@ -27,8 +28,9 @@ import { andList } from '../tags/tagText';
 
 type Data = { attributes: PbAttribute[]; values: PbProductValue[] };
 
-export default function ProductValues({ product, addToast, onSaved, load = productTaxonomy, save = setProductValues, fill = aiFillNow }: {
+export default function ProductValues({ product, addToast, onSaved, onSites = 0, load = productTaxonomy, save = setProductValues, fill = aiFillNow }: {
   product: Pick<PbProduct, 'id' | 'category' | 'locked' | 'status' | 'missing_attrs' | 'updated_at'>; addToast: AddToast; onSaved: () => void;
+  /** Websites (switched on) the product is on sale on: a tag chosen here follows there by itself. */ onSites?: number;
   load?: typeof productTaxonomy; save?: typeof setProductValues; fill?: typeof aiFillNow;
 }) {
   const [data, setData] = useState<Data | null>(null);
@@ -47,7 +49,7 @@ export default function ProductValues({ product, addToast, onSaved, load = produ
     setBusy(true);
     try {
       const r = await fill(product.id);
-      if (r.filled.length) addToast(`AI chose ${andList(r.filled)}${r.left.length ? ` — it couldn't tell ${andList(r.left)}, please choose` : ''}${r.routed ? ` · sent to ${r.routed} website${r.routed === 1 ? '' : 's'}` : ''}`, r.left.length ? 'info' : 'success');
+      if (r.filled.length) addToast(withFollow(`AI chose ${andList(r.filled)}${r.left.length ? ` — it couldn't tell ${andList(r.left)}, please choose` : ''}${r.routed ? ` · sent to ${r.routed} website${r.routed === 1 ? '' : 's'}` : ''}`, onSites), r.left.length ? 'info' : 'success');
       else addToast(`AI couldn't tell ${andList(r.left.length ? r.left : missing)} — please choose`, 'info');
       onSaved(); void get();
     } catch (e) { addToast(friendlyError(e), 'error'); } finally { setBusy(false); }
@@ -92,7 +94,7 @@ export default function ProductValues({ product, addToast, onSaved, load = produ
         </ul>
       )}
       {data && data.attributes.length > 0 && <span style={pbMeta}>Auto = found in the product's text · AI = chosen by the AI · You = chosen here. Websites send them with <span style={{ fontFamily: PB.mono }}>{'{tags}'}</span>.</span>}
-      <ValuesSheet attr={open} chosen={open && data ? chosen(open).map(v => v.id) : []} productId={product.id} save={save} addToast={addToast}
+      <ValuesSheet attr={open} chosen={open && data ? chosen(open).map(v => v.id) : []} productId={product.id} onSites={onSites} save={save} addToast={addToast}
         onClose={() => setOpen(null)} onSaved={() => { onSaved(); void get(); }} />
     </div>
   );

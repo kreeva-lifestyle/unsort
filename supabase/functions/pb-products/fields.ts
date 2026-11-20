@@ -7,8 +7,10 @@
 // writes only the keys it is given, so other apps' and the merchant's fields
 // are never touched (productSet would delete every field not in its input).
 // A field the store already had goes in that field's kind (fieldsSend.ts).
-// An empty fact is not sent; a fact that went empty is left as it is on the
-// store. No I/O — tested in test/fields.test.mjs.
+// An empty fact is not sent; a field Playbook filled before whose value went
+// empty is taken off the product (fieldsSend.ts dropFields; one Playbook has no
+// record of filling is left alone). No I/O — tested in test/storeSetup.test.mjs
+// and test/storeWriter.test.mjs.
 // As Playbook (owner, 2026-11-17: "Product Specifications & Custom Attributes
 // (Metafields) as per playbook"): given the product's Playbook tags, one field
 // per attribute (storeFields.ts fieldDefs: colour, fabric, work, occasion,

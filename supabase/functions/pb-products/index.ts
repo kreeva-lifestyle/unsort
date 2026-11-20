@@ -11,12 +11,13 @@
 // All database writes use the service role; credentials never leave the server.
 //
 // POST JSON { action, ... } → JSON; errors → HTTP 4xx/5xx { ok:false, error:'<plain sentence>' }.
-//   work               secret|staff   –                                   → { ok, read, routed, generated, published, failed, imported? }
+//   work               secret|staff   –                                   → { ok, read, routed, generated, published, failed, imported?, facts? }
 //   ingest             secret         { source:'telegram'|'import', source_ref, raw_text, vendor_name?, image_urls?[], less_amount?, source_url?, intake_notes?[], sell_price?, price_note?, attributes?{}, sku? } (attributes / sku: source 'import' only)
 //                                                                          → { ok, product_id, duplicate?, images?, warnings? }
 //   read_product       staff          { product_id }                      → { ok, product, routed, warning? }
 //   route_product      staff          { product_id }                      → { ok, routed, repriced, resent, listings, warning? }
 //   reprice_website    staff          { website_id }                      → { ok, repriced, kept, more }   (bulk.ts)
+//   resend_website     staff          { website_id, dry? }                → { ok, listings }  "Send tags and fields again": product type, tags and custom fields of every product on that store (factsSite.ts)
 //   retry_failed       staff          { website_id? }                     → { ok, retried }                (bulk.ts)
 //   reread_failed      staff          {}                                  → { ok, queued }                 (bulk.ts)
 //   set_stock          staff          { product_id, in_stock }            → { ok, resent, waiting }        (stock.ts)
@@ -69,6 +70,7 @@ import { userOf, whoIs } from './auth.ts';
 import { HttpError, corsHeaders, fail, json, plain } from './http.ts';
 import { importCancel, importCheck, importList, importStart } from './import/actions.ts';
 import { repriceWebsite, rereadFailed, retryFailed } from './bulk.ts';
+import { resendWebsite } from './factsSite.ts';
 import { bulkPreview, bulkRevert } from './bulkRevert.ts';
 import { copiesArchive } from './copies.ts';
 import { photosSet, photosSync } from './photosEdit.ts';
@@ -92,6 +94,7 @@ const ACTIONS: Record<string, { who: Who; run: (b: A.Body, c: Caller) => Promise
   delete_product: { who: 'admin', run: (b, c) => deleteProduct(b, userOf(c)) },
   route_website: { who: 'staff', run: (b, c) => routeWebsite(b, userOf(c)) },
   reprice_website: { who: 'staff', run: (b, c) => repriceWebsite(b, userOf(c)) },
+  resend_website: { who: 'staff', run: (b, c) => resendWebsite(b, userOf(c)) },
   retry_failed: { who: 'staff', run: (b, c) => retryFailed(b, userOf(c)) },
   reread_failed: { who: 'staff', run: (_b, c) => rereadFailed(userOf(c)) },
   set_stock: { who: 'staff', run: (b, c) => setStock(b, userOf(c)) },

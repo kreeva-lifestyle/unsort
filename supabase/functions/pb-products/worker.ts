@@ -26,8 +26,11 @@
 //     once the day's AI limit is used up, reading, writing and tag filling
 //     are skipped (sending to Shopify goes on);
 //   * the photos of freshly published listings are looked at (mediaCheck.ts).
+// 20 Nov 2026: the product type, tags and custom fields a store is owed (factsSend.ts) go right after the pause
+// check, and once more at the end with the time that is left: small, free, and never held up by the writing.
 import { overLimit, pauseWatch } from './brake.ts';
 import { getSettings } from './db.ts';
+import { sendFactsDue } from './factsSend.ts';
 import { autoFill } from './fillAuto.ts';
 import { claimGenerate, genCandidates, generateOne } from './generate.ts';
 import { advanceImport } from './import/runner.ts';
@@ -44,9 +47,9 @@ import { loadTaxonomy } from './taxonomy.ts';
 import type { Budget } from './types.ts';
 
 /** stock = stock changes sent to stores; paused = automation is paused (the run stopped, or sent stock only); limit = the day's AI limit is used up. */
-export interface WorkResult { read: number; routed: number; generated: number; published: number; failed: number; imported?: number; tagged?: number; filed?: number; stock?: number; taken_off?: number; paused?: boolean; limit?: boolean }
+export interface WorkResult { read: number; routed: number; generated: number; published: number; failed: number; imported?: number; tagged?: number; filed?: number; stock?: number; taken_off?: number; facts?: number; paused?: boolean; limit?: boolean }
 
-const CAPS = { read: 6, generate: 8, publish: 10, route: 10, fill: 5, stock: 10, media: 5, retire: 5, takeOff: 10 };
+const CAPS = { read: 6, generate: 8, publish: 10, route: 10, fill: 5, stock: 10, media: 5, retire: 5, takeOff: 10, facts: 60 };
 /** Listings already written that go out before any writing in a run (the rest after it, up to CAPS.publish). */
 const PUBLISH_FIRST = 2;
 /** "Let AI decide" products one run may take, CAPS.fill at a time. */
@@ -100,6 +103,12 @@ export async function work(userId: string | null, manual = false): Promise<WorkR
   const stopped = async () => { if (manual && pausedAtStart) return false; if (await watch()) out.paused = true; return !!out.paused; };
   // The day's AI limit: asked before each AI step, so one run cannot overshoot by more than that step.
   const capped = async () => { if (!out.limit && auto && await overLimit(auto.daily_limit_inr)) out.limit = true; return !!out.limit; };
+  // Product type, tags and custom fields owed to a store (factsSend.ts): `until` bounds the first pass, the last one has what is left.
+  const facts = async (until: number) => {
+    try { if (!(await stopped())) { const n = await sendFactsDue(CAPS.facts, () => inTime() && Date.now() < until, userId); if (n) out.facts = (out.facts ?? 0) + n; } }
+    catch (e) { failed('facts', 'run', e); }
+  };
+  await facts(Date.now() + STOCK_MS);
 
   try {
     const imp = (await stopped()) || (await importWaits()) ? null : await advanceImport(Date.now() + IMPORT_MS, userId);
@@ -176,5 +185,6 @@ export async function work(userId: string | null, manual = false): Promise<WorkR
   // New tag words: filed by themselves, as "also known as" of their nearest value or ignored (tagsFile.ts, owner 17 Nov).
   try { if (left(FILE_NEEDS_MS) && !(await stopped())) { const f = await fileWords({ budget, left, capped, stopped }); if (f?.aliased || f?.ignored) out.filed = f.aliased + f.ignored; } }
   catch (e) { failed('tags_file', 'run', e); }
+  await facts(budget.soft); // the rest of what the stores are owed, with the time that is left
   return out;
 }

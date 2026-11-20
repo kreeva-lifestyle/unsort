@@ -108,7 +108,7 @@ export default function WebsiteEditor({ site, initialDraft, onDraft, onClose, on
       {tab === 'publishing' && <PublishingSection draft={draft} set={setDraft} />}
       {tab === 'routing' && <RoutingSection siteId={site.id} draft={draft} set={setDraft} addToast={addToast} vendors={vendors} categories={categories} />}
       {tab === 'pricing' && <PricingSection siteId={site.id} dirty={dirty} draft={draft} set={setDraft} addToast={addToast} />}
-      {tab === 'tags' && <TagsSection draft={draft} set={setDraft} />}
+      {tab === 'tags' && <TagsSection siteId={site.id} dirty={dirty} draft={draft} set={setDraft} addToast={addToast} />}
       {tab === 'profile' && <ProfileSection draft={draft} set={setDraft} siteName={site.name} />}
       {tab === 'content' && <ContentSection draft={draft} set={setDraft} />}
     </>

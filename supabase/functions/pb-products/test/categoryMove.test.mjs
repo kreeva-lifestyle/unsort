@@ -34,10 +34,33 @@ const rpcs = (calls) => calls.filter(([m, p]) => m === 'POST' && p.startsWith('r
 test('rename: one database call inside a bulk change named after both names', async () => {
   const calls = world({ 'rpc/pb_category_rename': 3 });
   const r = await categoryRename({ from: ' Anarkali ', to: 'Anarkali  Suit' }, 'u1');
-  assert.deepEqual(r, { ok: true, renamed: 3, run_id: 'run1' });
+  assert.deepEqual(r, { ok: true, renamed: 3, run_id: 'run1', stores: [] }); // no website is switched on here: no store to rename a collection on
   assert.deepEqual(rpcs(calls).find(([f]) => f === 'pb_category_rename'), ['pb_category_rename', { p_from: 'Anarkali', p_to: 'Anarkali Suit' }, 'run1']);
   assert.equal(calls.find(([m, p]) => m === 'POST' && p.startsWith('pb_bulk_runs'))[2][0].label, 'Renamed the category Anarkali to Anarkali Suit');
   assert.deepEqual(calls.find(([m, p]) => m === 'PATCH' && p.startsWith('pb_bulk_runs'))[2].details, { from: 'Anarkali', to: 'Anarkali Suit', unit: 'products' }); // what the revert needs
+});
+
+test('rename and its revert: the stores\' collection is renamed BEFORE the database (storeCollections.ts; the calls to a store: factsStore.test.mjs)', async () => {
+  const sites = (calls) => calls.findIndex(([m, p]) => m === 'GET' && p.startsWith('pb_websites?active=eq.true&connected_at=not.is.null'));
+  const renamed = (calls) => calls.findIndex(([m, p]) => m === 'POST' && p.startsWith('rpc/pb_category_rename'));
+  const list = (...names) => ({ 'pb_settings?key=eq.categories': [{ value: names }] });
+  let calls = world({ ...list('Anarkali', 'Saree'), 'rpc/pb_category_rename': 3 });
+  await categoryRename({ from: 'Anarkali', to: 'Anarkali Suit' }, 'u1');
+  assert.ok(sites(calls) > -1 && sites(calls) < renamed(calls), 'the stores first: no product is owed a type whose collection is not there yet');
+  assert.deepEqual(calls.find(([m, p]) => m === 'POST' && p.startsWith('pb_activity'))[2][0].details.stores, []);
+  calls = world({ ...list('Anarkali Suit', 'Saree'), 'rpc/pb_category_rename': 2 });
+  await revertCategory(RUN({ kind: 'category_rename', details: { from: 'Anarkali', to: 'Anarkali Suit' } }), 'u1');
+  assert.ok(sites(calls) > -1 && sites(calls) < renamed(calls), 'a rename taken back takes the collection\'s name back first too');
+  // A rename the database will refuse (the new name is on the list already, or the old one is not) touches no store.
+  for (const names of [['Anarkali', 'Saree'], ['Saree']]) {
+    calls = world({ ...list(...names), 'rpc/pb_category_rename': () => { throw new Error('refused'); } });
+    await assert.rejects(categoryRename({ from: 'Anarkali', to: names.length > 1 ? 'Saree' : 'Anarkali Suit' }, 'u1'));
+    assert.equal(sites(calls), -1, 'a rename the database refused changes nothing on a store');
+  }
+  // The list as the server reads it said no, and the database still took the rename: the stores follow afterwards.
+  calls = world({ 'rpc/pb_category_rename': 3 });
+  await categoryRename({ from: 'Anarkali', to: 'Anarkali Suit' }, 'u1');
+  assert.ok(sites(calls) > renamed(calls));
 });
 
 test('move: the products go, the old name leaves the list, and the AI may choose tags for every one not waiting for a category', async () => {

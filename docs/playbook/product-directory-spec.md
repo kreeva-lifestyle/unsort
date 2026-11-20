@@ -113,7 +113,11 @@ Types: `src/playbook/types.ts` (jsonb shapes documented there).
      ai_extra_max, when ai_extra), apply `case`, trim, dedupe
      (case-insensitive), drop empties, each ≤ 255 chars, at most
      `tag_rules.max_tags` (default 30). Locked `tags` kept. product_type =
-     category.
+     category. (Since 2026-11-20 this is only the listing's first copy: tags
+     and product type are worked out again from the product at EVERY send,
+     `listingFacts.ts`, and the AI's extra tags are also saved apart in
+     `pb_listings.ai_tags` so that needs no AI — see "The store follows the
+     product by itself" at the end.)
    - Next status by `publish_mode`: `review` → `review` (waits for a person);
      `live` / `draft` → `publishing`.
 4. **Publish** — listings `publishing` (and `failed` with attempts < 3 after
@@ -138,6 +142,10 @@ Types: `src/playbook/types.ts` (jsonb shapes documented there).
    listing.error but the listing still counts as published; only on a create,
    Put back, or after that step failed). Save
    shopify_product_id, shopify_status, published_at; status `published`.
+   (Since 2026-11-20: `productType`, `tags` and the custom fields are the
+   product's as it is at the send, not the copies saved when the AI wrote;
+   the sizes go out in the house format; what was sent is saved in
+   `pb_listings.sent` — last section.)
    A price typed by hand gets its compare-at from the site's pricing at
    publish time. A lost create is found again by the listing's handles
    (current, `-<id6>`, and the ones sent by earlier failed publishes, logged
@@ -163,7 +171,9 @@ most 6 reads, 8 generations, 10 publishes per call. The cron's
 trigger_pb_worker calls the function only when the steps' own filters would
 find work (claims older than 5 min, listings of active websites only; since
 20261111090000 also a product queued for "Let AI decide" or made Ready by a
-tag change: tag_fill_run, route_due). A queued "Let AI decide" product leaves
+tag change: tag_fill_run, route_due; since 20261120100000 also a listing owed
+its product type, tags and fields on a switched-on website: `facts_due`, never
+tried or last tried 5 minutes ago, not while paused). A queued "Let AI decide" product leaves
 the queue first, and that is its claim, so two overlapping runs never fill
 the same product.
 A routing failure after a read counts towards the reader's 3 tries; after
@@ -177,7 +187,7 @@ admin/manager/operator (Bearer JWT → /auth/v1/user → profiles role,
 is_active). Service role for all DB writes. CORS like listing-ai.
 | action | who | body | result |
 |---|---|---|---|
-| `work` | secret or staff | – | `{ ok, read, routed, generated, published, failed }` |
+| `work` | secret or staff | – | `{ ok, read, routed, generated, published, failed }`; since 2026-11-20 also `facts` when above 0: the listings whose product type, tags and fields were settled in this run (`WorkResult.facts`, `factsSend.ts`) |
 | `ingest` | secret | `{ source:'telegram'|'import', source_ref, raw_text, vendor_name?, image_urls?[], less_amount?, source_url?, intake_notes?[], sell_price?, price_note?, attributes?{}, sku? }` | `{ ok, product_id, duplicate?, images?, warnings? }` (downloads images into the bucket; `sell_price` / `price_note` = import from website; `attributes` / `sku` accepted from source 'import' only) |
 | `import_check` | staff | `{ url }` | preview of another store (see "Import from website") → `{ ok, platform, host, origin, estimate, estimate_in_stock (a count, `'5000+'` when counting stopped at the cap, null when unknown), sample[≤3]{ name, price, currency, image, url, in_stock }, warnings[], vendor_suggestion }` Also `already_here` (products already copied from this website, www. or not: a count on `source_ref`) and `last_vendor` (the vendor of its latest run; null when that run had none — the vendor is optional, 2026-11-13), so a repeat import says "All 136 are already in Playbook", the button reads "Check for new products" / "Import about 14 new products", and the vendor is shown with Change instead of being asked again (owner, 2026-11-12). And `maker { checked, named, names[≤5]{ name, products }, own }` (2026-11-13, `import/maker.ts`): do the products name who makes them — a JSON-LD manufacturer, a "Manufactured / Marketed / Packed by …" or "Manufacturer: / Brand: / Vendor: / Sold by:" line in the description, or a brand / vendor field that is not the website's own name (its host's first part or site name: `own`). Counted on every Shopify product the estimate reads, 20 WooCommerce products, or the generic sample; the sheet shows "Manufacturer named" (≥ 80 %), "named on some products" or "not named". `maker.names` lists up to 30; `last_skip_makers` = the manufacturers the website's latest import left out. |
 | `import_start` | staff | `{ url, in_stock_only?, use_their_price?, vendor_name?, estimate?, skip_makers? }` | validates + detects again, creates the vendor if needed — `vendor_name` is optional (owner, 2026-11-13: "vendor not mandatory while scrapping from website"): empty or absent, the run has no vendor and its products come in without one (the website's own name is not made a vendor; until 2026-11-13 it was required and the sheet prefilled it with the site's name) —, inserts a `queued` pb_import_runs row (`estimate` → `cursor.estimate`, display only) → `{ ok, run_id, platform, host, warnings[] }`; 409 while a run for that host is queued / running. `skip_makers` (2026-11-13, ≤ 50 names): manufacturers to leave out — the run passes over a product that names one (`import/maker.ts skipsMaker`: its list data before its page is fetched, its page's JSON-LD manufacturer after), counted in `pb_import_runs.maker_skipped` (20261113200000_pb_import_skip_makers.sql); a product that names none is always imported |
@@ -192,7 +202,8 @@ is_active). Service role for all DB writes. CORS like listing-ai.
 | `unpublish_listing` | staff | `{ listing_id }` | claim the listing as `skipped` first (refused while a run holds it), then set Shopify status DRAFT (on failure the listing goes back) → `{ ok }` |
 | `save_credentials` | admin/manager | `{ website_id, auth_mode, access_token?, client_id?, client_secret?, shop_domain? }` | stores in pb_website_secrets, then test → `{ ok, shop_name }`. A different `shop_domain` moves the site to that store: needs full new credentials; site switched off; old secrets wiped; non-skipped listings re-queued without Shopify ids; skipped ones lose their old-store ids |
 | `test_connection` | staff | `{ website_id }` | `{ ok, shop_name, scopes[] , missing_scopes[] }`, sets connected_at / last_error |
-| `store_setup` | admin/manager | `{ website_id }` | (2026-11-17, SuratMandi) on the store: a product metafield definition (namespace `custom`, pinned, storefront PUBLIC_READ) per Playbook attribute — key = the attribute key in snake case, `list.single_line_text_field` when multi, else `single_line_text_field` — plus `set_contents` and `faq` (rich text); then a collection per category (`collectionCreate(collection:)` with one conditions source: product type EQUALS the category; handle from the name) put on the Online Store. Kept when there (a definition with the same key, whatever its type — 2026-11-17 "if already made then merge with it": publishing fills a plain-text one with the values joined by commas, `fieldsSend.ts`; a collection with the same handle or title); nothing is deleted or changed. Per item `{ name, status: made/kept/failed, note? }`; a store-wide refusal (credentials, permission, frozen) throws once. `storeSetup.ts`, `storeFields.ts` |
+| `store_setup` | admin/manager | `{ website_id }` | (2026-11-17, SuratMandi) on the store: a product metafield definition (namespace `custom`, pinned, storefront PUBLIC_READ) per Playbook attribute — key = the attribute key in snake case, `list.single_line_text_field` when multi, else `single_line_text_field` — plus `set_contents` and `faq` (rich text); then a collection per category (`collectionCreate(collection:)` with one conditions source: product type EQUALS the category; handle from the name) put on the Online Store. Kept when there (a definition with the same key, whatever its type — 2026-11-17 "if already made then merge with it": publishing fills a plain-text one with the values joined by commas, `fieldsSend.ts`; a collection with the same handle or title); nothing is deleted or changed. Per item `{ name, status: made/kept/failed, note? }`; a store-wide refusal (credentials, permission, frozen) throws once. `storeSetup.ts`, `storeFields.ts`; since 2026-11-20 the collection calls live in `storeCollections.ts` (`listCollections`, `makeCollection`), which also makes a collection when a product on the store changes category and renames one with its category (last section) |
+| `resend_website` | staff | `{ website_id, dry? }` | (2026-11-20, `factsSite.ts`) the website's button "Send tags and fields again". `dry: true` → `{ ok, dry: true, listings, active }`: how many products of that website are on sale on Shopify (`stockSend.ts ON_SALE`), nothing changes. Otherwise every such listing is marked `facts_due` + `facts_force` (`facts_tried_at` null) → `{ ok, listings }`, and the worker's small send does the rest; a website that is switched off is refused (400, a plain sentence); activity `facts_resend_site { listings }` on the website. Not a bulk change (last section) |
 | `preview_price` | staff | `{ website_id, cost, rule_id? }` | `{ price, compare_at }` |
 | `taxonomy_get` | staff | – | categories (pb_settings), attributes with values (+ `uses`), links, per-link `stats {products, lacking}`, `category_products`, `fill` (latest "Let AI decide" run) |
 | `categories_save` | admin/manager | `{ categories[] }` | the reader's category list; links of removed categories are dropped and every product left off the list is re-gated (held: "Missing: Category") → `{ ok, categories, regated }` |
@@ -201,6 +212,7 @@ is_active). Service role for all DB writes. CORS like listing-ai.
 | `value_save` | admin/manager | `{ attribute_id, id?, name, aliases?, force? }` | a new name (or rename) with look-alikes → **409** `{ error, matches }` unless `force`; an alias another value of the same attribute uses → 409 → `{ ok, value }` |
 | `value_delete` / `value_merge` | admin/manager | `{ id }` / `{ from, into }` | `pb_value_delete` / `pb_value_merge` (same attribute; products move, from's key + aliases become into's aliases) |
 | `category_link_check` / `category_link_save` | staff / admin | `{ category, attribute_id }` / `{ category, attribute_ids[] }` | products lacking it → `{ lacking }`; replace the category's attributes in order and re-gate → `{ to_needs_info, to_ready }` |
+| `category_rename` / `category_move` | admin/manager | `{ from, to }` / `{ from, to, remove? }` | see "Rename and move a category" below → `{ ok, renamed, run_id, stores }` / `{ ok, moved, to_ready, queued, removed, run_id }`. `stores` (since 2026-11-20) = what became of the category's collection on each website that is switched on and connected: `[{ website, status, note? }]`, status `renamed`, `kept`, `none` or `failed` (`storeCollections.ts renameCollections`) |
 | `product_values_set` | staff | `{ product_id, value_ids[], attribute_id? }` | staff's choice ('manual') for one attribute or all; checked against the category's allowed values and one-value attributes; locks `tags`; gate; routes it when it became Ready → `{ status, missing, locked, routed }` |
 | `retag` | admin/manager | `{ dry_run (default true) }` | the rules again for every unlocked product, for its category's attributes only (AI rows kept where the rules find nothing; 'manual' never touched; other attributes' values stay) → `{ products, locked, changed, to_needs_info, to_ready, sample[≤10] }`; apply in batches of 100 (`pb_product_values_bulk`, each row with its `attributes`) |
 | `tags_ai_fill` | staff | `{ product_ids? / category? / attribute_id? / needs_info?, missing_only?, now? }` | queue (status ready/needs_info, not locked, missing ≠ {} and ≠ {Category}) → `{ run_id, queued }`; `now` + one product: fill it at once → `{ filled, left, status, missing, routed }` |
@@ -239,7 +251,9 @@ use `useBackClose` so device Back closes them.
   add ₹, rounding, compare-at %, min price + live preview for a sample
   cost), Tags (templates with placeholder help — `{tags}` first, "the
   product's cleaned tags (Settings → Tags)" —, static tags, case, AI extra,
-  "At most N tags per product" = `max_tags`),
+  "At most N tags per product" = `max_tags`; since 2026-11-20 its last tile
+  "Products already on this website" has the button "Send tags and fields
+  again", `sections/ResendTile.tsx` → `resend_website`),
   Content & AI (model, effort, language, brand voice, title template,
   limits, extra instructions, alt text).
 - **Vendors** — list, add, edit, deactivate; product count per vendor.
@@ -330,7 +344,9 @@ above it (never paired across variants); Woo minor units ÷
 10^currency_minor_unit, compare-at = regular above sale; JSON-LD `price` /
 `lowPrice` ("Rs. 1,299" → 1299), `@type` as `Product`, an IRI or
 `ProductGroup` (offers from `hasVariant`), raw newlines in the JSON tolerated; `sizes` = the values of the
-option / attribute named Size (variants' values first); `color` = the Color
+option / attribute named Size (variants' values first; since 2026-11-20
+stored in the house format, `import/body.ts storeSizes` — the "Sizes:" line
+of `raw_text` keeps the store's own wording); `color` = the Color
 option when it has exactly one value; images in the store's order, https only,
 at most 10 (ingest's limit); description = body HTML → plain text (6000 chars).
 
@@ -664,7 +680,9 @@ is not paused:
 **Values that depend on the category — Product Type** (owner, 2026-11-13: "the
 values are to be mapped against the category, so no mistake can happen";
 answers: "You create it", a value with no category ticked is offered
-"nowhere", the Shopify Product type field keeps the category). Migration
+"nowhere", the Shopify Product type field keeps the category — since
+2026-11-20 as the category is NOW, at every send: a changed category reaches
+the products already on a store, last section). Migration
 `20261113210000_pb_tag_value_categories.sql`. `pb_attributes.by_category`
 ("Values depend on the category") and `pb_attribute_values.categories[]`
 (the categories a value is ticked for, names from the list). With the switch
@@ -704,7 +722,17 @@ revert `categoryRevert.ts`. A category name lives in the list, its links, its
 products, the Product Type ticks and `pb_routing_rules.conditions.categories`.
 `category_rename { from, to }` → `pb_category_rename` changes all five in one
 transaction (a case-only rename too; `to` already on the list is refused —
-that is a move). `category_move { from, to, remove? }` → `pb_category_move`
+that is a move). Since 2026-11-20 a sixth place follows, outside that
+transaction: the stores. **Before** the database call
+`storeCollections.ts renameCollections(from, to)` gives the category's
+collection the new title on every website that is switched on and connected
+(`categoryMove.ts storesThenDatabase`: only when the server's own look at the
+list says the database will take the rename, and the title is put back when
+the database still refuses); then the products on sale get the new product
+type one by one (`pb_facts_follow` marks their listings, `factsSend.ts`
+sends). Stores first, so no product is ever owed a type whose collection is
+not there yet. The answer is `{ ok, renamed, run_id, stores: [{ website,
+status: 'renamed' | 'kept' | 'none' | 'failed', note? }] }` (last section). `category_move { from, to, remove? }` → `pb_category_move`
 files every product of `from` (on the list or not, any status) under `to`
 (the list's spelling) and checks them again; `remove` then takes `from` off
 the list (`categories_save`, its own bulk change); "Let AI decide" is queued
@@ -714,7 +742,10 @@ they reach 2+ products (`category_rename` / `category_move`); their revert is
 the server's own (the database's `pb_bulk_revert` does not know them): a
 rename is renamed back; a move files back each product still in `to` whose
 category nobody locked (`pb_products` category is now recorded by
-`pb_bulk_capture`), then checks and retags them by the rules. The Tags page:
+`pb_bulk_capture`), then checks and retags them by the rules. Since
+2026-11-20 both reverts reach the stores as the change did: the products'
+listings are marked by the same trigger, and a rename taken back calls
+`renameCollections(to, from)`, again before its database call. The Tags page:
 a Name field with **Rename** in the category sheet; **Remove category** with
 products opens the move box (Move to … / Remove without moving / Cancel);
 **Waiting for a category** lists names off the list that still have
@@ -834,7 +865,9 @@ AI's extra tags are an enum of it.
   given the sizes on sale as a fact but never lists them in the description
   or the FAQ (`FACT_ORDER` has no sizes bullet); a measurement that belongs to
   a size, or "free size", may be a fit fact. On Shopify each size is one value
-  of the `Size` option, shown as scraped ("XS (34)"). Its SKU is the product's
+  of the `Size` option — until 2026-11-20 shown as scraped, since then in the
+  one house format (`sizes.ts`, last section: "XS (34)" stays as it is, `38"`
+  becomes `38`, "2XL" becomes "XXL"). Its SKU is the product's
   base SKU, the joiner and the size without its measurement (`skuParts`: an
   imported product carries its first size's own SKU, "NKB 47 PURPLE XS" →
   base "NKB 47 PURPLE", joiner " " → "NKB 47 PURPLE XS", "NKB 47 PURPLE S"…,
@@ -843,12 +876,15 @@ AI's extra tags are an enum of it.
   with no size at its end is joined with "-": "RG-1042-M"). Each colour is
   its own product and its SKU carries the colour, so every colour + size has
   one code of its own. An import hands its size choices
-  to `ingest` as a list (`importFacts`, import only), exactly as the store
-  writes them, and the reader never replaces an imported product's sizes;
+  to `ingest` as a list (`importFacts`, import only) — until 2026-11-20
+  exactly as the store writes them, since then in the house format
+  (`import/body.ts storeSizes`; a measurement the store gives is still kept)
+  — and the reader never replaces an imported product's sizes;
   before this the reader retyped them from the text and shortened "XS (34)"
   to "XS" on 109 of 136 products (restored from each product's own
   "Sizes:" line on 2026-11-12). For other sources the reader keeps a
-  measurement written with the size.
+  measurement written with the size (and since 2026-11-20 saves the labels
+  in the house format, `reader.ts`).
 - **A program finishes the draft**: pattern title (`title_template`), the SEO
   title always ends `| <brand>` inside `meta_title_max` (`withBrand`), cuts,
   kept (locked) fields; handle = 3–6 clean words with the design code taken
@@ -910,6 +946,11 @@ listing editor set the `_locked` flag (an emptied value hands it back).
   read fact (colour ← `color`, fabric ← `fabric`, else `attributes[key]`);
   then `custom.set_contents` (from the facts) and `custom.faq`
   (rich_text_field: question in bold, answer below). Empty ones are not sent.
+  (Since 2026-11-20 a field Playbook filled before whose value went empty is
+  taken off the product, `fieldsSend.ts dropFields` → `metafieldsDelete`,
+  only for keys on record in `pb_listings.sent.fields`; and the fields other
+  than `custom.faq` also go out in the small send, `factsSend.ts`: last
+  section. Until then an emptied field stayed on the store.)
   `metafieldsSet` touches only those keys. The store's own field kinds
   (`metafieldDefinitions`, namespace `custom`, read once per store every 10
   minutes) decide the kind each field is sent in: a list as one comma-joined
@@ -1060,7 +1101,9 @@ paid service, no library.
   - *An update keeps what people did in Shopify.* `productSet` replaces every
     list it is given, so: **tags** = Playbook's own + the store's tags that
     Playbook did not send at the last publish (`mergeTags`; the `published`
-    activity row records `tags`); **media** = `filesFor`: a photo the store
+    activity row records `tags` — since 2026-11-20 the record read first is
+    `pb_listings.sent.tags`, written by every send, and the `published` row
+    serves only a listing that has none yet); **media** = `filesFor`: a photo the store
     has goes as `{id}` (or `{id, alt}` when its description changed), a new
     one as `originalSource`, media Playbook did not put there stays, a photo
     removed in Shopify stays removed, a FAILED one is sent again, and while
@@ -1074,10 +1117,15 @@ paid service, no library.
     still goes out without `files`, and the record keeps what the store had.
     **Options**: a choice other than Size / Title on the store stops the
     update with a plain sentence (it would be deleted). **Variants**: an
-    existing size is matched by label, else by the size without its
-    measurement when one size here and one unmatched size there share it, so
-    "S" → "S (36)" renames the variant and keeps its stock and no store
-    variant is ever given to two sizes. **Category** goes out on a create
+    existing size is matched by label, else — since 2026-11-20 by `sizes.ts
+    sizeKeys` — by its letter (else its number, else the label without its
+    bracket part, which until then was the only second try) and then by its
+    number alone, each time only when one size here and one unmatched size
+    there share it, so "S" → "S (36)", `38"` → `38`, "2XL" → "XXL" and "38" →
+    "M (38)" rename the variant and keep its stock, and no store
+    variant is ever given to two sizes. **Category** (Shopify's standard
+    category; not the product type, which is the Playbook category at every
+    send) goes out on a create
     only. **Channel**: `publishablePublish` runs on a create (draft sites
     too, so the product shows once made Active), on Put back, and while it
     is still owed (`channel: false` on the last `published` row, or
@@ -1116,7 +1164,11 @@ paid service, no library.
   - *Changes that used to be lost*: the `published` row records the `sizes`
     and `sku` sent; routing sends a published listing again as it is when
     the product now has others (`route.ts lastSent` / `behind`), whichever
-    way the product was routed (Save facts, a re-read, tags, the worker). A
+    way the product was routed (Save facts, a re-read, tags, the worker).
+    (Still so since 2026-11-20, `route.ts` unchanged. What this never
+    caught — a changed category, tags or custom fields, for which no routing
+    was even asked — has its own record, `pb_listings.sent`, and its own
+    send, `factsSend.ts`: last section.) A
     listing being written or published when its product is routed sets
     `route_due`; `routeDue` clears the flag before routing and the other
     callers leave it while a listing is busy, so the worker checks it again
@@ -1143,7 +1195,9 @@ paid service, no library.
   `retry_failed { website_id? }`: failed + written → `publishing`, failed +
   never written → `queued`, attempts 0. Bar: Products with the Failed filter
   (`FailedBar`, follows the website filter). Both only mark rows; the worker
-  sends them (10 publishes a run). Shopify variants: `barcodes: [{ value }]`
+  sends them (10 publishes a run). (A third whole-website button, website →
+  Tags → "Send tags and fields again", came on 2026-11-20: `resend_website`,
+  which is not a bulk change and not in the log — last section.) Shopify variants: `barcodes: [{ value }]`
   = the variant's own SKU on every send (`barcode` on an API version before
   2026-10); `inventoryItem.countryCodeOfOrigin: 'IN'` on a new variant only.
   Hand edits are made in Playbook only (owner), so Playbook's title,
@@ -1669,6 +1723,16 @@ Revert can be tapped again for the rest.
 | `tag_fill` | Let AI decide, queued (`tagsQueue.ts`; the run has the fill run's id; the worker writes each product as part of it and closes it 5 minutes after the queue is over, never sooner: overlapping worker runs may still be writing a product they took, `tagFill.ts closeFills`) | as above: the AI's tags come off, the suggestions it counted as before |
 | `stock_notice` | a vendor's stock notice that marks two or more products (`stockNotice.ts`) | each product gets back the stock it had, where its stock is still as the notice left it (`changed` otherwise); after a PERMANENT notice it also comes out of the archive, and the listings the notice took off are put back: one archived on Shopify is sent again and made visible (`pb_listings.put_back`, cleared by that publish), one that only waited goes back to where it waited (`pb_bulk_revert_stock`; found by their note, `PERM_NOTE`). The notice's own row is not part of it |
 
+Since 2026-11-20 a revert that changes a product's category, chosen values
+(`pb_products.tags`) or read facts — a category move or rename, Retag all,
+"Let AI decide", a value merged or deleted, the re-read — reaches the stores
+by itself, as the change did: the revert is an UPDATE of `pb_products`, the
+trigger `pb_facts_follow` marks the product's listings that are on sale, and
+`factsSend.ts` sends the product type, tags and fields (last section). The
+mark is not part of the bulk change: no `pb_listings` item is recorded for it
+(`t_dups.sql` part 14). The revert sheet says so (`bulkText.ts FOLLOW`); until
+then it said "The revert itself sends nothing to a store."
+
 The two bulk changes of the week before the log existed were written into it
 from what was on record (`20261113070000_pb_bulk_log_backfill.sql`).
 
@@ -1680,9 +1744,18 @@ from what was on record (`20261113070000_pb_bulk_log_backfill.sql`).
   the rule of `stockSend.ts ON_SALE`); the answer suggests adding the new
   store as a new website. With nothing on the old store it works as before.
 - A change that reaches one product (see above) is an ordinary edit.
-- The tags a listing already carries on Shopify come from when it was
-  written: a tag change (or its revert) reaches the store when the listing is
-  written again.
+- The tags and product type a listing carries on Shopify: until 2026-11-20
+  they came from when the listing was written, and a tag change (or its
+  revert) reached the store only when the listing was written again. Since
+  then they, and the custom fields, follow the product by themselves (last
+  section): the change, or its revert, marks the listings on sale and the
+  worker's small send brings the store up to date. Neither that send nor the
+  website's button "Send tags and fields again" (`resend_website`) is a bulk
+  change: they change nothing a person or the AI decided, only send again
+  what follows from the product and the website's saved rules, so there is
+  nothing to put back and a second tap gives the same result. The button is
+  written to the website's activity (`facts_resend_site`), as "Set up on
+  Shopify" is.
 
 Part 2 of the database side (`20261113090000_pb_bulk_log_tags_stock.sql`)
 was run by hand on the live database on 13 Nov 2026 (the automated path
@@ -1704,3 +1777,347 @@ failed, so their button is "Stop the rest". The success messages of
 change can be taken back, and so do the confirmations of Delete and Merge on
 the Tags page when the change will be listed (two or more products, or an
 attribute with values: `TAKE_BACK`).
+
+## The store follows the product by itself: type, tags, fields; sizes in one format (owner, 2026-11-20)
+
+Owner: "Category changes: a change does not reach products already on the
+store. Corrected tags and fields: these are not sent again by themselves.
+Sizes: they are named six different ways. solve these biggest issues with
+permanent fixes."
+
+Before: a listing's Shopify **product type** (the Playbook category; the store
+files the product in its collection by it) and its **tags** were worked out
+once, when the AI wrote the listing (`pb_listings.product_type`,
+`pb_listings.tags`), and every later send repeated those copies; the **custom
+fields** were built fresh but rode only on some other full send. Nothing asked
+for a send when a category was renamed or moved, a person changed a product's
+category, a value was corrected or a bulk change was taken back: only
+"Regenerate" moved the type and tags, one listing at a time. Size labels were
+kept as each source wrote them. Now the first two work as stock has since
+13 Nov (`stockSend.ts`, batch 2): a mark, and a small send of its own.
+Migration `20261120100000_pb_facts_send.sql` (additive).
+
+### The marks (`pb_listings`) and the four triggers
+- `facts_due boolean not null default false` = the store is owed this
+  product's type, tags and fields as they are now; `facts_force boolean` =
+  send even when the record says nothing changed (the button);
+  `facts_tried_at timestamptz` = the stamp of the last try; `sent jsonb` =
+  what the store was last sent, `{ type, tags, fields }` (`types.ts
+  SentFacts`; null = not on record); `ai_tags text[]` = the AI's extra tags,
+  kept apart from the rule-built ones (null = written before they were kept).
+  Partial index `pb_listings_facts_due_idx (facts_tried_at) where facts_due`.
+- One trigger function `public.pb_facts_follow()` (SECURITY DEFINER: the
+  product page writes `pb_products` as the signed-in person, and the mark
+  must reach the listing whatever that person may change there; `search_path
+  = ''` with every table named in full, as the other Playbook functions that
+  run with the owner's rights; it writes nothing but the mark) behind four
+  AFTER UPDATE row triggers, each named `pb_facts_follow`:
+
+  | table | fires when one of these changed | marks the listings of |
+  |---|---|---|
+  | `pb_products` | category, fabric, color, tags, attributes, sku, sizes, vendor_id; or its status leaves `archived` (a restore: nothing is sent while a product is archived, so what changed meanwhile goes then) | that product |
+  | `pb_attributes` | name, key, multi, shopify_prefix, by_category | the products carrying one of its values |
+  | `pb_attribute_values` | name, categories | the products carrying that value |
+  | `pb_vendors` | name, codes | that vendor's products |
+
+  Each sets `facts_due = true, facts_tried_at = null` on those products'
+  listings that are **on sale on Shopify** (`shopify_product_id is not null
+  and not (status = 'skipped' and coalesce(shopify_status, '') in ('DRAFT',
+  'ARCHIVED'))`: the rule of `pb_stock_save` and `stockSend.ts ON_SALE`),
+  whatever their website (on a switched-off website the mark waits). Every
+  change writes the row, a listing already marked included: the write holds
+  the row until the change commits, so a send's stamp waits for it and then
+  reads the product as changed (code check, 2026-11-20: leaving a marked row
+  unwritten let a send read the old product and clear the mark). Nothing is
+  marked for a change of name, cost, text or any other status change, or for
+  a new "also known as" word.
+- So no path can be missed: the product page (a write straight from the
+  browser, `data/products.ts`), `pb_category_rename`, `pb_category_move`, a
+  re-read, Retag all, "Let AI decide", `product_values_set` (the Ready check
+  rewrites `pb_products.tags`) and every revert end in an UPDATE of one of
+  those rows.
+- `trigger_pb_worker` also wakes for a due listing (never tried, or last
+  tried 5 minutes ago) on a website that is switched on. The line is patched
+  into the live function as text (a DO block that raises when the function is
+  not the 20261118120000 version), in the part a pause holds.
+
+### One definition of what the store shows — `listingFacts.ts`
+Used by both sends, so they cannot drift apart.
+- `type` = the product's category, trimmed. An empty one is never sent: the
+  store keeps what it has.
+- `tags` = `ownTags`: the website's tag rules (`tags.ts buildTags`) over the
+  product's facts and its chosen values (`tagStore.ts siteValueTags`), sizes
+  in the house format, plus the AI's extra tags (`extrasOf`: the listing's
+  `ai_tags`). A listing written before they were kept (`ai_tags` null) keeps
+  as extras only its tags on the website's `tag_rules.ai_allowed` list:
+  anything else cannot be told from a rule tag that went stale, so on a
+  website with no such list its old AI extras leave the store at its next
+  send, until Regenerate writes new ones. Tags a person typed on the listing
+  (`locked` holds `'tags'`) stay as typed.
+- `fields` = `fieldRecord`: `fields.ts fieldInputs` without the questions,
+  as key → value (a list as its JSON); null when the website sends no custom
+  fields (Store profile).
+- `listingFacts(l, p, site)` reads the vendor, the value tags and the
+  attribute values (three small reads). `sameFacts(now, was)`: no record =
+  not the same; tags are compared as a set, capitals and order aside
+  (`sameTags`); an empty category is never a difference, nor are the fields
+  of a website that sends none. `sentOf(now, was, notIn, stayed)` = the record
+  of a send: **only what the store took**. A field it did not take keeps the
+  value it had from Playbook, or none (so the record differs and the field is
+  sent again; a field that is the store's own is never on record, so never
+  taken off); a field that could not be taken off stays on record (so it is
+  taken off again); a website that sends no fields keeps the earlier record
+  of them. `emptied` = the keys on record that the product no longer has a
+  value for.
+
+### The small send — `factsSend.ts`
+`sendFacts(c, userId, cols, ms)` for one due listing (`c` = the row as the
+worker's page of candidates read it), in this order:
+1. by that row: off sale (`stockSend.ts offSale`) → the mark is cleared,
+   nothing sent; a run is publishing the listing right now → wait (that
+   publish sends the same tags and fields and records them);
+2. **the try is stamped first** (`facts_tried_at = now`), only where the
+   listing is still due and not tried in the last 5 minutes (another run has
+   it → wait), and the send works from the row the stamp returns. Everything
+   after the stamp is read fresh. A change that commits before the stamp is
+   in what is read; one that commits after it wipes the stamp. (Code check,
+   2026-11-20: reading the product before stamping lost a change that landed
+   in between, and the button's "send anyway" with it);
+3. by the fresh row: off sale → cleared; a publish holds it → the stamp is
+   handed back, wait;
+4. the product or website is gone, or the product is **archived** → cleared,
+   nothing sent (its listing stays on the store as it was; a restore marks
+   it again); the **website is switched off** → the stamp is handed back,
+   wait: the mark stays;
+5. not forced and **the record equals** what the product gives now
+   (`sameFacts(now, l.sent)`) → cleared with **no call to Shopify**, so a
+   mark too many costs nothing;
+6. `ensureCollection` (below), then the store's tags are read; the **product
+   was deleted in Shopify** → cleared (the next publish says so on the
+   listing);
+7. `productUpdate { id, productType, tags }`, the tags through `mergeTags`
+   (the store's tags that are not on Playbook's record — `sent.tags`, else
+   the last `published` row's — stay). The type and tags go **on record at
+   once** (`sent`, `product_type`), before the fields: if the fields fail,
+   the next try still knows which of the store's tags are Playbook's;
+8. on a website with custom fields: `fieldsSend.ts syncFields` =
+   `sendFields` (`metafieldsSet`, without `custom.faq`: the questions belong
+   to the text) and `dropFields` (`metafieldsDelete`) for the `emptied` keys,
+   so a value removed in Playbook does not live on at the store. Both say
+   which keys they left undone (`FieldsLeft`), and whether the store simply
+   did not answer (a time-out, an empty answer): then what it took is put on
+   record and the send **fails**, so it is tried again. A field refused by
+   the store's own rules is a warning, not a failure;
+9. `sent` (only what the store took) and `product_type` are saved whatever
+   happened meanwhile; the mark and `facts_force` are cleared **only where
+   the stamp still stands**. Where it is gone — the product changed while
+   the send was on its way, or a newer send finished first and this older
+   one reached the store last — the listing is marked again with
+   `facts_force`, so the next send goes whatever the record says. The
+   listing's `tags` become the ones sent, unless a person typed tags
+   meanwhile;
+10. activity `facts_sent`: `type` and `was_type` (when the type changed),
+    `tags`, `fields` (how many are on record), `cleared` (keys taken off),
+    `asked: true` (forced), `warning`.
+
+A **failure** (Shopify refuses this product, a collection could not be made,
+the store did not answer for the fields) leaves the stamp, so it is tried
+again 5 minutes later (`RETRY_MS`), for as long as it takes; only the first
+failure in a row goes on the timeline (`failed`, `details.step = 'facts'`).
+It is seen in the app too: a listing with no note of its own gets `error` =
+`FACTS_NOTE` ("Its category, tags and custom fields could not be sent to
+Shopify yet, and Playbook tries again every 5 minutes: …") + the reason, so
+it counts as "Published with a note". A send that goes through takes away
+its own earlier notes — `FACTS_NOTE`, and an old custom-field warning the
+store has since taken the field for (`fieldsSend.ts withoutFieldNotes`) —
+and writes this send's field warnings, if any. Any other note (a publish's
+warning, a person's reason) is never replaced or added to. Shopify only
+being busy writes no note: the store's other listings wait for the next run.
+A store that refuses **three products in a row** in one run (its key was
+rejected, it is frozen) is left for the next run too (`STORE_FAILS`), so a
+store that refuses everything is not asked for every product it is owed.
+No title, description, price, size or photo is touched and no AI is used, so
+the send needs no approval on a "Review first" website and also goes for a
+product held in Needs info.
+
+### The full send — `publish.ts`, `productInput.ts`, `generate.ts`
+`publishOne` calls `listingFacts` and sends the **tags and fields** worked
+out fresh (before: the copies saved when the AI wrote, so "Update on
+Shopify", a re-price or a photo change put corrected tags back). The
+**product type**: a create sends the category as it is now; a product
+**already on the store keeps the type it has there** (`l.sent.type`, else the
+listing's `product_type`; `buildProductInput`'s `type`), because a changed
+category is the small send's to move — that one makes the collection first —
+and the save marks the listing for it (`facts_due`). Code check, 2026-11-20:
+a full publish that re-typed a product put it in no collection when the new
+category had none on the store yet. Tags: `mergeTags(existing.tags,
+l.sent?.tags ?? the last published row's, facts.tags)`. After `productSet`:
+`syncFields` (fill, then take off the `emptied(facts, l.sent)` keys). The
+save writes `tags`, `product_type` (what was sent) and `sent` = only what the
+store took (`sentOf` with the keys left undone), and the `published` row's
+`tags` are the fresh ones. When the store did not answer for the fields the
+publish still stands, with its warning, and the listing is marked so the
+small send tries them again. A full publish never clears `facts_due`: the
+next small-send run finds the record equal and clears it without a call.
+`generate.ts` builds the listing's tags through `ownTags` and saves `ai_tags`
+(not for a listing whose tags are typed).
+
+### Collections follow — `storeCollections.ts` (used by `storeSetup.ts` too)
+- **Which collection is a category's**: the one that *files its products* —
+  a rule "product type = the category" — whatever it is called
+  (`storeFields.ts sameCollection`; `listCollections` reads every
+  collection's rules, `Have.rules[].types`). The one that also carries the
+  name (same address or title) comes first, then any that files it, and only
+  then one that merely carries the name. Code check, 2026-11-20: SuratMandi's
+  own collection for sarees is `/collections/sarees`, titled "Sarees", filled
+  by product type Saree; matched by name only it was not recognised, so a
+  product moved into Saree would have made a second, public "Saree".
+- `ensureCollection(site, type, was, cache)`, before a product's type changes
+  on a store: when the store files by type (it has a collection for the old
+  type) and has none for the new one, that collection is made first, exactly
+  as store setup makes it (`makeCollection`: `collectionInput`, then the
+  Online Store) — or, when the old name is **gone from Playbook** (off the
+  list and no product filed under it: a rename this store missed, because it
+  failed then or its website was off), the old collection takes the new name
+  as a rename gives it (`renameOn`), so no second collection is made. When Shopify
+  does not make it the send fails: the product keeps its old type and its old
+  collection, and is tried again. A store with no collection for the old type
+  gets the new type without one. One store at a time (`turns`: two listings
+  sent side by side must not make it twice); a store's collections are read
+  once per worker run (`ColCache`, keyed by website and shop), and **read
+  again right before one is made**: the run's list can be minutes old, and a
+  rename may have given the old collection that very name meanwhile.
+- `renameCollections(from, to)`, called by `category_rename` **before** the
+  database call and by the revert of a rename with the names swapped
+  (`categoryRevert.ts`; both through `categoryMove.ts storesThenDatabase`):
+  on every website that is switched on and connected,
+  the collection that files the old name gets a second rule "product type =
+  new name" (`collectionUpdate` with `sourcesToCreate`; the old rule stays;
+  added unless a rule names the new name exactly, capitals included) and
+  takes the new **title** when its title was the old name (a title of the
+  store's own, "Sarees", stays). Its page, address and menu links
+  stay, and it holds the category's products the whole time they are re-typed
+  one by one. Tried on SuratMandi, 2026-11-20: a collection's rules add up —
+  a product matching either one is in it. Per website: `renamed`; `kept` (the
+  new name has a collection of its own that carries the name **and** files
+  it; products move over as they are re-typed — a hand-picked collection that
+  merely carries the name does not stop the rename); `none` (the store has
+  no collection for the old name);
+  `failed` + `note`. It never throws: the rename goes on, and
+  `ensureCollection` makes a collection for the new name when the first
+  product is re-typed. When the database then refuses the rename, the same
+  call with the names swapped puts the title back (the second rule stays: a
+  product type nobody has).
+- Nothing is ever deleted on a store, a rule included: a category moved away
+  leaves its collection there, empty, and a renamed collection keeps the rule
+  for its old name. A website that is switched off when a category is renamed
+  is not asked: once it is on again, the first product re-typed gives its
+  collection the new name (`ensureCollection`, above).
+
+### The worker — `worker.ts`
+`sendFactsDue` (`CAPS.facts` = 60) runs right after the pause check, for up
+to 25 s (`STOCK_MS`), and once more at the very end of the run with the time
+that is left. `factsCandidates`: due, not tried in the last 5 minutes, on
+websites that are switched on, never tried first; pages of 30, three at a
+time, 10 s a call. `WorkResult.facts` = how many listings were settled.
+Pace: about 30 to 100 listings a minute, by what else the run does. Unlike
+stock, a pause holds it (a round a person starts with "Run now" sends them),
+and so does a website that is switched off: the marks wait.
+
+### The button — `resend_website` (`factsSite.ts`, staff)
+Website → Tags → "Products already on this website" → **Send tags and fields
+again** (`sections/ResendTile.tsx`; dimmed while the form is unsaved, because
+the server reads the SAVED rules). The tap first asks with `dry: true` →
+`{ ok, dry: true, listings, active }` (how many products of the website are
+on sale on Shopify; nothing changes), a confirm names the website and the
+number, then the action marks every one of those listings `facts_due` +
+`facts_force` and answers `{ ok, listings }`; the worker's small send does
+the rest. A website that is switched off is refused with a plain sentence
+(HTTP 400). Website activity row `facts_resend_site { listings }`.
+Forced = sent even where the record equals, for what the triggers cannot
+see: the website's tag rules were changed, custom fields were switched on,
+someone edited products in Shopify, or a field's kind was changed there.
+**It is not in the bulk log** (Settings → Bulk changes), unlike the two other
+whole-website buttons: it changes nothing a person or the AI decided — it
+sends again what follows from the product and the website's saved rules — so
+there is nothing to put back (old tags put back would differ from the product
+at once and be sent again), and tapping it twice gives the same result.
+
+### What a revert does now
+A bulk revert that changes products' categories or values (category move or
+rename, Retag all, "Let AI decide", a value merged or deleted, the re-read)
+reaches the stores by itself too: the revert is an UPDATE of `pb_products`,
+so the trigger marks the listings. A rename's revert also gives the
+collection its old title back.
+
+### Not changed
+- Shopify's **standard category** (taxonomy, `garment.ts shopCategory`) still
+  goes out on a create only.
+- **Saving a website's tag rules does not send by itself** (as pricing): the
+  button does. The saved rules are used at each product's next send.
+- **The text does not follow**: the written title, description, SEO fields
+  and alt texts keep a corrected colour or category as they were written
+  (that needs Regenerate, the AI).
+- An edit made in Shopify is still not noticed: it stays until that product's
+  next send, or the button.
+
+### Sizes in one format — `sizes.ts` (pure: `normalizeSize`, `normalizeSizes`, `sizeKeys`, `LETTERS`)
+- Grammar: `LETTER` | `LETTER (N)` | `N` | `Free Size`; anything else comes
+  back as it is, spaces tidied. LETTER = XXS XS S M L XL XXL 3XL 4XL 5XL 6XL
+  in capitals (2XL → XXL, XXXL → 3XL, XXXXL → 4XL). N = a whole number 20 to
+  60 as given, without a unit, a quote mark or the words Size, Inch, Bust,
+  Chest, Stitched.
+- Examples: `38"`, `38”`, `38 Inch`, `Size: 38` → `38`; `40 Size` → `40`;
+  `2XL` → `XXL`; `xl` → `XL`; `L (40 Inch)`, `L Size, 40 Inch Stitched` →
+  `L (40)`; `M(38)`, `M-38`, `38 (M)` → `M (38)`; `Free`, `FS`, `Freesize` →
+  `Free Size`. `M/L`, `38-40`, `2-3 Years`, `Custom Stitch`, `Semi-Stitched`
+  stay as they are.
+- **Nothing is ever added**: `M` stays `M` (a supplier's M is not always 38:
+  one imported product's own chart says M = 30), a bare number stays a number
+  (34 can be a bust or a waist), and `M (38)` keeps the inches its supplier
+  gave (owner, 2026-11-12: the measurement written with a size is kept).
+- `normalizeSizes`: each label normalised, repeats dropped (case ignored), a
+  fixed order — letters XXS … 6XL (a letter before the same letter with
+  inches), then numbers rising, then Free Size, then unknown shapes in the
+  order they came; at most 40 characters a label and 30 labels.
+- Normalised at every write of `pb_products.sizes`: the import
+  (`import/body.ts storeSizes`), the reader (`reader.ts`; the prompt still
+  asks for the label as the post writes it), and the app, which writes the
+  row straight from the browser (`src/playbook/data/products.ts`
+  `updateProduct` / `createProduct`) through its own exact copy
+  `src/playbook/data/sizes.ts`, held equal by `test/sizesMirror.test.mjs` (as
+  `pricingMirror` holds the pricing copy).
+- Normalised again at the send (`productInput.ts`, and `listingFacts.ts` for
+  `{size}` tags), so a store can never show another format whatever a row
+  still holds.
+- A renamed size keeps its Shopify variant and option value (its id, carts
+  and stock setting). Variant matching by `sizeKeys`: the exact label first;
+  then the first key — the letter, else the number, else (an unknown shape)
+  the label without its bracket part; then the second key, the number alone
+  ("38" on the store, "M (38)" here). Each step takes only what is still
+  unmatched, and only when one size here and one there share the key.
+- Each size's SKU / barcode still ends in the label without its bracket part
+  (`skuCode.ts sizeCore`, spaces out), so a code changes only where the label
+  did: product `NNK1133` with the size `38"` sent `NNK1133-38"` and now sends
+  `NNK1133-38`; `5081-LSize,40InchStitched` becomes `5081-L`; `1086-2XL`
+  becomes `1086-XXL`.
+- `route.ts` is unchanged: it already sends a live listing again, without the
+  AI, when the product's sizes or SKU differ from what was last sent
+  (`behind`; on a "Review first" website that re-send waits for approval).
+  The rows that still held another spelling on 2026-11-20 (about 21 products,
+  all on SuratMandi) are rewritten once after the deploy.
+
+### Tests
+`test/sizes`, `sizesMirror`, `sizesSend` (labels, variant ids, codes and the
+product type at the send), `listingFacts` (tags without the AI, the
+comparison, the record), `factsSend` and `factsStore` (one listing end to end
+over a fake Supabase and a fake Shopify, `factsWorld.mjs`: every outcome
+above, the collections, the button), `factsRaces` (the cases of the code
+check: a change between the worker's page and the try, an older send landing
+last, the record holding only what the store took, a store that refuses
+everything), `publishFacts` (the full send), `categoryMove` (a rename and its
+revert call the stores before the database).
+SQL: `t_dups.sql` part 14 (which listings each change marks, the write with
+the owner's rights, the stamp, reverts, no listing row in the log) and 14b
+(the worker's wake-up line); the migration is in both lists of `run.sh`, and
+`bootstrap.sql` gained `pb_vendors`.

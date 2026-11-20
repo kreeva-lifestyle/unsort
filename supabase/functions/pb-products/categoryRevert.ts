@@ -2,7 +2,7 @@
 // not know them). The same refusals as every revert, in the same words: still running, already taken back, older than
 // 7 days.
 //   category_rename — renamed back (pb_category_rename), when the new name is still on the list and the old one free;
-//                     otherwise the database says why.
+//                     otherwise the database says why. The stores' collection takes the old name back too, first.
 //   category_move   — each product the move filed under `to` that is still there goes back to the category it had
 //                     (one database call per old category, only where the product still holds `to`); one moved again
 //                     or edited since is left and counted. Those products are checked again and their tags worked out
@@ -11,6 +11,8 @@
 import type { RunRow } from './bulkLog.ts';
 import { enc, logActivity, patch, rpc, selAll } from './db.ts';
 import { HttpError } from './http.ts';
+import { storesThenDatabase } from './categoryMove.ts';
+import type { StoreRename } from './storeCollections.ts';
 import { refresh } from './tagStore.ts';
 import { retagProducts } from './tagsProduct.ts';
 
@@ -67,11 +69,15 @@ export async function previewCategory(r: RunRow): Promise<Counts> {
 
 export async function revertCategory(r: RunRow, userId: string | null): Promise<Counts> {
   refuse(r);
-  let result: Counts;
+  let result: Counts, stores: StoreRename[] | undefined;
   if (r.kind === 'category_rename') {
     const from = String(r.details?.from ?? ''), to = String(r.details?.to ?? '');
     if (!from || !to) throw new HttpError(409, 'This rename does not say which names it changed, so it cannot be reverted.');
-    result = { renamed: 1, products: Number(await rpc<number>('pb_category_rename', { p_from: to, p_to: from })) || 0 };
+    // The stores' collection takes the old name back first, as in the rename itself (categoryMove.ts); the products
+    // follow by themselves (factsSend.ts), and a store that fails gets a new collection then.
+    const back = await storesThenDatabase(to, from, () => rpc<number>('pb_category_rename', { p_from: to, p_to: from }));
+    result = { renamed: 1, products: Number(back.r) || 0 };
+    stores = back.stores; // what each store answered goes on the activity row: a store that failed is seen there
   } else {
     const moved = await movedOf(r.id);
     const s = await standing(moved);
@@ -93,6 +99,6 @@ export async function revertCategory(r: RunRow, userId: string | null): Promise<
     result = { restored: done.length, changed: s.changed + (s.back.length - done.length), gone: s.gone };
   }
   await rpc('pb_bulk_close', { p_run: r.id, p_user: userId, p_result: result, p_more: false });
-  await logActivity({ action: 'bulk_reverted', details: { run_id: r.id, kind: r.kind, label: r.label, ...result }, user_id: userId });
+  await logActivity({ action: 'bulk_reverted', details: { run_id: r.id, kind: r.kind, label: r.label, ...result, ...(stores ? { stores } : {}) }, user_id: userId });
   return result;
 }

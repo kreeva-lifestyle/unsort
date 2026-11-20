@@ -47,9 +47,17 @@ export const collectionInput = (category: string) => {
   };
 };
 
-export interface Have { id: string; handle: string; title: string }
-/** The store's collection for this category already: same handle, or same title (any case). */
-export const sameCollection = (have: Have[], category: string) => {
-  const h = collectionHandle(category), t = category.trim().toLowerCase();
-  return have.find(c => (h && c.handle === h) || c.title.trim().toLowerCase() === t) ?? null;
-};
+/** A collection of the store. `rules`: its rules as read from the store, each with the product types it files (EQUALS
+ *  only); absent when they were not read. */
+export interface Have { id: string; handle: string; title: string; rules?: { id: string; title: string; types: string[] }[] }
+const low = (s: string) => String(s ?? '').trim().toLowerCase();
+/** Does this collection file products of this type by a rule of its own? */
+export const filesType = (c: Have, type: string) => (c.rules || []).some(r => r.types.some(t => low(t) === low(type)));
+/** Does it carry the category's name: the same handle, or the same title (any case)? */
+export const namedFor = (c: Have, category: string) => { const h = collectionHandle(category); return (!!h && c.handle === h) || low(c.title) === low(category); };
+/** The store's collection for this category already. What counts first is what files the products: a collection whose
+ *  rule names the category (SuratMandi's own "Sarees", /collections/sarees, files product type Saree — matched by name
+ *  only, it was not recognised and a second "Saree" was made: code check, 20 Nov 2026), the one that also carries the
+ *  name before any other. Only then a collection that merely carries the name. */
+export const sameCollection = (have: Have[], category: string) =>
+  have.find(c => namedFor(c, category) && filesType(c, category)) ?? have.find(c => filesType(c, category)) ?? have.find(c => namedFor(c, category)) ?? null;

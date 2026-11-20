@@ -40,6 +40,7 @@ import { READ_PHOTOS, readerPrompt, readerSchema, type ReadOut } from './readerP
 import { afterRead } from './restock.ts';
 import { stockNotice } from './stockNotice.ts';
 import { routeProduct } from './route.ts';
+import { normalizeSizes } from './sizes.ts';
 import { mergeReadAttrs } from './import/meta.ts';
 import { tagAfterRead } from './tagRead.ts';
 import { refresh } from './tagStore.ts';
@@ -84,7 +85,7 @@ function merge(p: ProductRow, out: ReadOut, categories: string[], manual: boolea
   if (set.name) set.name = nameWithColour(set.name, set.color ?? p.color, set.fabric ?? p.fabric).slice(0, 200); // the name says the colour the product has
   const cat = categories.find(c => c.toLowerCase() === String(out.category || '').trim().toLowerCase());
   if (cat && can('category')) set.category = cat;
-  const sizes = [...new Set((Array.isArray(out.sizes) ? out.sizes : []).map(s => String(s ?? '').trim().slice(0, 40)).filter(Boolean))].slice(0, 30);
+  const sizes = normalizeSizes((Array.isArray(out.sizes) ? out.sizes : []).map(s => String(s ?? '').trim().slice(0, 40)).filter(Boolean)); // one format for every source (sizes.ts)
   if (sizes.length && can('sizes') && !(p.source === 'import' && !empty(p.sizes))) set.sizes = sizes; // an imported product's sizes are the store's own choices
   // A Telegram "Less" comes off the RATE the AI read — in code, never by the AI: cost = rate − less.
   // Less >= rate leaves the cost empty (needs_info) instead of ₹0.

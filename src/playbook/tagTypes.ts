@@ -68,4 +68,9 @@ export const REASON_LABEL: Record<PbLookReason, string> = {
   shade: 'a shade of it', typo: 'a likely typo', similar: 'spelled almost the same',
 };
 
+/** What a category rename did to the category's collection on one website that is switched on (pb-products storeCollections.ts):
+ *  it took the new name ('renamed'), the new name has a collection of its own already ('kept'), the store has none for that
+ *  category ('none'), or the store could not rename it ('failed'; `note` says why). */
+export interface PbStoreRename { website: string; status: 'renamed' | 'kept' | 'none' | 'failed'; note?: string }
+
 export interface PbRetagResult { dry_run: boolean; products: number; locked: number; changed: number; to_needs_info: number; to_ready: number; sample: { name: string; added: string[]; removed: string[] }[] }
