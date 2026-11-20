@@ -17,21 +17,12 @@ shopper has seen any of this. The theme is also kept in the private
 
 ### Your answers (Claude does the rest the same day)
 
-- **S1 · Publish the new theme version yourself (one tap).** The new
-  version is ready: the home page shows your real categories and price
-  bands, product pages show the description and questions, the sample
-  reviews, sample products and "Ships today" labels are gone, and your
-  answers of 20 Nov are in (Arya Designs, your WhatsApp number, delivery
-  ₹70, free delivery on prepaid orders of ₹5,000 and above, "Cash on
-  delivery available", "Delivery within 5 to 7 days"). It is not live yet.
-  Shopify's tool refused to publish it from Claude's side, twice: on the
-  live theme it wrongly said three files were changed by someone else, and
-  it only publishes themes Claude made itself. So the same changes are
-  saved on your spare theme. You: Shopify admin → Online Store → Themes →
-  **suratmandi-theme/staging** → **Publish**. That theme then becomes the
-  live one and the old one stays in the list. Then tell Claude, who checks
-  the live store. Whoever works in the `suratmandi-theme` repository must
-  know that the live theme now follows the `staging` branch.
+- **Theme repository.** Since 20 Nov the live theme is the one named
+  `suratmandi-theme/staging` (it holds the new version: real categories and
+  price bands, your answers of 20 Nov, no sample content). Whoever works in
+  the `suratmandi-theme` repository must work on its `staging` branch, or
+  bring `staging` into `main` and publish `main` again; an upload to `main`
+  alone no longer reaches the live store.
 - **S2 · The rest of the contact and legal details.** The name and the
   WhatsApp number are in. Still missing, and hidden on the site until you
   give them: support email, short address, support hours, registered
@@ -71,10 +62,10 @@ shopper has seen any of this. The theme is also kept in the private
   bust, waist and hip per size, or say that sizes differ by supplier. (See
   also "Sizes: with or without inches" further down.)
 - **S14 · About page.** It reads "[Write your factory story here.]". Give
-  the story, a photo and real numbers, or Claude hides the page. In the
-  new theme version (S1) the two unfinished blocks under it are hidden
-  ("[Write your factory story…]" and "[0] [real number]"); the page's own
-  line still shows.
+  the story, a photo and real numbers, or Claude hides the page. On the
+  live theme the two unfinished blocks under it are hidden ("[Write your
+  factory story…]" and "[0] [real number]"); the page's own line still
+  shows.
 - **S15 · Kids Wear and Men's Kurta.** Both category pages exist and are
   empty (the saved version leaves them out of the category list). Selling
   these at launch? If not, Claude hides them until the first product
