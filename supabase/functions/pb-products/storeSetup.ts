@@ -7,15 +7,16 @@
 //      with the values joined by commas, a list one with a list (fieldsSend.ts);
 //   2. a collection for each Playbook category, filled by Shopify from the product type (the category) and shown on
 //      the Online Store — one already there by handle or title is kept as it is.
+//      (storeCollections.ts, which also makes one when a product on the store changes category).
 // Nothing is deleted or changed on the store, so tapping it again only adds what is new (a new category or
 // attribute). Each item is tried on its own: one Shopify refuses does not stop the rest. Fields go first, so a store
 // whose app lacks a permission says so before any collection is made.
 import { uuid, type Body } from './actions.ts';
 import { enc, logActivity, one } from './db.ts';
 import { HttpError, plain } from './http.ts';
-import { toOnlineStore } from './publishParts.ts';
 import { gql } from './shopify.ts';
-import { type FieldDef, type Have, collectionInput, fieldDefs, sameCollection } from './storeFields.ts';
+import { listCollections, makeCollection } from './storeCollections.ts';
+import { type FieldDef, fieldDefs, sameCollection } from './storeFields.ts';
 import { loadTaxonomy } from './taxonomy.ts';
 import { WEBSITE_COLS, type WebsiteRow } from './types.ts';
 
@@ -24,8 +25,6 @@ export interface SetupItem { name: string; status: Status; note?: string }
 
 const DEFS = `query PbDefs { metafieldDefinitions(first: 250, ownerType: PRODUCT, namespace: "custom") { nodes { key name type { name } } } }`;
 const DEF_CREATE = `mutation PbDef($d: MetafieldDefinitionInput!) { metafieldDefinitionCreate(definition: $d) { createdDefinition { id } userErrors { field message code } } }`;
-const COLLECTIONS = `query PbCols($after: String) { collections(first: 250, after: $after) { nodes { id handle title } pageInfo { hasNextPage endCursor } } }`;
-const COL_CREATE = `mutation PbCol($c: CollectionCreateInput!) { collectionCreate(collection: $c) { collection { id handle } userErrors { field message } } }`;
 const MS = 30_000;
 /** A failure of the store itself (credentials, a permission, frozen, busy): said once, not item by item. Shopify's
  *  answer about one item ("Shopify said …") is that item's note. */
@@ -58,23 +57,15 @@ async function fields(site: WebsiteRow, defs: FieldDef[]): Promise<SetupItem[]> 
 }
 
 async function collections(site: WebsiteRow, categories: string[]): Promise<SetupItem[]> {
-  const have: Have[] = [];
-  for (let after: string | null = null, i = 0; i < 8; i++) { // up to 2,000 collections
-    const r: { collections: { nodes: Have[]; pageInfo: { hasNextPage: boolean; endCursor: string | null } } } = await gql(site, COLLECTIONS, { after }, MS);
-    have.push(...r.collections.nodes);
-    if (!r.collections.pageInfo.hasNextPage) break;
-    after = r.collections.pageInfo.endCursor;
-  }
+  const have = await listCollections(site, MS);
   const out: SetupItem[] = [];
   for (const c of categories) {
     if (sameCollection(have, c)) { out.push({ name: c, status: 'kept' }); continue; }
     try {
-      const r = await gql<{ collectionCreate: { collection: { id: string; handle: string } | null; userErrors: { message: string }[] } }>(site, COL_CREATE, { c: collectionInput(c) }, MS);
-      const made = r.collectionCreate.collection, ue = r.collectionCreate.userErrors;
-      if (!made || ue.length) { out.push({ name: c, status: 'failed', note: ue.map(e => e.message).join('; ').slice(0, 200) || 'Shopify did not make it.' }); continue; }
-      have.push({ id: made.id, handle: made.handle, title: c });
-      const shown = await toOnlineStore(site, made.id, MS); // a collection is hidden from shoppers until it is on a channel
-      out.push(shown ? { name: c, status: 'made', note: shown.replace(/^Saved on Shopify, but it/, 'Made, but it') } : { name: c, status: 'made' });
+      const r = await makeCollection(site, c, MS);
+      if (!r.made) { out.push({ name: c, status: 'failed', note: r.note }); continue; }
+      have.push(r.made);
+      out.push(r.note ? { name: c, status: 'made', note: r.note } : { name: c, status: 'made' });
     } catch (e) {
       if (storeWide(e)) throw e;
       out.push({ name: c, status: 'failed', note: plain(e).slice(0, 200) });

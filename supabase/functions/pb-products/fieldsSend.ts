@@ -10,7 +10,8 @@
 // (["metafields", "2", "type"]); `elementIndex` is the place of an item INSIDE a list value, not which field —
 // reading it as the field's place sent nothing again, and left all 122 SuratMandi products without any custom field
 // (18 Nov 2026).
-import { METAFIELDS_SET, type FieldInput } from './fields.ts';
+// A field Playbook filled before whose value went empty is taken off the product: dropFields (20 Nov 2026).
+import { FIELD_NS, METAFIELDS_SET, type FieldInput } from './fields.ts';
 import { plain } from './http.ts';
 import { temporary } from './publishParts.ts';
 import { gql } from './shopify.ts';
@@ -105,5 +106,22 @@ export async function sendFields(site: WebsiteRow, fields: FieldInput[], ms: num
   } catch (e) {
     if (temporary(e)) throw e;
     return `${NO_FIELDS}: ${plain(e)}`;
+  }
+}
+
+const FIELDS_DROP = `mutation PbFieldsDrop($metafields: [MetafieldIdentifierInput!]!) { metafieldsDelete(metafields: $metafields) { deletedMetafields { key } userErrors { field message } } }`;
+
+/** Take Playbook's own fields off a product whose value went empty in Playbook (listingFacts.ts `emptied`: only keys
+ *  Playbook is on record as having filled), so a value removed there does not live on at the store (owner, 20 Nov 2026:
+ *  "Corrected tags and fields"). A field already gone is fine. Returns a warning for the listing, or null. */
+export async function dropFields(site: WebsiteRow, ownerId: string, keys: string[], ms: number): Promise<string | null> {
+  if (!keys.length) return null;
+  try {
+    const r = await gql<{ metafieldsDelete: { userErrors: FieldError[] } | null }>(site, FIELDS_DROP, { metafields: keys.map(key => ({ ownerId, namespace: FIELD_NS, key })) }, ms);
+    const ue = r.metafieldsDelete?.userErrors || [];
+    return ue.length ? `Saved on Shopify, but these emptied custom fields stayed there: ${keys.join(', ')} (${[...new Set(ue.map(e => e.message))].join('; ').slice(0, 200)}).` : null;
+  } catch (e) {
+    if (temporary(e)) throw e;
+    return `Saved on Shopify, but these emptied custom fields stayed there: ${keys.join(', ')} (${plain(e).slice(0, 200)}).`;
   }
 }

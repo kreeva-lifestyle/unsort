@@ -97,7 +97,17 @@ export interface ListingRow {
   /** The next publish also makes the product visible on Shopify again: a revert put it back (bulkRevert.ts, a vendor's
    *  stock notice taken back). Cleared by that publish. */
   put_back?: boolean;
+  /** The store is owed the product's type, tags and custom fields as they are now (factsSend.ts); facts_force: sent
+   *  even when the record says nothing changed (the website's "Send tags and fields again"). */
+  facts_due?: boolean; facts_force?: boolean; facts_tried_at?: string | null;
+  /** What the store was last sent of them (null = not on record), and the AI's extra tags kept apart from the
+   *  rule-built ones (null = written before they were kept): listingFacts.ts. */
+  sent?: SentFacts | null; ai_tags?: string[] | null;
 }
+
+/** What a store was last sent besides the written text: its product type, Playbook's own tags, and the custom fields
+ *  (key → value, a list as its JSON). */
+export interface SentFacts { type: string; tags: string[]; fields: Record<string, string> }
 
 export interface SecretsRow {
   access_token: string | null; client_id: string | null; client_secret: string | null;
@@ -119,7 +129,7 @@ export type Caller = { kind: 'secret' } | { kind: 'staff'; id: string; role: str
 export interface Budget { soft: number; hard: number }
 
 export const PRODUCT_COLS = 'id,vendor_id,source,source_ref,raw_text,sku,name,category,fabric,color,sizes,in_stock,temp_out_at,perm_out_at,cost_price,less_amount,sell_price,price_note,attributes,tags,missing_attrs,status,locked,ai_read_at,ai_error,claimed_at,source_posted_at,sku_colour,created_at,updated_at';
-export const LISTING_COLS = 'id,product_id,website_id,status,rule_id,price,compare_at_price,title,description_html,seo_title,seo_description,handle,tags,product_type,image_alts,locked,ai_model,ai_effort,ai_cost_usd,generated_at,shopify_product_id,shopify_status,published_at,first_published_at,attempts,claimed_at,error,put_back,created_at,updated_at';
+export const LISTING_COLS = 'id,product_id,website_id,status,rule_id,price,compare_at_price,title,description_html,seo_title,seo_description,handle,tags,product_type,image_alts,locked,ai_model,ai_effort,ai_cost_usd,generated_at,shopify_product_id,shopify_status,published_at,first_published_at,attempts,claimed_at,error,put_back,facts_due,facts_force,facts_tried_at,sent,ai_tags,created_at,updated_at';
 export const WEBSITE_COLS = 'id,name,shop_domain,auth_mode,api_version,active,publish_mode,routing_default,track_inventory,pricing,tag_rules,content,connected_at,shop_name,last_error';
 export const RULE_COLS = 'id,website_id,position,name,enabled,action,conditions,price_override';
 

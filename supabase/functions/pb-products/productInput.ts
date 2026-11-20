@@ -1,5 +1,5 @@
 // Pure: the productSet input for one listing, and the GraphQL documents.
-// Sizes → option "Size" with one variant each; no sizes → Shopify's single
+// Sizes (in the house format, sizes.ts) → option "Size" with one variant each; no sizes → Shopify's single
 // "Title / Default Title" variant. Photos are sent only on create or when
 // they changed (productSet replaces the media list when `files` is given).
 // On update the store's own option / variant ids are passed back, so the
@@ -19,8 +19,8 @@
 // Shopify sync check (2026-11-12): `files` is built by publishParts.ts filesFor
 // (a photo already on the store is sent by its id, so nothing is uploaded
 // twice and the store's own media stays); an existing size is matched by its
-// label and, failing that, by the size without its measurement, so a relabel
-// ("S" → "S (36)") renames the variant instead of deleting it and its stock;
+// label and, failing that, by its letter or number (sizes.ts), so a relabel
+// ("S" → "S (36)", "38\"" → "38") renames the variant instead of deleting it;
 // a choice someone added in Shopify stops the update with a plain sentence
 // instead of being deleted; weight and cost go out with a new variant.
 // Owner, 2026-11-12: "Country of origin by default India. Barcode value same
@@ -38,11 +38,11 @@
 // itself (Track stock on) its own numbers decide, as before (a new size
 // starts tracked at 0 with the box unticked).
 import { cleanHtml } from './content.ts';
-import { uniqueCi } from './db.ts';
 import { shopCategory } from './garment.ts';
 import { HttpError } from './http.ts';
 import { apiVersion } from './shopify.ts';
 import { type Existing, MF_KEY, MF_NAMESPACE, variantKey } from './shopifyProduct.ts';
+import { normalizeSizes, sizeKeys } from './sizes.ts';
 import { codeBase, sizeCore, skuParts } from './skuCode.ts';
 import { permOut, type ListingRow, type ProductRow, type WebsiteRow } from './types.ts';
 
@@ -80,7 +80,7 @@ export function buildProductInput(a: { l: ListingRow; p: ProductRow; site: Websi
   const tracked = !!site.track_inventory, inStock = p.in_stock !== false;
   const price = money(l.price);
   const compareAtPrice = l.compare_at_price !== null && Number(l.compare_at_price) > Number(l.price) ? money(l.compare_at_price) : null;
-  const sizes = uniqueCi((p.sizes || []).map(s => String(s).replace(/\s+/g, ' ').trim()).filter(Boolean)); // "S" and "s" are one size
+  const sizes = normalizeSizes(p.sizes || []); // the house format whatever the row holds (sizes.ts): "S" and "s" are one size, "38\"" is "38"
   const parts = skuParts(String(p.sku || ''), sizes), join = parts.join;
   const sku = codeBase(p, parts.base, join);
   const optName = sizes.length ? 'Size' : 'Title';
@@ -90,22 +90,27 @@ export function buildProductInput(a: { l: ListingRow; p: ProductRow; site: Websi
   if (foreign.length) throw new HttpError(400, `${site.name}: this product has a choice on Shopify that Playbook did not make (${foreign.join(', ')}). Playbook left the product as it is. Remove that choice in Shopify, or look after this product there.`);
   const oldOpt = existing?.options.find(o => o.name.trim().toLowerCase() === optName.toLowerCase());
   const oldVariant = new Map((existing?.variants || []).map(v => [v.key, v.id]));
-  // The same size under another label ("S" on the store, "S (36)" here): matched by the size without its
-  // measurement, but only what the labels left unmatched, and only when one size here and one there share it —
-  // so no store variant is ever given to two sizes.
-  const core = (v: string) => sizeCore(v).toLowerCase();
+  // The same size under another label ("S" on the store, "S (36)" here; "38\"" there, "38" here; "2XL" there, "XXL"
+  // here): after the exact labels, by what two labels of one size share (sizes.ts sizeKeys) — its letter, else its
+  // number — and then by the number alone ("38" ↔ "M (38)"). Only what is still unmatched, and only when one size
+  // here and one there share it, so no store variant is ever given to two sizes. `store` = [label, id].
   const lead = `${optName.toLowerCase()}=`;
   const pair = (exact: (name: string) => string | undefined, store: [string, string][]): (string | undefined)[] => {
-    const ids = values.map(exact), used = new Set(ids.filter(Boolean));
-    const free = store.filter(([k, id]) => k && !used.has(id));
-    const want = values.map((n, i) => (ids[i] || !sizes.length ? '' : core(n)));
+    const ids = values.map(exact);
+    if (!sizes.length) return ids;
     const one = <T,>(list: T[], is: (x: T) => boolean) => list.filter(is).length === 1;
-    return values.map((_, i) => ids[i] ?? (want[i] && one(want, w => w === want[i]) && one(free, ([k]) => k === want[i]) ? free.find(([k]) => k === want[i])![1] : undefined));
+    for (const k of [0, 1] as const) {
+      const used = new Set(ids.filter(Boolean));
+      const free = store.filter(([label, id]) => label && !used.has(id)).map(([label, id]): [string, string] => [sizeKeys(label)[k], id]).filter(([key]) => key);
+      const want = values.map((n, i) => (ids[i] ? '' : sizeKeys(n)[k]));
+      values.forEach((_, i) => { if (want[i] && one(want, w => w === want[i]) && one(free, ([key]) => key === want[i])) ids[i] = free.find(([key]) => key === want[i])![1]; });
+    }
+    return ids;
   };
   const variantIds = pair(name => oldVariant.get(variantKey([{ name: optName, value: name }])),
-    (existing?.variants || []).map((v): [string, string] => [v.key.startsWith(lead) && !v.key.includes('|') ? core(v.key.slice(lead.length)) : '', v.id]));
+    (existing?.variants || []).map((v): [string, string] => [v.key.startsWith(lead) && !v.key.includes('|') ? v.key.slice(lead.length) : '', v.id]));
   const valueIds = pair(name => oldOpt?.values.find(v => v.name.trim().toLowerCase() === name.toLowerCase())?.id,
-    (oldOpt?.values || []).map((v): [string, string] => [core(v.name), v.id]));
+    (oldOpt?.values || []).map((v): [string, string] => [v.name, v.id]));
   const weight = weightOf(p.attributes?.weight), cost = Number(p.cost_price) > 0 ? Number(p.cost_price).toFixed(2) : null;
   const newBarcodes = apiVersion(site) >= '2026-10'; // `barcodes` replaced the single `barcode` field
   const variant = (name: string, i: number) => {
@@ -131,7 +136,7 @@ export function buildProductInput(a: { l: ListingRow; p: ProductRow; site: Websi
     ...(l.handle ? { handle: l.handle } : {}),
     ...(handleMoves ? { redirectNewHandle: true } : {}), // the old URL keeps working
     ...(a.vendor ? { vendor: a.vendor } : {}),
-    productType: l.product_type || p.category || '',
+    productType: p.category || l.product_type || '', // the category as it is NOW: a rename or move reaches the store (the listing's copy only when the product has none)
     ...(category ? { category } : {}),
     tags: l.tags || [],
     // A permanent stock-out (stock.ts takeOffSale): the Shopify product is archived, whatever else this send says.

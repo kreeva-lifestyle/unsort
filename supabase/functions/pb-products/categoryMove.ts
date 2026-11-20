@@ -4,7 +4,10 @@
 // 20261113220000_pb_category_rename_move.sql — one transaction each, the server only.
 //   category_rename { from, to }          the list, its must-have tags, its products, the Product Type ticks and the
 //                                         website rules take the new name. A bulk change when it reaches 2+ products;
-//                                         its revert renames it back (categoryRevert.ts).
+//                                         its revert renames it back (categoryRevert.ts). On the stores the category's
+//                                         collection takes the new name (storeCollections.ts; `stores` in the answer says
+//                                         what happened on each), and the products already there get the new product type
+//                                         one by one (factsSend.ts: the database marks them when their category changes).
 //   category_move   { from, to, remove? } every product filed under `from` (on the list or taken off it) is filed under
 //                                         `to` and checked again — a bulk change whose revert files each product back
 //                                         that is still in `to`. remove: `from` also leaves the list (categories_save,
@@ -15,6 +18,7 @@ import type { Body } from './actions.ts';
 import { asBulk } from './bulkLog.ts';
 import { logActivity, one, rpc } from './db.ts';
 import { HttpError } from './http.ts';
+import { renameCollections } from './storeCollections.ts';
 import type { Refreshed } from './tagStore.ts';
 import { displayName, tagKey } from './tagText.ts';
 import { categoriesSave } from './tagsBulk.ts';
@@ -29,8 +33,9 @@ export async function categoryRename(b: Body, userId: string | null) {
   if (from === to) return { ok: true, renamed: 0, run_id: null };
   const r = await asBulk('category_rename', `Renamed the category ${from} to ${to}`, userId,
     async (run) => ({ renamed: Number(await rpc<number>('pb_category_rename', { p_from: from, p_to: to }, run)) || 0 }), () => ({ from, to }));
-  await logActivity({ action: 'settings_edited', details: { key: 'categories', renamed: { from, to }, products: r.renamed, run_id: r.run_id }, user_id: userId });
-  return { ok: true, renamed: r.renamed, run_id: r.run_id };
+  const stores = await renameCollections(from, to); // after the database (its refusals are the common failure); never throws
+  await logActivity({ action: 'settings_edited', details: { key: 'categories', renamed: { from, to }, products: r.renamed, run_id: r.run_id, stores }, user_id: userId });
+  return { ok: true, renamed: r.renamed, run_id: r.run_id, stores };
 }
 
 /** The moved products the AI may give tags to: every one not waiting for a category (tags chosen by a person are left

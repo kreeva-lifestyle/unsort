@@ -19,8 +19,8 @@
 import { enc, logActivity, nowIso, one, patch, sel } from './db.ts';
 import { makeHandle } from './content.ts';
 import { faqHtml, fieldInputs } from './fields.ts';
-import { sendFields } from './fieldsSend.ts';
-import { attributeValues } from './tagStore.ts';
+import { dropFields, sendFields } from './fieldsSend.ts';
+import { emptied, listingFacts, sentOf } from './listingFacts.ts';
 import { HttpError, plain } from './http.ts';
 import { compareAt } from './pricing.ts';
 import { galleryOf } from './photos.ts';
@@ -86,7 +86,8 @@ export async function publishOne(l: ListingRow, o: { manual: boolean; putBack?: 
     if (!(Number(l.price) > 0)) throw new HttpError(400, 'This listing has no price — regenerate it or type one.');
     const currency = await shopCurrency(site, ms(15_000));
     if (currency && currency !== CURRENCY) throw new HttpError(400, wrongCurrency(site.name, currency));
-    const seoRows = await seoGet([l.id]);
+    // The product type, tags and custom fields are worked out from the product as it is now, at every send (listingFacts.ts).
+    const [seoRows, facts] = await Promise.all([seoGet([l.id]), listingFacts(l, p, site)]);
     const profile = profileOf(site), faq = seoRows.get(l.id)?.faq ?? [];
     const paths = imgs.map(i => i.path), was = last?.details ?? null;
     const live = site.publish_mode !== 'draft'; // review sites go live once a person approved
@@ -123,7 +124,7 @@ export async function publishOne(l: ListingRow, o: { manual: boolean; putBack?: 
       known = knownPhotos(was, existing?.media ?? null, !!adopted);
       gallery = noFiles || leaveGallery(was, paths, known, !!existing, !!adopted) ? { files: null, fresh: [] }
         : filesFor({ paths, alts: l.image_alts || [], known, store: existing?.media ?? null });
-      const tags = existing ? mergeTags(existing.tags, adopted ? null : was?.tags ?? null, l.tags || []) : l.tags || [];
+      const tags = existing ? mergeTags(existing.tags, adopted ? null : l.sent?.tags ?? was?.tags ?? null, facts.tags) : facts.tags;
       const input = buildProductInput({ l: { ...l, handle, tags, compare_at_price: compare }, p: coded, site, vendor: profile.brand, files: gallery.files, live, sendStatus, existing, tail: profile.faq_in_description ? faqHtml(faq) : '', noCategory });
       sent.push(handle);
       return gql<SetReply>(site, PRODUCT_SET, { input, identifier: existing ? { id: existing.id } : null }, ms(SET_MS));
@@ -159,8 +160,8 @@ export async function publishOne(l: ListingRow, o: { manual: boolean; putBack?: 
     if (site.track_inventory && !existing) warnings.push(STOCK_WARNING);
     if (noCategory) warnings.push('Saved on Shopify without its standard category (the store did not accept it): choose the category in Shopify.');
     if (noFiles) warnings.push('Saved on Shopify, but the store did not take the change to its photos: check the photos there.');
-    const fw = await sendFields(site, profile.custom_fields ? fieldInputs(prod.id, p, faq, await attributeValues(p.id, p.category)) : [], ms(30_000));
-    if (fw) warnings.push(fw);
+    // Its custom fields; and off the product any Playbook filled before whose value went empty.
+    for (const w of [await sendFields(site, profile.custom_fields ? fieldInputs(prod.id, p, faq, facts.attrs) : [], ms(30_000)), await dropFields(site, prod.id, emptied(facts, l.sent), ms(30_000))]) if (w) warnings.push(w);
     if (owed) { // not shown to shoppers = not published: the listing fails here (owed stays → channel_due) and is tried again
       const cw = await toOnlineStore(site, prod.id, ms(30_000));
       if (cw) throw new HttpError(400, cw);
@@ -175,8 +176,9 @@ export async function publishOne(l: ListingRow, o: { manual: boolean; putBack?: 
     const saved = await patch<ListingRow>('pb_listings', mine, gone
       ? { status: 'skipped', shopify_status: prod.status, attempts: 0, error: PERM_NOTE, claimed_at: null, put_back: false } // archived on Shopify: off the website
       : { status: 'published', shopify_status: prod.status, published_at: at, ...(l.first_published_at ? {} : { first_published_at: at }), // the first time only: a re-send does not make it new again
-        attempts: 0, error: warning, claimed_at: null, put_back: false, ...(gallery.fresh.length ? { media_checked_at: null } : {}) }, LISTING_COLS);
-    await logActivity({ product_id: l.product_id, website_id: l.website_id, listing_id: l.id, action: 'published', details: { shopify_product_id: prod.id, status: prod.status, update: !!existing, ...(adopted ? { adopted: true } : {}), ...photos, tags: l.tags || [], sizes: p.sizes || [], sku: p.sku || '', in_stock: p.in_stock !== false, ...(warning ? { warning } : {}) }, user_id: o.userId });
+        attempts: 0, error: warning, claimed_at: null, put_back: false, ...(gallery.fresh.length ? { media_checked_at: null } : {}),
+        tags: facts.tags, product_type: facts.type || l.product_type, sent: sentOf(facts, l.sent) }, LISTING_COLS); // what the store has now (factsSend.ts compares with it)
+    await logActivity({ product_id: l.product_id, website_id: l.website_id, listing_id: l.id, action: 'published', details: { shopify_product_id: prod.id, status: prod.status, update: !!existing, ...(adopted ? { adopted: true } : {}), ...photos, tags: facts.tags, sizes: p.sizes || [], sku: p.sku || '', in_stock: p.in_stock !== false, ...(warning ? { warning } : {}) }, user_id: o.userId });
     if (gone) await retire(l.product_id); else await stockMoved(l.id, p); // the stock changed while this was sent → its own send follows
     if (!saved[0]) throw new HttpError(409, 'Published on Shopify, but the listing changed meanwhile — open it again.');
     return saved[0];

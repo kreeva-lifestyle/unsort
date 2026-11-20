@@ -2,7 +2,7 @@
 // not know them). The same refusals as every revert, in the same words: still running, already taken back, older than
 // 7 days.
 //   category_rename — renamed back (pb_category_rename), when the new name is still on the list and the old one free;
-//                     otherwise the database says why.
+//                     otherwise the database says why. The stores' collection takes the old name back too.
 //   category_move   — each product the move filed under `to` that is still there goes back to the category it had
 //                     (one database call per old category, only where the product still holds `to`); one moved again
 //                     or edited since is left and counted. Those products are checked again and their tags worked out
@@ -11,6 +11,7 @@
 import type { RunRow } from './bulkLog.ts';
 import { enc, logActivity, patch, rpc, selAll } from './db.ts';
 import { HttpError } from './http.ts';
+import { renameCollections } from './storeCollections.ts';
 import { refresh } from './tagStore.ts';
 import { retagProducts } from './tagsProduct.ts';
 
@@ -72,6 +73,7 @@ export async function revertCategory(r: RunRow, userId: string | null): Promise<
     const from = String(r.details?.from ?? ''), to = String(r.details?.to ?? '');
     if (!from || !to) throw new HttpError(409, 'This rename does not say which names it changed, so it cannot be reverted.');
     result = { renamed: 1, products: Number(await rpc<number>('pb_category_rename', { p_from: to, p_to: from })) || 0 };
+    await renameCollections(to, from); // the products follow by themselves (factsSend.ts); a store that fails gets a new collection then
   } else {
     const moved = await movedOf(r.id);
     const s = await standing(moved);
