@@ -6,7 +6,8 @@
 // drift apart:
 //   type    the product's category (never an empty one: the store keeps what it has);
 //   tags    the website's tag rules (tags.ts) over the product's facts and chosen values, plus the AI's extra tags
-//           kept with the listing (ai_tags). Tags a person typed on the listing (locked) stay as typed;
+//           kept with the listing (ai_tags). Tags a person typed on the listing (locked) stay as typed. And
+//           "New Arrival" while the product was uploaded 30 days ago or less, never otherwise (withNewArrival);
 //   fields  one per Playbook attribute, as fields.ts builds them (without the questions: they belong to the text).
 // What was sent is kept on the listing (pb_listings.sent), so the next send knows which of the store's tags are
 // Playbook's own (publishParts.ts mergeTags), which fields it filled before, and whether anything changed at all.
@@ -20,6 +21,25 @@ import { buildTags, vendorCode } from './tags.ts';
 import type { ListingRow, ProductRow, SentFacts, TagRules, WebsiteRow } from './types.ts';
 
 export interface Vendor { name: string; codes: string[] | null }
+
+/** Owner, 12 Nov 2026: "Last 30 days = auto tag New arrival". The tag the store's "New arrivals" collection and its
+ *  badge read (the theme looks for exactly these words); on a product uploaded 30 days ago or less, and off after
+ *  that by itself: 20261120180000_pb_new_arrival.sql marks the listing when the 30 days run out. */
+export const NEW_ARRIVAL = 'New Arrival', NEW_ARRIVAL_DAYS = 30;
+type Dated = Pick<ProductRow, 'attributes' | 'created_at'>;
+/** The day a product was uploaded: on the supplier's site (attributes.source_created_at), else the day it came into
+ *  Playbook (a Telegram post, a product added by hand). The twin of SQL pb_upload_date. NaN when neither is a date. */
+export function uploadedAt(p: Dated): number {
+  const src = Date.parse(String((p.attributes as Record<string, unknown> | null)?.source_created_at ?? ''));
+  return Number.isFinite(src) ? src : Date.parse(String(p.created_at ?? ''));
+}
+export const isNewArrival = (p: Dated, now = Date.now()) => { const t = uploadedAt(p); return Number.isFinite(t) && t >= now - NEW_ARRIVAL_DAYS * 86_400_000; };
+/** The tags with "New Arrival" first while the product is new (so no tag limit ever cuts it), and without it
+ *  otherwise: the same words from a rule, a fixed tag, the AI or a person never make an older product new. */
+export function withNewArrival(tags: string[], p: Dated, now = Date.now()): string[] {
+  const rest = tags.filter(t => String(t).trim().toLowerCase() !== NEW_ARRIVAL.toLowerCase());
+  return isNewArrival(p, now) ? [NEW_ARRIVAL, ...rest] : rest;
+}
 type TagListing = Pick<ListingRow, 'tags' | 'ai_tags' | 'locked'>;
 
 /** The AI's extra tags a rebuild keeps: the ones stored with the listing. For a listing written before they were
@@ -32,10 +52,10 @@ export function extrasOf(l: Pick<ListingRow, 'tags' | 'ai_tags'>, rules: Partial
 
 /** Playbook's own tags for a listing, as its product is now. `valueTags`: the chosen values in the site's tag style. */
 export function ownTags(a: { l: TagListing; p: ProductRow; rules: Partial<TagRules>; vendor: Vendor | null; valueTags: string[] }): string[] {
-  if ((a.l.locked || []).includes('tags')) return a.l.tags || [];
+  if ((a.l.locked || []).includes('tags')) return withNewArrival(a.l.tags || [], a.p);
   const { p, vendor } = a;
   const vars = { category: p.category || '', fabric: p.fabric || '', color: p.color || '', vendor: vendor?.name || '', sku: p.sku || '', name: p.name || '' };
-  return buildTags(a.rules, { ...vars, vendor_code: vendorCode(vendor?.codes, p.sku), sizes: normalizeSizes(p.sizes || []), attributes: p.attributes || {}, tags: a.valueTags }, extrasOf(a.l, a.rules));
+  return withNewArrival(buildTags(a.rules, { ...vars, vendor_code: vendorCode(vendor?.codes, p.sku), sizes: normalizeSizes(p.sizes || []), attributes: p.attributes || {}, tags: a.valueTags }, extrasOf(a.l, a.rules)), p);
 }
 
 /** The custom fields as key → value (a list as its JSON), for telling whether one changed or went empty. */

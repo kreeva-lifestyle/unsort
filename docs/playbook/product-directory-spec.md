@@ -389,7 +389,7 @@ them). The writer is not given `compare_at_price`, `currency`,
 `source_page_url`, `barcode`, the two source dates or the store's SEO wording
 (it writes its own). The dates show on the product page as "Uploaded on their
 site" and, when a different day, "On sale there since" (`WebMetaTile.tsx`);
-they are what a later "New arrival" rule will read.
+they are what the "New Arrival" rule reads (below, 2026-11-20).
 Tag templates can use them: `{attr:brand}`, `{attr:product_type}`,
 `{attr:manufacturer}`…; `{attr:store_tags}` gives ONE tag per store tag
 (with `{size}` too: one per tag × size); an empty key drops the template.
@@ -2131,6 +2131,34 @@ collection its old title back.
   store would have kept the old labels until the product was routed for
   another reason. Every one of the 21 kept its Shopify variants (checked on
   the store: same ids, created 17–18 Nov).
+
+### New Arrival — by the owner's rule (2026-11-20)
+Owner, 2026-11-12: "Last 30 days = auto tag New arrival"; 2026-11-20: "Did you check which where actually new
+arrival as per our condition?". Until then the store called every product new: its "New arrivals" collection
+held every product with a price (rule `price > 0`, sorted by Shopify's creation date), and the theme's badge
+counted 30 days from the day the product was made **on Shopify** (17-20 Nov 2026 for all 510 SuratMandi
+products). By the rule, 10 of the 510 were new.
+- **The rule** (`listingFacts.ts`): a product is new while its **upload date** is 30 days old or less
+  (`NEW_ARRIVAL_DAYS`). The upload date is `attributes.source_created_at` (the supplier's site, kept since
+  2026-11-12; "Uploaded on their site" on the product page), else `pb_products.created_at` (a Telegram post, a
+  product added by hand) — `uploadedAt`, twin of SQL `pb_upload_date`. A date that is not one counts as missing.
+- **The tag** `New Arrival` (exactly; `NEW_ARRIVAL`): `ownTags` → `withNewArrival` puts it **first** on a new
+  product (so `max_tags` never cuts it, on every website) and **never** on another one — the same words from a
+  template, a fixed tag, the AI or tags a person typed are dropped on an older product, so the tag always means
+  the rule. Both sends (the small send and the full publish) and the writer use `ownTags`, so it goes out with
+  any send.
+- **Off by itself**: nothing on the product changes when the 30 days run out, so no trigger sees it. The cron job
+  `pb-new-arrivals` (hourly, minute 13) runs `pb_new_arrival_sweep()` (`20261120180000_pb_new_arrival.sql`,
+  SECURITY INVOKER: run by the job's owner): it marks `facts_due` on every listing on sale (the `ON_SALE` rule)
+  of a product that is not archived, not already marked, whose record (`sent.tags ? 'New Arrival'`) disagrees
+  with the rule now. The small send then adds or takes off the tag (`mergeTags` drops a Playbook tag that left
+  the record), and a listing marked once too often costs nothing on Shopify (the record is compared first).
+- **The store** reads the tag: SuratMandi's "New arrivals" collection (`/collections/new-arrivals`, home page
+  "Just landed" grid, header search) is filled by the rule "tag is New Arrival", and the theme's product-page
+  badge shows when the product has that tag. A store whose New arrivals page has no product hides the home grid
+  (the theme's `featured-collection` skips an empty collection).
+- Tests: `test/newArrival` (the date, the 30 days, the tag first / never), `t_dups.sql` part 15 (which listings
+  the sweep marks, and that it marks nothing twice).
 
 ### Tests
 `test/sizes`, `sizesMirror`, `sizesSend` (labels, variant ids, codes and the

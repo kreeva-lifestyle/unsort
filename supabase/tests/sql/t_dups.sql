@@ -645,7 +645,37 @@ update pb_listings set stock_due = true where title = 'off';
 select t_is('… (a stock change still wakes it then, as before)', pg_temp.worker(), 'wakes');
 rollback;
 
+-- ── 15. "New Arrival" follows the owner's rule (20261120180000): the hourly sweep marks a listing on sale whose record
+-- of the tag (pb_listings.sent) disagrees with "uploaded in the last 30 days", and no other. Dates relative to now(). ──
+begin;
+select count(t_product(n, :V1, 'KN ' || n, 'Red', 1)) = 8 from generate_series(151, 158) n;
+create or replace function pg_temp.up(p_days int) returns jsonb language sql as $$
+  select jsonb_build_object('source_created_at', to_char((now() - make_interval(days => p_days)) at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')) $$;
+update pb_products set created_at = now() - interval '200 days' where id in (select t_id(n) from generate_series(151, 158) n);
+update pb_products set attributes = pg_temp.up(10) where id in (t_id(151), t_id(154), t_id(156), t_id(158));
+update pb_products set attributes = pg_temp.up(40) where id in (t_id(152), t_id(153));
+update pb_products set created_at = now() - interval '5 days' where id = t_id(155);               -- no supplier date: came in 5 days ago
+update pb_products set attributes = '{"source_created_at": "yesterday-ish"}' where id = t_id(157); -- not a date: the day it came in (200 days)
+update pb_products set status = 'archived' where id = t_id(156);
+insert into pb_websites (id, name, shop_domain, active) values ('e5000000-0000-4000-8000-000000000001', 'Store', 'store.myshopify.com', true);
+insert into pb_listings (product_id, website_id, title, status, shopify_product_id, shopify_status, sent)
+select t_id(n), 'e5000000-0000-4000-8000-000000000001', 'n' || n, case when n = 158 then 'skipped' else 'published' end, 'gid://' || n,
+       case when n = 158 then 'DRAFT' else 'ACTIVE' end,
+       jsonb_build_object('tags', case when n in (152, 154) then '["Lehenga", "New Arrival"]'::jsonb else '["Lehenga"]'::jsonb end)
+from generate_series(151, 158) n;
+update pb_listings set facts_due = false where title like 'n15%';
+select t_is('the upload date: the supplier''s, else the day the product came in; a date that is not one falls back too',
+  (select string_agg((public.pb_upload_date(attributes, created_at)::date = (now() - make_interval(days => d))::date)::text, ',' order by n)
+   from (values (151, 10), (155, 5), (157, 200)) v(n, d) join pb_products p on p.id = t_id(v.n)), 'true,true,true');
+select t_is('the sweep marks 3: new without the tag, old with it, one with no supplier date that came in 5 days ago', public.pb_new_arrival_sweep()::text, '3');
+select t_is('… and only those (not: old without it, new with it, archived, a bad date read as old, one hidden on the store)',
+  (select string_agg(title, ', ' order by title) from pb_listings where title like 'n15%' and facts_due), 'n151, n152, n155');
+select t_is('run again at once: nothing more (a marked listing waits for its send)', public.pb_new_arrival_sweep()::text, '0');
+update pb_listings set facts_due = false, sent = '{"tags": ["New Arrival", "Lehenga"]}' where title = 'n151';
+select t_is('once the store has the tag on record, the listing is left alone', public.pb_new_arrival_sweep()::text, '0');
+rollback;
+
 -- Every check above printed a line: a part that silently printed nothing would be a failure too.
-select case when last_value = 279 then 'ok   every check ran (279)' else 'FAIL the number of checks is ' || last_value || ', not 279: a part printed fewer lines than it has, or this number was not updated' end from public.t_checks;
+select case when last_value = 284 then 'ok   every check ran (284)' else 'FAIL the number of checks is ' || last_value || ', not 284: a part printed fewer lines than it has, or this number was not updated' end from public.t_checks;
 drop function public.t_refused(text, text); drop function public.t_is(text, text, text); drop function public.t_rel(uuid, uuid); drop function public.t_product(int, uuid, text, text, int, numeric, text); drop function public.t_id(int);
 drop sequence public.t_checks;
