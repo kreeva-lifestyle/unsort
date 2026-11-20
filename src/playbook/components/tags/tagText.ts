@@ -9,18 +9,28 @@ export const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocal
 export const lookSentence = (phrase: string, m: PbLookAlike) =>
   `“${phrase}” looks like “${m.value}” (${m.attribute}) — ${REASON_LABEL[m.reason]}${m.via && m.via.toLowerCase() !== m.value.toLowerCase() ? `, via “${m.via}”` : ''}.`;
 
-/** The toast after a category rename. The websites follow by themselves, so it says so. A website whose collection could not be
- *  renamed is named with the reason: the rename itself is done, so that is a note ('info'), not an error. */
+/** The toast after a category rename, one sentence per store answer (pb-products storeCollections.ts): 'renamed' —
+ *  the websites follow by themselves; 'kept' — the store has a collection of its own for the new name, so the products
+ *  move into it and the old one keeps its name; 'failed' — not renamed yet, and Playbook gives it the new name itself
+ *  when it sends the first product of the category; 'none' — nothing to rename there. The rename itself is done, so a
+ *  store's answer is a note ('info'), never an error. */
 export function renamedSaid(from: string, to: string, r: { renamed: number; stores?: PbStoreRename[] }): { text: string; type: 'success' | 'info' } {
   const said = `Renamed ${from} to ${to}${r.renamed ? ` — ${plural(r.renamed, 'product')} follow` : ''}`;
-  const bad = (r.stores ?? []).filter(s => s.status === 'failed').map(s => {
-    // The server's own sentences start with the website's name and end with a full stop; Shopify's refusals do neither.
-    const why = (s.note?.startsWith(`${s.website}:`) ? s.note.slice(s.website.length + 1) : s.note ?? '').trim().replace(/\.$/, '');
+  const stores = r.stores ?? [];
+  const failed = stores.filter(s => s.status === 'failed').map(s => {
+    // The server's own sentences start with the website's name and end with a full stop, some with "it will be tried
+    // again" (that is about the Shopify call, not this collection); Shopify's refusals do neither.
+    const why = (s.note?.startsWith(`${s.website}:`) ? s.note.slice(s.website.length + 1) : s.note ?? '').replace(/\s*—\s*it will be tried again.*$/i, '').trim().replace(/\.$/, '');
     return `${s.website}${why ? ` (${why})` : ''}`;
   });
-  if (bad.length) return { text: `${said}. On ${andList(bad)} the collection kept its old name: check it in Shopify. The products there still follow by themselves`, type: 'info' };
+  const kept = stores.filter(s => s.status === 'kept').map(s => s.website);
+  const notes = [
+    ...(failed.length ? [`On ${andList(failed)} the collection is not renamed yet: Playbook gives it the new name when it sends the first product of ${to}`] : []),
+    ...(kept.length ? [`${andList(kept)} already ${kept.length === 1 ? 'has' : 'have'} a collection for ${to}: the products move into it, and the one for ${from} keeps its name`] : []),
+  ];
+  if (notes.length) return { text: `${said}. ${notes.join('. ')}`, type: 'info' };
   // Something to follow: products that may be on a website, or a collection that took the new name.
-  const follows = !!r.stores?.length && (r.renamed > 0 || r.stores.some(s => s.status === 'renamed'));
+  const follows = !!stores.length && (r.renamed > 0 || stores.some(s => s.status === 'renamed'));
   return { text: `${said}${follows ? '. Your websites follow by themselves within a few minutes' : ''}`, type: 'success' };
 }
 

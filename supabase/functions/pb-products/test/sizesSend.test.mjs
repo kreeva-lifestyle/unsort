@@ -50,3 +50,33 @@ test('the product type is the category as it is now; the listing\'s copy only wh
   assert.equal(ask({ l: { ...L, product_type: 'Anarkali' }, p: { ...P, category: null } }).productType, 'Anarkali');
   assert.equal(ask({ p: { ...P, category: null } }).productType, '');
 });
+
+// Code check of 20 Nov 2026 (sizes reviewer): a bare letter beside its measured twin, two store labels of one size,
+// a code that ends in a size written another way, and two sizes that share a letter.
+test('a bare letter and its measured twin, both written another way, each keep their own variant', () => {
+  for (const [onStore, here] of [[['XXXL', 'XXXL (46)'], ['3XL', '3XL (46)']], [['M Size', 'M (38 Inch)'], ['M', 'M (38)']]]) {
+    const made = ask({ existing: store(...onStore), p: { ...P, sizes: here } });
+    assert.deepEqual([sizes(made), made.variants.map(v => v.id), made.productOptions[0].values.map(v => v.id)], [here, ['var0', 'var1'], ['val0', 'val1']], onStore.join(' + '));
+  }
+});
+
+test('two store labels that are one size: the size keeps one of their variants, nothing is made again', () => {
+  const made = ask({ existing: store('38"', '38”'), p: { ...P, sizes: ['38'] } });
+  assert.deepEqual([sizes(made), made.variants.map(v => v.id)], [['38'], ['var0']]);
+});
+
+test('a product code that ends in one of its sizes written another way: the size is not added twice', () => {
+  const codes = (sku, list) => ask({ p: { ...P, sku, sizes: list } }).variants.map(v => v.inventoryItem.sku);
+  assert.deepEqual(codes('AB-FREE', ['Free']), ['AB-FreeSize']);
+  assert.deepEqual(codes('AB-XXXXL', ['XXXXL', 'XXXL']), ['AB-3XL', 'AB-4XL']);
+  assert.deepEqual(codes('KB123-M-38', ['M-38', 'L-40']), ['KB123-M', 'KB123-L']);
+  assert.deepEqual(codes('NNK1133-38"', ['38"']), ['NNK1133-38']);
+  assert.deepEqual(codes('KB 302 MAROON', ['S', 'M']), ['KB 302 MAROON-S', 'KB 302 MAROON-M'], 'a code with no size at its end stays whole');
+});
+
+test('two sizes that share a letter never share a code: the measured one keeps its number', () => {
+  const codes = (list) => ask({ p: { ...P, sizes: list } }).variants.map(v => v.inventoryItem.sku);
+  assert.deepEqual(codes(['28 (S)', '30 (S)', '32 (M)', '34 (M)']), ['NNK1133-S28', 'NNK1133-S30', 'NNK1133-M32', 'NNK1133-M34']);
+  assert.deepEqual(codes(['M', 'M (38)']), ['NNK1133-M', 'NNK1133-M38']);
+  assert.deepEqual(codes(['XS (34)', 'S (36)', 'M (38)']), ['NNK1133-XS', 'NNK1133-S', 'NNK1133-M'], 'one size per letter: the letter alone, as before');
+});

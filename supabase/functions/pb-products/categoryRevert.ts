@@ -74,10 +74,12 @@ export async function revertCategory(r: RunRow, userId: string | null): Promise<
     const from = String(r.details?.from ?? ''), to = String(r.details?.to ?? '');
     if (!from || !to) throw new HttpError(409, 'This rename does not say which names it changed, so it cannot be reverted.');
     // The stores' collection takes the old name back first, as in the rename itself (categoryMove.ts); the products
-    // follow by themselves (factsSend.ts), and a store that fails gets a new collection then.
+    // follow by themselves (factsSend.ts), and a store that failed here gives its collection the old name back when
+    // the first product is sent (storeCollections.ts ensureCollection).
     const back = await storesThenDatabase(to, from, () => rpc<number>('pb_category_rename', { p_from: to, p_to: from }));
-    result = { renamed: 1, products: Number(back.r) || 0 };
-    stores = back.stores; // what each store answered goes on the activity row: a store that failed is seen there
+    stores = back.stores; // on the activity row, and counted in the answer so the screen can say it
+    const failed = stores.filter(s => s.status === 'failed').length;
+    result = { renamed: 1, products: Number(back.r) || 0, ...(failed ? { stores_failed: failed } : {}) };
   } else {
     const moved = await movedOf(r.id);
     const s = await standing(moved);

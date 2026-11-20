@@ -183,8 +183,9 @@ product is live (checked against the code and all 504 store products,
   sentence-long tags), and the limit of 8 tags can cut an occasion.
 - **Leftovers.** From 20 Nov a value removed in Playbook is taken off the
   store too, for every field Playbook has sent since then. What was left
-  behind earlier stays: an old value, "set contents" or a question that was
-  removed before that day.
+  behind earlier stays: an old value or "set contents" removed before that
+  day. Still open: when every question of a listing is removed, the old
+  questions stay on the store (removing some of them works).
 - **Collections.** A new category gets its collection when "Set up on
   Shopify" is tapped again, or when a product already on the store moves
   into it. Collections get no description or picture, an empty one stays
@@ -216,12 +217,13 @@ product is live (checked against the code and all 504 store products,
 - **A product Shopify keeps refusing** (its category, tags or fields) is
   tried again every 5 minutes for as long as it takes; its listing says
   why. Next: after the third refusal it waits an hour between tries.
+- **Messages while automation is paused.** "Send tags and fields again"
+  says the products wait for automation, but the product page, the Tags
+  page and Bulk changes still say "within a few minutes" while it is
+  paused. Next: they say it waits too.
 - **AI tags before approval.** On a "Review first" website, the extra tags
   of a rewrite that still waits for your approval can reach the store with
   the next tag update. Next: they wait for the approval too.
-- **Size codes from a future import.** If another store's own code ends in
-  a size written the old way ("…-38""), the size would be added a second
-  time ("…-38"-38"). No product has this today.
 - **Listing promises.** About 500 search descriptions say "Ships in 5 to 7
   days"; your answer of 20 Nov is "Delivery within 5 to 7 days". Next:
   Claude changes the store profile line and those descriptions. About 300
@@ -255,7 +257,9 @@ product is live (checked against the code and all 504 store products,
   Google or Instagram should get them too.
 - **Supplier tag.** Once vendor short names are entered, every listing,
   also the ones already on the store, gets a public tag such as
-  "Vendor_KB". Keep it or drop it?
+  "Vendor_KB" within minutes, and each loses one other tag (they are at the
+  limit of 8). Keep it or drop it? Answer this before entering the names
+  (below).
 
 ## Playbook — decisions the owner still has to make
 
@@ -356,7 +360,9 @@ Found in the overnight check of 19 Nov; built in the next Playbook change.
   Storage: it still holds 2 files that nothing uses (security check, 13 Nov).
 - **Enter the vendor's short names.** Playbook → Vendors → Kashtbhanjan:
   add **KB** and **NKB**. Repeat posts and stock notices are matched by them;
-  the list is empty today.
+  the list is empty today. First answer "Supplier tag" above: once the
+  names are in, the 134 products of this vendor on SuratMandi get a public
+  "Vendor_KB" tag within minutes.
 - **Set up Telegram.** Link the staff group (the bot must be an admin),
   then Kashtbhanjan's channel (it needs a public name). Run the nightly
   crawler from a separate, long-established staff account, not your own

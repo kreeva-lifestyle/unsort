@@ -203,7 +203,7 @@ is_active). Service role for all DB writes. CORS like listing-ai.
 | `save_credentials` | admin/manager | `{ website_id, auth_mode, access_token?, client_id?, client_secret?, shop_domain? }` | stores in pb_website_secrets, then test → `{ ok, shop_name }`. A different `shop_domain` moves the site to that store: needs full new credentials; site switched off; old secrets wiped; non-skipped listings re-queued without Shopify ids; skipped ones lose their old-store ids |
 | `test_connection` | staff | `{ website_id }` | `{ ok, shop_name, scopes[] , missing_scopes[] }`, sets connected_at / last_error |
 | `store_setup` | admin/manager | `{ website_id }` | (2026-11-17, SuratMandi) on the store: a product metafield definition (namespace `custom`, pinned, storefront PUBLIC_READ) per Playbook attribute — key = the attribute key in snake case, `list.single_line_text_field` when multi, else `single_line_text_field` — plus `set_contents` and `faq` (rich text); then a collection per category (`collectionCreate(collection:)` with one conditions source: product type EQUALS the category; handle from the name) put on the Online Store. Kept when there (a definition with the same key, whatever its type — 2026-11-17 "if already made then merge with it": publishing fills a plain-text one with the values joined by commas, `fieldsSend.ts`; a collection with the same handle or title); nothing is deleted or changed. Per item `{ name, status: made/kept/failed, note? }`; a store-wide refusal (credentials, permission, frozen) throws once. `storeSetup.ts`, `storeFields.ts`; since 2026-11-20 the collection calls live in `storeCollections.ts` (`listCollections`, `makeCollection`), which also makes a collection when a product on the store changes category and renames one with its category (last section) |
-| `resend_website` | staff | `{ website_id, dry? }` | (2026-11-20, `factsSite.ts`) the website's button "Send tags and fields again". `dry: true` → `{ ok, dry: true, listings, active }`: how many products of that website are on sale on Shopify (`stockSend.ts ON_SALE`), nothing changes. Otherwise every such listing is marked `facts_due` + `facts_force` (`facts_tried_at` null) → `{ ok, listings }`, and the worker's small send does the rest; a website that is switched off is refused (400, a plain sentence); activity `facts_resend_site { listings }` on the website. Not a bulk change (last section) |
+| `resend_website` | staff | `{ website_id, dry? }` | (2026-11-20, `factsSite.ts`) the website's button "Send tags and fields again". `dry: true` → `{ ok, dry: true, listings, active }`: how many products of that website are on sale on Shopify (`stockSend.ts ON_SALE`), nothing changes. Otherwise every such listing is marked `facts_due` + `facts_force` (`facts_tried_at` null) → `{ ok, listings, paused? }` (`paused: true` while automation is paused: the marks wait, and the toast says they go out when it is switched on again instead of a time), and the worker's small send does the rest; a website that is switched off is refused (400, a plain sentence); activity `facts_resend_site { listings }` on the website. Not a bulk change (last section) |
 | `preview_price` | staff | `{ website_id, cost, rule_id? }` | `{ price, compare_at }` |
 | `taxonomy_get` | staff | – | categories (pb_settings), attributes with values (+ `uses`), links, per-link `stats {products, lacking}`, `category_products`, `fill` (latest "Let AI decide" run) |
 | `categories_save` | admin/manager | `{ categories[] }` | the reader's category list; links of removed categories are dropped and every product left off the list is re-gated (held: "Missing: Category") → `{ ok, categories, regated }` |
@@ -1979,7 +1979,10 @@ next small-send run finds the record equal and clears it without a call.
   Online Store) — or, when the old name is **gone from Playbook** (off the
   list and no product filed under it: a rename this store missed, because it
   failed then or its website was off), the old collection takes the new name
-  as a rename gives it (`renameOn`), so no second collection is made. When Shopify
+  as a rename gives it (`renameOn`), so no second collection is made. And a
+  collection that already files the new type but is still **titled** after
+  the old name, once that name is gone from Playbook (a rename taken back
+  that the store missed), takes the title of the type it files. When Shopify
   does not make it the send fails: the product keeps its old type and its old
   collection, and is tried again. A store with no collection for the old type
   gets the new type without one. One store at a time (`turns`: two listings
@@ -2004,8 +2007,14 @@ next small-send run finds the record equal and clears it without a call.
   merely carries the name does not stop the rename); `none` (the store has
   no collection for the old name);
   `failed` + `note`. It never throws: the rename goes on, and
-  `ensureCollection` makes a collection for the new name when the first
-  product is re-typed. When the database then refuses the rename, the same
+  `ensureCollection` gives the collection the new name when the first
+  product is re-typed. The app's toast (`tagText.ts renamedSaid`) says each
+  answer in its own sentence: `failed` — not renamed yet, Playbook does it
+  with the first product; `kept` — the products move into the store's own
+  collection for the new name and the old one keeps its name; `renamed` and
+  `none` — the plain "your websites follow". The revert of a rename counts
+  the websites that failed (`stores_failed`; the activity row keeps every
+  answer) and its toast says so. When the database then refuses the rename, the same
   call with the names swapped puts the title back (the second rule stays: a
   product type nobody has).
 - Nothing is ever deleted on a store, a rule included: a category moved away
@@ -2071,15 +2080,19 @@ collection its old title back.
   `2XL` → `XXL`; `xl` → `XL`; `L (40 Inch)`, `L Size, 40 Inch Stitched` →
   `L (40)`; `M(38)`, `M-38`, `38 (M)` → `M (38)`; `Free`, `FS`, `Freesize` →
   `Free Size`. `M/L`, `38-40`, `2-3 Years`, `Custom Stitch`, `Semi-Stitched`
-  stay as they are.
+  stay as they are — exactly as written, spaces tidied: no quote is
+  straightened and no fraction rewritten (`5½ Mtr` stays `5½ Mtr`), and `+`
+  and `&` are part of a size (`XL+` is not `XL`). Code check, 2026-11-20.
 - **Nothing is ever added**: `M` stays `M` (a supplier's M is not always 38:
   one imported product's own chart says M = 30), a bare number stays a number
   (34 can be a bust or a waist), and `M (38)` keeps the inches its supplier
   gave (owner, 2026-11-12: the measurement written with a size is kept).
 - `normalizeSizes`: each label normalised, repeats dropped (case ignored), a
   fixed order — letters XXS … 6XL (a letter before the same letter with
-  inches), then numbers rising, then Free Size, then unknown shapes in the
-  order they came; at most 40 characters a label and 30 labels.
+  inches), then numbers rising (bare numbers outside 20 to 60 too, such as
+  kids' `16`, `18` or a `62`, so a scale that crosses 20 or 60 keeps its
+  order), then Free Size, then unknown shapes in the order they came; at
+  most 40 characters a label and 30 labels.
 - Normalised at every write of `pb_products.sizes`: the import
   (`import/body.ts storeSizes`), the reader (`reader.ts`; the prompt still
   asks for the label as the post writes it), and the app, which writes the
@@ -2091,21 +2104,33 @@ collection its old title back.
   `{size}` tags), so a store can never show another format whatever a row
   still holds.
 - A renamed size keeps its Shopify variant and option value (its id, carts
-  and stock setting). Variant matching by `sizeKeys`: the exact label first;
-  then the first key — the letter, else the number, else (an unknown shape)
-  the label without its bracket part; then the second key, the number alone
-  ("38" on the store, "M (38)" here). Each step takes only what is still
-  unmatched, and only when one size here and one there share the key.
+  and stock setting). Variant matching: the exact label first; then a store
+  label whose house form IS this size (`XXXL` for `3XL`, `38"` for `38`; two
+  store labels of one size give it one of their variants); then by
+  `sizeKeys` — the first key (the letter, else the number, else, for an
+  unknown shape, the label without its bracket part), then the second key,
+  the number alone ("38" on the store, "M (38)" here). Each key step takes
+  only what is still unmatched, and only when one size here and one there
+  share the key.
 - Each size's SKU / barcode still ends in the label without its bracket part
   (`skuCode.ts sizeCore`, spaces out), so a code changes only where the label
   did: product `NNK1133` with the size `38"` sent `NNK1133-38"` and now sends
   `NNK1133-38`; `5081-LSize,40InchStitched` becomes `5081-L`; `1086-2XL`
-  becomes `1086-XXL`.
+  becomes `1086-XXL`. Where two sizes of one product share a letter
+  (`S (28)` and `S (30)`, `M` and `M (38)`), the measured one keeps its
+  number (`-S28`, `-M38`), so no two sizes share a code. A product's own code
+  that ends in one of its sizes written another way (`AB-FREE`, `KB123-M-38`)
+  is split there (`skuParts`: the house form of what follows a joiner), so
+  the size is not added twice.
 - `route.ts` is unchanged: it already sends a live listing again, without the
   AI, when the product's sizes or SKU differ from what was last sent
   (`behind`; on a "Review first" website that re-send waits for approval).
-  The rows that still held another spelling on 2026-11-20 (about 21 products,
-  all on SuratMandi) are rewritten once after the deploy.
+  The 21 rows (all on SuratMandi) that still held another spelling were
+  rewritten once on 2026-11-20 after the deploy, by SQL, with `route_due`
+  set: an UPDATE by SQL alone does not route a product, so without it the
+  store would have kept the old labels until the product was routed for
+  another reason. Every one of the 21 kept its Shopify variants (checked on
+  the store: same ids, created 17–18 Nov).
 
 ### Tests
 `test/sizes`, `sizesMirror`, `sizesSend` (labels, variant ids, codes and the

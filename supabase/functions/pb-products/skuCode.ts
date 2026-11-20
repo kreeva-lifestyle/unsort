@@ -1,5 +1,6 @@
 // The code each size of a product is sent to Shopify with (its SKU and its barcode): the product's own code, the
 // colour where the code does not name one, and the size. Pure: no I/O (unit-tested in test/garment.test.mjs).
+import { normalizeSize } from './sizes.ts';
 /** A size label without its measurement: "XS (34)" → "XS". */
 export const sizeCore = (s: string) => s.replace(/\(.*?\)/g, ' ').replace(/\s+/g, ' ').trim();
 
@@ -21,6 +22,12 @@ export function skuParts(sku: string, sizes: string[]): { base: string; join: st
     if (!low.endsWith(size)) continue;
     const head = s.slice(0, s.length - size.length), join = /[\s\-_/]+$/.exec(head);
     if (join && join.index > 0) return { base: head.slice(0, join.index), join: join[0] };
+  }
+  // The code's own ending written another way than the house format ("-38\"", "-FREE", "-M-38"): what follows a
+  // joiner is, in the house format, one of the product's sizes.
+  for (const m of s.matchAll(/[\s\-_/]+/g)) {
+    const tail = s.slice((m.index ?? 0) + m[0].length);
+    if ((m.index ?? 0) > 0 && tail && own.includes(sizeCore(normalizeSize(tail)).toLowerCase())) return { base: s.slice(0, m.index), join: m[0] };
   }
   return { base: s, join: '-' };
 }

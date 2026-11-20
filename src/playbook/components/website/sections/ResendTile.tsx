@@ -41,7 +41,7 @@ export default function ResendTile({ siteId, name, fields, dirty, addToast, send
         setBusy('Sending…');
       }
       const r = await send(siteId);
-      if (r.listings) addToast(resentMessage(r.listings), 'success'); else none();
+      if (r.listings) addToast(resentMessage(r.listings, r.paused), r.paused ? 'info' : 'success'); else none();
     } catch (e) { addToast(friendlyError(e), 'error'); } finally { setBusy(''); }
   };
   return (

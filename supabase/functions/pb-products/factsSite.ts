@@ -8,7 +8,7 @@
 // follows from the product and the website's saved tag rules, so there is nothing to put back, and tapping it twice
 // gives the same result. It is written to the website's activity instead, as "Set up on Shopify" is.
 import { type Body, uuid } from './actions.ts';
-import { countRows, enc, logActivity, one, patch } from './db.ts';
+import { countRows, enc, getSettings, logActivity, one, patch } from './db.ts';
 import { HttpError } from './http.ts';
 import { ON_SALE } from './stockSend.ts';
 
@@ -24,5 +24,6 @@ export async function resendWebsite(b: Body, userId: string | null) {
     await patch('pb_listings', onSale, { facts_due: true, facts_force: true, facts_tried_at: null });
     await logActivity({ website_id: id, action: 'facts_resend_site', details: { listings }, user_id: userId });
   }
-  return { ok: true, listings };
+  // While automation is paused the marks wait (worker.ts): the screen says so instead of a time.
+  return { ok: true, listings, ...((await getSettings()).automation.paused ? { paused: true } : {}) };
 }
