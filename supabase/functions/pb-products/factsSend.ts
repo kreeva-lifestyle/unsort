@@ -108,7 +108,7 @@ export async function sendFactsDue(limit: number, inTime: () => boolean, userId:
   let n = 0;
   const down = new Set<string>(), cols: ColCache = new Map();
   while (n < limit && inTime()) {
-    const list = await factsCandidates(Math.min(PAGE, limit - n), [...down]);
+    const list = await factsCandidates(Math.min(PAGE, limit - n), [...down]), wasDown = down.size;
     let moved = 0;
     for (let i = 0; i < list.length && inTime(); i += AT_ONCE) {
       const part = list.slice(i, i + AT_ONCE).filter(l => !down.has(l.website_id));
@@ -117,7 +117,7 @@ export async function sendFactsDue(limit: number, inTime: () => boolean, userId:
         if (r === 'done') { n++; moved++; } else if (r === 'failed') moved++; else if (r === 'busy') down.add(part[j].website_id);
       });
     }
-    if (!moved) break; // nothing left that can go now
+    if (!moved && down.size === wasDown) break; // nothing left that can go now (a store that just failed: asked once more without it)
   }
   return n;
 }

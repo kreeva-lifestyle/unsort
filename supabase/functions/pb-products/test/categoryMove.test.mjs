@@ -34,7 +34,7 @@ const rpcs = (calls) => calls.filter(([m, p]) => m === 'POST' && p.startsWith('r
 test('rename: one database call inside a bulk change named after both names', async () => {
   const calls = world({ 'rpc/pb_category_rename': 3 });
   const r = await categoryRename({ from: ' Anarkali ', to: 'Anarkali  Suit' }, 'u1');
-  assert.deepEqual(r, { ok: true, renamed: 3, run_id: 'run1' });
+  assert.deepEqual(r, { ok: true, renamed: 3, run_id: 'run1', stores: [] }); // no website is switched on here: no store to rename a collection on
   assert.deepEqual(rpcs(calls).find(([f]) => f === 'pb_category_rename'), ['pb_category_rename', { p_from: 'Anarkali', p_to: 'Anarkali Suit' }, 'run1']);
   assert.equal(calls.find(([m, p]) => m === 'POST' && p.startsWith('pb_bulk_runs'))[2][0].label, 'Renamed the category Anarkali to Anarkali Suit');
   assert.deepEqual(calls.find(([m, p]) => m === 'PATCH' && p.startsWith('pb_bulk_runs'))[2].details, { from: 'Anarkali', to: 'Anarkali Suit', unit: 'products' }); // what the revert needs
