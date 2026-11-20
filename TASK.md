@@ -109,9 +109,16 @@ shopper has seen any of this. The theme is also kept in the private
 
 ### Claude fixes next on the store (no answer needed)
 
-- **Phone filters.** After ticking a filter the page may stop scrolling
-  (read from the code, to be tested on a phone). Search results on a phone
-  cannot be filtered or sorted.
+- **Phone filters.** After ticking a filter or typing a price in the filter
+  panel, the page stops scrolling (read from the code; to be tested on a
+  phone). Search results on a phone cannot be filtered or sorted.
+- **Cart.** A GSTIN typed in the cart is wiped by any cart change. A code
+  that does not exist is shown as "saved". A double tap on the bin can
+  remove two items, and on "+ Add" can add two.
+- **Wishlist and "Recently viewed".** Their product cards stay faded, as if
+  still loading.
+- **Weak connection.** A size change that fails keeps the earlier size in
+  the cart, and most failed taps show no message.
 - **Choosing a size.** The first size is picked for the shopper, and "+ Add"
   on a card puts a one-size product straight into the cart. Cards print odd
   size text ("38"–38"", "Free Size–Free Size").
@@ -124,7 +131,9 @@ shopper has seen any of this. The theme is also kept in the private
   its smallest quantity is 20.
 - **Small bugs.** Clearing the search box leaves an empty list. The cart
   icon on the cart page opens the cart over itself. Page 2 of a category
-  loads without moving up.
+  loads without moving up. The home banner may not swipe on phones. Saved
+  hearts look unsaved after filtering. Dispatch dates come out a day early
+  on Sunday mornings (matters once S5 is set).
 - **Policy pages** have no spacing; phone and email are not tappable (after
   S2).
 - **Details on the product page** lack Colour, Type and "In the set",
@@ -139,13 +148,16 @@ product is live (checked against the code and all 504 store products,
 
 ### Claude builds next (no answer needed)
 
-- **A category change never reaches the store.** Rename or move a category,
-  or change a live product's category, and the product stays in its old
-  collection. Next: the change is sent without a new AI text. The 121
-  products waiting for a category need this.
-- **Tag and field changes are not sent again.** A corrected colour, fabric,
-  work or occasion stays wrong on the store. Next: they are re-sent when
-  they change, plus a button "Send tags and fields again" per website.
+- **A category change does not reach products already on the store.**
+  Rename or move a category, or change a live product's category, and the
+  product stays in its old collection; only Regenerate moves it, one
+  listing at a time and with a new AI text. Next: the change is sent by
+  itself, without the AI.
+- **Tag and field changes are not sent by themselves.** A corrected colour,
+  fabric, work or occasion waits for the listing's next send ("Update on
+  Shopify" does it for one listing); tags change only when the AI writes
+  the listing again. Next: both are sent when they change, plus one button
+  per website, "Send tags and fields again".
 - **Sizes are named six ways** ("M (38)", "38"", "40 Size", "2XL"…). Next:
   one format on every product.
 - **Another website's word in Product Type.** 34 products show "WOMEN
@@ -161,26 +173,31 @@ product is live (checked against the code and all 504 store products,
   they cannot be filters. Next: sent as lists (needs the Filters app above).
 - **Tags.** Raw supplier words reach the store (spelling twins, mill names,
   sentence-long tags), and the limit of 8 tags can cut an occasion.
-- **Leftovers.** A value removed in Playbook stays on the store, and
-  renaming an attribute starts a new field.
+- **Leftovers.** A value, "set contents" or question removed in Playbook
+  stays on the store, and renaming an attribute starts a new field while
+  the old one stays.
 - **Collections.** A new category gets its collection only when "Set up on
   Shopify" is tapped again. Collections get no description or picture, an
   empty one stays public, and no menu link is added. Next: Playbook also
   keeps each collection's lowest price for the "from ₹…" labels.
-- **No SKU without a design code,** and the barcode repeats the SKU.
-- **Photos.** About 1 photo in 10 gets the stand-in text "<title> - view
-  9", and a listing can carry photos of another colour.
+- **No SKU without a design code.** Such a product goes out with no SKU and
+  no barcode, so an order names neither the vendor nor the design.
+- **Photos.** The AI describes the first 8 photos; the rest get the stand-in
+  text "<title> - view 9", and a photo added later gets none. A listing can
+  also carry photos of another colour.
 - **Weight.** 23 products weigh 0. Next: a usual weight per category when
   the source gives none.
-- **Edits made in Shopify are not noticed** and can be overwritten. Next: a
-  nightly check.
+- **Edits made in Shopify are not noticed.** The next send replaces the
+  title, description, prices and sizes typed there. Next: a nightly check
+  that says what differs.
 
 ### Needs your decision first
 
-- **Stock.** Every size of every product is always buyable: stock goes out
-  as 0 with "keep selling", one switch covers all sizes, and orders never
-  reach Playbook, so it does not know what sold. Decide: is everything
-  bought after the order comes, or do you hold stock?
+- **Stock.** No stock numbers are sent. A product marked In stock shows 0
+  on the store and keeps selling in every size; Out of stock makes every
+  size "Sold out". One switch covers all sizes, and orders never reach
+  Playbook, so it does not know what sold. Decide: is everything bought
+  after the order comes, or do you hold stock per size?
 - **Dispatch on each product** (after S5), and **bulk price and full sets**
   (after S10): the theme has places for them, and Playbook sends none.
 - **The store's legal fields.** HSN code, "lowest price in 30 days" and
@@ -302,20 +319,15 @@ Found in the overnight check of 19 Nov; built in the next Playbook change.
   crawler from a separate, long-established staff account, not your own
   number (Q11), and install crawler 1.2.0 on that computer. Recommended
   start: no old posts for this vendor (Q12) and one check a night (Q13).
-- **Create the Shopify app with `write_inventory`** next to the other
-  permissions: sending stock changes needs it.
-- **Connect the first store step by step (Q1, Q15, Q18).** First a
-  development store on Draft with automation paused; send one product by
-  hand and check it in Shopify. Then the real store, on "Review first" for
-  the first week of Telegram products. Switch Stock off and on once and note
-  the words your theme shows. Check the first real product and the first
-  stock notice by hand.
+- **When Telegram products start (Q1, Q18).** SuratMandi is connected and
+  on Live. Put it on "Review first" for the first week of Telegram
+  products, and check the first Telegram product and the first stock notice
+  by hand.
 - **Before the first paid order (Q2, Q6).** Written permission to use the
-  supplier's photos; the seller's legal name and address, a grievance
-  officer, return, refund, shipping and payment pages, country of origin in
-  words, and tax settings for the two GST rates on stitched garments (5% up
-  to ₹2,500 a piece, 18% above). Settle these with your accountant and
-  lawyer.
+  suppliers' photos, and tax settings for the two GST rates on stitched
+  garments (5% up to ₹2,500 a piece, 18% above). Settle these with your
+  accountant and lawyer. The seller's details and the policy pages are S2
+  and S6 above.
 
 ## Playbook — later (owner said not now)
 
