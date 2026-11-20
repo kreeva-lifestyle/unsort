@@ -40,6 +40,21 @@ test('rename: one database call inside a bulk change named after both names', as
   assert.deepEqual(calls.find(([m, p]) => m === 'PATCH' && p.startsWith('pb_bulk_runs'))[2].details, { from: 'Anarkali', to: 'Anarkali Suit', unit: 'products' }); // what the revert needs
 });
 
+test('rename and its revert: the stores\' collection follows after the database (storeCollections.ts; the calls to a store: factsStore.test.mjs)', async () => {
+  const sites = (calls) => calls.findIndex(([m, p]) => m === 'GET' && p.startsWith('pb_websites?active=eq.true&connected_at=not.is.null'));
+  const renamed = (calls) => calls.findIndex(([m, p]) => m === 'POST' && p.startsWith('rpc/pb_category_rename'));
+  let calls = world({ 'rpc/pb_category_rename': 3 });
+  await categoryRename({ from: 'Anarkali', to: 'Anarkali Suit' }, 'u1');
+  assert.ok(renamed(calls) > -1 && sites(calls) > renamed(calls), 'the database first: its refusals are the common failure');
+  assert.deepEqual(calls.find(([m, p]) => m === 'POST' && p.startsWith('pb_activity'))[2][0].details.stores, []);
+  calls = world({ 'rpc/pb_category_rename': 2 });
+  await revertCategory(RUN({ kind: 'category_rename', details: { from: 'Anarkali', to: 'Anarkali Suit' } }), 'u1');
+  assert.ok(sites(calls) > renamed(calls), 'a rename taken back takes the collection\'s name back too');
+  calls = world({ 'rpc/pb_category_rename': () => { throw new Error('refused'); } });
+  await assert.rejects(categoryRename({ from: 'Anarkali', to: 'Saree' }, 'u1'));
+  assert.equal(sites(calls), -1, 'a rename the database refused changes nothing on a store');
+});
+
 test('move: the products go, the old name leaves the list, and the AI may choose tags for every one not waiting for a category', async () => {
   const [p1, p2, p3] = [1, 2, 3].map(n => `a0000000-0000-4000-8000-00000000000${n}`);
   const moved = [

@@ -1,6 +1,6 @@
 -- "Was this product already added?" — the rules in the database, checked (pre-launch fix D21: they had no test).
 -- The real SQL is loaded by run.sh: 20261112150000_pb_duplicates.sql, 20261112170000_pb_photo_prints.sql,
--- 20261113040000_pb_stock_save.sql, 20261113120000_pb_copies.sql, 20261113130000_pb_stock_word.sql, 20261113150000_pb_gate_category_list.sql, 20261113210000_pb_tag_value_categories.sql, 20261113220000_pb_category_rename_move.sql and 20261118090000_pb_tags_auto_file.sql. Every check prints "ok …" or "FAIL …";
+-- 20261113040000_pb_stock_save.sql, 20261113120000_pb_copies.sql, 20261113130000_pb_stock_word.sql, 20261113150000_pb_gate_category_list.sql, 20261113210000_pb_tag_value_categories.sql, 20261113220000_pb_category_rename_move.sql, 20261118090000_pb_tags_auto_file.sql, 20261118120000_pb_tags_auto_select.sql and 20261120100000_pb_facts_send.sql. Every check prints "ok …" or "FAIL …";
 -- run.sh fails when a FAIL is printed. Nothing is kept: each part rolls back.
 \set ON_ERROR_STOP 1
 \pset format unaligned
@@ -178,7 +178,7 @@ select t_is('revert: the same numbers', (public.pb_bulk_revert(:R1, true) - 'lab
 -- 21 waits as a copy again; 31 is no longer a copy of anything (30 is archived): it stays archived, and carries no note
 select t_is('back as they were: waiting as copies again', (select string_agg(right(id::text, 2) || ':' || status || coalesce('>' || right(copy_of::text, 2), ''), ' ' order by id) from pb_products where id = any (array[t_id(21), t_id(23), t_id(31)])),
   '21:needs_info>20 23:new>20 31:archived');
-select t_is('a revert sends nothing to the websites either', (select count(*)::text from pb_products where route_due), '0');
+select t_is('a revert asks for no full re-send to the websites either', (select count(*)::text from pb_products where route_due), '0');
 select t_is('the run says reverted', (select status from pb_bulk_runs where id = :R1), 'reverted');
 select t_refused('a second revert is refused', format('select public.pb_bulk_revert(%L, true)', :R1));
 -- the chain, by hand: the person archives the middle one. The last one is no longer a copy of anything; its own gate lets it go when it is next saved.
@@ -520,7 +520,130 @@ select t_is('a reverted delete brings it back "only if it fits"', (select requir
 select set_config('request.jwt.claims', '{}', false);
 rollback;
 
+-- ── 14. a store follows its products by itself: which listings are marked (20261120100000_pb_facts_send.sql) ──
+-- Product 140 has a listing in every state, one per website (the listing's title says which); 141, 142 and 143 are on
+-- sale once each (p1, p2, p3). 141 carries Party (an Occasion) and is vendor A's, 142 carries Wedding and is vendor B's,
+-- 143 carries Zari (a Work) and is vendor A's; 140 carries no value and is another vendor's.
+begin;
+\set VN_A '''a1000000-0000-4000-8000-000000000141''' \set VN_B '''a1000000-0000-4000-8000-000000000142'''
+\set A_O14 '''e0000000-0000-4000-8000-000000000141''' \set V_PA '''e1000000-0000-4000-8000-000000000141''' \set V_WE '''e1000000-0000-4000-8000-000000000142'''
+\set A_W14 '''e0000000-0000-4000-8000-000000000142''' \set V_ZA '''e1000000-0000-4000-8000-000000000143''' \set V_MR '''e1000000-0000-4000-8000-000000000144'''
+\set R14 '''d9000000-0000-4000-8000-000000000141''' \set R15 '''d9000000-0000-4000-8000-000000000142'''
+insert into public.pb_settings (key, value) values ('categories', '["Saree", "Lehenga"]');
+insert into public.pb_vendors (id, name, codes) values (:VN_A, 'Vendor A', '{KB}'), (:VN_B, 'Vendor B', '{}');
+select t_product(140, :V1, 'KX 1400', 'Pink', 1) is not null, t_product(141, :VN_A, 'KX 1401', 'Blue', 2) is not null, t_product(142, :VN_B, 'KX 1402', 'Red', 3) is not null, t_product(143, :VN_A, 'KX 1403', 'Green', 4) is not null;
+update public.pb_products set category = 'Lehenga' where id in (t_id(141), t_id(142)); -- 140 and 143 stay a Saree
+insert into public.pb_attributes (id, name, key, multi, position) values (:A_O14, 'Occasion', 'occasion', true, 1), (:A_W14, 'Work', 'work', true, 2);
+insert into public.pb_attribute_values (id, attribute_id, name, key, aliases, position) values
+  (:V_PA, :A_O14, 'Party', 'party', '{}', 1), (:V_WE, :A_O14, 'Wedding', 'wedding', '{}', 2), (:V_ZA, :A_W14, 'Zari', 'zari', '{}', 1), (:V_MR, :A_W14, 'Mirror', 'mirror', '{}', 2);
+insert into public.pb_product_values (product_id, value_id, source) values (t_id(141), :V_PA, 'rules'), (t_id(142), :V_WE, 'ai'), (t_id(143), :V_ZA, 'manual');
+select count(*) from public.pb_products_refresh(array[t_id(140), t_id(141), t_id(142), t_id(143)]); -- each product's tags are its chosen values now
+insert into pb_websites (id, name, shop_domain, active) select ('e4000000-0000-4000-8000-00000000000' || i)::uuid, 'S' || i, 's' || i || '.myshopify.com', i <> 7 from generate_series(1, 7) i;
+insert into pb_listings (product_id, website_id, title, status, shopify_product_id, shopify_status)
+select t_id(x.p), ('e4000000-0000-4000-8000-00000000000' || x.w)::uuid, x.title, x.status, x.gid, x.st from (values
+  (140, 1, 'live', 'published', 'gid://1401', 'ACTIVE'), (140, 2, 'unsent', 'queued', null, null), (140, 3, 'hidden', 'skipped', 'gid://1403', 'DRAFT'),
+  (140, 4, 'archived', 'skipped', 'gid://1404', 'ARCHIVED'), (140, 5, 'aside', 'skipped', 'gid://1405', 'ACTIVE'), (140, 6, 'draft', 'published', 'gid://1406', 'DRAFT'),
+  (140, 7, 'off', 'published', 'gid://1407', 'ACTIVE'), (141, 1, 'p1', 'published', 'gid://1411', 'ACTIVE'), (142, 1, 'p2', 'published', 'gid://1421', 'ACTIVE'),
+  (143, 1, 'p3', 'published', 'gid://1431', 'ACTIVE')) x(p, w, title, status, gid, st);
+-- a person changes the category on the product page: a plain update of the product, with no server in between
+update pb_products set category = 'Lehenga' where id = t_id(140);
+select t_is('a product''s category is changed: its listing ' || x.what, (select facts_due::text from pb_listings where title = x.title), x.want) from (values
+  ('live', 'true', 'on sale on Shopify is marked'), ('unsent', 'false', 'never sent to Shopify is not'), ('hidden', 'false', 'taken off the site (hidden on Shopify) is not'),
+  ('archived', 'false', 'archived on Shopify is not'), ('aside', 'true', 'set aside in Playbook but still Active on Shopify is'), ('draft', 'true', 'sent as a draft is'),
+  ('off', 'true', 'on a website that is switched off is too (the mark waits there)')) x(title, want, what);
+select t_is('… exactly the listings pb_listing_on_sale names, and none of another product', (select string_agg(title, ', ' order by title collate "C") from pb_listings where facts_due)
+  || ' / ' || (select bool_and(facts_due = pb_listing_on_sale(status, shopify_product_id, shopify_status))::text from pb_listings where product_id = t_id(140)), 'aside, draft, live, off / true');
+-- one change, with every mark cleared first; answers the listings it marked
+create or replace function pg_temp.marks(p_sql text) returns text language plpgsql as $$
+declare r text;
+begin
+  update public.pb_listings set facts_due = false, facts_tried_at = null;
+  execute p_sql;
+  select coalesce(string_agg(l.title, ', ' order by l.title collate "C"), 'none') into r from public.pb_listings l where l.facts_due;
+  return r;
+end $$;
+select t_is('its ' || x.what || ' changes: the same four listings', pg_temp.marks('update pb_products set ' || x.set || ' where id = t_id(140)'), 'aside, draft, live, off') from (values
+  ('fabric', $$fabric = 'Cotton'$$), ('colour', $$color = 'Wine'$$), ('list of chosen values (tags)', $$tags = '{Party}'$$), ('set of read details (attributes)', $$attributes = '{"work": "Zari"}'$$),
+  ('code', $$sku = 'KX 1499'$$), ('list of sizes', $$sizes = '{M,L}'$$), ('vendor', 'vendor_id = ' || quote_literal(:V2))) x(what, set);
+select t_is(x.what || ': nothing is marked', pg_temp.marks('update pb_products set ' || x.set || ' where id = t_id(140)'), 'none') from (values
+  ('only its name changes', $$name = 'Renamed'$$), ('only its cost changes', 'cost_price = 650'), ('only its status changes', $$status = 'needs_info'$$),
+  ('it is saved again with nothing changed', 'category = category, fabric = fabric, tags = tags, sizes = sizes')) x(what, set);
+-- the mark is made with the owner's rights: a signed-in person who may not write a single listing still saves the product
+grant select, update on public.pb_products to authenticated;
+set local role authenticated;
+update public.pb_products set fabric = 'Linen' where id = public.t_id(140);
+reset role;
+select t_is('a signed-in person who may not write listings changes the product: it is saved, and its listings are marked all the same',
+  (select fabric from pb_products where id = t_id(140)) || ' / ' || (select string_agg(title, ', ' order by title collate "C") from pb_listings where facts_due), 'Linen / aside, draft, live, off');
+-- a send stamps its try (facts_tried_at) and clears the mark only where that stamp still stands; the website's button also sets facts_force
+update pb_listings set facts_due = true, facts_force = (title = 'live'), facts_tried_at = case when title = 'live' then now() end where title in ('live', 'aside');
+select ctid as aside_row from pb_listings where title = 'aside' \gset
+update pb_products set color = 'Navy' where id = t_id(140);
+select t_is('the product changes again while a send is on its way: the stamp is wiped (the mark stays for the next run), "send anyway" is kept',
+  (select facts_due::text || '/' || coalesce(facts_tried_at::text, 'no stamp') || '/' || facts_force::text from pb_listings where title = 'live'), 'true/no stamp/true');
+select t_is('a listing already marked and never tried is left as it is: not written a second time',
+  (select facts_due::text || '/' || coalesce(facts_tried_at::text, 'no stamp') || '/' || (ctid = :'aside_row'::tid)::text from pb_listings where title = 'aside'), 'true/no stamp/true');
+-- changes that reach a product through the Ready check (it rewrites the product's tags), and a bulk change that is taken back
+select t_is('a person corrects a product''s chosen value (Zari becomes Mirror; the Ready check rewrites its tags): its listing',
+  pg_temp.marks(format('select * from pb_product_values_set(t_id(143), %L, ''manual'')', jsonb_build_array(jsonb_build_object('value_id', :V_MR)))), 'p3');
+select set_config('request.jwt.claims', '{"role":"service_role"}', false);
+insert into pb_bulk_runs (id, kind, label, status) values (:R15, 'value_delete', 'Deleted the tag value Wedding', 'running');
+select set_config('request.headers', json_build_object('x-pb-bulk', :R15)::text, false);
+select t_is('a value is deleted in a bulk change: the listing of the product that carried it', pg_temp.marks(format('select public.pb_value_delete(%L)', :V_WE)), 'p2');
+select set_config('request.headers', '{}', false);
+update pb_bulk_runs set status = 'done', items = pb_bulk_products(:R15) where id = :R15;
+select t_is('… and when that change is taken back (Revert), the same listing again', pg_temp.marks(format('select public.pb_bulk_revert(%L, true)', :R15)), 'p2');
+select t_is('a category is renamed: the listings on sale of its products, and of no other', pg_temp.marks($$select public.pb_category_rename('lehenga', 'Lehenga Choli')$$), 'aside, draft, live, off, p1, p2');
+insert into pb_bulk_runs (id, kind, label, status) values (:R14, 'category_move', 'Moved the products of Lehenga Choli to Saree', 'running');
+select set_config('request.headers', json_build_object('x-pb-bulk', :R14)::text, false);
+select t_is('a category''s products are moved to another one, as a bulk change: the same listings', pg_temp.marks($$select * from public.pb_category_move('Lehenga Choli', 'saree')$$), 'aside, draft, live, off, p1, p2');
+select set_config('request.headers', '{}', false);
+select t_is('… the log keeps the 3 products it moved and not one row about a listing (a mark is not part of the change)',
+  (select count(distinct pk ->> 'id') filter (where tbl = 'pb_products') || ' products, ' || count(*) filter (where tbl = 'pb_listings') || ' listing rows' from pb_bulk_items where run_id = :R14), '3 products, 0 listing rows');
+select set_config('request.jwt.claims', '{}', false);
+-- the tag lists and the vendor: no product row changes, yet the store shows them (tags, custom fields)
+select t_is(x.what, pg_temp.marks(format('update %s set %s where id = %L', x.tbl, x.set, x.id)), x.want) from (values
+  ('an attribute is renamed: the products that carry one of its values, and no other', 'pb_attributes', $$name = 'Event'$$, :A_O14, 'p1, p2'),
+  ('… its Shopify prefix changes', 'pb_attributes', $$shopify_prefix = 'Occasion'$$, :A_O14, 'p1, p2'),
+  ('… it takes one value instead of several', 'pb_attributes', 'multi = false', :A_O14, 'p1, p2'),
+  ('… its key changes', 'pb_attributes', $$key = 'event'$$, :A_O14, 'p1, p2'),
+  ('… its values now depend on the category', 'pb_attributes', 'by_category = true', :A_O14, 'p1, p2'),
+  ('a value is renamed: only the products that carry it', 'pb_attribute_values', $$name = 'Party Wear'$$, :V_PA, 'p1'),
+  ('… the categories it is offered for change', 'pb_attribute_values', $$categories = '{Saree}'$$, :V_PA, 'p1'),
+  ('… a new "also known as" word on it marks nothing', 'pb_attribute_values', $$aliases = '{evening}'$$, :V_PA, 'none'),
+  ('a vendor is renamed: only that vendor''s products', 'pb_vendors', $$name = 'Vendor A Fashion'$$, :VN_A, 'p1, p3'),
+  ('a vendor''s short names change: only that vendor''s products', 'pb_vendors', $$codes = '{NB}'$$, :VN_B, 'p2')) x(what, tbl, set, id, want);
+rollback;
+
+-- ── 14b. the worker wakes for a listing that is owed (the line 20261120100000 adds to trigger_pb_worker) ──
+-- The wake-up check also reads Supabase's vault and makes its web call, and reads a column the minimal tables lack:
+-- stand-ins for the three, rolled back with this part. "wakes" = the call is made.
+begin;
+select t_is('the wake-up check carries the new line', (position('facts_due' in pg_get_functiondef('public.trigger_pb_worker()'::regprocedure)) > 0)::text, 'true');
+create schema if not exists vault; create table if not exists vault.decrypted_secrets (name text, decrypted_secret text); insert into vault.decrypted_secrets values ('pb_worker_secret', 'stand-in');
+create schema if not exists net; create or replace function net.http_post(url text, headers jsonb, body jsonb, timeout_milliseconds int) returns bigint language sql as $$ select 1::bigint $$;
+alter table public.pb_import_runs add column if not exists claimed_at timestamptz;
+create or replace function pg_temp.worker() returns text language sql as $$ select case when public.trigger_pb_worker() is null then 'sleeps' else 'wakes' end $$;
+select t_product(145, :V1, 'KX 1450', 'Pink', 1) is not null;
+insert into pb_websites (id, name, shop_domain, active) values ('e4000000-0000-4000-8000-000000000001', 'On', 'on.myshopify.com', true), ('e4000000-0000-4000-8000-000000000002', 'Off', 'off.myshopify.com', false);
+insert into pb_listings (product_id, website_id, title, status, shopify_product_id, shopify_status) values
+  (t_id(145), 'e4000000-0000-4000-8000-000000000001', 'on', 'published', 'gid://1451', 'ACTIVE'), (t_id(145), 'e4000000-0000-4000-8000-000000000002', 'off', 'published', 'gid://1452', 'ACTIVE');
+select t_is('nothing is owed: the worker sleeps', pg_temp.worker(), 'sleeps');
+update pb_products set category = 'Lehenga' where id = t_id(145);
+select t_is('a product on sale changes: the worker wakes', pg_temp.worker(), 'wakes');
+update pb_listings set facts_due = false where title = 'on';
+select t_is('… not for a listing whose website is switched off (its mark waits)', pg_temp.worker() || '/' || (select facts_due::text from pb_listings where title = 'off'), 'sleeps/true');
+update pb_listings set facts_due = true, facts_tried_at = now() - interval '4 minutes' where title = 'on';
+select t_is('… not while its last try is under 5 minutes old', pg_temp.worker(), 'sleeps');
+update pb_listings set facts_tried_at = now() - interval '6 minutes' where title = 'on';
+select t_is('… again once that try is 5 minutes old', pg_temp.worker(), 'wakes');
+insert into pb_settings (key, value) values ('automation', '{"paused": true}');
+select t_is('… and not while automation is paused', pg_temp.worker(), 'sleeps');
+update pb_listings set stock_due = true where title = 'off';
+select t_is('… (a stock change still wakes it then, as before)', pg_temp.worker(), 'wakes');
+rollback;
+
 -- Every check above printed a line: a part that silently printed nothing would be a failure too.
-select case when last_value = 231 then 'ok   every check ran (231)' else 'FAIL the number of checks is ' || last_value || ', not 231: a part printed fewer lines than it has, or this number was not updated' end from public.t_checks;
+select case when last_value = 277 then 'ok   every check ran (277)' else 'FAIL the number of checks is ' || last_value || ', not 277: a part printed fewer lines than it has, or this number was not updated' end from public.t_checks;
 drop function public.t_refused(text, text); drop function public.t_is(text, text, text); drop function public.t_rel(uuid, uuid); drop function public.t_product(int, uuid, text, text, int, numeric, text); drop function public.t_id(int);
 drop sequence public.t_checks;

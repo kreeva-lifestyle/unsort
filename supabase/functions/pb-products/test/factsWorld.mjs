@@ -1,7 +1,7 @@
 // A fake Supabase and a fake Shopify for the small send of a product's type, tags and custom fields (factsSend.ts,
 // storeCollections.ts, factsSite.ts) and for a full publish of the same listing (publish.ts). Not a test: shared by
 // factsSend.test.mjs, factsStore.test.mjs and publishFacts.test.mjs.
-// The listing filters the send relies on are applied for real (facts_due, the stamp facts_tried_at, tags locked), and
+// The listing filters the send relies on are applied for real (facts_due, the stamp facts_tried_at, tags locked, no note), and
 // `w.onUpdate` runs while the store is being updated, so a test can change the product "meanwhile" as the database
 // trigger would (pb_facts_follow wipes the stamp).
 globalThis.Deno = { env: { get: (k) => (k === 'SUPABASE_URL' ? 'https://sb.example' : 'test') } };
@@ -19,6 +19,7 @@ function passes(l, path) {
   const untried = /or=\(facts_tried_at\.is\.null,facts_tried_at\.lt\.([^)]+)\)/.exec(q);
   if (untried && l.facts_tried_at && !(l.facts_tried_at < untried[1])) return false;
   if (q.includes('locked=not.cs.{tags}') && (l.locked || []).includes('tags')) return false;
+  if (/(^|&)error=is\.null/.test(q) && l.error) return false;
   return true;
 }
 

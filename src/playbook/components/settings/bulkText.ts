@@ -1,6 +1,8 @@
 // The words of the bulk-change log (Settings → Bulk changes): what a row
 // counts, what a revert would do (from the server's counts, before anyone
-// confirms) and what it did. Pure: no I/O.
+// confirms) and what it did. Pure: no I/O. Since 20 Nov 2026 a revert that
+// changes a product's category, tags or facts reaches the websites the product
+// is on by itself (FOLLOW), as the change itself did.
 import type { BulkCounts, PbBulkRun } from '../../data/bulk';
 import { count } from '../../format';
 
@@ -26,6 +28,8 @@ const TAG_CONFIRM: Partial<Record<Kind, string>> = {
   value_delete: 'Bring the value back', attribute_delete: 'Bring the attribute back', value_merge: 'Separate them again', categories: 'Put the list back',
   category_links: 'Put the must-have tags back', suggestions: 'Put the words back', retag: 'Put the tags back', tag_fill: 'Take the AI tags off',
 };
+/** After a revert of a category, tag or facts change: the stores follow by themselves (pb-products factsSend.ts). */
+const FOLLOW = 'On the websites these products are already on, the category, tags and fields follow by themselves within a few minutes.';
 const busy = (k: number, what: string) => `${what} ${s(k, 'is', 'are')} being worked on right now. Tap Revert again in a few minutes for ${s(k, 'it', 'them')}.`;
 
 /** What a revert would do now, in plain sentences. `todo` = 0: nothing is left to take back. */
@@ -81,20 +85,20 @@ export function plan(run: Pick<PbBulkRun, 'kind' | 'details'>, c: BulkCounts): P
     add(tin + tout, `The tags of ${n(v('products'), 'product')} go back to how they were: ${[tin ? `${n(tin, 'tag')} put back` : '', tout ? `${n(tout, 'tag')} taken off` : ''].filter(Boolean).join(', ')}.`);
     add(v('kept'), `${n(v('kept'), 'product')} had ${s(v('kept'), 'its', 'their')} tags set by hand since and ${s(v('kept'), 'stays as it is', 'stay as they are')}.`);
     add(v('left'), `${n(v('left'), 'tag')} ${s(v('left'), 'stays', 'stay')} off: the product has another value for that by now, or was edited by hand since.`);
-    note = 'Every product it reached is checked again: one missing a must-have tag goes to Needs info, one with all of them goes to Ready and is matched to the websites as usual. The revert itself sends nothing to a store.';
+    note = `Every product it reached is checked again: one missing a must-have tag goes to Needs info, one with all of them goes to Ready and is matched to the websites as usual. ${FOLLOW}`;
     confirm = TAG_CONFIRM[run.kind] || 'Revert';
   } else if (run.kind === 'category_move' || run.kind === 'category_rename') {
     const from = String(run.details?.from ?? 'the old category'), to = String(run.details?.to ?? 'the new one');
     if (run.kind === 'category_rename') {
       todo = 1;
       add(1, `${to} is renamed back to ${from}: in the category list, its must-have tags, its products, the Product Type ticks and the website rules.`);
-      note = `Refused if ${to} is gone from the list, or ${from} is back on it.`;
+      note = `Your websites follow by themselves: the category’s collection is named ${from} again, and the products there get that product type back within a few minutes. Refused if ${to} is gone from the list, or ${from} is back on it.`;
       confirm = `Rename it back to ${from}`;
     } else {
       todo = v('restored');
       add(todo, `${n(todo, 'product')} ${s(todo, 'goes', 'go')} back to ${from}.`);
       add(v('changed'), `${n(v('changed'), 'product')} ${s(v('changed'), 'was moved again or had its category set by hand since and stays', 'were moved again or had their category set by hand since and stay')} as ${s(v('changed'), 'it is', 'they are')}.`);
-      note = `They are checked again and their tags worked out again by the word rules. If ${from} is no longer on the list they wait with "Missing: Category". Tags the AI chose after the move are their own entry here (Let AI decide).`;
+      note = `They are checked again and their tags worked out again by the word rules. If ${from} is no longer on the list they wait with "Missing: Category". Tags the AI chose after the move are their own entry here (Let AI decide). ${FOLLOW}`;
       confirm = `Move ${n(todo, 'product')} back`;
     }
   } else if (run.kind === 'stock_notice') {
@@ -111,7 +115,7 @@ export function plan(run: Pick<PbBulkRun, 'kind' | 'details'>, c: BulkCounts): P
     add(todo, `${n(todo, 'product')} ${s(todo, 'gets', 'get')} back what ${s(todo, 'it', 'they')} said before: name, colour, work, pattern, set contents and wash care (${n(v('fields'), 'field')}).`);
     add(cut, `The old notes of ${n(cut, 'product')} were only kept up to their first 200 letters, so those notes stay as they are now.`);
     add(v('changed'), `${n(v('changed'), 'product')} ${s(v('changed'), 'was edited since and stays as it is', 'were edited since and stay as they are')}.`);
-    note = 'The tags Playbook reads off the text are worked out again for these products.';
+    note = `The tags Playbook reads off the text are worked out again for these products. ${FOLLOW}`;
     confirm = `Put back ${n(todo, 'product')}`;
   }
   add(v('gone'), `${n(v('gone'), unit)} no longer ${s(v('gone'), 'exists', 'exist')}.`);

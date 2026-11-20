@@ -7,6 +7,7 @@ import { logSwallowed } from '../../lib/errorLogger';
 import { PB_BUCKET, type PbListingStatus, type PbProduct, type PbProductImage, type PbProductStatus, type PbWebsite } from '../types';
 import { LISTING_COLS, logPbActivity as logActivity, type ListingFull } from './listings';
 import { plainError } from './plainError';
+import { normalizeSizes } from './sizes';
 export type { ListingFull } from './listings';
 
 export const PAGE_SIZE = 25;
@@ -69,12 +70,12 @@ export async function getProduct(id: string): Promise<ProductDetail> {
   return data as unknown as ProductDetail;
 }
 
-/** Save facts staff typed; every field named in `changed` joins `locked` so the AI reader keeps it.
+/** Save facts staff typed; every field named in `changed` joins `locked` so the AI reader keeps it. Sizes are saved in the one house format (sizes.ts).
  *  Refused while the AI reader holds the product (it would overwrite what was typed with what it read);
  *  a status change only applies while the product is still in `p.status`. */
 export async function updateProduct(p: Pick<PbProduct, 'id' | 'locked' | 'status'>, patch: Partial<PbProduct>, changed: string[]) {
   const locked = Array.from(new Set([...p.locked, ...changed.filter(c => c !== 'status' && c !== 'vendor_id')]));
-  let q = supabase.from('pb_products').update({ ...patch, locked }).eq('id', p.id).neq('status', 'reading');
+  let q = supabase.from('pb_products').update({ ...patch, ...(patch.sizes ? { sizes: normalizeSizes(patch.sizes) } : null), locked }).eq('id', p.id).neq('status', 'reading');
   if (patch.status) q = q.eq('status', p.status);
   const { data, error } = await q.select('id');
   if (error) throw error;
@@ -127,8 +128,9 @@ export type NewProduct = { vendor_id: string | null; cost_price: number | null; 
  *  `id` is fixed per Add form, so a retry after a partial failure finishes the same product instead of making a second one.
  *  Once the row exists this never throws: a later failure comes back as `photoError` / `releaseError`. */
 export async function createProduct(id: string, p: NewProduct, files: File[]): Promise<{ id: string; photoError?: unknown; releaseError?: unknown }> {
-  const locked = [p.cost_price != null && 'cost_price', p.sku && 'sku', p.category && 'category', p.sizes.length && 'sizes'].filter(Boolean) as string[];
-  const fields = { vendor_id: p.vendor_id, cost_price: p.cost_price, sku: p.sku || null, raw_text: p.raw_text || null, category: p.category || null, sizes: p.sizes, locked };
+  const sizes = normalizeSizes(p.sizes); // the one house format (sizes.ts), as at every other write of sizes
+  const locked = [p.cost_price != null && 'cost_price', p.sku && 'sku', p.category && 'category', sizes.length && 'sizes'].filter(Boolean) as string[];
+  const fields = { vendor_id: p.vendor_id, cost_price: p.cost_price, sku: p.sku || null, raw_text: p.raw_text || null, category: p.category || null, sizes, locked };
   const { error } = await supabase.from('pb_products').insert({ id, source: 'manual', ...fields, status: files.length ? 'needs_info' : 'new' });
   let retry = false;
   if (error) {

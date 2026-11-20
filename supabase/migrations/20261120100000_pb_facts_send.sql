@@ -37,25 +37,27 @@ create index if not exists pb_listings_facts_due_idx on public.pb_listings (fact
 
 -- One function for the four tables. It runs with the owner's rights: the product page writes pb_products as the
 -- signed-in person, and the mark must reach the listing whatever that person may change there. It cannot be called
--- on its own (a trigger function), and it writes nothing but the mark.
+-- on its own (a trigger function), and it writes nothing but the mark. No search path, every table named in full
+-- (as the other Playbook functions that run with the owner's rights): a session's own temporary table of the same
+-- name can never take the mark.
 create or replace function public.pb_facts_follow() returns trigger
-language plpgsql security definer set search_path = public as $$
+language plpgsql security definer set search_path = '' as $$
 declare ids uuid[];
 begin
   if tg_table_name = 'pb_products' then
     ids := array[new.id];
   elsif tg_table_name = 'pb_vendors' then
-    select array_agg(p.id) into ids from pb_products p where p.vendor_id = new.id;
+    select array_agg(p.id) into ids from public.pb_products p where p.vendor_id = new.id;
   elsif tg_table_name = 'pb_attribute_values' then
-    select array_agg(distinct pv.product_id) into ids from pb_product_values pv where pv.value_id = new.id;
+    select array_agg(distinct pv.product_id) into ids from public.pb_product_values pv where pv.value_id = new.id;
   else -- pb_attributes
     select array_agg(distinct pv.product_id) into ids
-    from pb_product_values pv join pb_attribute_values v on v.id = pv.value_id where v.attribute_id = new.id;
+    from public.pb_product_values pv join public.pb_attribute_values v on v.id = pv.value_id where v.attribute_id = new.id;
   end if;
   if ids is null then return null; end if;
   -- On sale on Shopify, by the rule pb_stock_save uses: it has a Shopify product that was not hidden or archived
   -- there. A listing already marked and never tried is left as it is (no second write for the same change).
-  update pb_listings l set facts_due = true, facts_tried_at = null
+  update public.pb_listings l set facts_due = true, facts_tried_at = null
   where l.product_id = any(ids) and l.shopify_product_id is not null
     and not (l.status = 'skipped' and coalesce(l.shopify_status, '') in ('DRAFT', 'ARCHIVED'))
     and (not l.facts_due or l.facts_tried_at is not null);

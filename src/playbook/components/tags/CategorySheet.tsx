@@ -6,7 +6,8 @@
 // "12 products will need a Colour" → Link and let AI decide (the sheet's one
 // gradient: links, then queues those products for the AI) / Link only /
 // Cancel. Rename at the top (everywhere: products, links, Product Type ticks,
-// website rules); removing the category from the list lives at the bottom, and
+// website rules; the stores follow by themselves: the collection takes the new
+// name and the products there the new product type); removing the category from the list lives at the bottom, and
 // with products in it first asks where they go (CategoryMoveBox). An attribute
 // whose values depend on the category (Product Type) says how many of its values
 // are ticked for this category — none means its products cannot be finished.
@@ -21,7 +22,7 @@ import PbModal from '../product/PbModal';
 import { PbButton, PbConfirm } from '../ui';
 import { Dot } from '../product/status';
 import CategoryMoveBox from './CategoryMoveBox';
-import { plural } from './tagText';
+import { plural, renamedSaid } from './tagText';
 
 /** `categories`: the list (where products can move); `products`: how many are filed under this category now. */
 export default function CategorySheet({ category, categories, products, attrs, links, stats, api, addToast, onClose, onChanged, onRemove, canEdit }: {
@@ -83,8 +84,8 @@ export default function CategorySheet({ category, categories, products, attrs, l
     if (!nm || nm === category || busy) return;
     setBusy('rename');
     try {
-      const r = await api.renameCategory(category, nm);
-      addToast(`Renamed ${category} to ${nm}${r.renamed ? ` — ${plural(r.renamed, 'product')} follow` : ''}`, 'success'); onChanged(); onClose();
+      const said = renamedSaid(category, nm, await api.renameCategory(category, nm)); // names a website whose collection kept its old name
+      addToast(said.text, said.type); onChanged(); onClose();
     } catch (e) { addToast(friendlyError(e), 'error'); } finally { setBusy(''); }
   };
   const remove = async () => {
@@ -104,7 +105,7 @@ export default function CategorySheet({ category, categories, products, attrs, l
                 onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void rename(); } }} className="pb-input" style={{ ...pbInput, minWidth: 0 }} />
               <PbButton icon="edit" onClick={() => void rename()} disabled={!nm || nm === category} busy={busy === 'rename'} busyLabel="Renaming…" dim={!!busy && busy !== 'rename'} style={{ flexShrink: 0 }}>Rename</PbButton>
             </div>
-            <span id="pbc-name-hint" style={pbMeta}>A new name follows everywhere: its products, the tags it needs, Product Type ticks and website rules.</span>
+            <span id="pbc-name-hint" style={{ ...pbBody, color: PB.tx2 }}>A new name follows everywhere: its products, the tags it needs, Product Type ticks and website rules. On your websites its collection takes the new name by itself, and the products already there get the new product type within a few minutes.</span>
           </div>
         )}
         <p style={{ ...pbBody, color: PB.tx2, margin: 0 }}>Every product in {category} needs a value for each must-have attribute here before it can go to websites; one marked “only if it fits” is filled only when a value truly fits. Playbook fills them by itself: from the text first, then the AI.</p>

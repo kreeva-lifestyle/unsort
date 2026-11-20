@@ -14,7 +14,8 @@
 //   * a collection is never left behind: before a product's type changes, the collection it falls into is made if
 //     the store files by type and lacks it (storeCollections.ts);
 //   * a website that is switched off is sent nothing and a pause holds it (worker.ts); the marks wait. A send that
-//     fails stays owed and is tried again 5 minutes later; only its first failure is written to the timeline.
+//     fails stays owed and is tried again 5 minutes later; only its first failure is written to the timeline, and
+//     the listing says so in its note (FACTS_NOTE) until a send goes through, so the failure is seen in the app.
 // Each try is stamped (facts_tried_at). A change of the product while the try is on its way wipes the stamp (the
 // trigger), and the mark is cleared only where the stamp still stands: the newer change is never lost.
 // A full publish sends the same facts (publish.ts) and records them, but never clears the mark: the next run here
@@ -31,6 +32,11 @@ import { type ColCache, ensureCollection } from './storeCollections.ts';
 import { LISTING_COLS, PRODUCT_COLS, STALE_MS, WEBSITE_COLS, type ListingRow, type ProductRow, type WebsiteRow } from './types.ts';
 
 const RETRY_MS = 5 * 60_000, AT_ONCE = 3, PAGE = 30;
+/** The start of a listing's note while its facts could not be sent (only ever put on a listing with no other note). */
+export const FACTS_NOTE = 'Its category, tags and custom fields could not be sent to Shopify yet, and Playbook tries again every 5 minutes: ';
+/** The listing's note after a send: a field the store did not take, or nothing. A note that is not this file's own
+ *  (a publish's warning, a person's reason) is left as it is. */
+const noteAfter = (l: ListingRow, notes: string[]) => (!l.error || l.error.startsWith(FACTS_NOTE) ? { error: notes.join(' ') || null } : {});
 const READ = 'query PbFactsRead($id: ID!) { product(id: $id) { id tags } }';
 const UPDATE = `mutation PbFacts($product: ProductUpdateInput!) {
   productUpdate(product: $product) { product { id } userErrors { field message } }
@@ -66,7 +72,7 @@ export async function sendFacts(l: ListingRow, userId: string | null, cols: ColC
   const id = l.shopify_product_id;
   try {
     const now = await listingFacts(l, p, site), was = l.sent ?? null;
-    if (!l.facts_force && sameFacts(now, was)) { await patch('pb_listings', mine, clear); return 'done'; } // the store has them already
+    if (!l.facts_force && sameFacts(now, was)) { await patch('pb_listings', mine, { ...clear, ...(l.error?.startsWith(FACTS_NOTE) ? { error: null } : {}) }); return 'done'; } // the store has them already
     const old = String(was?.type ?? l.product_type ?? '');
     await ensureCollection(site, now.type, old, cols, ms);
     const d = await gql<{ product: { id: string; tags: string[] } | null }>(site, READ, { id }, ms);
@@ -78,7 +84,7 @@ export async function sendFacts(l: ListingRow, userId: string | null, cols: ColC
     const cleared = now.fields ? emptied(now, was) : [];
     const notes = now.fields ? [await sendFields(site, fieldInputs(id, p, [], now.attrs), ms), await dropFields(site, id, cleared, ms)].filter((x): x is string => !!x) : [];
     // What the store has now goes on record whatever happened meanwhile; the mark goes only if nothing did.
-    const row = { sent: sentOf(now, was), ...(now.type ? { product_type: now.type } : {}) };
+    const row = { sent: sentOf(now, was), ...(now.type ? { product_type: now.type } : {}), ...noteAfter(l, notes) };
     const done = (await patch('pb_listings', mine, { ...clear, ...row })).length > 0;
     if (!done) await patch('pb_listings', `id=eq.${enc(l.id)}`, row);
     // The listing shows the tags the store has; tags a person typed meanwhile are theirs.
@@ -92,6 +98,8 @@ export async function sendFacts(l: ListingRow, userId: string | null, cols: ColC
     // The stamp stays, so it is tried again in 5 minutes: only the first failure in a row goes on the timeline.
     if (!l.facts_tried_at) await logActivity({ ...who, action: 'failed', details: { step: 'facts', error: plain(e) } }).catch(w => console.error(`pb-products facts log ${l.id}: ${plain(w)}`));
     else console.error(`pb-products facts ${l.id}: ${plain(e)}`);
+    // Seen on the listing too, unless it already carries a note of its own. Shopify only being busy is not worth one.
+    if (!l.error && !temporary(e)) await patch('pb_listings', `${due}&error=is.null`, { error: `${FACTS_NOTE}${plain(e)}`.slice(0, 900) }).catch(w => console.error(`pb-products facts note ${l.id}: ${plain(w)}`));
     return temporary(e) ? 'busy' : 'failed';
   }
 }

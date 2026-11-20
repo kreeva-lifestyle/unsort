@@ -3,6 +3,7 @@
 // products, and for a category no longer on the list that still has products (CategoriesTile). The server moves them,
 // takes the old name off the list when `remove`, and queues "Let AI decide" for the ones missing a tag the new category
 // needs (Product Type…): the word rules first, then the AI. Settings → Bulk changes moves them back for 7 days.
+// The moved products that are on a website follow there by themselves (20 Nov 2026): the new product type, so the other collection.
 // The box's one gradient: Move. `onRemoveOnly`: removing without moving (they wait with "Missing: Category").
 import { useState } from 'react';
 import { friendlyError } from '../../../lib/friendlyError';
@@ -28,7 +29,7 @@ export default function CategoryMoveBox({ from, count, categories, remove, api, 
     try {
       const r = await api.moveCategory(from, to, remove);
       addToast([`Moved ${plural(r.moved, 'product')} to ${to}`, r.to_ready ? `${r.to_ready} ready` : '', r.queued ? `AI is choosing the missing tags for ${plural(r.queued, 'product')}` : '',
-        r.removed ? `${from} removed from the list` : ''].filter(Boolean).join(' · '), 'success');
+        r.removed ? `${from} removed from the list` : ''].filter(Boolean).join(' · ') + (r.moved ? `. The ones on a website move to the ${to} collection there by themselves within a few minutes` : ''), 'success');
       onDone();
     } catch (e) { addToast(friendlyError(e), 'error'); } finally { setBusy(''); }
   };
@@ -38,7 +39,7 @@ export default function CategoryMoveBox({ from, count, categories, remove, api, 
       <Dot color={PB.review} label={<span id={`${id}-t`}>{plural(count, 'product')} {count === 1 ? 'is' : 'are'} filed under {from}</span>} style={{ color: PB.tx, fontWeight: 600, fontSize: 13, whiteSpace: 'normal' }} />
       <span style={pbBody}>
         Move them to another category. There the word rules, then the AI, choose the tags that category needs and they lack (Product Type…).
-        {remove ? ` Then ${from} leaves the list.` : ''} Settings → Bulk changes can move them back for 7 days.
+        {remove ? ` Then ${from} leaves the list.` : ''} The ones already on a website move to that category’s collection there by themselves. Settings → Bulk changes can move them back for 7 days.
       </span>
       <label htmlFor={id} className="pb-sr">Move them to</label>
       <select id={id} value={to} onChange={e => setTo(e.target.value)} disabled={!!busy} className="pb-input" style={{ ...pbInput, minWidth: 0 }}>

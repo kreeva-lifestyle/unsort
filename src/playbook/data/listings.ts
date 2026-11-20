@@ -26,6 +26,15 @@ export const logPbActivity = (row: { product_id: string; action: string; listing
 export const listingBusy = (l: Pick<ListingFull, 'status' | 'claimed_at'>) =>
   l.status === 'generating' || (l.status === 'publishing' && !!l.claimed_at && Date.parse(l.claimed_at) > Date.now() - STALE_MS);
 
+/** On sale on Shopify (the twin of the server's offSale, stockSend.ts): sent there, and not hidden or archived there since. */
+export const onStore = (l: Pick<ListingFull, 'shopify_product_id' | 'status' | 'shopify_status'>) =>
+  !!l.shopify_product_id && !(l.status === 'skipped' && ['DRAFT', 'ARCHIVED'].includes(l.shopify_status || ''));
+/** A "Saved" toast after the category, tags or facts changed on a product that is on sale on `n` websites that are switched on:
+ *  `said`, then that the stores follow by themselves (pb-products factsSend.ts; the database marks the listings). The written
+ *  title and description do not follow. Never promise less than "a few minutes". */
+export const withFollow = (said: string, n: number) =>
+  (n > 0 ? `${said.replace(/\.$/, '')}. On its ${n === 1 ? 'website' : `${n} websites`} the category, tags and fields follow by themselves within a few minutes` : said);
+
 const emptyValue = (v: unknown) => v === null || v === undefined || v === '' || (Array.isArray(v) && !v.length);
 
 /** Save hand edits. A field given a value joins `locked` so Regenerate keeps it; a field emptied leaves `locked`,

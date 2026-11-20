@@ -8,6 +8,7 @@ create function public.app_is_staff() returns boolean language sql stable as $$ 
 create table public.profiles (id uuid primary key default gen_random_uuid(), full_name text);
 create function public.pb_touch() returns trigger language plpgsql as $$ begin new.updated_at := now(); return new; end $$;
 create table public.pb_websites (id uuid primary key default gen_random_uuid(), name text not null, shop_domain text not null, active boolean not null default true, tag_rules jsonb not null default '{}', content jsonb not null default '{}', pricing jsonb not null default '{}');
+create table public.pb_vendors (id uuid primary key default gen_random_uuid(), name text not null, codes text[] not null default '{}', updated_at timestamptz not null default now()); -- only what the "store follows its products" trigger reads (20261120100000_pb_facts_send.sql)
 create table public.pb_products (
   id uuid primary key default gen_random_uuid(), vendor_id uuid, source text not null default 'manual', source_ref text, raw_text text, sku text, name text, category text, fabric text, color text,
   sizes text[] not null default '{}', cost_price numeric, attributes jsonb not null default '{}', status text not null default 'new', locked text[] not null default '{}',

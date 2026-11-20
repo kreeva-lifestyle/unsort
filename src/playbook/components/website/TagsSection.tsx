@@ -3,14 +3,18 @@
 // written (plain "Black" or prefixed "Colour_Black"), fixed tags, letter case,
 // AI extras and the per-product cap — with an example built from a sample
 // product. Layout: (Templates 12) / (Tag style 6)(Letter case 6) /
-// (Fixed tags 6)(AI extra 6) / (Example 6)(Cap 6); pairs stack on phone.
+// (Fixed tags 6)(AI extra 6) / (Example 6)(Cap 6) / (Products already on this
+// website 12: "Send tags and fields again", sections/ResendTile.tsx — the saved
+// rules for every product already on the store); pairs stack on phone.
 import PbSwitch from '../ui/PbSwitch';
 import type { PbTagRules } from '../../types';
 import { DEFAULT_MAX_TAGS, buildTags, valueTags, type ChosenTag, type TagFacts } from './tagPreview';
 import { PB, pbMeta } from '../../pbTheme';
+import type { AddToast } from '../PbToasts';
 import { PbTag } from '../ui';
 import { ChipsInput, Field, NumInput, Section, Seg } from './ui';
 import { Cell, SectionGrid } from './sections/SectionGrid';
+import ResendTile from './sections/ResendTile';
 import type { Draft, SetDraft } from './WebsiteEditor';
 
 const PLACEHOLDERS: [string, string][] = [
@@ -33,7 +37,7 @@ function example(r: PbTagRules): string[] {
   return r.ai_extra && r.ai_extra_max > 0 ? [...tags, AI_MARK] : tags;
 }
 
-export default function TagsSection({ draft, set }: { draft: Draft; set: SetDraft }) {
+export default function TagsSection({ siteId, dirty, draft, set, addToast }: { siteId: string; dirty: boolean; draft: Draft; set: SetDraft; addToast: AddToast }) {
   const r = draft.tag_rules;
   const put = (x: Partial<PbTagRules>) => set({ tag_rules: { ...r, ...x } });
   const tags = example(r);
@@ -120,6 +124,8 @@ export default function TagsSection({ draft, set }: { draft: Draft; set: SetDraf
           </div>
         </Section>
       </Cell>
+      {/* Custom fields are sent unless Store profile switches them off (the server's default too). */}
+      <Cell><ResendTile siteId={siteId} name={draft.name} fields={draft.content.profile?.custom_fields !== false} dirty={dirty} addToast={addToast} /></Cell>
     </SectionGrid>
   );
 }

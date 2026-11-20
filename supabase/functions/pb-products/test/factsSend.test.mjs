@@ -114,10 +114,18 @@ test('Shopify refuses this product: it stays owed for a try in 5 minutes, and on
   assert.deepEqual(w.activity.map(a => [a.action, a.details.step]), [['failed', 'facts']]);
   assert.match(w.activity[0].details.error, /Kreeva: Shopify said "Tags is invalid"/);
   assert.equal(w.listing.sent.type, 'Saree', 'the record still says what the store has');
+  assert.match(w.listing.error, /^Its category, tags and custom fields could not be sent to Shopify yet.*Tags is invalid/, 'seen on the listing, not only on the timeline');
   assert.equal(await send(w), 'wait', 'another run finds the fresh stamp and leaves it');
   w.listing.facts_tried_at = new Date(Date.now() - 6 * 60_000).toISOString();
   assert.equal(await send(w), 'failed');
   assert.equal(w.activity.length, 1, 'the second failure in a row is not written again');
+  // Once Shopify takes it, the note goes; a note that is not about this send is never touched.
+  w.refuse = null; w.listing.facts_tried_at = null;
+  assert.equal(await send(w), 'done');
+  assert.equal(w.listing.error, null);
+  const noted = world({ refuse: 'Tags is invalid', listing: { error: 'Stock tracking is on for this website.' } });
+  await send(noted);
+  assert.equal(noted.listing.error, 'Stock tracking is on for this website.');
 });
 
 test('the worker\'s step: every due listing, and a store that cannot answer is left for the next run', async () => {

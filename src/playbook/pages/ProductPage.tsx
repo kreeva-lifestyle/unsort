@@ -17,6 +17,7 @@ import DupTile from '../components/product/detail/DupTile';
 import { logSwallowed } from '../../lib/errorLogger';
 import type { PbAiCost } from '../seoTypes';
 import { getProduct, setProductStatus, type ProductDetail, type VendorLite, type WebsiteLite } from '../data/products';
+import { onStore } from '../data/listings';
 import ProductFacts from '../components/product/ProductFacts';
 import ProductListings from '../components/product/ProductListings';
 import { Dot, PRODUCT_STATUS } from '../components/product/status';
@@ -124,9 +125,11 @@ export default function ProductPage({ id, onClose, onChanged, onOpenOther, onDel
   };
   // The page's one gradient: Edit on the first listing waiting for approval, else Save facts.
   const waiting = p.pb_listings.some(l => l.status === 'review'), owed = p.pb_listings.filter(l => l.stock_due).length;
+  // On sale on a website that is switched on: there its category, tags and fields follow a change by themselves (an archived product's do not).
+  const onSites = p.status === 'archived' ? 0 : p.pb_listings.filter(l => onStore(l) && sites.some(s => s.id === l.website_id && s.active)).length;
   const facts = (
     <ProductFacts key={p.id} product={p} vendors={vendors} categories={categories} onVendorCreated={onVendorCreated}
-      onSaved={refresh} addToast={addToast} primary={!waiting} />
+      onSaved={refresh} addToast={addToast} primary={!waiting} onSites={onSites} />
   );
   const heldAs = dups.find(m => m.product_id === p.id && m.kind === 'held');
   const copyOf = heldAs ? dupName(heldAs) : undefined;
