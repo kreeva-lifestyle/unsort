@@ -21,14 +21,18 @@ shopper has seen any of this. The theme is also kept in the private
   version of the theme: the home page shows your real categories and price
   bands, product pages show the description and questions, and the sample
   reviews, sample products and "Ships today" labels are gone. It is not
-  live yet. Say yes and Claude publishes it.
+  live yet. Say yes and Claude publishes it. Whoever works in the
+  `suratmandi-theme` repository must take these 13 changed files in first,
+  or a later upload from there can undo them.
 - **S2 · Contact and legal details.** Every page's footer still shows
   blanks ("+91 98XXX XXXXX", "[Legal name]", "GSTIN [24XXX…]", "Grievance
   officer: [Name]"), and every WhatsApp button opens a number that does not
   exist. Give: WhatsApp number, support email, short address, support
   hours, registered name and address, GSTIN, grievance officer's name and
   email. Shopify holds two different street addresses: say which is the
-  registered one.
+  registered one. Each product's legal details also print this name as
+  "Manufacturer": if you do not make the product, say so and Claude changes
+  the word (for example "Marketed by").
 - **S3 · Delivery charge.** Shopify charges ₹379 on every order (one rate,
   named in Hindi). The site says "free shipping above ₹999, otherwise ₹79".
   Decide: free, one flat charge, or free above an amount. Claude sets the
@@ -37,21 +41,22 @@ shopper has seen any of this. The theme is also kept in the private
   ₹10,000" with a "₹49 fee" and a WhatsApp confirmation. Payment settings
   cannot be read from outside. Say: is COD on, any limit, is a fee really
   charged (Shopify needs an app for that), do you confirm on WhatsApp.
-- **S5 · Dispatch and delivery time.** The old theme said "Ships today",
-  "Ready stock in 24 hours" and showed delivery dates; your Playbook store
-  profile says "Ships in 5 to 7 days". The saved version shows no dispatch
-  promise at all. Give the real dispatch days (one for all, or by product)
-  and the courier days. Claude puts them in the theme, the listings and the
-  shipping policy.
+- **S5 · Dispatch and delivery time.** Every product said "Ships today" and
+  showed delivery dates, while your Playbook store profile says "Ships in
+  5 to 7 days". The saved version takes both off the products; the footer
+  still says "Ready stock in 24 hours". Give the real dispatch days (one
+  for all, or by product) and the courier days. Claude puts them in the
+  theme, the listings and the shipping policy.
 - **S6 · Exchange and returns.** "7-day exchange" is promised on every page
   and in about 300 listings, but the store has no returns, shipping or
   terms policy: those three footer links open "page not found". Give the
   rule (how many days, exchange or refund, who pays the courier, what is
   excluded). Claude writes the policies and matches the site to them.
 - **S7 · "Made in our Surat unit", "factory price", "every piece checked by
-  hand".** These lines are on every page and in about 140 listings, while the
-  products come from other sellers' websites. Say what is true for every
-  product; Claude rewords the rest, on the site and in Playbook's writer.
+  hand".** These lines are on every page and in about 140 listings, while
+  every product so far was imported from other websites. Say what is true
+  for every product; Claude rewords the rest, on the site and in Playbook's
+  writer.
 - **S8 · Best Price Promise** ("Found it cheaper? We refund the
   difference"). It is on every page; its terms page holds only a writing
   instruction. Say yes with terms (which websites, how to claim, how it is
@@ -78,8 +83,9 @@ shopper has seen any of this. The theme is also kept in the private
 - **S14 · About page.** It reads "[Write your factory story here.]". Give
   the story, a photo and real numbers, or Claude hides the page.
 - **S15 · Kids Wear and Men's Kurta.** Both category pages exist and are
-  empty. Selling these at launch? If not, Claude hides them until the first
-  product arrives.
+  empty (the saved version leaves them out of the category list). Selling
+  these at launch? If not, Claude hides them until the first product
+  arrives.
 - **S16 · Small choices.** Product pages show the supplier's design code as
   "SKU" (keep or hide?). The name is written three ways (SuratMandi,
   suratmandi, Surat Mandi). The footer says "Powered by Shopify" and the
@@ -87,15 +93,21 @@ shopper has seen any of this. The theme is also kept in the private
 
 ### Only you can do
 
-- **Payments.** Shopify → Settings → Payments: check the online gateway and
-  Cash on Delivery, then place one test order of each kind.
+- **Payments and one test order.** Nobody has opened the checkout yet.
+  Shopify → Settings → Payments: the gateway must be live (not in test, KYC
+  done) and Cash on Delivery set as you want. Settings → Checkout: make the
+  phone number required (couriers need it). Then, on your phone, place one
+  prepaid and one COD order from the menu to the "thank you" page, and tell
+  Claude: it reads the order's delivery charge, tax and GSTIN, and the
+  emails the shopper gets.
 - **Filters.** Install Shopify's free "Search & Discovery" app. Category
   pages offer only Availability and Price today; with it Claude adds size,
   colour and fabric.
-- **Reviews.** The site shows no reviews now (the samples are removed).
-  Install a reviews app after the first orders.
-- **Courier and tracking.** No courier app is installed, and "Track order"
-  is only a sign-in button.
+- **Reviews.** The saved version shows no reviews (the samples are
+  removed). Install a reviews app after the first orders.
+- **Courier and tracking.** No courier is chosen: get its list of pincodes
+  (prepaid and COD) and its rates. "Track order" is only a sign-in button
+  until a courier app sends tracking.
 - **A mailbox on your domain.** Store emails are sent from a personal Gmail
   address, and the privacy policy names it.
 - **₹ sign.** Prices print "Rs." beside the theme's "₹". Shopify → Settings
@@ -139,6 +151,11 @@ shopper has seen any of this. The theme is also kept in the private
 - **Details on the product page** lack Colour, Type and "In the set",
   though Playbook sends them.
 - **Category pages** have no description, picture or search text.
+- **Still to check.** Product photos for a supplier's logo, watermark or
+  phone number; page speed; how the site reads for weak eyesight; what
+  search engines will list on opening day; tablet screens. The phone menu,
+  cart and filter panels were read from the code, never tapped: your test
+  order covers them.
 
 ## Playbook → SuratMandi: gaps to fill
 
@@ -170,7 +187,8 @@ product is live (checked against the code and all 504 store products,
 - **Pre-draped sarees filed under Saree** (7 products), so Pre-Stitched
   Saree shows only 5.
 - **Work and Occasion go as one line of text** ("Festival, Wedding"), so
-  they cannot be filters. Next: sent as lists (needs the Filters app above).
+  they cannot be filters. The store's own two fields are text fields.
+  Next: Claude makes them list fields; Playbook then sends lists by itself.
 - **Tags.** Raw supplier words reach the store (spelling twins, mill names,
   sentence-long tags), and the limit of 8 tags can cut an occasion.
 - **Leftovers.** A value, "set contents" or question removed in Playbook
@@ -200,10 +218,11 @@ product is live (checked against the code and all 504 store products,
   after the order comes, or do you hold stock per size?
 - **Dispatch on each product** (after S5), and **bulk price and full sets**
   (after S10): the theme has places for them, and Playbook sends none.
-- **The store's legal fields.** HSN code, "lowest price in 30 days" and
-  "sold in 30 days" stay empty on every product. Generic name (the
-  category) and country of origin (India) are printed by the theme itself.
-  Say whether Playbook should send them as real values.
+- **Generic name and country of origin.** Each product's legal details
+  print the category as its generic name and "India" as its country: the
+  theme's own stand-ins, the same on every product. Say if that is right
+  for all, or Playbook should send them per product. (HSN is under
+  "later".)
 - **Listing promises.** About 500 search descriptions say "Ships in 5 to 7
   days" and about 300 "exchange within 7 days"; some say "stitched to
   measure", "Swarovski" or "100% pure". They come from the store profile
@@ -211,8 +230,9 @@ product is live (checked against the code and all 504 store products,
   words and the listings are written again.
 - **Where products are sold.** Only the Online Store. Say if the Shop app,
   Google or Instagram should get them too.
-- **Supplier tag.** Once vendor short names are entered, products get a
-  public tag such as "Vendor_KB". Keep it or drop it?
+- **Supplier tag.** Once vendor short names are entered, every new or
+  rewritten listing gets a public tag such as "Vendor_KB". Keep it or drop
+  it?
 
 ## Playbook — decisions the owner still has to make
 
