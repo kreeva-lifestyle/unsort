@@ -32,7 +32,7 @@ function parseSize(text: unknown): Parsed | null {
   // 38" / 38'' / 38in / 40Size: the number and its unit word apart. Letters glued to a number otherwise ("S20", "M38",
   // "KB302") are left alone: that is a code, not a shape this knows.
   const words = t.replace(/(\d)\s*(?:"|'')/g, '$1 inch ').replace(/(\d)(?=(?:in|inch|inches|size)\b)/gi, '$1 ').replace(/\b(size)(?=\d)/gi, '$1 ')
-    .split(/[\s()[\],/:;|\-\u2013\u2014_.+&]+/).filter(Boolean);
+    .split(/[\s()[\],/:;|\-\u2013\u2014_.]+/).filter(Boolean); // "+" and "&" stay: "XL+" is not "XL"
   const joined: string[] = [];
   for (let i = 0; i < words.length; i++) { // "2 XL" is the one word "2XL"
     if (/^[2-6]$/.test(words[i]) && /^xl$/i.test(words[i + 1] || '')) { joined.push(words[i] + words[i + 1]); i++; } else joined.push(words[i]);
@@ -48,10 +48,10 @@ function parseSize(text: unknown): Parsed | null {
   return letter ? { kind: 'letter', letter, n } : n !== null ? { kind: 'number', letter: '', n } : null;
 }
 
-/** One label in the house format; a shape it does not know comes back as it is (spaces tidied). */
+/** One label in the house format; a shape it does not know comes back as it is written (spaces tidied). */
 export function normalizeSize(text: unknown): string {
   const p = parseSize(text);
-  if (!p) return tidy(text);
+  if (!p) return String(text ?? '').replace(/\s+/g, ' ').trim(); // as written: "5½ Mtr" stays "5½ Mtr"
   if (p.kind === 'free') return 'Free Size';
   if (p.kind === 'letter') return p.n === null ? p.letter : `${p.letter} (${p.n})`;
   return String(p.n);
@@ -68,7 +68,7 @@ export function sizeKeys(text: unknown): [string, string] {
 
 const rank = (label: string): [number, number] => {
   const p = parseSize(label);
-  if (!p) return [3, 0];
+  if (!p) return /^\d{1,3}$/.test(label) ? [1, Number(label)] : [3, 0]; // a bare number outside 20..60 ("16", "62") sorts with the numbers
   return p.kind === 'letter' ? [0, LETTERS.indexOf(p.letter) * 100 + (p.n ?? 0)] : p.kind === 'number' ? [1, p.n as number] : [2, 0];
 };
 

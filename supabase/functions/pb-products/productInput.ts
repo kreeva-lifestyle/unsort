@@ -98,6 +98,12 @@ export function buildProductInput(a: { l: ListingRow; p: ProductRow; site: Websi
   const pair = (exact: (name: string) => string | undefined, store: [string, string][]): (string | undefined)[] => {
     const ids = values.map(exact);
     if (!sizes.length) return ids;
+    // The same size written another way: a store label whose house form IS this size ("XXXL" for "3XL", "38\"" for "38").
+    values.forEach((n, i) => {
+      if (ids[i]) return;
+      const used = new Set(ids.filter(Boolean));
+      ids[i] = store.find(([label, id]) => label && !used.has(id) && (normalizeSizes([label])[0] || '').toLowerCase() === n.toLowerCase())?.[1];
+    });
     const one = <T,>(list: T[], is: (x: T) => boolean) => list.filter(is).length === 1;
     for (const k of [0, 1] as const) {
       const used = new Set(ids.filter(Boolean));
@@ -113,9 +119,13 @@ export function buildProductInput(a: { l: ListingRow; p: ProductRow; site: Websi
     (oldOpt?.values || []).map((v): [string, string] => [v.name, v.id]));
   const weight = weightOf(p.attributes?.weight), cost = Number(p.cost_price) > 0 ? Number(p.cost_price).toFixed(2) : null;
   const newBarcodes = apiVersion(site) >= '2026-10'; // `barcodes` replaced the single `barcode` field
+  // The size in each code: its letter ("M (38)" → "M"); where two sizes share a letter ("S (28)" and "S (30)", "M" and
+  // "M (38)"), the measured one keeps its number, so no two sizes of one product share a code.
+  const cores = values.map(n => (sizeCore(n) || n).replace(/\s+/g, ''));
+  const tailOf = (name: string, i: number) => (name !== sizeCore(name) && cores.filter(c => c.toLowerCase() === cores[i].toLowerCase()).length > 1 ? name.replace(/[()\s]+/g, '') : cores[i]);
   const variant = (name: string, i: number) => {
     const id = variantIds[i];
-    const code = sku ? (sizes.length ? `${sku}${join}${(sizeCore(name) || name).replace(/\s+/g, '')}` : sku) : '';
+    const code = sku ? (sizes.length ? `${sku}${join}${tailOf(name, i)}` : sku) : '';
     const stock = tracked ? (id ? null : { policy: 'DENY', tracked: true }) : { policy: inStock ? 'CONTINUE' : 'DENY', tracked: true };
     return {
       ...(id ? { id } : {}), ...(stock ? { inventoryPolicy: stock.policy } : {}),

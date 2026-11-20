@@ -121,7 +121,7 @@ export const repricedMessage = (r: RepriceResult) =>
 
 /** "Send tags and fields again" (pb-products factsSite.ts): every product of this website that is on Shopify is sent its product type,
  *  tags and custom fields as Playbook has them now. `dry`: only count them, nothing changes (`active` false = the website is switched off). */
-export type ResendResult = { listings: number; active?: boolean };
+export type ResendResult = { listings: number; active?: boolean; paused?: boolean };
 export const resendWebsite = (websiteId: string, dry = false) => pbCall<ResendResult>('resend_website', { website_id: websiteId, ...(dry ? { dry: true } : {}) });
 /** How long the re-send takes: the server sends 30 to 100 products a minute, so about a minute or two for each hundred. */
 export function resendTime(n: number): string {
@@ -131,8 +131,9 @@ export function resendTime(n: number): string {
   const h = Math.max(1, Math.round(lo / 60));
   return `about ${h} to ${Math.max(Math.round(lo / 30), h + 1)} hours`;
 }
-export const resentMessage = (n: number) =>
-  `${n.toLocaleString('en-IN')} product${n === 1 ? ' is' : 's are'} being sent ${n === 1 ? 'its' : 'their'} tags and fields again — ${resendTime(n)}`;
+export const resentMessage = (n: number, paused = false) => (paused
+  ? `${n.toLocaleString('en-IN')} product${n === 1 ? ' is' : 's are'} marked to be sent ${n === 1 ? 'its' : 'their'} tags and fields again. Automation is paused, so ${n === 1 ? 'it goes' : 'they go'} out when you switch it on again (Settings), or tap Run one round now`
+  : `${n.toLocaleString('en-IN')} product${n === 1 ? ' is' : 's are'} being sent ${n === 1 ? 'its' : 'their'} tags and fields again — ${resendTime(n)}`);
 
 // ── routing rules ──
 const RULE_COLS = 'id,website_id,position,name,enabled,action,conditions,price_override,created_at,updated_at';

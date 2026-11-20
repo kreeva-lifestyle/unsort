@@ -138,7 +138,7 @@ export function done(kind: Kind, c: BulkCounts | null): string {
       v('suggestions') ? `${n(v('suggestions'), 'new word')} as before` : '', v('kept') ? `${count(v('kept'))} edited by hand left as ${s(v('kept'), 'it is', 'they are')}` : ''].filter(Boolean));
     if (!parts.length) parts.push('Nothing was left to put back');
   } else if (kind === 'stock_notice') parts.push(`Put back the stock of ${n(v('restored'), 'product')}`, ...(v('back') ? [`${n(v('back'), 'listing')} back on ${s(v('back'), 'its website', 'their websites')}`] : []), ...(v('changed') ? [`${count(v('changed'))} changed since left as ${s(v('changed'), 'it is', 'they are')}`] : []));
-  else if (kind === 'category_rename') parts.push('Renamed it back');
+  else if (kind === 'category_rename') parts.push('Renamed it back', ...(v('stores_failed') ? [`on ${n(v('stores_failed'), 'website')} the collection is not renamed back yet: Playbook does it when it sends the first product`] : []));
   else if (kind === 'category_move') parts.push(`Moved ${n(v('restored'), 'product')} back`, ...(v('changed') ? [`${count(v('changed'))} changed since left as ${s(v('changed'), 'it is', 'they are')}`] : []));
   else if (kind === 'copies') parts.push(`Put back ${n(v('restored'), 'copy', 'copies')}`, ...(v('not_copies') ? [`${count(v('not_copies'))} no longer ${s(v('not_copies'), 'a copy', 'copies')}, left in Archived`] : []), ...(v('changed') ? [`${count(v('changed'))} changed since left as ${s(v('changed'), 'it is', 'they are')}`] : []));
   else parts.push(`Put back ${n(v('restored'), 'product')}`, ...(v('changed') ? [`${count(v('changed'))} edited since left as ${s(v('changed'), 'it is', 'they are')}`] : []));

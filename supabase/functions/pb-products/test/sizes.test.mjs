@@ -53,3 +53,17 @@ test('what two labels of one size share, for giving a renamed size its Shopify v
   assert.deepEqual(sizeKeys('M'), ['m', '']);
   assert.deepEqual(sizeKeys('Custom Stitch (hand)'), ['custom stitch', '']);
 });
+
+// Code check of 20 Nov 2026 (sizes reviewer): a shape it does not know comes back exactly as written, and bare numbers
+// outside 20..60 sort with the other numbers instead of after Free Size.
+test('a shape it does not know comes back as written: no fraction or quote is changed, "+" and "&" are part of the size', () => {
+  for (const l of ['5½ Mtr', '2½ Years', '38½', 'Kid’s 2-3Y', 'XL+', 'M+', '40+', 'M & L']) assert.equal(normalizeSize(l), l, l);
+  assert.deepEqual(normalizeSizes(['XL', 'XL+']), ['XL', 'XL+'], 'two sizes stay two');
+});
+
+test('a scale of bare numbers keeps its order, wherever it crosses 20 or 60', () => {
+  assert.deepEqual(normalizeSizes(['16', '18', '20', '22', '24', '26']), ['16', '18', '20', '22', '24', '26']);
+  assert.deepEqual(normalizeSizes(['6', '8', '10', '12', '14', '16', '18', '20', '22']), ['6', '8', '10', '12', '14', '16', '18', '20', '22']);
+  assert.deepEqual(normalizeSizes(['58"', '60"', '62', '64']), ['58', '60', '62', '64']);
+  assert.deepEqual(normalizeSizes(['Free Size', '18', '20']), ['18', '20', 'Free Size']);
+});

@@ -5,8 +5,9 @@
 //   * ensureCollection — before a product on the store is given another product type (factsSend.ts): when the store
 //     files by type (it has a collection for the old type) and has none for the new one, that collection is made
 //     first, exactly as store setup makes it — or, when the old name is gone from Playbook (a rename the store missed:
-//     it failed then, or its website was off), the old collection takes the new name as a rename gives it. A product
-//     is never re-typed out of a collection into none;
+//     it failed then, or its website was off), the old collection takes the new name as a rename gives it; and a
+//     collection still titled after a name that is gone (a rename taken back that the store missed) takes the title of
+//     the type it files. A product is never re-typed out of a collection into none;
 //   * renameCollections — a renamed category keeps its collection: the same page, address and menu links, under the
 //     new name. It is given a second rule for the new product type and keeps the old one, so it holds the category's
 //     products the whole time they are re-typed one by one, and a rename taken back only changes the title again.
@@ -79,7 +80,24 @@ export function ensureCollection(site: WebsiteRow, type: string, was: string, ca
   const mine = (turns.get(key) ?? Promise.resolve()).then(async () => {
     let have = cache.get(key);
     if (!have) { have = await listCollections(site, ms); cache.set(key, have); }
-    if (sameCollection(have, type)) return;
+    const found = sameCollection(have, type);
+    if (found) {
+      // It files this type but is still titled after the name being left (a rename taken back that the store missed):
+      // once that name is gone from Playbook, this very collection takes the title of the type it files. Only the
+      // title: the product files there already, so a failure here never holds the product back.
+      const t = found.title.trim().toLowerCase();
+      if (was && t === was.trim().toLowerCase() && t !== type.trim().toLowerCase()) {
+        try {
+          if (await nameGone(was)) {
+            const r = await gql<{ collectionUpdate: { userErrors: { message: string }[] } | null }>(site, COL_UPDATE, { c: { id: found.id, title: type } }, ms);
+            const ue = r.collectionUpdate?.userErrors || [];
+            if (ue.length) console.error(`pb-products collection title ${site.name}: ${ue.map(e => e.message).join('; ')}`);
+            else found.title = type;
+          }
+        } catch (e) { console.error(`pb-products collection title ${site.name}: ${plain(e)}`); }
+      }
+      return;
+    }
     if (!was || !sameCollection(have, was)) return; // this store does not file that type in a collection: nothing to keep whole
     // Asked again right before one is made: this run's list can be minutes old, and a rename may have given the old
     // collection this very name meanwhile (code check, 20 Nov 2026: a second collection of the same name).
