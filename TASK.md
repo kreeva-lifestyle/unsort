@@ -29,14 +29,14 @@ shopper has seen any of this. The theme is also kept in the private
   address (Shopify holds two different street addresses: say which),
   GSTIN, and the grievance officer's name and email.
 - **S6 · Policies copied from ethnicvilla.com.** You asked for this on
-  20 Nov. Claude could not open that website: this workspace's network
-  list does not allow it. Either add ethnicvilla.com under "Allowed
-  domains" in the cloud environment's network settings, or paste the
-  policy text into the chat. Claude then writes the shipping, exchange and
-  returns, terms and privacy policies for SuratMandi from it and makes the
-  site's promises ("7-day exchange" on every page and in about 300
-  listings) say the same. Until then those three footer links open "page
-  not found".
+  20 Nov. Claude could not open that website (this workspace's network
+  list does not allow it), so on 21 Nov Claude gave you a prompt for
+  another AI that can browse: it writes the shipping, exchange and
+  returns, terms, privacy and contact policies in Shopify, with
+  ethnicvilla.com only as a model. Paste its report to Claude, who then
+  makes the site's promises ("7-day exchange" on every page and in about
+  300 listings) say the same. Until then those three footer links open
+  "page not found".
 - **S9 · Offers FLAT150, FIRST10, SET5 and PREPAID.** They showed on every
   product and in the cart with "Tap to apply", but the store has no
   discounts. Claude switched them off on 20 Nov. Say which are real; Claude
@@ -63,7 +63,8 @@ shopper has seen any of this. The theme is also kept in the private
 - **S12 · GST line on product pages.** They print "Inclusive of all taxes
   (18% GST)" above ₹2,500 and "(5% GST)" up to ₹2,500, worked out from the
   price alone. Confirm with your accountant, or Claude prints only
-  "Inclusive of all taxes".
+  "Inclusive of all taxes". Also ask whether GST applies to the ₹70
+  delivery charge: Shopify adds none to it today.
 - **S13 · Size guide.** The page shows sample numbers in brackets. Give real
   bust, waist and hip per size, or say that sizes differ by supplier. (See
   also "Sizes: with or without inches" further down.)
@@ -83,6 +84,14 @@ shopper has seen any of this. The theme is also kept in the private
 
 ### Only you can do
 
+The settings prompt Claude gave you on 21 Nov lets another AI do most of
+these with you in the Shopify admin. Paste its report to Claude.
+
+- **New e-commerce rules from 1 Jan 2027** (the government's change of
+  9 Sep 2026). Every online shop must take part in the National Consumer
+  Helpline's "convergence" programme, and a price cut must show the
+  lowest price of the 30 days before (see Q5). Ask your lawyer what
+  SuratMandi needs; Claude changes the site to match.
 - **Payments and one test order.** Nobody has opened the checkout yet.
   Shopify → Settings → Payments: the gateway must be live (not in test, KYC
   done) and Cash on Delivery set as you want. Settings → Checkout: make the
