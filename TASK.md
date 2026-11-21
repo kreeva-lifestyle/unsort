@@ -37,20 +37,26 @@ shopper has seen any of this. The theme is also kept in the private
   site's promises ("7-day exchange" on every page and in about 300
   listings) say the same. Until then those three footer links open "page
   not found".
-- **S8 · Best Price Promise** ("Found it cheaper? We refund the
-  difference"). It is on every page; its terms page holds only a writing
-  instruction. Say yes with terms (which websites, how to claim, how it is
-  paid), or no and Claude removes every mention.
 - **S9 · Offers FLAT150, FIRST10, SET5 and PREPAID.** They showed on every
   product and in the cart with "Tap to apply", but the store has no
   discounts. Claude switched them off on 20 Nov. Say which are real; Claude
   creates the discounts and shows only those. (Money off for paying online
   needs an app.)
-- **S10 · Wholesale.** The site says "cheaper at 4+ pieces", "GST invoice in
-  your business name", "plain packing", "dispatch in 24 hours" and "we
-  reply within 2 working hours", and the cart asks for a GSTIN. Nothing in
-  the store lowers a price at 4 pieces. Say whether this website sells
-  wholesale and the rule; otherwise Claude removes the wholesale parts.
+- **S10 · Wholesale and the bulk price.** Nothing lowers a price at 4
+  pieces today: no product has a bulk price, the store has no discount, and
+  checkout charges the normal price. Yet the site says "prices drop
+  automatically at 4 pieces of the same design" (home page and FAQ) and
+  "every design gets cheaper at 4+ pieces" (home and every category page),
+  plus "GST invoice in your business name", "plain packing", "dispatch in 24
+  hours" and "we reply within 2 working hours". Pick one: (a) any 4 pieces
+  in the cart get X% off: Shopify's own free discount, works today; (b) 4 or
+  more of one design, sizes mixed, at a bulk price per design: needs a paid
+  volume-discount app, and Playbook then fills that price (each colour is
+  its own product, so colours do not add up); (c) a private code for
+  resellers (for example BULK10) that your team sends on WhatsApp: free,
+  works today; (d) bulk rates only on WhatsApp: Claude changes the words to
+  "ask on WhatsApp for the bulk rate". Until you choose, the words stay as
+  they are.
 - **S11 · Telegram and WhatsApp channels for shoppers.** The site invited
   them to "new designs daily at 11 am" with no link; the saved version
   hides it. Give the links if the channels exist.
@@ -91,9 +97,16 @@ shopper has seen any of this. The theme is also kept in the private
   cash. Install a payment-rules app from the Shopify App Store (search
   "hide payment methods") and set: hide Cash on Delivery when the free
   delivery rate is chosen. Tell Claude when it is in.
-- **Filters.** Install Shopify's free "Search & Discovery" app. Category
-  pages offer only Availability and Price today; with it Claude adds size,
-  colour and fabric.
+- **Filters.** Category pages offer only Availability and Price, because
+  Shopify sets filters only in its free "Search & Discovery" app (no other
+  way). Install it from the Shopify App Store, then in the app: Filters →
+  Add filter, in this order: Product Type, Colour, Size, Price, Fabric,
+  Availability (Product Type, Colour and Fabric are product fields Playbook
+  fills; pick those, not Shopify's own "Product type"). In Colour, group
+  look-alike names (Wine with Maroon) so the list stays short. Work and
+  Occasion come later (see "Work and Occasion as filters" below). The filter panel is
+  ready for them since 20 Nov (long lists show 8 and "Show more"). Tell
+  Claude when it is in; Claude checks it on a phone.
 - **Reviews.** The saved version shows no reviews (the samples are
   removed). Install a reviews app after the first orders.
 - **Courier and tracking.** No courier is chosen: get its list of pincodes
@@ -112,14 +125,9 @@ shopper has seen any of this. The theme is also kept in the private
 
 ### Claude fixes next on the store (no answer needed)
 
-- **Phone filters.** After ticking a filter or typing a price in the filter
-  panel, the page stops scrolling (read from the code; to be tested on a
-  phone). Search results on a phone cannot be filtered or sorted.
 - **Cart.** A GSTIN typed in the cart is wiped by any cart change. A code
   that does not exist is shown as "saved". A double tap on the bin can
   remove two items, and on "+ Add" can add two.
-- **Wishlist and "Recently viewed".** Their product cards stay faded, as if
-  still loading.
 - **Weak connection.** A size change that fails keeps the earlier size in
   the cart, and most failed taps show no message.
 - **Choosing a size.** The first size is picked for the shopper, and "+ Add"
@@ -133,11 +141,9 @@ shopper has seen any of this. The theme is also kept in the private
 - **Enquiry form.** It can be sent with "[name]" and "[city]" unfilled, and
   its smallest quantity is 20.
 - **Small bugs.** Clearing the search box leaves an empty list. The cart
-  icon on the cart page opens the cart over itself. Page 2 of a category
-  loads without moving up. The home banner may not swipe on phones. Saved
-  hearts look unsaved after filtering. Dispatch dates come out a day early
-  on Sunday mornings (matters only if products get their own dispatch
-  day).
+  icon on the cart page opens the cart over itself. The home banner may not
+  swipe on phones. Dispatch dates come out a day early on Sunday mornings
+  (matters only if products get their own dispatch day).
 - **Policy pages** have no spacing; phone and email are not tappable (after
   S2).
 - **Details on the product page** lack Colour, Type and "In the set",
@@ -157,8 +163,12 @@ product is live (checked against the code and all 504 store products,
 
 ### Claude builds next (no answer needed)
 
-- **Another website's word in Product Type.** 34 products show "WOMEN
+- **Another website's word in Product Type.** 37 products show "WOMEN
   FASHION". Next: a real type or nothing.
+- **Work and Occasion as filters.** They reach the store as one line
+  ("Digital Print, Lace, Khatli Work"), so a store filter would list every
+  combination (52 for Work, 97 for Occasion) instead of 8 works and 12
+  occasions. Next: send them as lists, then add the two filters.
 - **Titles.** They use the category name ("…Suits & Dresses"), stack
   occasion words, and different designs can share one title. Next: see
   "Suits & Dresses" under follow-ups.
