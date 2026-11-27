@@ -162,6 +162,7 @@ would look like.
 - Must use `createPortal(..., document.body)` to render at root
 - Must toggle `document.body.classList.toggle('modal-open', isOpen)` in useEffect for scroll lock
 - Must reset ALL form state on close (form fields, error state, editing ID)
+- A tap on the dark area outside must NOT close a pop-up in which something is typed or chosen and only kept by a button inside it (a form, a reason box, a tick list, a file import) — owner, 2026-11-27: a stray tap on a phone threw the typing away. Such an overlay has no click-to-close; when it opens over another pop-up give it `onClick={e => e.stopPropagation()}` so the tap does not reach the one behind. ×, Cancel and the device's Back (`useBackClose`) close it. Views, pickers that act on a tap, confirm dialogs, menus and image zooms may still close on an outside tap
 - Error display: inline red box above buttons (`background: rgba(239,68,68,.08)`, `border: 1px solid rgba(239,68,68,.2)`, `borderRadius: 6`, `padding: 8px 10px`, `fontSize: 11`, `color: T.re`)
 - On mobile (the `.modal-inner` rule in index.css): modals become bottom sheets (position:fixed, bottom:0, slideUp animation)
 
@@ -231,7 +232,7 @@ would look like.
 5. On mobile, does it fit within 393px (iPhone 15 Pro)?
 6. Are all interactive elements at least 44px touch target?
 7. Does the modal use createPortal + modal-inner + body scroll-lock?
-8. Does the form have error display + double-submit prevention + Enter key submission?
+8. Does the form have error display + double-submit prevention + Enter key submission, and does it stay open on a tap outside it?
 9. Are number inputs using numericKeyDown to block alphabets?
 10. Is the search icon 14x14, stroke T.tx3, positioned correctly?
 

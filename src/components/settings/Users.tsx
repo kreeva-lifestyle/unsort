@@ -259,7 +259,7 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
           </form>
         )}
       </div></div>, document.body)}
-      {resetResult && createPortal(<div style={S.modalOverlay} onClick={() => setResetResult(null)}><div className="modal-inner" style={{ ...S.modalBox, maxWidth: 360, padding: '20px 18px' }} onClick={e => e.stopPropagation()}>
+      {resetResult && createPortal(<div style={S.modalOverlay}><div className="modal-inner" style={{ ...S.modalBox, maxWidth: 360, padding: '20px 18px' }} onClick={e => e.stopPropagation()}>
         <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>Password Reset</div>
         <div style={{ fontSize: 11, color: T.tx3, marginBottom: 12 }}>New password for <strong style={{ color: T.tx }}>{resetResult.name}</strong>. Share this with the user:</div>
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, padding: 12, marginBottom: 12 }}>

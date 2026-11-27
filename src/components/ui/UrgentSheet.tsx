@@ -2,12 +2,15 @@
 // sheet for all three modules; the save is the set_urgent RPC (role and
 // "still live" checks, audit row). Opens over the record's own detail, so
 // the parent renders it OUTSIDE its overlay (React events bubble through
-// portals — a tap in here must not close the detail behind it).
+// portals — a tap in here must not close the detail behind it). A tap
+// outside does not close it (the reason typed would be lost); ×, Cancel and
+// the device's Back do.
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
 import { useModalLock } from '../../hooks/useModalLock';
+import { useBackClose } from '../../hooks/useBackClose';
 import DateInput from './DateInput';
 import { setUrgent } from '../../lib/urgency';
 import type { Urgent, UrgentModule } from '../../types/urgency';
@@ -24,6 +27,7 @@ export default function UrgentSheet({ module, id, title, row, onClose, onSaved, 
   addToast: (m: string, t?: string) => void;
 }) {
   useModalLock();
+  useBackClose(true, onClose);
   const [reason, setReason] = useState(row.urgent_reason ?? '');
   const [by, setBy] = useState(row.urgent_by ?? '');
   const [busy, setBusy] = useState<'' | 'save' | 'clear'>('');

@@ -56,7 +56,7 @@ export default function InventoryExtras() {
   const [editForm, setEditForm] = useState({ sku: '', size: '', location: '', manufacturer: '', notes: '' });
   // Add form
   const resetAddForm = () => { setFProductId(''); setFComponentId(''); setFSku(''); setFSize(''); setFLocation(''); setFManufacturer(''); setFQty('1'); setFNotes(''); };
-  // Every way out of the Add sheet (Cancel, backdrop, back gesture) clears
+  // Every way out of the Add sheet (×, Cancel, back gesture) clears
   // the half-typed form so the next open starts clean.
   const closeAdd = () => { setShowAdd(false); setError(''); resetAddForm(); };
   const [fProductId, setFProductId] = useState('');
@@ -446,8 +446,8 @@ export default function InventoryExtras() {
       {/* Add Spare Part Modal */}
       {showAdd && createPortal(<div style={overlay}>
         <div className="modal-inner" style={modal} onClick={e => e.stopPropagation()}>
-          <div style={{ padding: '13px 18px', borderBottom: `1px solid ${T.bd}` }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>Add Spare Part</span>
+          <div style={{ padding: '13px 18px', borderBottom: `1px solid ${T.bd}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>Add Spare Part</span><button type="button" onClick={closeAdd} style={S.modalClose} aria-label="Close">&#215;</button>
           </div>
           <form onSubmit={e => { e.preventDefault(); addExtra(); }} style={{ padding: 16 }}>
             <div style={{ marginBottom: 10 }}>
