@@ -9,11 +9,22 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
+import { logSwallowed } from '../../lib/errorLogger';
 import { numericKeyDown } from '../../lib/numericInput';
 import type { POVendor } from '../../types/database';
 
 type Picked = { id: string | null; name: string; phone: string };
 type VendorRow = Pick<POVendor, 'id' | 'name' | 'phone'>;
+
+/** The one saved vendor with exactly this name (any letter case), or null — a name typed in full but not tapped still finds its contact. */
+export async function vendorNamed(name: string): Promise<Picked | null> {
+  const { data, error } = await supabase.from('po_vendors').select('id, name, phone')
+    .eq('is_active', true).ilike('name', name.trim().replace(/[\\%_]/g, '\\$&')).limit(2);
+  // No match, two contacts of that name, or a failed look-up: the form asks for the vendor to be picked or added.
+  if (error) { logSwallowed('PO vendor by name', error); return null; }
+  const rows = (data as VendorRow[] | null) ?? [];
+  return rows.length === 1 ? { id: rows[0].id, name: rows[0].name, phone: rows[0].phone || '' } : null;
+}
 
 export default function VendorPicker({ value, onPick, addToast, disabled, addSignal }: {
   value: string;
@@ -32,6 +43,15 @@ export default function VendorPicker({ value, onPick, addToast, disabled, addSig
   const [newPhone, setNewPhone] = useState('');
   const [saving, setSaving] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
+  const nameRef = useRef<HTMLInputElement>(null), phoneRef = useRef<HTMLInputElement>(null);
+  // Which box of "Add new vendor" takes the cursor when it shows — once per opening, never when the list is merely reopened.
+  const focusNext = useRef<'name' | 'phone' | null>(null);
+  const openAdd = (name: string) => { setAdding(true); setNewName(name); setNewPhone(''); focusNext.current = name ? 'phone' : 'name'; };
+  useEffect(() => {
+    if (!adding || !open || !focusNext.current) return;
+    (focusNext.current === 'phone' ? phoneRef : nameRef).current?.focus();
+    focusNext.current = null;
+  }, [adding, open]);
 
   useEffect(() => { setQ(value); }, [value]);
 
@@ -48,8 +68,8 @@ export default function VendorPicker({ value, onPick, addToast, disabled, addSig
   useEffect(() => {
     if (!addSignal || !q.trim()) return;
     search(q); setOpen(true);
-    // Already open (a second refused save): what was typed in it stays.
-    if (!adding) { setAdding(true); setNewName(q.trim()); setNewPhone(''); }
+    // Already open for this name (a second refused save): what was typed in it stays.
+    if (!adding) openAdd(q.trim());
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only when the form asks
   }, [addSignal]);
 
@@ -62,6 +82,7 @@ export default function VendorPicker({ value, onPick, addToast, disabled, addSig
   const pick = (v: VendorRow) => {
     onPick({ id: v.id, name: v.name, phone: v.phone || '' });
     setQ(v.name);
+    setAdding(false);
     setOpen(false);
   };
 
@@ -95,7 +116,8 @@ export default function VendorPicker({ value, onPick, addToast, disabled, addSig
       <input
         value={q}
         disabled={disabled}
-        onChange={e => { const v = e.target.value; setQ(v); onPick({ id: null, name: v, phone: '' }); search(v); setOpen(true); }}
+        onChange={e => { const v = e.target.value; setQ(v); setAdding(false); onPick({ id: null, name: v, phone: '' }); search(v); setOpen(true); }}
+        // ^ the add box closes with the name it was opened for: it never saves an older spelling.
         // ^ phone cleared on manual edit: it belonged to the previously PICKED
         //   vendor — carrying it onto a retyped free-text vendor printed the
         //   wrong phone on the PO.
@@ -104,7 +126,7 @@ export default function VendorPicker({ value, onPick, addToast, disabled, addSig
         style={{ ...S.fInput, width: '100%' }}
       />
       {open && (suggestions.length > 0 || q.trim().length >= 1) && !disabled && (
-        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 30, marginTop: 4, background: T.s2, border: `1px solid ${T.bd2}`, borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,.4)', overflow: 'hidden', maxHeight: 220, overflowY: 'auto' }}>
+        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 30, marginTop: 4, background: T.s2, border: `1px solid ${T.bd2}`, borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,.4)', overflow: 'hidden', maxHeight: adding ? undefined : 220, overflowY: 'auto' }}>
           {suggestions.map(v => (
             <div key={v.id} role="option" aria-selected={false} onClick={() => pick(v)} style={{ padding: '8px 12px', minHeight: 44, display: 'flex', alignItems: 'center', cursor: 'pointer', borderBottom: `1px solid ${T.bd}`, fontSize: 13, color: T.tx }}
               onMouseEnter={e => (e.currentTarget.style.background = T.glass2)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
@@ -113,15 +135,15 @@ export default function VendorPicker({ value, onPick, addToast, disabled, addSig
             </div>
           ))}
           {!adding && (
-            <div onClick={() => { setAdding(true); setNewName(q); setNewPhone(''); }} style={{ padding: '8px 12px', minHeight: 44, display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: 12, color: T.ac2, fontWeight: 600 }}>
+            <div onClick={() => openAdd(q.trim())} style={{ padding: '8px 12px', minHeight: 44, display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: 12, color: T.ac2, fontWeight: 600 }}>
               + Add new vendor{q.trim() ? ` "${q.trim()}"` : ''}
             </div>
           )}
           {adding && (
             <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 6, background: T.glass1 }} onClick={e => e.stopPropagation()}>
               {!!addSignal && <div style={{ fontSize: 11, color: T.yl, lineHeight: 1.4 }}>Not in Contacts yet — add the phone number and tap Save vendor.</div>}
-              <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Vendor name *" style={{ ...S.fInput, width: '100%' }} autoFocus={!newName.trim()} />
-              <input value={newPhone} onChange={e => setNewPhone(e.target.value)} onKeyDown={e => numericKeyDown(e)} inputMode="numeric" placeholder="Phone (10 digits) *" style={{ ...S.fInput, width: '100%', fontFamily: T.mono }} autoFocus={!!newName.trim()} />
+              <input value={newName} onChange={e => setNewName(e.target.value)} ref={nameRef} placeholder="Vendor name *" style={{ ...S.fInput, width: '100%' }} />
+              <input value={newPhone} onChange={e => setNewPhone(e.target.value)} onKeyDown={e => numericKeyDown(e)} inputMode="numeric" ref={phoneRef} placeholder="Phone (10 digits) *" style={{ ...S.fInput, width: '100%', fontFamily: T.mono }} />
               <div style={{ display: 'flex', gap: 6 }}>
                 <button onClick={quickAdd} disabled={saving} style={{ ...S.btnPrimary, ...S.btnSm, flex: 1, minHeight: 44, pointerEvents: saving ? 'none' : 'auto', opacity: saving ? 0.5 : 1 }}>{saving ? 'Saving…' : 'Save vendor'}</button>
                 <button onClick={() => setAdding(false)} style={{ ...S.btnGhost, ...S.btnSm, minHeight: 44 }}>Cancel</button>

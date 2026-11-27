@@ -38,8 +38,10 @@ export default function POListCards({ sections, onOpen, onPrint }: { sections: S
                         <Title v={v} size={14} />
                         <span style={{ marginLeft: 'auto' }}>{v.late && v.due ? <StateDot label={`${v.due.late} d late`} color={T.re} /> : <StateDot label={st.label} color={st.color} />}</span>
                       </div>
-                      <div style={{ fontSize: 12, color: T.tx2, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        <Item v={v} /> · <b style={{ color: T.tx, fontWeight: 600 }}>{v.po.vendor_name}</b>
+                      {/* The item (now with what it is for) is what gets cut on a narrow card — never the vendor's name. */}
+                      <div style={{ display: 'flex', gap: 4, minWidth: 0, fontSize: 12, color: T.tx2, marginTop: 3 }}>
+                        <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}><Item v={v} /></span>
+                        <span style={{ flexShrink: 0, maxWidth: '55%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>· <b style={{ color: T.tx, fontWeight: 600 }}>{v.po.vendor_name}</b></span>
                       </div>
                       <div style={{ margin: '8px 0 6px' }}><Bar v={v} h={3} /></div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '4px 10px', flexWrap: 'wrap', fontSize: 11, color: T.tx3 }}>

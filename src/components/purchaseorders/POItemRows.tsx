@@ -13,12 +13,13 @@ import SkuInput from '../ui/SkuInput';
 import SuggestInput from '../ui/SuggestInput';
 import ItemNameChips, { useRecentItemNames } from './ItemNameChips';
 import POComponentField from './POComponentField';
+import { touchedRow, partOptional } from './poFormSave';
 import type { PurchaseOrderType } from '../../types/database';
 
 /** `id` / `received` / `ordered`: an existing line on a revision — it keeps its id, and a cut stops at what arrived on it.
  *  `buffer`: the part of the quantity ordered as buffer over the costing plan (set in Raise POs, kept on edits).
- *  `component`: what a fabric line is for ("LEHENGA, BLOUSE"). */
-export type FormItem = { id?: string; received?: number; ordered?: number; buffer?: number; sku: string; item_name: string; fabric_code: string; component: string; quantity: string; unit: string; rate: string };
+ *  `component`: what a fabric line is for ("LEHENGA, BLOUSE"); `hadPart`: an existing line came with one (a revision may not blank it). */
+export type FormItem = { id?: string; received?: number; ordered?: number; buffer?: number; hadPart?: boolean; sku: string; item_name: string; fabric_code: string; component: string; quantity: string; unit: string; rate: string };
 // The quantity starts empty: over a pre-filled "1", typing 50 gave 150.
 export const blankItem = (): FormItem => ({ sku: '', item_name: '', fabric_code: '', component: '', quantity: '', unit: '', rate: '' });
 const UNIT_OPTIONS = ['Meter', 'Piece', 'Dozen'];
@@ -29,7 +30,7 @@ export default function POItemRows({ items, poType, forPieces, amend, tried, onC
   items: FormItem[];
   poType: PurchaseOrderType | '';
   forPieces: string;
-  /** A revision: a line already on the order may stay without "Fabric is for" (older orders have none). */
+  /** A revision: a line already on the order without "Fabric is for" may stay so (older orders have none). */
   amend: boolean;
   /** Save was tried and refused: what is still missing shows red. */
   tried: boolean;
@@ -80,7 +81,7 @@ export default function POItemRows({ items, poType, forPieces, amend, tried, onC
                 )}
               </div>
               {!it.item_name.trim() && <ItemNameChips names={recentNames} onPick={n => onChange(i, { item_name: n })} />}
-              {fabric && <POComponentField sku={it.sku} value={it.component} onChange={v => onChange(i, { component: v })} missing={tried && !it.component.trim() && !(amend && !!it.id)} />}
+              {fabric && <POComponentField sku={it.sku} value={it.component} onChange={v => onChange(i, { component: v })} missing={tried && touchedRow(it) && !it.component.trim() && !partOptional(it, amend)} />}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
                 <input value={it.quantity} onChange={e => onChange(i, { quantity: e.target.value })} onKeyDown={e => numericKeyDown(e)} inputMode="decimal" placeholder="Qty" style={{ ...S.fInput, width: '100%', minWidth: 0, fontFamily: T.mono }} />
                 <select value={it.unit} onChange={e => onChange(i, { unit: e.target.value })} style={{ ...S.fInput, width: '100%', minWidth: 0, color: it.unit ? T.tx : T.tx3 }}>

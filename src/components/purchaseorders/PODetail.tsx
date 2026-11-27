@@ -103,6 +103,8 @@ export default function PODetail({ po: livePo, items: liveItems, receipts: liveR
     setBusy('');
   };
   const canRemoveReceipt = canManage && !['draft', 'cancelled'].includes(po.status);
+  // After a cancel or a close the sheet's buttons wait until the order has been re-read.
+  const reread = async () => { setBusy('reread'); try { await onChanged(); } finally { setBusy(''); } };
 
   const open = OPEN.includes(po.status);
   const canEdit = po.status === 'draft';
@@ -168,14 +170,14 @@ export default function PODetail({ po: livePo, items: liveItems, receipts: liveR
             {(canEdit || canRevise) && <button onClick={onEdit} disabled={!!busy || holding} style={{ ...S.btnGhost, ...S.btnSm, opacity: busy || holding ? 0.5 : 1 }}>{canEdit ? 'Edit' : 'Revise'}</button>}
           </div>
         </div>
-        <ConfirmModal {...modalProps} />
       </div>
-      {/* Outside the sheet's overlay: a tap on this modal's backdrop must not bubble up and close the order. */}
-      {closing && <POCloseModal po={po} items={items} onClose={() => setClosing(false)} onClosed={() => { setClosing(false); onChanged(); }} addToast={addToast} />}
-      {cancelPo && <POCancelModal po={po} items={items} onClose={() => setCancelPo(false)} onCancelled={() => { setCancelPo(false); void onChanged(); }} addToast={addToast} />}
+      {/* Outside the sheet's overlay: a tap on one of these pop-ups' backdrop must not bubble up and close the order. */}
+      <ConfirmModal {...modalProps} />
+      {closing && <POCloseModal po={po} items={items} onClose={() => setClosing(false)} onClosed={() => { setClosing(false); void reread(); }} addToast={addToast} />}
+      {cancelPo && <POCancelModal po={po} items={items} onClose={() => setCancelPo(false)} onCancelled={() => { setCancelPo(false); void reread(); }} addToast={addToast} />}
       {jw.sheet}
       {urgentOpen && <UrgentSheet module="purchase_order" id={po.id} title={`PO #${po.po_number}`} row={po} onClose={() => setUrgentOpen(false)} onSaved={() => { void onChanged(); }} addToast={addToast} />}
-      {cancelling && <POLineCancelModal po={po} item={cancelling} onClose={() => setCancelling(null)} onDone={() => { setCancelling(null); void onChanged(); }} addToast={addToast} />}
+      {cancelling && <POLineCancelModal po={po} item={cancelling} onClose={() => setCancelling(null)} onDone={() => { setCancelling(null); void reread(); }} addToast={addToast} />}
     </>,
     document.body,
   );

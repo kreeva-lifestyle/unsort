@@ -21,6 +21,7 @@ import POItemRows, { blankItem } from './POItemRows';
 import type { FormItem } from './POItemRows';
 import POFormCharges, { type Charges } from './POFormCharges';
 import { poPayload, num } from './poFormSave';
+import { vendorNamed } from './VendorPicker';
 import type { PurchaseOrder, PurchaseOrderItem, PurchaseOrderType } from '../../types/database';
 import { useModalLock } from '../../hooks/useModalLock';
 
@@ -60,14 +61,14 @@ export default function POForm({ editing, duplicateFrom, prefill, canApprove, on
   // A cancelled line stays as it is (not on the form, not on a duplicate); an edited line keeps its id.
   const [items, setItems] = useState<FormItem[]>(() => {
     const lines = (src?.items ?? []).filter(it => !it.cancelled_at);
-    return lines.length ? lines.map(it => ({ ...(editing && it.id ? { id: it.id, received: Number(it.received_qty || 0), ordered: Number(it.quantity) } : {}), sku: it.sku ?? '', item_name: it.item_name ?? '', fabric_code: it.fabric_code ?? '', component: it.component ?? '', quantity: String(it.quantity), buffer: Number(it.buffer_qty || 0), unit: it.unit ?? '', rate: it.rate == null ? '' : String(it.rate) })) : [blankItem()];
+    return lines.length ? lines.map(it => ({ ...(editing && it.id ? { id: it.id, received: Number(it.received_qty || 0), ordered: Number(it.quantity), hadPart: !!(it.component || '').trim() } : {}), sku: it.sku ?? '', item_name: it.item_name ?? '', fabric_code: it.fabric_code ?? '', component: it.component ?? '', quantity: String(it.quantity), buffer: Number(it.buffer_qty || 0), unit: it.unit ?? '', rate: it.rate == null ? '' : String(it.rate) })) : [blankItem()];
   });
   const [showCharges, setShowCharges] = useState(!!(src?.discount_value || src?.tax_percent || src?.other_charges));
   const [charges, setCharges] = useState<Charges>({ discountType: src?.discount_type ?? 'flat', discountValue: src?.discount_value ? String(src.discount_value) : '', taxPercent: src?.tax_percent ? String(src.tax_percent) : '', otherCharges: src?.other_charges ? String(src.other_charges) : '' });
   const [reason, setReason] = useState('');
   const [error, setError] = useState('');
-  // A save refused for the vendor is said at the vendor box, which opens "Add new vendor" (addSignal).
-  const [vendorError, setVendorError] = useState(''); const [addSignal, setAddSignal] = useState(0);
+  // A save refused for the vendor is said at the vendor box (vendorTry scrolls to it); a typed name with no contact opens "Add new vendor" (addSignal).
+  const [vendorError, setVendorError] = useState(''); const [vendorTry, setVendorTry] = useState(0); const [addSignal, setAddSignal] = useState(0);
   const [saving, setSaving] = useState<'' | 'save' | 'approve'>('');
 
   useModalLock();
@@ -120,10 +121,15 @@ export default function POForm({ editing, duplicateFrom, prefill, canApprove, on
 
   const save = async (approve = false) => {
     if (saving) return;
-    setError(''); setVendorError('');
-    const p = poPayload({ vendor, poType, poDate, expectedDate, paymentTerms, notes, forPieces, lumpSum, costingId, items, ...charges }, subtotal, amend);
-    if ('error' in p) { if (p.vendor) { setVendorError(p.error); setAddSignal(n => n + 1); } else setError(p.error); return; }
-    setSaving(approve ? 'approve' : 'save');
+    setError(''); setVendorError(''); setSaving(approve ? 'approve' : 'save');
+    // A saved vendor's name typed in full but not tapped still finds its contact.
+    let v = vendor;
+    if (!amend && !v.id && v.name.trim()) { const hit = await vendorNamed(v.name); if (hit) { v = hit; setVendor(hit); } }
+    const p = poPayload({ vendor: v, poType, poDate, expectedDate, paymentTerms, notes, forPieces, lumpSum, costingId, items, ...charges }, subtotal, amend);
+    if ('error' in p) {
+      if (p.vendor) { setVendorError(p.error); setVendorTry(n => n + 1); if (p.vendor === 'add') setAddSignal(n => n + 1); } else setError(p.error);
+      setSaving(''); return;
+    }
     try {
       if (editing && amend) {
         // base_revision: the server refuses the save if someone revised the order since this form opened.
@@ -159,7 +165,7 @@ export default function POForm({ editing, duplicateFrom, prefill, canApprove, on
         </div>
         <div style={{ padding: '16px 18px', overflowY: 'auto', WebkitOverflowScrolling: 'touch', flex: 1, minHeight: 0 }}>
           {amend && <div style={{ fontSize: 12, color: T.tx2, lineHeight: 1.5, marginBottom: 12 }}>The vendor, type and PO date stay as raised. What already arrived stays on record — a quantity can be cut only down to it. Every change is kept in the order’s history.</div>}
-          <POFormHeader amend={amend} editing={!!editing} vendor={vendor} onPickVendor={pickVendor} vendorError={vendorError} addSignal={addSignal} poType={poType} onType={changeType} poDate={poDate} onPoDate={setPoDate}
+          <POFormHeader amend={amend} editing={!!editing} vendor={vendor} onPickVendor={pickVendor} vendorError={vendorError} vendorTry={vendorTry} addSignal={addSignal} poType={poType} onType={changeType} poDate={poDate} onPoDate={setPoDate}
             expectedDate={expectedDate} onExpected={setExpectedDate} paymentTerms={paymentTerms} onTerms={setPaymentTerms}
             forPieces={forPieces} onPieces={setForPieces} lumpSum={lumpSum} onLumpSum={setLumpSum} piecesMissing={!!error && !lumpSum && !forPieces.trim()} addToast={addToast} />
 

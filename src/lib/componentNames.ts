@@ -16,6 +16,12 @@ export const componentKey = (name: string): string => {
   return VARIANTS[k] ?? k;
 };
 
+/** A component in capitals with its usual spelling ("lehanga" → LEHENGA); a name with no known variant comes back as typed, in capitals. */
+export const canonicalComponent = (name: string): string => {
+  const t = name.trim().toUpperCase();
+  return VARIANTS[t.replace(/[^A-Z]/g, '')] ?? t;
+};
+
 export const sameComponent = (a: string, b: string): boolean => {
   const k = componentKey(a);
   return k !== '' && k === componentKey(b);

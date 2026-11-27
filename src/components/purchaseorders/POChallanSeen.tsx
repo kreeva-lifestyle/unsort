@@ -35,7 +35,7 @@ export function useChallanSeen(vendor: { id: string | null; name: string } | nul
 
 export default function ChallanSeenNote({ no, seen }: { no: string; seen: ChallanSeen[] }) {
   if (!seen.length) return null;
-  const when = shortDate(seen[0].receipt_date);
+  const when = shortDate(seen.map(s => s.receipt_date).filter((d): d is string => !!d).sort().pop());
   return (
     <div role="status" style={{ marginTop: 8, background: alpha(T.yl, 0.08), border: `1px solid ${alpha(T.yl, 0.25)}`, borderRadius: 6, padding: '8px 10px', fontSize: 11, lineHeight: 1.5, color: T.yl }}>
       Challan <b style={{ fontFamily: T.mono }}>{no.trim()}</b> is already entered for this vendor — {seen.slice(0, SHOW).map(s => `PO #${s.po_number}`).join(', ')}{seen.length > SHOW ? ` and ${seen.length - SHOW} more` : ''}{when ? ` (last on ${when})` : ''}.

@@ -8,11 +8,11 @@
 import { useState } from 'react';
 import { T, S } from '../../lib/theme';
 import { useProductCatalog, resolveSku } from '../../hooks/useProductCatalog';
-import { mergeComponents, sameComponent } from '../../lib/componentNames';
+import { mergeComponents, coversComponent, canonicalComponent } from '../../lib/componentNames';
 
 const split = (v: string) => v.split(',').map(s => s.trim()).filter(Boolean);
-/** As it is saved: capitals, no blanks, no repeats — "lehenga , Blouse" → "LEHENGA, BLOUSE". */
-export const cleanComponent = (v: string): string => [...new Set(split(v).map(s => s.toUpperCase()))].join(', ');
+/** As it is saved: capitals, the usual spelling, no blanks, no repeats — "lehanga , Blouse" → "LEHENGA, BLOUSE". */
+export const cleanComponent = (v: string): string => [...new Set(split(v).map(canonicalComponent))].join(', ');
 
 export default function POComponentField({ sku, value, onChange, missing }: {
   sku: string;
@@ -25,11 +25,12 @@ export default function POComponentField({ sku, value, onChange, missing }: {
   const design = resolveSku(index, sku)?.product;
   const options = mergeComponents(design?.includes ?? [], []).map(c => c.toUpperCase());
   const parts = split(value);
-  const lit = (c: string) => parts.some(p => sameComponent(p, c));
+  // The sheet's BOTTOM stands for a costing's PANT, and "lehanga" for LEHENGA: the chip lights for either.
+  const lit = (c: string) => parts.some(p => coversComponent(c, p));
   const [typing, setTyping] = useState(false);
   // The box shows when there is nothing to tap, when asked for, or when the value holds a part the chips do not offer.
-  const box = options.length === 0 || typing || parts.some(p => !options.some(o => sameComponent(o, p)));
-  const toggle = (c: string) => onChange((lit(c) ? parts.filter(p => !sameComponent(p, c)) : [...parts, c]).join(', '));
+  const box = options.length === 0 || typing || parts.some(p => !options.some(o => coversComponent(o, p)));
+  const toggle = (c: string) => onChange((lit(c) ? parts.filter(p => !coversComponent(c, p)) : [...parts, c]).join(', '));
   const note = options.length > 0 ? ''
     : error ? 'The SKU list could not be loaded — type the part'
     : !index ? 'Loading this design’s parts…'
@@ -46,7 +47,7 @@ export default function POComponentField({ sku, value, onChange, missing }: {
           {!box && <button type="button" className="touch44" onClick={() => setTyping(true)} style={chip(false)}>Other…</button>}
         </div>
       )}
-      {box && <input value={value} onChange={e => onChange(e.target.value)} aria-label="Fabric is for" autoCapitalize="characters"
+      {box && <input value={value} onChange={e => onChange(e.target.value)} onFocus={() => setTyping(true)} aria-label="Fabric is for" autoCapitalize="characters"
         placeholder={options.length > 0 ? 'or type — e.g. LEHENGA, BLOUSE for two parts' : 'e.g. DUPATTA, TOP, LEHENGA'} style={{ ...S.fInput, width: '100%', minWidth: 0 }} />}
       {note && <div style={{ fontSize: 10, color: T.tx3, marginTop: 4 }}>{note}</div>}
     </div>

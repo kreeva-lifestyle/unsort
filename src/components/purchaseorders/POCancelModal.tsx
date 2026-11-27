@@ -38,6 +38,8 @@ export default function POCancelModal({ po, items, onClose, onCancelled, addToas
 
   const say = (v: string) => { setReason(v); setError(''); };
   const arrived = items.some(it => Number(it.received_qty || 0) > 0);
+  // Edit is for a draft, Revise and "Close remaining" for an order the vendor has; a closed order has neither.
+  const open = ['approved', 'sent', 'partially_received'].includes(po.status);
   const fix = po.status === 'draft' ? 'Edit' : 'Revise';
 
   const submit = async () => {
@@ -66,9 +68,9 @@ export default function POCancelModal({ po, items, onClose, onCancelled, addToas
         <div style={{ padding: '16px 18px', overflowY: 'auto', WebkitOverflowScrolling: 'touch', flex: 1, minHeight: 0 }}>
           <div style={{ fontSize: 12, color: T.tx2, lineHeight: 1.5, marginBottom: 12 }}>
             The order for <b style={{ color: T.tx }}>{po.vendor_name}</b> stays on record but is closed to further edits and receiving. This cannot be undone.
-            {arrived
+            {arrived && open
               ? ' Part of it has already arrived — “Close remaining” keeps what came and writes off only the rest.'
-              : ` If only a detail is wrong, keep the order and use ${fix} instead.`}
+              : !arrived && (open || po.status === 'draft') ? ` If only a detail is wrong, keep the order and use ${fix} instead.` : ''}
           </div>
 
           <label style={S.fLabel}>Why? *</label>

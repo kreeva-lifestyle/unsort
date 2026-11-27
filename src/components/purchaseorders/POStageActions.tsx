@@ -82,7 +82,7 @@ export default function POStageActions({ po: livePo, items: liveItems, canManage
       {canReceive && <button type="button" onClick={onReceive} style={{ ...(canApprove ? S.btnGhost : S.btnPrimary), ...S.btnLg, ...wait }}>{receiveLabel}</button>}
       {canClose && <button type="button" onClick={onCloseRemaining} title="The rest is not coming — write off the balance" style={{ ...S.btnGhost, ...S.btnLg, ...wait }}>Close remaining</button>}
       {canReopen && btn('reopen', S.btnGhost)}
-      {canCancel && <button type="button" onClick={onCancel} style={{ ...S.btnDanger, ...S.btnLg, ...wait }}>Cancel PO</button>}
+      {canCancel && <button type="button" onClick={onCancel} disabled={!!busy || holding} style={{ ...S.btnDanger, ...S.btnLg, ...wait }}>Cancel PO</button>}
     </div>
   );
 }

@@ -25,21 +25,25 @@ export interface POPayload {
   p_items: Array<{ id?: string; item_name: string; sku: string | null; fabric_code: string | null; component: string | null; quantity: number; buffer_qty: number; unit: string | null; rate: number | null }>;
 }
 
-/** The first problem with the form (`vendor`: it is about the vendor — the form opens "Add new vendor"), or the payload to save.
+/** A card the user typed into. The unit alone does not count: a fabric row gets "Meter" by itself, and an
+ *  extra empty card must not block the save with "item name is required". */
+export const touchedRow = (it: FormItem): boolean => !!(it.id || it.sku.trim() || it.item_name.trim() || it.fabric_code.trim() || it.component.trim() || it.quantity.trim() || it.rate.trim());
+/** A fabric line may be saved without "Fabric is for" only on a revision, and only if it was already on the order without one. */
+export const partOptional = (it: FormItem, amend: boolean): boolean => amend && !!it.id && !it.hadPart;
+
+/** The first problem with the form, or the payload to save. `vendor` says the problem is the vendor: 'add' = a typed name with
+ *  no contact (the form opens "Add new vendor"), 'pick' = none chosen, or a contact without a phone.
  *  A revision keeps each line's id (amend_po updates it in place). */
-export function poPayload(f: POFormState, subtotal: number, keepIds: boolean): { error: string; vendor?: boolean } | POPayload {
+export function poPayload(f: POFormState, subtotal: number, keepIds: boolean): { error: string; vendor?: 'pick' | 'add' } | POPayload {
   const vendor = f.vendor.name.trim();
-  if (!vendor) return { error: 'Choose the vendor', vendor: true };
+  if (!vendor) return { error: 'Choose the vendor', vendor: 'pick' };
   // Owner's rule (27 Nov 2026): an order goes only to a vendor saved in Contacts with a phone number —
   // a typed name has no chat to send or remind on. A revision keeps the vendor it was raised with.
-  if (!keepIds && !f.vendor.id) return { error: `“${vendor}” is not saved in Contacts. Pick the vendor from the list, or add the name and phone number right here and tap “Save vendor”.`, vendor: true };
-  if (!keepIds && f.vendor.phone.replace(/\D/g, '').length < 10) return { error: `${vendor} has no phone number saved. Add the number in Contacts, then pick the vendor again.`, vendor: true };
+  if (!keepIds && !f.vendor.id) return { error: `“${vendor}” is not saved in Contacts. Pick the vendor from the list, or add the name and phone number right here and tap “Save vendor”.`, vendor: 'add' };
+  if (!keepIds && f.vendor.phone.replace(/\D/g, '').length < 10) return { error: `${vendor} has no phone number saved. Add the number in Contacts, then pick the vendor again.`, vendor: 'pick' };
   if (!f.poType) return { error: 'Select a PO type — Fabric, Job Work, or Material' };
-  // A row counts as "touched" only if the user typed something into it. The
-  // unit alone does not count: a fabric row gets "Meter" by itself, and an
-  // extra empty card must not block the save with "item name is required".
-  // Keep the ORIGINAL index so errors point at the visual row.
-  const clean = f.items.map((it, idx) => ({ it, idx })).filter(({ it }) => it.id || it.sku.trim() || it.item_name.trim() || it.fabric_code.trim() || it.component.trim() || it.quantity.trim() || it.rate.trim());
+  // Only the cards the user typed into; the ORIGINAL index is kept so errors point at the visual row.
+  const clean = f.items.map((it, idx) => ({ it, idx })).filter(({ it }) => touchedRow(it));
   if (clean.length === 0) return { error: 'Add at least one item' };
   const skuRequired = f.poType === 'fabric' || f.poType === 'material';
   for (const { it, idx } of clean) {
@@ -47,9 +51,9 @@ export function poPayload(f: POFormState, subtotal: number, keepIds: boolean): {
     if (skuRequired && !it.sku.trim()) return { error: `Row ${idx + 1} (${it.item_name}): SKU is required for Fabric / Material items` };
     // Owner's rule: every fabric line names its fabric code (the RPC refuses it too).
     if (f.poType === 'fabric' && !it.fabric_code.trim()) return { error: `Row ${idx + 1} (${it.item_name}): fabric code is required for fabric items` };
-    // Owner's rule (27 Nov 2026): a fabric line says which part of the design it is for. A line that was
-    // already on an order being revised may stay without one (orders from before the rule have none).
-    if (f.poType === 'fabric' && !cleanComponent(it.component) && !(keepIds && it.id)) return { error: `Row ${idx + 1} (${it.item_name}): choose what this fabric is for — lehenga, blouse, dupatta…` };
+    // Owner's rule (27 Nov 2026): a fabric line says which part of the design it is for. Only a line that was
+    // already on an order being revised WITHOUT one may stay so (orders from before the rule have none).
+    if (f.poType === 'fabric' && !cleanComponent(it.component) && !partOptional(it, keepIds)) return { error: `Row ${idx + 1} (${it.item_name}): choose what this fabric is for — lehenga, blouse, dupatta…` };
     if (num(it.quantity) <= 0) return { error: `Row ${idx + 1} (${it.item_name}): quantity must be greater than 0` };
     // Only a cut is held at what arrived — a line that got more than ordered may stay as it is.
     if (it.received && num(it.quantity) < it.received && num(it.quantity) < (it.ordered ?? Infinity)) return { error: `Row ${idx + 1} (${it.item_name}): ${it.received} already arrived — the quantity cannot go below that` };
