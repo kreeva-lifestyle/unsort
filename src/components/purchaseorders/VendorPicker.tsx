@@ -47,7 +47,9 @@ export default function VendorPicker({ value, onPick, addToast, disabled, addSig
 
   useEffect(() => {
     if (!addSignal || !q.trim()) return;
-    search(q); setOpen(true); setAdding(true); setNewName(q.trim()); setNewPhone('');
+    search(q); setOpen(true);
+    // Already open (a second refused save): what was typed in it stays.
+    if (!adding) { setAdding(true); setNewName(q.trim()); setNewPhone(''); }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only when the form asks
   }, [addSignal]);
 
@@ -117,11 +119,12 @@ export default function VendorPicker({ value, onPick, addToast, disabled, addSig
           )}
           {adding && (
             <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 6, background: T.glass1 }} onClick={e => e.stopPropagation()}>
+              {!!addSignal && <div style={{ fontSize: 11, color: T.yl, lineHeight: 1.4 }}>Not in Contacts yet — add the phone number and tap Save vendor.</div>}
               <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Vendor name *" style={{ ...S.fInput, width: '100%' }} autoFocus={!newName.trim()} />
               <input value={newPhone} onChange={e => setNewPhone(e.target.value)} onKeyDown={e => numericKeyDown(e)} inputMode="numeric" placeholder="Phone (10 digits) *" style={{ ...S.fInput, width: '100%', fontFamily: T.mono }} autoFocus={!!newName.trim()} />
               <div style={{ display: 'flex', gap: 6 }}>
-                <button onClick={quickAdd} disabled={saving} style={{ ...S.btnPrimary, ...S.btnSm, flex: 1, pointerEvents: saving ? 'none' : 'auto', opacity: saving ? 0.5 : 1 }}>{saving ? 'Saving…' : 'Save vendor'}</button>
-                <button onClick={() => setAdding(false)} style={{ ...S.btnGhost, ...S.btnSm }}>Cancel</button>
+                <button onClick={quickAdd} disabled={saving} style={{ ...S.btnPrimary, ...S.btnSm, flex: 1, minHeight: 44, pointerEvents: saving ? 'none' : 'auto', opacity: saving ? 0.5 : 1 }}>{saving ? 'Saving…' : 'Save vendor'}</button>
+                <button onClick={() => setAdding(false)} style={{ ...S.btnGhost, ...S.btnSm, minHeight: 44 }}>Cancel</button>
               </div>
             </div>
           )}

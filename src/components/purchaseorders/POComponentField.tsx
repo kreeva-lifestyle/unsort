@@ -22,7 +22,8 @@ export default function POComponentField({ sku, value, onChange, missing }: {
   missing: boolean;
 }) {
   const { index, error } = useProductCatalog();
-  const options = mergeComponents(resolveSku(index, sku)?.product.includes ?? [], []).map(c => c.toUpperCase());
+  const design = resolveSku(index, sku)?.product;
+  const options = mergeComponents(design?.includes ?? [], []).map(c => c.toUpperCase());
   const parts = split(value);
   const lit = (c: string) => parts.some(p => sameComponent(p, c));
   const [typing, setTyping] = useState(false);
@@ -31,7 +32,9 @@ export default function POComponentField({ sku, value, onChange, missing }: {
   const toggle = (c: string) => onChange((lit(c) ? parts.filter(p => !sameComponent(p, c)) : [...parts, c]).join(', '));
   const note = options.length > 0 ? ''
     : error ? 'The SKU list could not be loaded — type the part'
-    : sku.trim().length >= 3 && index ? `${sku.trim().toUpperCase()} is not in the master sheet — type the part`
+    : !index ? 'Loading this design’s parts…'
+    : design ? `The master sheet lists no parts for ${design.sku} — type the part`
+    : sku.trim().length >= 3 ? `${sku.trim().toUpperCase()} is not in the master sheet — type the part`
     : 'Enter the SKU above to pick from its parts, or type it';
   const chip = (on: boolean): React.CSSProperties => ({ ...S.btnGhost, ...S.btnSm, minHeight: 32, borderRadius: 999, padding: '5px 12px', fontSize: 11, ...(on ? { borderColor: T.ac, color: T.ac2, background: T.ac3 } : {}) });
   return (

@@ -47,7 +47,7 @@ export default function POLineTable({ items, forPieces, canCancel, busy, onCance
                     <span style={{ fontSize: 13, color: cancelled ? T.tx3 : T.tx, textDecoration: cancelled && got === 0 ? 'line-through' : undefined }}>{itemLabel(it)}</span>
                     {it.unit && <span style={{ fontSize: 10, color: T.tx3, marginLeft: 4 }}>/{it.unit}</span>}
                     {/* The design, and what the fabric is for ("DRS230 · for DUPATTA"). */}
-                    {lineNote(it) && <div style={{ fontSize: 10, color: T.tx3, fontFamily: T.mono, marginTop: 1 }}>{lineNote(it)}</div>}
+                    {lineNote(it) && <div style={{ fontSize: 10, color: T.tx3, fontFamily: T.mono, marginTop: 1, whiteSpace: 'nowrap' }}>{lineNote(it)}</div>}
                     {buf > 0 && (
                       <div style={{ fontSize: 11, color: T.ac2, marginTop: 3 }}>
                         {fmtQty(qty - buf)} for {forPieces ? `${forPieces} pcs` : 'the plan'} + {fmtQty(buf)} buffer

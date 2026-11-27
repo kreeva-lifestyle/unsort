@@ -36,6 +36,7 @@ export default function POCancelModal({ po, items, onClose, onCancelled, addToas
   useBackClose(true, onClose);
   useEffect(() => { if (error) errRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }, [error]);
 
+  const say = (v: string) => { setReason(v); setError(''); };
   const arrived = items.some(it => Number(it.received_qty || 0) > 0);
   const fix = po.status === 'draft' ? 'Edit' : 'Revise';
 
@@ -73,13 +74,13 @@ export default function POCancelModal({ po, items, onClose, onCancelled, addToas
           <label style={S.fLabel}>Why? *</label>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '6px 0 8px' }}>
             {PRESETS.map(p => (
-              <button key={p} type="button" className="touch44" onClick={() => setReason(p)} aria-pressed={reason === p}
+              <button key={p} type="button" className="touch44" onClick={() => say(p)} aria-pressed={reason === p}
                 style={{ ...S.btnGhost, ...S.btnSm, minHeight: 32, padding: '5px 12px', fontSize: 11, borderRadius: 999, borderColor: reason === p ? T.ac3 : T.bd2, color: reason === p ? T.ac2 : T.tx3, background: reason === p ? T.ac3 : 'transparent' }}>
                 {p}
               </button>
             ))}
           </div>
-          <input value={reason} onChange={e => setReason(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') submit(); }} maxLength={200}
+          <input value={reason} onChange={e => say(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') submit(); }} maxLength={200}
             placeholder="Tap one above or type your own" aria-label="Reason for cancelling the order"
             style={{ ...S.fInput, width: '100%' }} />
 

@@ -39,7 +39,8 @@ export async function loadPoActivity(po: PurchaseOrder, receipts: PurchaseOrderR
   for (const u of (p.data as { id: string; full_name: string | null }[] | null) ?? []) names[u.id] = u.full_name?.trim() || 'User';
   // "Save and approve" writes Created and Approved in one transaction, so both carry the same moment:
   // newest first as read, and at the same moment Created stays below.
-  const audit = ((a.data as AuditLog[] | null) ?? []).slice().sort((x, y) => (y.created_at ?? '').localeCompare(x.created_at ?? '') || Number(x.action === 'CREATE') - Number(y.action === 'CREATE'));
+  const at = (r: AuditLog) => Date.parse(r.created_at ?? '') || 0;
+  const audit = ((a.data as AuditLog[] | null) ?? []).slice().sort((x, y) => at(y) - at(x) || Number(x.action === 'CREATE') - Number(y.action === 'CREATE'));
   // The history is part of the trail: a failed read shows as the trail's retry.
   return { audit, names, revisions: (r.data as unknown as PORevisionRow[] | null) ?? [], auditError: a.error || r.error, namesError: p.error };
 }

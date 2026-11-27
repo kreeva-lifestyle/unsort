@@ -40,7 +40,7 @@ export default function POFormHeader({ amend, editing, vendor, onPickVendor, ven
         {vendorError && <div role="alert" style={{ fontSize: 12, color: T.re, lineHeight: 1.45, marginBottom: 6 }}>{vendorError}</div>}
         {amend
           ? <div style={{ ...S.fInput, display: 'flex', alignItems: 'center', gap: 8, color: T.tx2 }}><b style={{ color: T.tx }}>{vendor.name}</b>{vendor.phone && <span style={{ fontFamily: T.mono, fontSize: 12, color: T.tx3 }}>{vendor.phone}</span>}</div>
-          : <VendorPicker value={vendor.name} phone={vendor.phone} onPick={onPickVendor} addToast={addToast} addSignal={addSignal} />}
+          : <VendorPicker value={vendor.name} phone={vendor.phone} onPick={onPickVendor} addToast={addToast} addSignal={vendor.id ? 0 : addSignal} />}
         {!editing && !vendor.name.trim() && <TopVendorChips onPick={onPickVendor} />}
       </div>
       <div>

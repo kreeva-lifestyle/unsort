@@ -32,7 +32,7 @@ export function poPayload(f: POFormState, subtotal: number, keepIds: boolean): {
   if (!vendor) return { error: 'Choose the vendor', vendor: true };
   // Owner's rule (27 Nov 2026): an order goes only to a vendor saved in Contacts with a phone number —
   // a typed name has no chat to send or remind on. A revision keeps the vendor it was raised with.
-  if (!keepIds && !f.vendor.id) return { error: `“${vendor}” is not saved in Contacts. Pick the vendor from the list, or add the name and phone number right here.`, vendor: true };
+  if (!keepIds && !f.vendor.id) return { error: `“${vendor}” is not saved in Contacts. Pick the vendor from the list, or add the name and phone number right here and tap “Save vendor”.`, vendor: true };
   if (!keepIds && f.vendor.phone.replace(/\D/g, '').length < 10) return { error: `${vendor} has no phone number saved. Add the number in Contacts, then pick the vendor again.`, vendor: true };
   if (!f.poType) return { error: 'Select a PO type — Fabric, Job Work, or Material' };
   // A row counts as "touched" only if the user typed something into it. The

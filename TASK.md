@@ -6,7 +6,7 @@ done (built, merged, deployed and checked, or done or decided by the
 owner), its entry is deleted in the same change. The rules are in
 `CLAUDE.md` → "Pending work — TASK.md".
 
-Last checked: 20 Nov 2026.
+Last checked: 27 Nov 2026.
 
 ## SuratMandi store — before it opens
 
@@ -390,26 +390,29 @@ Found in the overnight check of 19 Nov; built in the next Playbook change.
 
 ## DailyWork
 
-- **Purchase orders: tips of 27 Nov, waiting for your pick.** Claude studied
-  the module and every order since August. Nothing is built yet. Say which
-  numbers to build:
-  1. The "late" rule. An order with no expected date counts as late after
-     3 days (your rule of 14 Oct), but most orders arrive later than that,
-     so the red list is mostly false alarms. Keep 3 days, or give another
-     number. Then a line on Home with how many are late and due today.
-  2. "Cancel PO" asks a one-tap reason, offers "Change it instead" (Revise)
-     and "Close remaining", and offers the WhatsApp message to the vendor.
-     Today it saves no reason.
-  3. A vendor who is typed but is not on the vendor list: ask the phone
-     once and add them. Claude then repairs the older orders that have no
-     phone (reminders cannot open those vendors' chats today).
-  4. "Save and approve" as one step for admins and managers.
-  5. Order form: quantity starts empty, a half-typed order is not thrown
-     away by a stray tap, an empty item card no longer blocks the save,
-     and this vendor's recent fabrics show as one-tap buttons.
-  6. Receive challan: show each order's fabric, code and design before it
-     is ticked, and warn when a challan number was already entered.
-  Your answers decide the rest: how an order reaches the vendor today
-  (picture, typed message or call), whether you want purchase prices in
-  the app, whether this page is used on a phone or a computer, and who
-  types the deliveries.
+- **Purchase orders: what is left after the changes of 27 Nov.** Built and
+  live: late after 5 days, Cancel asks a reason, vendor must be in Contacts
+  with a phone, Save and approve, forms no longer close on a tap outside,
+  the clearer challan screen, and "Fabric is for" on every fabric line.
+  Still open, say yes or no to each:
+  1. Older orders without a phone. 13 older orders (4 still open) were
+     raised for 5 vendor names that are not in Contacts, so "Remind vendor"
+     cannot open their chat. You: add those 5 vendors in Contacts with
+     their phone. Then tell Claude, who links the old orders to them.
+  2. "Fabric is for" is shown only to us. Should it also be printed on the
+     order the vendor gets (print and picture)?
+  3. A line on Home: "Purchases: 2 late, 3 due today".
+  4. Order form: this vendor's recent fabrics as one-tap buttons.
+  5. Cancel PO: also offer a ready WhatsApp message telling the vendor.
+  6. Phone layout: orders and search first, the summary folded into one
+     row (you said the page is used mostly on a phone).
+  7. The "tap outside does not close a form" rule is in DailyWork only.
+     Say "Playbook: same rule" if you want it there too.
+  Claude does by itself, right after this update is on every phone: the
+  server also refuses a fabric line without "Fabric is for" and a cancel
+  without a reason (today only the app checks these two).
+  Small one Claude fixes with the next challan change: in "Share Payment
+  QR" the phone's Back button closes the whole challan, not just that box.
+  Still to answer (they decide further tips): how an order reaches the
+  vendor today (picture, typed message or call), whether you want purchase
+  prices in the app, and who types the deliveries.

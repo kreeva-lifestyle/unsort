@@ -141,8 +141,8 @@ export default function POReceive({ po, items: allItems, onClose, onReceived, on
           {error && <div ref={errRef} style={{ marginTop: 12, background: 'oklch(0.63 0.22 25 / .08)', border: '1px solid oklch(0.63 0.22 25 / .2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.re }}>{error}</div>}
         </div>
         <div style={{ padding: '12px 18px', borderTop: `1px solid ${T.bd}`, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-          <button onClick={onClose} style={S.btnGhost}>Cancel</button>
-          <button onClick={submit} disabled={saving} style={{ ...S.btnPrimary, pointerEvents: saving ? 'none' : 'auto', opacity: saving ? 0.5 : 1 }}>{saving ? 'Saving…' : 'Confirm receipt'}</button>
+          <button onClick={onClose} style={{ ...S.btnGhost, minHeight: 44 }}>Cancel</button>
+          <button onClick={submit} disabled={saving} style={{ ...S.btnPrimary, minHeight: 44, pointerEvents: saving ? 'none' : 'auto', opacity: saving ? 0.5 : 1 }}>{saving ? 'Saving…' : 'Confirm receipt'}</button>
         </div>
       </div>
     </div>,

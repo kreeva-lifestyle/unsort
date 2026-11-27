@@ -25,7 +25,7 @@ export default function TopVendorChips({ onPick }: { onPick: (v: V) => void }) {
   return (
     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
       {tops.map(v => (
-        <button key={v.name} type="button" onClick={() => onPick({ id: v.id ?? null, name: v.name, phone: v.phone || '' })}
+        <button key={v.name} type="button" className="touch44" onClick={() => onPick({ id: v.id ?? null, name: v.name, phone: v.phone || '' })}
           aria-label={`Use vendor ${v.name}`}
           style={{ ...S.btnGhost, ...S.btnSm, minHeight: 30, padding: '4px 12px', fontSize: 11, borderRadius: 999 }}>
           {v.name}
