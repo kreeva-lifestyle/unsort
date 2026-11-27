@@ -15,13 +15,14 @@ import { supabase } from '../../lib/supabase';
 import { T, S } from '../../lib/theme';
 import { useBackClose } from '../../hooks/useBackClose';
 import { friendlyError } from '../../lib/friendlyError';
-import { logSwallowed } from '../../lib/errorLogger';
 import POFormHeader from './POFormHeader';
 import POItemRows, { blankItem } from './POItemRows';
 import type { FormItem } from './POItemRows';
 import POFormCharges, { type Charges } from './POFormCharges';
 import { poPayload, num } from './poFormSave';
 import { vendorNamed } from './VendorPicker';
+import { forgetSkuHistory } from './poSkuHistory';
+import { vendorDefaults } from './poVendorDefaults';
 import type { PurchaseOrder, PurchaseOrderItem, PurchaseOrderType } from '../../types/database';
 import { useModalLock } from '../../hooks/useModalLock';
 
@@ -91,30 +92,19 @@ export default function POForm({ editing, duplicateFrom, prefill, canApprove, on
   // Fabric is bought by the meter (owner's rule): new rows on a fabric PO
   // start with unit Meter, and switching the type to fabric fills it into
   // any row whose unit is still empty — a typed unit is never overwritten.
-  const addRow = () => setItems(list => [...list, { ...blankItem(), ...(poType === 'fabric' ? { unit: 'Meter' } : {}) }]);
+  const addRow = (patch?: Partial<FormItem>) => setItems(list => [...list, { ...blankItem(), ...(poType === 'fabric' ? { unit: 'Meter' } : {}), ...patch }]);
   const changeType = (t: PurchaseOrderType | '') => {
     setPoType(t);
     if (t === 'fabric') setItems(list => list.map(it => (it.unit ? it : { ...it, unit: 'Meter' })));
   };
 
-  // Smart defaults from the vendor's LATEST PO (owner's ask): picking a
-  // vendor loads that PO's type and its items' unit — filling ONLY what is
-  // still empty, never overwriting a choice already made. One single-row
-  // indexed lookup per pick; nothing runs on form open.
+  // Picking a vendor fills the type and unit from that vendor's latest PO — only what is still empty (poVendorDefaults).
   const pickVendor = async (v: { id: string | null; name: string; phone: string }) => {
     setVendor(v); if (v.id) setVendorError('');
-    if (!v.name.trim()) return;
-    let q = supabase.from('purchase_orders').select('po_type, purchase_order_items(unit)')
-      .order('created_at', { ascending: false }).limit(1);
-    q = v.id ? q.eq('vendor_id', v.id) : q.ilike('vendor_name', v.name.trim());
-    const { data, error } = await q;
-    if (error) { logSwallowed('PO vendor defaults', error); return; } // best-effort prefill
-    const last = data?.[0] as { po_type: PurchaseOrderType; purchase_order_items?: { unit: string | null }[] } | undefined;
-    if (!last) return;
-    setPoType(prev => prev || last.po_type);
-    const lastUnit = (last.purchase_order_items || []).map(x => (x.unit || '').trim()).find(Boolean)
-      || (last.po_type === 'fabric' ? 'Meter' : '');
-    if (lastUnit) setItems(list => list.map(it => (it.unit ? it : { ...it, unit: lastUnit })));
+    const d = await vendorDefaults(v);
+    if (!d) return;
+    setPoType(prev => prev || d.type);
+    if (d.unit) setItems(list => list.map(it => (it.unit ? it : { ...it, unit: d.unit })));
   };
   // A line that already has goods in is never removed here — its balance is cancelled from the order.
   const removeRow = (i: number) => setItems(list => list.length > 1 && !list[i]?.received ? list.filter((_, idx) => idx !== i) : list);
@@ -131,6 +121,7 @@ export default function POForm({ editing, duplicateFrom, prefill, canApprove, on
       setSaving(''); return;
     }
     try {
+      forgetSkuHistory(); // a saved order changes what "ordered before" means
       if (editing && amend) {
         // base_revision: the server refuses the save if someone revised the order since this form opened.
         const { data, error: e } = await supabase.rpc('amend_po', { p_po_id: editing.id, p_po: { ...p.p_po, base_revision: editing.revision }, p_items: p.p_items, p_reason: reason.trim() || null });
@@ -170,7 +161,7 @@ export default function POForm({ editing, duplicateFrom, prefill, canApprove, on
             forPieces={forPieces} onPieces={setForPieces} lumpSum={lumpSum} onLumpSum={setLumpSum} piecesMissing={!!error && !lumpSum && !forPieces.trim()} addToast={addToast} />
 
           <label style={S.fLabel}>Items *</label>
-          <POItemRows items={items} poType={poType} forPieces={lumpSum ? '' : forPieces} amend={amend} tried={!!error} onChange={setItem} onRemove={removeRow} onAdd={addRow} />
+          <POItemRows items={items} poType={poType} forPieces={lumpSum ? '' : forPieces} amend={amend} tried={!!error} vendor={vendor} onVendor={pickVendor} onType={changeType} onChange={setItem} onRemove={removeRow} onAdd={addRow} />
 
           <POFormCharges show={showCharges} onToggle={() => setShowCharges(s => !s)} charges={charges} onCharges={c => setCharges(prev => ({ ...prev, ...c }))}
             notes={notes} onNotes={setNotes} totals={{ subtotal, discAmt, taxAmt, other: num(charges.otherCharges), grand }} />

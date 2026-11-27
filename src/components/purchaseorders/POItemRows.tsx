@@ -4,6 +4,8 @@
 // Fabric POs get a "Fabric code" box next to the item name (compulsory,
 // checked again by the RPC), offering codes used on earlier POs as you type,
 // and "Fabric is for" (POComponentField): the part of the design it is for.
+// A code ordered before fills the line from that order, or offers the
+// design's earlier fabrics for one tap (POSkuHistory).
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { T, S } from '../../lib/theme';
@@ -14,19 +16,24 @@ import SuggestInput from '../ui/SuggestInput';
 import ItemNameChips, { useRecentItemNames } from './ItemNameChips';
 import POComponentField from './POComponentField';
 import { touchedRow, partOptional } from './poFormSave';
+import POSkuHistory from './POSkuHistory';
+import { skuKey, type SkuFabric } from './poSkuHistory';
 import type { PurchaseOrderType } from '../../types/database';
 
 /** `id` / `received` / `ordered`: an existing line on a revision — it keeps its id, and a cut stops at what arrived on it.
  *  `buffer`: the part of the quantity ordered as buffer over the costing plan (set in Raise POs, kept on edits).
- *  `component`: what a fabric line is for ("LEHENGA, BLOUSE"); `hadPart`: an existing line came with one (a revision may not blank it). */
-export type FormItem = { id?: string; received?: number; ordered?: number; buffer?: number; hadPart?: boolean; sku: string; item_name: string; fabric_code: string; component: string; quantity: string; unit: string; rate: string };
+ *  `component`: what a fabric line is for ("LEHENGA, BLOUSE"); `hadPart`: an existing line came with one (a revision may not blank it).
+ *  `autoSku`: the code this line was filled for from an earlier order (it is not filled a second time for the same code). */
+export type FormItem = { id?: string; received?: number; ordered?: number; buffer?: number; hadPart?: boolean; autoSku?: string; sku: string; item_name: string; fabric_code: string; component: string; quantity: string; unit: string; rate: string };
 // The quantity starts empty: over a pre-filled "1", typing 50 gave 150.
 export const blankItem = (): FormItem => ({ sku: '', item_name: '', fabric_code: '', component: '', quantity: '', unit: '', rate: '' });
 const UNIT_OPTIONS = ['Meter', 'Piece', 'Dozen'];
 const num = (s: string) => { const n = parseFloat(s); return isNaN(n) ? 0 : n; };
 const fmt = (n: number) => n.toLocaleString('en-IN', { maximumFractionDigits: 3 });
 
-export default function POItemRows({ items, poType, forPieces, amend, tried, onChange, onRemove, onAdd }: {
+type Vendor = { id: string | null; name: string; phone: string };
+
+export default function POItemRows({ items, poType, forPieces, amend, tried, vendor, onVendor, onType, onChange, onRemove, onAdd }: {
   items: FormItem[];
   poType: PurchaseOrderType | '';
   forPieces: string;
@@ -34,13 +41,24 @@ export default function POItemRows({ items, poType, forPieces, amend, tried, onC
   amend: boolean;
   /** Save was tried and refused: what is still missing shows red. */
   tried: boolean;
+  /** The form's vendor and type: a line filled from an earlier order also picks these when they are still empty. */
+  vendor: Vendor; onVendor: (v: Vendor) => void; onType: (t: PurchaseOrderType) => void;
   onChange: (i: number, patch: Partial<FormItem>) => void;
   onRemove: (i: number) => void;
-  onAdd: () => void;
+  /** A new line — blank, or already holding another fabric of the same design. */
+  onAdd: (patch?: Partial<FormItem>) => void;
 }) {
   const fabric = poType === 'fabric';
   const skuRequired = fabric || poType === 'material';
   const recentNames = useRecentItemNames(poType);
+  // An earlier order's fabric as this form holds it; the unit a line already has is kept.
+  const asLine = (f: SkuFabric, sku: string, unit = ''): Partial<FormItem> => ({ item_name: f.item_name, fabric_code: f.fabric_code ?? '', component: f.component ?? '', unit: unit || f.unit || '', autoSku: skuKey(sku) });
+  const fill = (i: number, f: SkuFabric) => {
+    onChange(i, asLine(f, items[i].sku, items[i].unit));
+    if (!poType) onType(f.po_type);
+    // The vendor too, when none is chosen yet and Contacts has this one with a phone.
+    if (!vendor.id && !vendor.name.trim() && f.vendor_id && (f.vendor_phone ?? '').replace(/\D/g, '').length >= 10) onVendor({ id: f.vendor_id, name: f.vendor_name, phone: f.vendor_phone ?? '' });
+  };
   // Previously used fabric codes, fetched once the first time the form is a
   // fabric PO (never on a job-work form). Best-effort: without the list the
   // box is still a plain text field.
@@ -73,6 +91,9 @@ export default function POItemRows({ items, poType, forPieces, amend, tried, onC
                 </div>
                 <button onClick={() => onRemove(i)} disabled={locked} title={it.received ? 'Goods already arrived on this line — cancel its balance from the order' : undefined} style={{ border: 'none', background: 'none', cursor: locked ? 'not-allowed' : 'pointer', color: T.re, opacity: locked ? 0.25 : 0.7, fontSize: 18, padding: '8px 10px', lineHeight: 1, flexShrink: 0 }} aria-label="Remove item">&times;</button>
               </div>
+              <POSkuHistory row={it} rows={items} last={items.map(x => skuKey(x.sku)).lastIndexOf(skuKey(it.sku)) === i} vendorId={vendor.id} pieces={forPieces}
+                onFill={f => fill(i, f)} onAdd={f => onAdd({ sku: it.sku, ...asLine(f, it.sku) })} onQty={q => onChange(i, { quantity: q })}
+                onClear={() => onChange(i, { item_name: '', fabric_code: '', component: '' })} />
               <div style={{ display: 'grid', gridTemplateColumns: fabric ? '1fr 1fr' : '1fr', gap: 6, marginBottom: 8 }}>
                 <input value={it.item_name} onChange={e => onChange(i, { item_name: e.target.value })} placeholder={fabric ? 'Fabric name *' : 'Item name *'} style={{ ...S.fInput, width: '100%', minWidth: 0 }} />
                 {fabric && (
@@ -106,7 +127,7 @@ export default function POItemRows({ items, poType, forPieces, amend, tried, onC
           );
         })}
       </div>
-      <button onClick={onAdd} style={{ ...S.btnGhost, ...S.btnSm, marginTop: 8, borderStyle: 'dashed', minHeight: 36 }}>+ Add item</button>
+      <button onClick={() => onAdd()} style={{ ...S.btnGhost, ...S.btnSm, marginTop: 8, borderStyle: 'dashed', minHeight: 36 }}>+ Add item</button>
     </>
   );
 }
