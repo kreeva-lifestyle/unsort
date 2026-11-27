@@ -62,8 +62,9 @@ function changeLine(c: POChange, all: POChange[] = []): string | null {
     }
     case 'added': return `• Added: ${c.label} — *${q(c.to, c.unit)}*`;
     case 'cancelled': return `• Cancelled: ${c.label} — ${q(c.from, c.unit)}${n(c.received) > 0 ? ` (we keep the ${q(c.received, c.unit)} already received)` : ''}`;
+    case 'item': return `• ${c.label}: ${FIELD_WORD[c.field]} ${c.from || '—'} → *${c.to || '—'}*`;
     // What a fabric is for is internal: the vendor never hears it.
-    case 'item': return c.field === 'component' ? null : `• ${c.label}: ${FIELD_WORD[c.field]} ${c.from || '—'} → *${c.to || '—'}*`;
+    case 'component': return null;
     case 'field':
       if (c.field === 'expected_date') return c.to ? `• Delivery date: ${c.from ? `~${day(String(c.from))}~ → ` : ''}*${day(String(c.to))}*` : '• Delivery date: removed';
       if (c.field === 'notes') return c.to ? `• Note: ${String(c.to)}` : null;

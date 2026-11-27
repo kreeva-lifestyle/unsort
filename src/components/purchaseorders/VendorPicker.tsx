@@ -18,6 +18,7 @@ type VendorRow = Pick<POVendor, 'id' | 'name' | 'phone'>;
 
 /** The one saved vendor with exactly this name (any letter case), or null — a name typed in full but not tapped still finds its contact. */
 export async function vendorNamed(name: string): Promise<Picked | null> {
+  if (name.includes('*')) return null; // PostgREST reads * as "anything": not an exact name
   const { data, error } = await supabase.from('po_vendors').select('id, name, phone')
     .eq('is_active', true).ilike('name', name.trim().replace(/[\\%_]/g, '\\$&')).limit(2);
   // No match, two contacts of that name, or a failed look-up: the form asks for the vendor to be picked or added.

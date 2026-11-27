@@ -110,7 +110,9 @@ export type POChange =
   | { kind: 'qty'; item_id: string; label: string; unit: string | null; from: number; to: number; received: number }
   | { kind: 'added'; item_id: string; label: string; unit: string | null; to: number }
   | { kind: 'cancelled'; item_id: string; label: string; unit: string | null; from: number; received: number }
-  | { kind: 'item'; item_id: string; label: string; field: 'item_name' | 'fabric_code' | 'sku' | 'unit' | 'component'; from: string | null; to: string | null }
+  | { kind: 'item'; item_id: string; label: string; field: 'item_name' | 'fabric_code' | 'sku' | 'unit'; from: string | null; to: string | null }
+  /** What the fabric is for changed. A kind of its own: internal, never part of what the vendor is told. */
+  | { kind: 'component'; item_id: string; label: string; from: string | null; to: string | null }
   | { kind: 'rate'; item_id: string; label: string; from: number | null; to: number | null }
   | { kind: 'field'; field: 'expected_date' | 'notes' | 'payment_terms' | 'for_pieces' | 'lump_sum' | 'discount' | 'tax_percent' | 'other_charges'; from: unknown; to: unknown }
   | { kind: 'total'; from: number; to: number };
