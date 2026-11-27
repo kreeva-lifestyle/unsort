@@ -390,4 +390,26 @@ Found in the overnight check of 19 Nov; built in the next Playbook change.
 
 ## DailyWork
 
-- Nothing pending.
+- **Purchase orders: tips of 27 Nov, waiting for your pick.** Claude studied
+  the module and every order since August. Nothing is built yet. Say which
+  numbers to build:
+  1. The "late" rule. An order with no expected date counts as late after
+     3 days (your rule of 14 Oct), but most orders arrive later than that,
+     so the red list is mostly false alarms. Keep 3 days, or give another
+     number. Then a line on Home with how many are late and due today.
+  2. "Cancel PO" asks a one-tap reason, offers "Change it instead" (Revise)
+     and "Close remaining", and offers the WhatsApp message to the vendor.
+     Today it saves no reason.
+  3. A vendor who is typed but is not on the vendor list: ask the phone
+     once and add them. Claude then repairs the older orders that have no
+     phone (reminders cannot open those vendors' chats today).
+  4. "Save and approve" as one step for admins and managers.
+  5. Order form: quantity starts empty, a half-typed order is not thrown
+     away by a stray tap, an empty item card no longer blocks the save,
+     and this vendor's recent fabrics show as one-tap buttons.
+  6. Receive challan: show each order's fabric, code and design before it
+     is ticked, and warn when a challan number was already entered.
+  Your answers decide the rest: how an order reaches the vendor today
+  (picture, typed message or call), whether you want purchase prices in
+  the app, whether this page is used on a phone or a computer, and who
+  types the deliveries.
