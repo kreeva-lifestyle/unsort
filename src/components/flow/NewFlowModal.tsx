@@ -82,7 +82,7 @@ export default function NewFlowModal({ onClose, onCreated, addToast }: { onClose
   const enter = (e: React.KeyboardEvent) => { if (e.key === 'Enter') save(); };
 
   return createPortal(
-    <div style={S.modalOverlay} onClick={onClose}>
+    <div style={S.modalOverlay}>
       <div className="modal-inner" style={{ ...S.modalBox, width: 520 }} onClick={e => e.stopPropagation()}>
         <div style={S.modalHead}>
           <span style={S.modalTitle}>New Flow Pipeline</span>

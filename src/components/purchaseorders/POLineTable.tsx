@@ -5,7 +5,7 @@
 // cancelled with its reason: what arrived on it stands, the balance is gone.
 // Split out of PODetail so that file stays under the 200-line limit.
 import { T, S } from '../../lib/theme';
-import { itemLabel } from './poItemLabel';
+import { itemLabel, lineNote } from './poItemLabel';
 import { fmtQty } from './poStats';
 import type { PurchaseOrderItem } from '../../types/database';
 
@@ -46,7 +46,8 @@ export default function POLineTable({ items, forPieces, canCancel, busy, onCance
                   <td style={S.tdStyle}>
                     <span style={{ fontSize: 13, color: cancelled ? T.tx3 : T.tx, textDecoration: cancelled && got === 0 ? 'line-through' : undefined }}>{itemLabel(it)}</span>
                     {it.unit && <span style={{ fontSize: 10, color: T.tx3, marginLeft: 4 }}>/{it.unit}</span>}
-                    {it.sku && <div style={{ fontSize: 10, color: T.tx3, fontFamily: T.mono, marginTop: 1 }}>{it.sku}</div>}
+                    {/* The design, and what the fabric is for ("DRS230 · for DUPATTA"). */}
+                    {lineNote(it) && <div style={{ fontSize: 10, color: T.tx3, fontFamily: T.mono, marginTop: 1 }}>{lineNote(it)}</div>}
                     {buf > 0 && (
                       <div style={{ fontSize: 11, color: T.ac2, marginTop: 3 }}>
                         {fmtQty(qty - buf)} for {forPieces ? `${forPieces} pcs` : 'the plan'} + {fmtQty(buf)} buffer

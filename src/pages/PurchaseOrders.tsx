@@ -74,13 +74,14 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
   }, [addToast]);
 
   const closeForm = () => { setShowForm(false); setEditing(null); setDuplicating(null); };
-  const onSaved = async (r: { id: string; po_number: number; revision?: number; changed?: boolean }, isNew: boolean) => {
+  const onSaved = async (r: { id: string; po_number: number; revision?: number; changed?: boolean; approved?: boolean }, isNew: boolean) => {
     closeForm();
-    addToast(isNew ? `PO #${r.po_number} created` : r.changed === false ? `Nothing changed on PO #${r.po_number}` : r.revision ? `PO #${r.po_number} revised — now Rev ${r.revision}` : `PO #${r.po_number} updated`, 'success');
+    addToast(isNew ? `PO #${r.po_number} created${r.approved ? ' and approved' : ''}` : r.changed === false ? `Nothing changed on PO #${r.po_number}` : r.revision ? `PO #${r.po_number} revised — now Rev ${r.revision}` : `PO #${r.po_number} updated`, 'success');
     fetchPos(); bumpData();
     // Edits originate from the detail view — reopen it so the user keeps their
-    // place instead of being dropped back to the list.
-    if (!isNew) {
+    // place instead of being dropped back to the list. An order saved and
+    // approved in one step opens too: Print / Share is the next tap.
+    if (!isNew || r.approved) {
       const { data, error } = await supabase.from('purchase_orders').select(COLS).eq('id', r.id).maybeSingle();
       if (error) { addToast(friendlyError(error), 'error'); return; }
       if (data) openDetail(data as PurchaseOrder);
@@ -126,7 +127,7 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
       />
 
       <Suspense fallback={null}>
-      {showForm && <POForm editing={editing} duplicateFrom={duplicating} onClose={closeForm} onSaved={onSaved} addToast={addToast} />}
+      {showForm && <POForm editing={editing} duplicateFrom={duplicating} canApprove={canManage} onClose={closeForm} onSaved={onSaved} addToast={addToast} />}
 
       {detail && <PODetail key={detail.po.id}
         po={detail.po} items={detail.items} receipts={detail.receipts} audit={detail.audit} names={detail.names} revisions={detail.revisions}

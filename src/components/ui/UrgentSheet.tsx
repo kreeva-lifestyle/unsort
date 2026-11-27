@@ -41,7 +41,7 @@ export default function UrgentSheet({ module, id, title, row, onClose, onSaved, 
   const dim = (b: boolean): React.CSSProperties => ({ pointerEvents: busy ? 'none' : 'auto', opacity: b ? 0.5 : 1 });
 
   return createPortal(
-    <div style={S.modalOverlay} onClick={onClose}>
+    <div style={S.modalOverlay}>
       <form className="modal-inner" style={{ ...S.modalBox, width: 420 }} onClick={e => e.stopPropagation()} onSubmit={e => { e.preventDefault(); save(true); }}>
         <div style={S.modalHead}>
           <span style={S.modalTitle}>{row.is_urgent ? 'Urgent' : 'Mark urgent'} · <span style={{ fontFamily: T.mono }}>{title}</span></span>

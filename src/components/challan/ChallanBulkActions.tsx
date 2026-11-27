@@ -94,7 +94,7 @@ export default function ChallanBulkActions(p: Props) {
       )}
 
       {p.showBulkPay && createPortal(
-        <div style={S.modalOverlay} onClick={p.onCloseBulkPay}>
+        <div style={S.modalOverlay}>
           <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 420, padding: '20px 18px' }} onClick={e => e.stopPropagation()}>
             <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 12 }}>{p.netTotal < 0 ? 'Settle & Refund' : 'Bulk Pay'}</div>
             <ChallanKPIs payableCount={p.payable.length} outstanding={p.outstanding} returnsCount={p.returns.length} returnsTotal={p.returnsTotal} netTotal={p.netTotal} />

@@ -2,6 +2,9 @@
 // Only name + phone are mandatory (owner decision). Selecting an existing
 // vendor snapshots its id/name/phone; quick-add inserts into po_vendors
 // first, then selects it — so the vendor master grows as POs are raised.
+// An order is only saved for a vendor picked or added here (owner, 27 Nov
+// 2026): when a typed name is refused, the form bumps `addSignal` and the
+// add box opens with that name, waiting for the phone number.
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { T, S } from '../../lib/theme';
@@ -12,12 +15,14 @@ import type { POVendor } from '../../types/database';
 type Picked = { id: string | null; name: string; phone: string };
 type VendorRow = Pick<POVendor, 'id' | 'name' | 'phone'>;
 
-export default function VendorPicker({ value, onPick, addToast, disabled }: {
+export default function VendorPicker({ value, onPick, addToast, disabled, addSignal }: {
   value: string;
   phone: string; // still accepted from the parent; intentionally NOT reused on manual edits (see onChange note)
   onPick: (v: Picked) => void;
   addToast: (m: string, t?: string) => void;
   disabled?: boolean;
+  /** Bumped when a save was refused for a typed, unsaved vendor: opens "Add new vendor" with the name filled in. */
+  addSignal?: number;
 }) {
   const [q, setQ] = useState(value);
   const [suggestions, setSuggestions] = useState<VendorRow[]>([]);
@@ -39,6 +44,12 @@ export default function VendorPicker({ value, onPick, addToast, disabled }: {
     if (error) { addToast(friendlyError(error), 'error'); return; }
     setSuggestions((data as VendorRow[] | null) || []);
   }, [addToast]);
+
+  useEffect(() => {
+    if (!addSignal || !q.trim()) return;
+    search(q); setOpen(true); setAdding(true); setNewName(q.trim()); setNewPhone('');
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only when the form asks
+  }, [addSignal]);
 
   useEffect(() => {
     const h = (e: MouseEvent) => { if (boxRef.current && !boxRef.current.contains(e.target as Node)) setOpen(false); };
@@ -106,8 +117,8 @@ export default function VendorPicker({ value, onPick, addToast, disabled }: {
           )}
           {adding && (
             <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 6, background: T.glass1 }} onClick={e => e.stopPropagation()}>
-              <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Vendor name *" style={{ ...S.fInput, width: '100%' }} autoFocus />
-              <input value={newPhone} onChange={e => setNewPhone(e.target.value)} onKeyDown={e => numericKeyDown(e)} inputMode="numeric" placeholder="Phone (10 digits) *" style={{ ...S.fInput, width: '100%', fontFamily: T.mono }} />
+              <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Vendor name *" style={{ ...S.fInput, width: '100%' }} autoFocus={!newName.trim()} />
+              <input value={newPhone} onChange={e => setNewPhone(e.target.value)} onKeyDown={e => numericKeyDown(e)} inputMode="numeric" placeholder="Phone (10 digits) *" style={{ ...S.fInput, width: '100%', fontFamily: T.mono }} autoFocus={!!newName.trim()} />
               <div style={{ display: 'flex', gap: 6 }}>
                 <button onClick={quickAdd} disabled={saving} style={{ ...S.btnPrimary, ...S.btnSm, flex: 1, pointerEvents: saving ? 'none' : 'auto', opacity: saving ? 0.5 : 1 }}>{saving ? 'Saving…' : 'Save vendor'}</button>
                 <button onClick={() => setAdding(false)} style={{ ...S.btnGhost, ...S.btnSm }}>Cancel</button>

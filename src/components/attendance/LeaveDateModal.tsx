@@ -34,7 +34,7 @@ export default function LeaveDateModal({ emp, busy, onCancel, onConfirm }: {
   };
 
   return createPortal((
-    <div style={{ ...S.modalOverlay }} onClick={busy ? undefined : onCancel}>
+    <div style={{ ...S.modalOverlay }}>
       <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 380 }} onClick={ev => ev.stopPropagation()}>
         <div style={S.modalHead}>
           <div style={S.modalTitle}>Deactivate {emp.name}</div>

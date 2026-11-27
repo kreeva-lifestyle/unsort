@@ -96,7 +96,7 @@ export default function AttendanceEntryModal({ employees, month, editing, preset
   const lbl = { ...S.fLabel, display: 'block', marginBottom: 4 } as const;
 
   return createPortal((
-    <div style={{ ...S.modalOverlay }} onClick={onClose}>
+    <div style={{ ...S.modalOverlay }}>
       <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 460 }} onClick={ev => ev.stopPropagation()}>
         <div style={S.modalHead}>
           <div style={S.modalTitle}>{editing ? 'Edit attendance' : 'Add attendance'}</div>

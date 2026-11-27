@@ -1484,7 +1484,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
       {/* WhatsApp Phone Prompt Modal */}
       {reminderChallan && createPortal((
-        <div style={S.modalOverlay} onClick={() => setReminderChallan(null)}>
+        <div style={S.modalOverlay}>
           <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 360, padding: '20px 18px' }} onClick={e => e.stopPropagation()}>
             <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>Add Customer Phone</div>
             <div style={{ fontSize: 11, color: T.tx3, marginBottom: 12 }}>No phone saved for <strong style={{ color: T.tx }}>{reminderChallan.customer_name}</strong>. Enter a 10-digit mobile to send reminder:</div>

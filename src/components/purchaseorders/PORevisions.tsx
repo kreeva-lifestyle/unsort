@@ -17,7 +17,7 @@ import type { POChange, PurchaseOrder, PurchaseOrderItem } from '../../types/dat
 
 const q = (v: unknown, unit?: string | null) => `${fmtQty(Number(v || 0))}${unit !== undefined ? ` ${unitOf(unit)}` : ''}`;
 const money = (v: unknown) => (v == null ? '—' : `₹${Number(v).toLocaleString('en-IN')}`);
-const FIELD: Record<string, string> = { item_name: 'item', fabric_code: 'fabric code', sku: 'SKU', unit: 'unit' };
+const FIELD: Record<string, string> = { item_name: 'item', fabric_code: 'fabric code', sku: 'SKU', unit: 'unit', component: 'fabric is for' };
 
 /** One change in our own words (rates and totals included — this never reaches a vendor). */
 export function changeText(c: POChange): string {

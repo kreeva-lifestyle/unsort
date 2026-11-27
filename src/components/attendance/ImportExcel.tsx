@@ -224,7 +224,7 @@ export default function ImportExcel({ employees, onClose, onImported, addToast }
   };
 
   return createPortal((
-    <div style={{ ...S.modalOverlay }} onClick={() => !busy && onClose()}>
+    <div style={{ ...S.modalOverlay }}>
       <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 460 }} onClick={ev => ev.stopPropagation()}>
         <div style={S.modalHead}>
           <div style={S.modalTitle}>Import Timesheet (Excel)</div>

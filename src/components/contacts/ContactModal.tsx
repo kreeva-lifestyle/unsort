@@ -69,7 +69,7 @@ export default function ContactModal({ contact, canEdit, onClose, onSaved, addTo
   const ro = !canEdit;
 
   return createPortal(
-    <div style={S.modalOverlay} onClick={onClose}>
+    <div style={S.modalOverlay}>
       <div className="modal-inner" style={{ ...S.modalBox, width: 460, display: 'flex', flexDirection: 'column', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
         <div style={S.modalHead}>
           <span style={S.modalTitle}>{contact ? (canEdit ? 'Edit contact' : 'Contact') : 'New contact'}</span>

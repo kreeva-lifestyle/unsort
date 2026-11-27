@@ -70,7 +70,7 @@ export default function LineSheet({ sub, compName, library, onChange, onRemove, 
 
   const fld = (b: boolean): React.CSSProperties => ({ ...S.fInput, width: '100%', fontSize: 15, height: 42, ...(b ? { border: BAD } : {}) });
   return createPortal(
-    <div style={S.modalOverlay} onClick={onClose}>
+    <div style={S.modalOverlay}>
       <div className="modal-inner" style={{ ...S.modalBox, width: 480 }} onClick={e => e.stopPropagation()}>
         <div style={S.modalHead}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, minWidth: 0 }}>

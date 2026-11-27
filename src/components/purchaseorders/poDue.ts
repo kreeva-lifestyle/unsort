@@ -1,12 +1,14 @@
 // When an open purchase order is due, and where today stands against it.
 // The due date is the PO's expected date; a PO raised without one gives the
-// vendor ASSUMED_LEAD_DAYS from the PO date (owner's rule). Past the due
+// vendor ASSUMED_LEAD_DAYS from the PO date (owner's rule: 5 days since
+// 27 Nov 2026 — most orders take about 5, so 3 turned the list red too
+// early). Past the due
 // date the order is "breached" — the summary tile, the list rows, the due
 // columns and the vendor pendency report all read this one definition.
 // Pure: dates in and out are ISO days, so a harness can feed any "today".
 
 /** No expected date on the PO → due this many days after the PO date. */
-export const ASSUMED_LEAD_DAYS = 3;
+export const ASSUMED_LEAD_DAYS = 5;
 
 const pad = (x: number) => String(x).padStart(2, '0');
 const iso = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;

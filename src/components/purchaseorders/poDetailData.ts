@@ -8,7 +8,7 @@
 import { supabase } from '../../lib/supabase';
 import type { PurchaseOrder, PurchaseOrderItem, PurchaseOrderReceipt, PurchaseOrderRevision, AuditLog } from '../../types/database';
 
-export const ITEM_COLS = 'id, po_id, item_name, sku, fabric_code, quantity, unit, rate, amount, received_qty, buffer_qty, sort_order, created_at, cancelled_qty, cancelled_at, cancelled_by, cancel_reason';
+export const ITEM_COLS = 'id, po_id, item_name, sku, fabric_code, component, quantity, unit, rate, amount, received_qty, buffer_qty, sort_order, created_at, cancelled_qty, cancelled_at, cancelled_by, cancel_reason';
 /** A revision with the name of whoever made it (embedded, one round trip). */
 export type PORevisionRow = PurchaseOrderRevision & { creator?: { full_name: string | null } | null };
 const REV_COLS = 'id, po_id, revision, kind, changes, reason, created_by, created_at, notified_at, notified_by, notified_how, creator:profiles!purchase_order_revisions_created_by_fkey(full_name)';
@@ -37,6 +37,9 @@ export async function loadPoActivity(po: PurchaseOrder, receipts: PurchaseOrderR
   const names: Record<string, string> = {};
   // A profile with no name is still a person ("User"); an id with no profile at all is left out.
   for (const u of (p.data as { id: string; full_name: string | null }[] | null) ?? []) names[u.id] = u.full_name?.trim() || 'User';
+  // "Save and approve" writes Created and Approved in one transaction, so both carry the same moment:
+  // newest first as read, and at the same moment Created stays below.
+  const audit = ((a.data as AuditLog[] | null) ?? []).slice().sort((x, y) => (y.created_at ?? '').localeCompare(x.created_at ?? '') || Number(x.action === 'CREATE') - Number(y.action === 'CREATE'));
   // The history is part of the trail: a failed read shows as the trail's retry.
-  return { audit: (a.data as AuditLog[] | null) ?? [], names, revisions: (r.data as unknown as PORevisionRow[] | null) ?? [], auditError: a.error || r.error, namesError: p.error };
+  return { audit, names, revisions: (r.data as unknown as PORevisionRow[] | null) ?? [], auditError: a.error || r.error, namesError: p.error };
 }

@@ -64,6 +64,8 @@ export interface PurchaseOrder extends Urgent {
   approved_at: string | null;
   cancelled_by: string | null;
   cancelled_at: string | null;
+  /** Why it was cancelled (compulsory since 27 Nov 2026; null on older cancels). */
+  cancel_reason: string | null;
   /** Short-close: the undelivered balance was written off, with a reason. */
   closed_at: string | null;
   closed_by: string | null;
@@ -85,6 +87,8 @@ export interface PurchaseOrderItem {
   sku: string | null;
   /** Fabric POs only: the vendor's fabric code (compulsory there, null elsewhere). */
   fabric_code: string | null;
+  /** What the fabric is for — the design's component(s), in capitals ("LEHENGA", "LEHENGA, BLOUSE"). Internal: never printed or shared. Null on lines from before 27 Nov 2026 and on non-fabric lines. */
+  component: string | null;
   quantity: number;
   unit: string | null;
   rate: number | null;
@@ -106,7 +110,7 @@ export type POChange =
   | { kind: 'qty'; item_id: string; label: string; unit: string | null; from: number; to: number; received: number }
   | { kind: 'added'; item_id: string; label: string; unit: string | null; to: number }
   | { kind: 'cancelled'; item_id: string; label: string; unit: string | null; from: number; received: number }
-  | { kind: 'item'; item_id: string; label: string; field: 'item_name' | 'fabric_code' | 'sku' | 'unit'; from: string | null; to: string | null }
+  | { kind: 'item'; item_id: string; label: string; field: 'item_name' | 'fabric_code' | 'sku' | 'unit' | 'component'; from: string | null; to: string | null }
   | { kind: 'rate'; item_id: string; label: string; from: number | null; to: number | null }
   | { kind: 'field'; field: 'expected_date' | 'notes' | 'payment_terms' | 'for_pieces' | 'lump_sum' | 'discount' | 'tax_percent' | 'other_charges'; from: unknown; to: unknown }
   | { kind: 'total'; from: number; to: number };
@@ -146,6 +150,7 @@ export type POItemInput = {
   item_name: string;
   sku?: string | null;
   fabric_code?: string | null;
+  component?: string | null;
   quantity: number;
   unit?: string | null;
   rate?: number | null;

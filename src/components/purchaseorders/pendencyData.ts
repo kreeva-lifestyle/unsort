@@ -15,7 +15,7 @@ export interface PendencyPo {
   id: string; po_number: number; po_date: string | null; expected_date: string | null; status: PurchaseOrderStatus;
   /** ISO date the wait is counted from — the PO date, else the day it was created. */
   since: string; days: number;
-  /** ISO day the order was due (expected date, or PO date + 3 d when none), days past it, and whether the date was assumed. */
+  /** ISO day the order was due (expected date, or PO date + ASSUMED_LEAD_DAYS when none), days past it, and whether the date was assumed. */
   due: string; late: number; assumed: boolean;
   items: PendencyItem[]; pendingQty: number; pendingAmount: number | null;
 }

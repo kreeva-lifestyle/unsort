@@ -444,7 +444,7 @@ export default function InventoryExtras() {
       </div>}
 
       {/* Add Spare Part Modal */}
-      {showAdd && createPortal(<div style={overlay} onClick={closeAdd}>
+      {showAdd && createPortal(<div style={overlay}>
         <div className="modal-inner" style={modal} onClick={e => e.stopPropagation()}>
           <div style={{ padding: '13px 18px', borderBottom: `1px solid ${T.bd}` }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>Add Spare Part</span>
@@ -511,7 +511,7 @@ export default function InventoryExtras() {
       </div>, document.body)}
 
       {/* Adjust Quantity Modal */}
-      {adjustExtra && createPortal(<div style={overlay} onClick={() => setAdjustExtra(null)}>
+      {adjustExtra && createPortal(<div style={overlay}>
         <div className="modal-inner" style={{ ...modal, width: 380 }} onClick={e => e.stopPropagation()}>
           <div style={{ padding: '13px 18px', borderBottom: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>{adjustMode === 'add' ? 'Add' : 'Remove'} Quantity</span>
@@ -592,7 +592,7 @@ export default function InventoryExtras() {
           </div>
         </div>
       </div>, document.body)}
-      {editingExtra && createPortal(<div style={overlay} onClick={() => setEditingExtra(null)}>
+      {editingExtra && createPortal(<div style={overlay}>
         <div className="modal-inner" style={modal} onClick={e => e.stopPropagation()}>
           <div style={{ padding: '13px 18px', borderBottom: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>Edit Spare Part</span>

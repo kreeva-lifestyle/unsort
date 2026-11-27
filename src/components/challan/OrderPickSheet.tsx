@@ -26,7 +26,7 @@ export default function OrderPickSheet({ order, onClose, onPick }: {
   const step: React.CSSProperties = { ...S.btnGhost, width: 44, minHeight: 44, padding: 0, fontSize: 18, lineHeight: 1 };
 
   return createPortal(
-    <div style={S.modalOverlay} onClick={onClose}>
+    <div style={S.modalOverlay}>
       <div className="modal-inner" style={{ ...S.modalBox, display: 'flex', flexDirection: 'column', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
         <div style={S.modalHead}>
           <div style={{ minWidth: 0 }}>

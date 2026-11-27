@@ -191,7 +191,7 @@ export default function Trackly({ addToast, onBack }: { addToast: (msg: string, 
         </div>
       </div>}
 
-      {showAdd && createPortal(<div style={S.modalOverlay} onClick={closeModal}>
+      {showAdd && createPortal(<div style={S.modalOverlay}>
         <div className="modal-inner" style={S.modalBox} onClick={e => e.stopPropagation()}>
           <div style={S.modalHead}>
             <span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>Create Short Link</span>

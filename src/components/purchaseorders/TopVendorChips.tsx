@@ -17,7 +17,8 @@ export default function TopVendorChips({ onPick }: { onPick: (v: V) => void }) {
     supabase.from('app_settings').select('value').eq('key', 'po_top_vendors').maybeSingle()
       .then(({ data, error }) => {
         if (error) { logSwallowed('PO top vendors', error); return; } // chips are a convenience
-        if (Array.isArray(data?.value)) setTops((data.value as V[]).filter(v => (v?.name || '').trim()));
+        // Only vendors saved in Contacts: an order cannot be raised for a name without a record.
+        if (Array.isArray(data?.value)) setTops((data.value as V[]).filter(v => (v?.name || '').trim() && v.id));
       });
   }, []);
   if (tops.length === 0) return null;

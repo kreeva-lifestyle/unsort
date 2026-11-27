@@ -219,7 +219,7 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
         })}
       </div>
 
-      {showInvite && createPortal(<div style={S.modalOverlay} onClick={() => { if (!inviteResult) setShowInvite(false); }}><div className="modal-inner" style={S.modalBox} onClick={e => e.stopPropagation()}>
+      {showInvite && createPortal(<div style={S.modalOverlay}><div className="modal-inner" style={S.modalBox} onClick={e => e.stopPropagation()}>
         <div style={S.modalHead}><span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>Invite New User</span>{!inviteResult && <button type="button" onClick={() => setShowInvite(false)} aria-label="Close" style={S.modalClose}>&#215;</button>}</div>
         {inviteResult ? (
           <div style={{ padding: 16 }}>

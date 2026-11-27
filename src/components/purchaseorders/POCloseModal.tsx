@@ -11,7 +11,7 @@ import { friendlyError } from '../../lib/friendlyError';
 import { useModalLock } from '../../hooks/useModalLock';
 import { useBackClose } from '../../hooks/useBackClose';
 import type { PurchaseOrder, PurchaseOrderItem } from '../../types/database';
-import { itemLabel } from './poItemLabel';
+import { itemLabel, lineNote } from './poItemLabel';
 
 const PRESETS = [
   'Vendor delivered short',
@@ -56,7 +56,7 @@ export default function POCloseModal({ po, items, onClose, onClosed, addToast }:
   };
 
   return createPortal(
-    <div style={S.modalOverlay} onClick={onClose}>
+    <div style={S.modalOverlay} onClick={e => e.stopPropagation()}>
       <div className="modal-inner" style={{ ...S.modalBox, width: 460, display: 'flex', flexDirection: 'column', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
         <div style={S.modalHead}>
           <span style={S.modalTitle}>Close remaining · PO #{po.po_number}</span>
@@ -73,7 +73,7 @@ export default function POCloseModal({ po, items, onClose, onClosed, addToast }:
               <div key={it.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: '8px 10px', borderBottom: `1px solid ${T.bd}`, fontSize: 12 }}>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ color: T.tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{itemLabel(it)}</div>
-                  {it.sku && <div style={{ fontSize: 10, color: T.tx3, fontFamily: T.mono }}>{it.sku}</div>}
+                  {lineNote(it) && <div style={{ fontSize: 10, color: T.tx3, fontFamily: T.mono }}>{lineNote(it)}</div>}
                 </div>
                 <div style={{ fontFamily: T.mono, color: T.yl, flexShrink: 0 }}>{qty(pending)}{it.unit ? ` ${it.unit}` : ''}</div>
               </div>

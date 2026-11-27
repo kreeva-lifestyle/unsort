@@ -203,7 +203,7 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
     <div className="challan-detail-overlay" style={mobile
       ? { position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,.6)' }
       : { position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.80)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', padding: 16 }
-    } onClick={onClose}>
+    }>
       <div ref={scrollRef} className="challan-detail-modal" style={mobile
         ? { position: 'fixed', bottom: 0, left: 0, right: 0, background: T.bg, borderRadius: '16px 16px 0 0', padding: 0, maxHeight: '85dvh', overflowY: 'auto', WebkitOverflowScrolling: 'touch', animation: 'slideUp .25s ease both' }
         : { background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: 0, maxWidth: 520, width: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 24px 80px rgba(0,0,0,.65)' }
@@ -428,7 +428,7 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
   );
 
   const qrModal = showQrShare && qrUrl ? createPortal(
-    <div style={{ ...S.modalOverlay, zIndex: 10001 }} onClick={() => setShowQrShare(false)}>
+    <div style={{ ...S.modalOverlay, zIndex: 10001 }}>
       <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 360, padding: '20px 18px' }} onClick={e => e.stopPropagation()}>
         <div style={{ ...S.modalHead, borderBottom: 'none', padding: '0 0 12px' }}>
           <div style={S.modalTitle}>Share Payment QR</div>

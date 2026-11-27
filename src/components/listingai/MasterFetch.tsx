@@ -74,7 +74,7 @@ export default function MasterFetch({ busy, hasSkus, onPick, addToast }: {
         style={{ ...S.btnGhost, pointerEvents: busy ? 'none' : 'auto', opacity: busy ? 0.5 : 1 }}>Fetch from Master</button>
 
       {open && createPortal((
-        <div style={{ ...S.modalOverlay }} onClick={() => setOpen(false)}>
+        <div style={{ ...S.modalOverlay }}>
           <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 420 }} onClick={ev => ev.stopPropagation()}>
             <div style={S.modalHead}>
               <div style={S.modalTitle}>Fetch from Master</div>

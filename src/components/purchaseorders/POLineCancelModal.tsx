@@ -10,7 +10,7 @@ import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
 import { useModalLock } from '../../hooks/useModalLock';
 import { useBackClose } from '../../hooks/useBackClose';
-import { itemLabel } from './poItemLabel';
+import { itemLabel, lineNote } from './poItemLabel';
 import { fmtQty } from './poStats';
 import type { PurchaseOrder, PurchaseOrderItem } from '../../types/database';
 
@@ -56,7 +56,7 @@ export default function POLineCancelModal({ po, item, onClose, onDone, addToast 
   };
 
   return createPortal(
-    <div style={S.modalOverlay} onClick={onClose}>
+    <div style={S.modalOverlay} onClick={e => e.stopPropagation()}>
       <div className="modal-inner" style={{ ...S.modalBox, width: 460, display: 'flex', flexDirection: 'column', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
         <div style={S.modalHead}>
           <span style={S.modalTitle}>Cancel item · PO #{po.po_number}</span>
@@ -67,7 +67,7 @@ export default function POLineCancelModal({ po, item, onClose, onDone, addToast 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: '10px 12px', border: `1px solid ${T.bd}`, borderRadius: 10, marginBottom: 12 }}>
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: T.tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{itemLabel(item)}</div>
-              {item.sku && <div style={{ fontSize: 10, color: T.tx3, fontFamily: T.mono }}>{item.sku}</div>}
+              {lineNote(item) && <div style={{ fontSize: 10, color: T.tx3, fontFamily: T.mono }}>{lineNote(item)}</div>}
             </div>
             <div style={{ fontFamily: T.mono, fontSize: 13, color: T.re, flexShrink: 0 }}>{fmtQty(pending)}{unit}</div>
           </div>

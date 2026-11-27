@@ -41,11 +41,12 @@ export function Title({ v, size }: { v: RowView; size: number }) {
   );
 }
 
-/** "Valentino · 137 +2 more" — the type when the order has no lines. */
+/** "Valentino · 137 for DUPATTA +2 more" — the type when the order has no lines. */
 export function Item({ v }: { v: RowView }) {
   const items = liveLines(v), first = items[0];
   if (!first) return <>{PO_TYPE_LABELS[v.po.po_type] || v.po.po_type}</>;
-  return <>{itemLabel({ item_name: (first.item_name || '').trim() || 'item', fabric_code: first.fabric_code })}{items.length > 1 && <b style={{ color: T.ac2, fontWeight: 600 }}> +{items.length - 1} more</b>}</>;
+  const part = (first.component || '').trim();
+  return <>{itemLabel({ item_name: (first.item_name || '').trim() || 'item', fabric_code: first.fabric_code })}{part && <span style={{ color: T.tx3 }}> for {part}</span>}{items.length > 1 && <b style={{ color: T.ac2, fontWeight: 600 }}> +{items.length - 1} more</b>}</>;
 }
 
 /** The green share of what has arrived. */
