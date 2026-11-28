@@ -48,14 +48,16 @@ export default function POSkuHistory({ row, rows, last, vendor, poType, pieces, 
   // A line already on the order (edit / revise) is its own history: nothing is looked up or offered for it.
   const history = usePoSkuHistory(row.id ? '' : row.sku);
   const [all, setAll] = useState(false);
-  // Rows that have just appeared take no tap for a moment: they push the boxes below them down, and a finger
-  // already on its way to "Fabric name" must not pick a fabric instead.
-  const shownFor = history?.length ? key : '';
+  const empty = !row.item_name.trim() && !row.fabric_code.trim();
+  // Rows that have just appeared take no tap for a moment — every time they appear (a new code, after Clear, after
+  // the name is erased): they push the boxes below them down, and a finger already on its way to "Fabric name",
+  // or a second tap on Clear, must not pick a fabric instead.
+  const shownFor = history?.length && empty ? key : '';
   const [armedFor, setArmedFor] = useState('');
   useEffect(() => {
     if (!shownFor) return;
     const t = window.setTimeout(() => setArmedFor(shownFor), 500);
-    return () => window.clearTimeout(t);
+    return () => { window.clearTimeout(t); setArmedFor(''); };
   }, [shownFor]);
 
   if (!history?.length) return null;
@@ -63,7 +65,7 @@ export default function POSkuHistory({ row, rows, last, vendor, poType, pieces, 
   const design = row.sku.trim().toUpperCase();
   const onForm = (f: SkuFabric, but?: FormItem) => rows.some(r => r !== but && skuKey(r.sku) === key && sameFabric(f, r));
 
-  if (!row.item_name.trim() && !row.fabric_code.trim()) {
+  if (empty) {
     const offer = list.filter(f => !onForm(f, row));
     if (!offer.length) return null;
     const armed = armedFor === shownFor, named = foreign || (!vendor.id && !vendor.name.trim());
