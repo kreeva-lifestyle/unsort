@@ -406,7 +406,8 @@ Found in the overnight check of 19 Nov; built in the next Playbook change.
   2. "Fabric is for" is shown only to us. Should it also be printed on the
      order the vendor gets (print and picture)?
   3. A line on Home: "Purchases: 2 late, 3 due today".
-  4. Order form: this vendor's recent fabrics as one-tap buttons.
+  4. Order form: when you pick a vendor, its recent fabrics as one-tap
+     buttons before any design code is typed.
   5. Cancel PO: also offer a ready WhatsApp message telling the vendor.
   6. Phone layout: orders and search first, the summary folded into one
      row (you said the page is used mostly on a phone).
