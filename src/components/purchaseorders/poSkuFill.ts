@@ -31,12 +31,12 @@ export const fillStands = (it: FormItem): boolean =>
   !!it.filled && it.item_name === it.filled.name && it.fabric_code === it.filled.code && it.component === it.filled.part;
 
 /** Takes a fill back. `all` (Clear): name, code and part go whatever was typed over them. Otherwise (the code now names
- *  another design) they go only while they are still what the tap wrote. The unit returns to what it was if untouched. */
+ *  another design) they go only while they are still what the tap wrote. A unit the tap replaced comes back if untouched. */
 export function unfill(it: FormItem, all: boolean): Partial<FormItem> {
   const m = it.filled;
   if (!m) return {};
   return {
     filled: undefined,
-    ...(all || fillStands(it) ? { item_name: '', fabric_code: '', component: '', ...(it.unit === m.unit ? { unit: m.unitWas } : {}) } : {}),
+    ...(all || fillStands(it) ? { item_name: '', fabric_code: '', component: '', ...(m.unitWas && it.unit === m.unit ? { unit: m.unitWas } : {}) } : {}),
   };
 }

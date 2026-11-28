@@ -8,7 +8,6 @@
 // as new lines, and Clear, which takes back exactly what the tap wrote.
 import { useEffect, useState } from 'react';
 import { T, S } from '../../lib/theme';
-import { itemLabel } from './poItemLabel';
 import { fmtQty, unitOf } from './poStats';
 import { shortDate } from './POHeaderInfo';
 import { usePoSkuHistory, offerFor, sameFabric, skuKey, suggestQty, type SkuFabric } from './poSkuHistory';
@@ -20,6 +19,14 @@ const cut: React.CSSProperties = { minWidth: 0, overflow: 'hidden', textOverflow
 const chip: React.CSSProperties = { ...S.btnGhost, ...S.btnSm, minHeight: 30, padding: '4px 12px', fontSize: 11, borderRadius: 999 };
 const pick: React.CSSProperties = { ...S.btnGhost, display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 2, width: '100%', minHeight: 48, padding: '6px 12px', textAlign: 'left', color: T.tx, fontWeight: 400 };
 const amount = (f: SkuFabric) => `${fmtQty(Number(f.quantity))} ${unitOf(f.unit)}`;
+const pcs = (n: number | string) => `${n} ${Number(n) === 1 ? 'pc' : 'pcs'}`;
+/** "Valentino satin hea… · 137": on a narrow screen the name gives way, the code never does (it is what tells two fabrics apart). */
+const Label = ({ f, plus }: { f: SkuFabric; plus?: boolean }) => (
+  <>
+    <span style={cut}>{plus ? '+ ' : ''}{f.item_name}</span>
+    {f.fabric_code && <span style={{ flexShrink: 0, whiteSpace: 'pre' }}> · {f.fabric_code}</span>}
+  </>
+);
 
 export default function POSkuHistory({ row, rows, last, vendor, poType, pieces, onFill, onAdd, onClear, onQty }: {
   row: FormItem;
@@ -69,7 +76,7 @@ export default function POSkuHistory({ row, rows, last, vendor, poType, pieces, 
             return (
               <button key={`${f.po_number}|${f.item_name}|${f.fabric_code}`} type="button" onClick={() => onFill(f)} style={pick}>
                 <span style={{ display: 'flex', gap: 10, alignItems: 'baseline', minWidth: 0 }}>
-                  <b style={{ ...cut, flex: 1, fontSize: 13, fontWeight: 600 }}>{itemLabel(f)}</b>
+                  <b style={{ display: 'flex', flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600 }}><Label f={f} /></b>
                   <span style={{ ...note, flexShrink: 0, whiteSpace: 'nowrap' }}>{amount(f)} · {shortDate(f.po_date)}</span>
                 </span>
                 {under && <span style={{ ...note, ...cut }}>{under}</span>}
@@ -91,15 +98,19 @@ export default function POSkuHistory({ row, rows, last, vendor, poType, pieces, 
   return (
     <div style={{ marginBottom: 8 }}>
       {used && (
-        <div style={note}>
-          {mark ? 'Same as' : 'Ordered before:'} {[`PO #${used.po_number}`, shortDate(used.po_date), used.vendor_name].filter(Boolean).join(' · ')} — {amount(used)}{used.lump_sum ? ' (lump sum)' : used.for_pieces ? ` for ${used.for_pieces} pcs` : ''}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div style={{ ...note, flex: 1, minWidth: 0 }}>
+            {mark ? 'Same as' : 'Ordered before:'} {[`PO #${used.po_number}`, shortDate(used.po_date), used.vendor_name].filter(Boolean).join(' · ')} — {amount(used)}{used.lump_sum ? ' (lump sum)' : used.for_pieces ? ` for ${pcs(used.for_pieces)}` : ''}
+          </div>
+          {mark && <button type="button" className="touch44" onClick={onClear} style={{ ...chip, color: T.tx2, flexShrink: 0 }}>Clear</button>}
         </div>
       )}
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginTop: 2 }}>
-        {sug && used && <button type="button" className="touch44" onClick={() => onQty(String(sug.qty), used.unit ?? '')} style={chip}>Use {fmtQty(sug.qty)} {unitOf(used.unit)}{sug.scaled ? ` for ${pieces} pcs` : ''}</button>}
-        {others.map(f => <button key={`${f.po_number}|${f.item_name}|${f.fabric_code}`} type="button" className="touch44" onClick={() => onAdd(f)} style={chip}>+ {itemLabel(f)}</button>)}
-        {mark && <button type="button" className="touch44" onClick={onClear} style={{ ...chip, color: T.tx2 }}>Clear</button>}
-      </div>
+      {(sug || others.length > 0) && (
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginTop: 4 }}>
+          {sug && used && <button type="button" className="touch44" onClick={() => onQty(String(sug.qty), used.unit ?? '')} style={chip}>Use {fmtQty(sug.qty)} {unitOf(used.unit)}{sug.scaled ? ` for ${pcs(pieces)}` : ''}</button>}
+          {others.map(f => <button key={`${f.po_number}|${f.item_name}|${f.fabric_code}`} type="button" className="touch44" onClick={() => onAdd(f)} style={{ ...chip, maxWidth: 150 }}><Label f={f} plus /></button>)}
+        </div>
+      )}
     </div>
   );
 }
