@@ -33,13 +33,16 @@ const lower = (s: string | null | undefined) => (s ?? '').trim().toLowerCase();
 /** Letters and digits only: "L.K fab" = "lk fab", and "Fendi" starts like "fendy". */
 const letters = (s: string | null | undefined) => (s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
-/** The same fabric, as po_sku_history groups it: a code with a number names one fabric whatever name was typed with it
- *  ("FENDI 965" = "fendy 965", "micro 1573" = "LINING 1573"). A code without a number is a colour word ("Green") that
- *  several fabrics share, so there the whole name must match too. */
-export const sameFabric = (a: Fab, b: Fab): boolean => {
+/** The same fabric, as po_sku_history groups it within one vendor: a code with a number names one fabric of that vendor's
+ *  range whatever name was typed with it ("FENDI 965" = "fendy 965", "micro 1573" = "LINING 1573"). A code without a
+ *  number is a colour word ("Green") that several fabrics share, so there the whole name must match too. Across vendors
+ *  (`sameVendor` false) a numbered code is not enough — two vendors use 157 for different fabrics — so the name must also
+ *  start alike. */
+export const sameFabric = (a: Fab, b: Fab, sameVendor = true): boolean => {
   const code = lower(a.fabric_code);
   if (code !== lower(b.fabric_code)) return false;
-  return /\d/.test(code) || (lower(a.item_name) !== '' && lower(a.item_name) === lower(b.item_name));
+  if (!/\d/.test(code)) return lower(a.item_name) !== '' && lower(a.item_name) === lower(b.item_name);
+  return sameVendor || (letters(a.item_name) !== '' && letters(a.item_name).slice(0, 3) === letters(b.item_name).slice(0, 3));
 };
 
 /** An earlier order of this vendor: the same contact or — for an order raised without one — the same name on letters and digits. */
@@ -49,12 +52,14 @@ export const isMine = (r: SkuFabric, v: { id: string | null; name: string }): bo
 /** What to offer for a design on this form — only the form's type once one is chosen. With a vendor chosen or typed:
  *  that vendor's fabrics (`mine`), or — when it never supplied the design (`foreign`) — everyone's, shown for reference
  *  only (a code from another vendor's range is not this vendor's code). No vendor yet: everyone's. */
-export function offerFor(rows: SkuFabric[], vendor: { id: string | null; name: string }, poType: string): { list: SkuFabric[]; mine: SkuFabric[]; foreign: boolean } {
+export function offerFor(rows: SkuFabric[], vendor: { id: string | null; name: string }, poType: string): { list: SkuFabric[]; mine: SkuFabric[]; foreign: boolean; partial: boolean } {
   const typed = poType ? rows.filter(r => r.po_type === poType) : rows;
   const name = letters(vendor.name);
-  if (!vendor.id && !name) return { list: typed, mine: [], foreign: false };
+  if (!vendor.id && !name) return { list: typed, mine: [], foreign: false, partial: false };
   const mine = typed.filter(r => isMine(r, vendor));
-  return mine.length ? { list: mine, mine, foreign: false } : { list: typed, mine, foreign: true };
+  if (mine.length) return { list: mine, mine, foreign: false, partial: false };
+  // `partial`: the name typed so far is the start of a vendor in the list — most likely still being typed or not yet picked.
+  return { list: typed, mine, foreign: true, partial: !vendor.id && typed.some(r => letters(r.vendor_name).startsWith(name)) };
 }
 
 /** The quantity to offer: last time's scaled to this order's pieces ("120 m for 48 pcs" → 240 for 96), rounded up to a

@@ -417,4 +417,7 @@ Found in the overnight check of 19 Nov; built in the next Playbook change.
   QR" the phone's Back button closes the whole challan, not just that box.
   Still to answer (they decide further tips): how an order reaches the
   vendor today (picture, typed message or call), whether you want purchase
-  prices in the app, and who types the deliveries.
+  prices in the app, and who types the deliveries. Also: on one order with
+  several designs, is "For how many pcs" for each design or for all
+  together? Until you say, a repeat order does not work out last time's
+  quantity from such an order.
