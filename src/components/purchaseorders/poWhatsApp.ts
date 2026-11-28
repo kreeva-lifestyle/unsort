@@ -62,7 +62,8 @@ function changeLine(c: POChange, all: POChange[] = []): string | null {
     }
     case 'added': return `• Added: ${c.label} — *${q(c.to, c.unit)}*`;
     case 'cancelled': return `• Cancelled: ${c.label} — ${q(c.from, c.unit)}${n(c.received) > 0 ? ` (we keep the ${q(c.received, c.unit)} already received)` : ''}`;
-    case 'item': return `• ${c.label}: ${FIELD_WORD[c.field]} ${c.from || '—'} → *${c.to || '—'}*`;
+    // A field with no word here is not the vendor's business (and must never read "undefined" in their chat).
+    case 'item': { const w = FIELD_WORD[c.field]; return w ? `• ${c.label}: ${w} ${c.from || '—'} → *${c.to || '—'}*` : null; }
     // What a fabric is for is internal: the vendor never hears it.
     case 'component': return null;
     case 'field':

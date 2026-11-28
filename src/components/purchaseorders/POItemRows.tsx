@@ -12,7 +12,7 @@ import { numericKeyDown } from '../../lib/numericInput';
 import SkuInput from '../ui/SkuInput';
 import SuggestInput from '../ui/SuggestInput';
 import ItemNameChips, { useRecentItemNames } from './ItemNameChips';
-import POComponentField from './POComponentField';
+import POComponentField, { cleanComponent } from './POComponentField';
 import { touchedRow, partOptional } from './poFormSave';
 import type { PurchaseOrderType } from '../../types/database';
 
@@ -81,7 +81,7 @@ export default function POItemRows({ items, poType, forPieces, amend, tried, onC
                 )}
               </div>
               {!it.item_name.trim() && <ItemNameChips names={recentNames} onPick={n => onChange(i, { item_name: n })} />}
-              {fabric && <POComponentField sku={it.sku} value={it.component} onChange={v => onChange(i, { component: v })} missing={tried && touchedRow(it) && !it.component.trim() && !partOptional(it, amend)} />}
+              {fabric && <POComponentField sku={it.sku} value={it.component} onChange={v => onChange(i, { component: v })} missing={tried && touchedRow(it, true) && !cleanComponent(it.component) && !partOptional(it, amend)} />}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
                 <input value={it.quantity} onChange={e => onChange(i, { quantity: e.target.value })} onKeyDown={e => numericKeyDown(e)} inputMode="decimal" placeholder="Qty" style={{ ...S.fInput, width: '100%', minWidth: 0, fontFamily: T.mono }} />
                 <select value={it.unit} onChange={e => onChange(i, { unit: e.target.value })} style={{ ...S.fInput, width: '100%', minWidth: 0, color: it.unit ? T.tx : T.tx3 }}>

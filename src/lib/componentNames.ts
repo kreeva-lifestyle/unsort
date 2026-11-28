@@ -16,10 +16,11 @@ export const componentKey = (name: string): string => {
   return VARIANTS[k] ?? k;
 };
 
-/** A component in capitals with its usual spelling ("lehanga" → LEHENGA); a name with no known variant comes back as typed, in capitals. */
+/** A component in capitals with its usual spelling ("lehanga" → LEHENGA); a name with no known variant comes back as typed,
+ *  in capitals. Digits stay in the look-up, so "Dupata 2" is kept apart from "Dupata 1" instead of both becoming DUPATTA. */
 export const canonicalComponent = (name: string): string => {
   const t = name.trim().toUpperCase();
-  return VARIANTS[t.replace(/[^A-Z]/g, '')] ?? t;
+  return VARIANTS[t.replace(/[^A-Z0-9]/g, '')] ?? t;
 };
 
 export const sameComponent = (a: string, b: string): boolean => {
