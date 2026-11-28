@@ -6,7 +6,7 @@ done (built, merged, deployed and checked, or done or decided by the
 owner), its entry is deleted in the same change. The rules are in
 `CLAUDE.md` → "Pending work — TASK.md".
 
-Last checked: 27 Nov 2026.
+Last checked: 28 Nov 2026.
 
 ## SuratMandi store — before it opens
 
@@ -411,6 +411,10 @@ Found in the overnight check of 19 Nov; built in the next Playbook change.
   Claude does by itself, right after this update is on every phone: the
   server also refuses a fabric line without "Fabric is for" and a cancel
   without a reason (today only the app checks these two).
+  Being built now, comes in the next update (you asked on 27 Nov):
+  type a design's code on a new order and the fabrics ordered before
+  for it show right there; one tap fills the fabric, its code, what it
+  is for and the vendor.
   Small one Claude fixes with the next challan change: in "Share Payment
   QR" the phone's Back button closes the whole challan, not just that box.
   Still to answer (they decide further tips): how an order reaches the

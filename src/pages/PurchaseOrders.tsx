@@ -3,7 +3,7 @@
 // the list and the modal orchestration (form / detail / receive / print /
 // pendency / contacts). Mirrors the Cash Challan module; PO ≈ challan,
 // receipts ≈ payments.
-import { useState, useCallback, useEffect, Suspense } from 'react';
+import { useState, useCallback, useEffect, useRef, Suspense } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
@@ -73,6 +73,9 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
     setPrintData({ po: poRow, items });
   }, [addToast]);
 
+  // What is open right now: an order that opens by itself after a save must not land on top of it.
+  const openNow = useRef(false);
+  openNow.current = showForm || !!detail || !!receiving || !!challan || !!printData || !!pendency || showContacts;
   const closeForm = () => { setShowForm(false); setEditing(null); setDuplicating(null); };
   const onSaved = async (r: { id: string; po_number: number; revision?: number; changed?: boolean; approved?: boolean }, isNew: boolean) => {
     closeForm();
@@ -84,7 +87,7 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
     if (!isNew || r.approved) {
       const { data, error } = await supabase.from('purchase_orders').select(COLS).eq('id', r.id).maybeSingle();
       if (error) { addToast(friendlyError(error), 'error'); return; }
-      if (data) openDetail(data as PurchaseOrder);
+      if (data && !openNow.current) openDetail(data as PurchaseOrder);
     }
   };
 

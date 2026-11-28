@@ -26,8 +26,10 @@ export interface POPayload {
 }
 
 /** A card the user typed into. The unit alone does not count: a fabric row gets "Meter" by itself, and an
- *  extra empty card must not block the save with "item name is required". */
-export const touchedRow = (it: FormItem): boolean => !!(it.id || it.sku.trim() || it.item_name.trim() || it.fabric_code.trim() || it.component.trim() || it.quantity.trim() || it.rate.trim());
+ *  extra empty card must not block the save with "item name is required". The fabric code and the part count
+ *  only on a fabric order — on any other type their boxes are not on screen. */
+export const touchedRow = (it: FormItem, fabric: boolean): boolean =>
+  !!(it.id || it.sku.trim() || it.item_name.trim() || it.quantity.trim() || it.rate.trim() || (fabric && (it.fabric_code.trim() || it.component.trim())));
 /** A fabric line may be saved without "Fabric is for" only on a revision, and only if it was already on the order without one. */
 export const partOptional = (it: FormItem, amend: boolean): boolean => amend && !!it.id && !it.hadPart;
 
@@ -43,7 +45,7 @@ export function poPayload(f: POFormState, subtotal: number, keepIds: boolean): {
   if (!keepIds && f.vendor.phone.replace(/\D/g, '').length < 10) return { error: `${vendor} has no phone number saved. Add the number in Contacts, then pick the vendor again.`, vendor: 'pick' };
   if (!f.poType) return { error: 'Select a PO type — Fabric, Job Work, or Material' };
   // Only the cards the user typed into; the ORIGINAL index is kept so errors point at the visual row.
-  const clean = f.items.map((it, idx) => ({ it, idx })).filter(({ it }) => touchedRow(it));
+  const clean = f.items.map((it, idx) => ({ it, idx })).filter(({ it }) => touchedRow(it, f.poType === 'fabric'));
   if (clean.length === 0) return { error: 'Add at least one item' };
   const skuRequired = f.poType === 'fabric' || f.poType === 'material';
   for (const { it, idx } of clean) {

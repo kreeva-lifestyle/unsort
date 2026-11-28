@@ -34,8 +34,9 @@ export function usePoDetail(addToast: (m: string, t?: string) => void, fetchPos:
       : d);
   }, [addToast]);
 
-  // Load lines + receipts for a PO and open the detail panel at once.
-  const openDetail = useCallback(async (poRow: PurchaseOrder) => {
+  // Load lines + receipts for a PO and open the detail panel at once. `refresh`: only update the sheet if this
+  // order is still the one open — a sheet closed (or switched) during the re-read is left alone.
+  const openDetail = useCallback(async (poRow: PurchaseOrder, refresh = false) => {
     const d = await loadPoLines(poRow);
     // Never open a detail (or later print) on silently-missing data — a
     // transient failure here would render a PO with zero line items.
@@ -44,7 +45,7 @@ export function usePoDetail(addToast: (m: string, t?: string) => void, fetchPos:
     // already has, so the header does not blink and the rail does not reposition.
     setDetail(prev => prev && prev.po.id === poRow.id
       ? { ...prev, po: poRow, items: d.items, receipts: d.receipts }
-      : { po: poRow, items: d.items, receipts: d.receipts, audit: null, names: null, revisions: null });
+      : refresh ? prev : { po: poRow, items: d.items, receipts: d.receipts, audit: null, names: null, revisions: null });
     loadActivity(poRow, d.receipts);
   }, [addToast, loadActivity]);
 
@@ -55,7 +56,7 @@ export function usePoDetail(addToast: (m: string, t?: string) => void, fetchPos:
     const { data, error } = await supabase.from('purchase_orders').select(PO_COLS).eq('id', detail.po.id).maybeSingle();
     // A failed re-read must not quietly re-render the old status and buttons.
     if (error) { addToast(friendlyError(error), 'error'); fetchPos(true); return; }
-    await openDetail((data as PurchaseOrder) ?? detail.po);
+    await openDetail((data as PurchaseOrder) ?? detail.po, true);
     fetchPos(true);
   };
 

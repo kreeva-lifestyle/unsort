@@ -25,7 +25,7 @@ export function changeText(c: POChange): string {
     case 'qty': return `${c.label}: ${q(c.from)} → ${q(c.to, c.unit)}`;
     case 'added': return `Added ${c.label} — ${q(c.to, c.unit)}`;
     case 'cancelled': return `Cancelled ${c.label} — ${q(c.from, c.unit)}${Number(c.received) > 0 ? ` (${q(c.received, c.unit)} had arrived)` : ''}`;
-    case 'item': return `${c.label}: ${FIELD[c.field]} ${c.from || '—'} → ${c.to || '—'}`;
+    case 'item': return `${c.label}: ${FIELD[c.field] ?? c.field} ${c.from || '—'} → ${c.to || '—'}`;
     case 'component': return `${c.label}: fabric is for ${c.from || '—'} → ${c.to || '—'}`;
     case 'rate': return `${c.label}: rate ${money(c.from)} → ${money(c.to)}`;
     case 'total': return `Total ${money(c.from)} → ${money(c.to)}`;
