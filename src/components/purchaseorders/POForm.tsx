@@ -62,7 +62,7 @@ export default function POForm({ editing, duplicateFrom, prefill, canApprove, on
   // A cancelled line stays as it is (not on the form, not on a duplicate); an edited line keeps its id.
   const [items, setItems] = useState<FormItem[]>(() => {
     const lines = (src?.items ?? []).filter(it => !it.cancelled_at);
-    return lines.length ? lines.map(it => ({ ...(editing && it.id ? { id: it.id, received: Number(it.received_qty || 0), ordered: Number(it.quantity), hadPart: !!(it.component || '').trim() } : {}), sku: it.sku ?? '', item_name: it.item_name ?? '', fabric_code: it.fabric_code ?? '', component: it.component ?? '', quantity: String(it.quantity), buffer: Number(it.buffer_qty || 0), unit: it.unit ?? '', rate: it.rate == null ? '' : String(it.rate) })) : [blankItem()];
+    return lines.length ? lines.map(it => ({ ...blankItem(), ...(editing && it.id ? { id: it.id, received: Number(it.received_qty || 0), ordered: Number(it.quantity), hadPart: !!(it.component || '').trim() } : {}), sku: it.sku ?? '', item_name: it.item_name ?? '', fabric_code: it.fabric_code ?? '', component: it.component ?? '', quantity: String(it.quantity), buffer: Number(it.buffer_qty || 0), unit: it.unit ?? '', rate: it.rate == null ? '' : String(it.rate) })) : [blankItem()];
   });
   const [showCharges, setShowCharges] = useState(!!(src?.discount_value || src?.tax_percent || src?.other_charges));
   const [charges, setCharges] = useState<Charges>({ discountType: src?.discount_type ?? 'flat', discountValue: src?.discount_value ? String(src.discount_value) : '', taxPercent: src?.tax_percent ? String(src.tax_percent) : '', otherCharges: src?.other_charges ? String(src.other_charges) : '' });
@@ -171,7 +171,7 @@ export default function POForm({ editing, duplicateFrom, prefill, canApprove, on
             forPieces={forPieces} onPieces={setForPieces} lumpSum={lumpSum} onLumpSum={setLumpSum} piecesMissing={!!error && !lumpSum && !forPieces.trim()} addToast={addToast} />
 
           <label style={S.fLabel}>Items *</label>
-          <POItemRows items={items} poType={poType} forPieces={lumpSum ? '' : forPieces} amend={amend} tried={!!error} vendor={vendor} onVendor={pickVendor} onType={changeType} onChange={setItem} onRemove={removeRow} onAdd={addRow} />
+          <POItemRows items={items} poType={poType} forPieces={lumpSum ? '' : forPieces} lumpSum={lumpSum} amend={amend} tried={!!error} vendor={vendor} onVendor={pickVendor} onType={changeType} onChange={setItem} onRemove={removeRow} onAdd={addRow} />
 
           <POFormCharges show={showCharges} onToggle={() => setShowCharges(s => !s)} charges={charges} onCharges={c => setCharges(prev => ({ ...prev, ...c }))}
             notes={notes} onNotes={setNotes} totals={{ subtotal, discAmt, taxAmt, other: num(charges.otherCharges), grand }} />

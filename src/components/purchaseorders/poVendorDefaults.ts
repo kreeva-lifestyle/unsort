@@ -7,12 +7,18 @@ import { supabase } from '../../lib/supabase';
 import { logSwallowed } from '../../lib/errorLogger';
 import type { PurchaseOrderType } from '../../types/database';
 
+// Only the newest pick's answer is used: on a slow connection the answer for a vendor picked before — or one taken back
+// by Clear (an empty pick) — must not fill the type in afterwards.
+let latest = 0;
+
 export async function vendorDefaults(v: { id: string | null; name: string }): Promise<{ type: PurchaseOrderType; unit: string } | null> {
+  const mine = ++latest;
   if (!v.name.trim()) return null;
   let q = supabase.from('purchase_orders').select('po_type, purchase_order_items(unit)')
     .order('created_at', { ascending: false }).limit(1);
   q = v.id ? q.eq('vendor_id', v.id) : q.ilike('vendor_name', v.name.trim());
   const { data, error } = await q;
+  if (mine !== latest) return null;
   if (error) { logSwallowed('PO vendor defaults', error); return null; }
   const last = data?.[0] as { po_type: PurchaseOrderType; purchase_order_items?: { unit: string | null }[] } | undefined;
   if (!last) return null;
