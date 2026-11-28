@@ -6,7 +6,9 @@
 // receipts on it stand, never lets a quantity drop below what arrived, keeps
 // the vendor, type and PO date as raised, and asks what changed. Only item
 // name + qty are mandatory (owner decision) — unit, rate and all header
-// charges are optional. Rules and payload: poFormSave.
+// charges are optional. Rules and payload: poFormSave. A new order can be
+// saved and approved in one step (create_po_approved) by whoever may approve.
+// A tap on the dark area outside never closes the form (owner, 27 Nov 2026).
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
@@ -19,22 +21,25 @@ import POItemRows, { blankItem } from './POItemRows';
 import type { FormItem } from './POItemRows';
 import POFormCharges, { type Charges } from './POFormCharges';
 import { poPayload, num } from './poFormSave';
+import { vendorNamed } from './VendorPicker';
 import type { PurchaseOrder, PurchaseOrderItem, PurchaseOrderType } from '../../types/database';
 import { useModalLock } from '../../hooks/useModalLock';
 
 export type EditingPO = PurchaseOrder & { items?: PurchaseOrderItem[] };
 /** A pre-filled NEW order (e.g. raised from a costing sheet's purchase plan): any header fields plus draft lines. */
-export type POPrefill = Partial<PurchaseOrder> & { items?: Array<Pick<PurchaseOrderItem, 'sku' | 'item_name' | 'fabric_code' | 'quantity' | 'unit' | 'rate'> & Partial<Pick<PurchaseOrderItem, 'id' | 'received_qty' | 'cancelled_at' | 'buffer_qty'>>> };
+export type POPrefill = Partial<PurchaseOrder> & { items?: Array<Pick<PurchaseOrderItem, 'sku' | 'item_name' | 'fabric_code' | 'quantity' | 'unit' | 'rate'> & Partial<Pick<PurchaseOrderItem, 'id' | 'received_qty' | 'cancelled_at' | 'buffer_qty' | 'component'>>> };
 
 const localToday = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 
-export default function POForm({ editing, duplicateFrom, prefill, onClose, onSaved, addToast }: {
+export default function POForm({ editing, duplicateFrom, prefill, canApprove, onClose, onSaved, addToast }: {
   editing: EditingPO | null;
   duplicateFrom?: EditingPO | null;
   prefill?: POPrefill | null;
+  /** Admin / manager on the PO page: a new order also offers "Save and approve". */
+  canApprove?: boolean;
   onClose: () => void;
-  /** `revision` is set when a revision saved a change; `changed: false` when it saved nothing. */
-  onSaved: (r: { id: string; po_number: number; revision?: number; changed?: boolean }, isNew: boolean) => void;
+  /** `revision` is set when a revision saved a change; `changed: false` when it saved nothing; `approved` when a new order was saved and approved. */
+  onSaved: (r: { id: string; po_number: number; revision?: number; changed?: boolean; approved?: boolean }, isNew: boolean) => void;
   addToast: (m: string, t?: string) => void;
 }) {
   const src: POPrefill | null = editing || duplicateFrom || prefill || null;
@@ -56,13 +61,15 @@ export default function POForm({ editing, duplicateFrom, prefill, onClose, onSav
   // A cancelled line stays as it is (not on the form, not on a duplicate); an edited line keeps its id.
   const [items, setItems] = useState<FormItem[]>(() => {
     const lines = (src?.items ?? []).filter(it => !it.cancelled_at);
-    return lines.length ? lines.map(it => ({ ...(editing && it.id ? { id: it.id, received: Number(it.received_qty || 0), ordered: Number(it.quantity) } : {}), sku: it.sku ?? '', item_name: it.item_name ?? '', fabric_code: it.fabric_code ?? '', quantity: String(it.quantity), buffer: Number(it.buffer_qty || 0), unit: it.unit ?? '', rate: it.rate == null ? '' : String(it.rate) })) : [blankItem()];
+    return lines.length ? lines.map(it => ({ ...(editing && it.id ? { id: it.id, received: Number(it.received_qty || 0), ordered: Number(it.quantity), hadPart: !!(it.component || '').trim() } : {}), sku: it.sku ?? '', item_name: it.item_name ?? '', fabric_code: it.fabric_code ?? '', component: it.component ?? '', quantity: String(it.quantity), buffer: Number(it.buffer_qty || 0), unit: it.unit ?? '', rate: it.rate == null ? '' : String(it.rate) })) : [blankItem()];
   });
   const [showCharges, setShowCharges] = useState(!!(src?.discount_value || src?.tax_percent || src?.other_charges));
   const [charges, setCharges] = useState<Charges>({ discountType: src?.discount_type ?? 'flat', discountValue: src?.discount_value ? String(src.discount_value) : '', taxPercent: src?.tax_percent ? String(src.tax_percent) : '', otherCharges: src?.other_charges ? String(src.other_charges) : '' });
   const [reason, setReason] = useState('');
   const [error, setError] = useState('');
-  const [saving, setSaving] = useState(false);
+  // A save refused for the vendor is said at the vendor box (vendorTry scrolls to it); a typed name with no contact opens "Add new vendor" (addSignal).
+  const [vendorError, setVendorError] = useState(''); const [vendorTry, setVendorTry] = useState(0); const [addSignal, setAddSignal] = useState(0);
+  const [saving, setSaving] = useState<'' | 'save' | 'approve'>('');
 
   useModalLock();
   // The error box sits at the bottom of a long scrolling sheet; on a phone the
@@ -95,7 +102,7 @@ export default function POForm({ editing, duplicateFrom, prefill, onClose, onSav
   // still empty, never overwriting a choice already made. One single-row
   // indexed lookup per pick; nothing runs on form open.
   const pickVendor = async (v: { id: string | null; name: string; phone: string }) => {
-    setVendor(v);
+    setVendor(v); if (v.id) setVendorError('');
     if (!v.name.trim()) return;
     let q = supabase.from('purchase_orders').select('po_type, purchase_order_items(unit)')
       .order('created_at', { ascending: false }).limit(1);
@@ -112,12 +119,17 @@ export default function POForm({ editing, duplicateFrom, prefill, onClose, onSav
   // A line that already has goods in is never removed here — its balance is cancelled from the order.
   const removeRow = (i: number) => setItems(list => list.length > 1 && !list[i]?.received ? list.filter((_, idx) => idx !== i) : list);
 
-  const save = async () => {
+  const save = async (approve = false) => {
     if (saving) return;
-    setError('');
-    const p = poPayload({ vendor, poType, poDate, expectedDate, paymentTerms, notes, forPieces, lumpSum, costingId, items, ...charges }, subtotal, amend);
-    if ('error' in p) { setError(p.error); return; }
-    setSaving(true);
+    setError(''); setVendorError(''); setSaving(approve ? 'approve' : 'save');
+    // A saved vendor's name typed in full but not tapped still finds its contact.
+    let v = vendor;
+    if (!amend && !v.id && v.name.trim()) { const hit = await vendorNamed(v.name); if (hit) { v = hit; setVendor(hit); } }
+    const p = poPayload({ vendor: v, poType, poDate, expectedDate, paymentTerms, notes, forPieces, lumpSum, costingId, items, ...charges }, subtotal, amend);
+    if ('error' in p) {
+      if (p.vendor) { setVendorError(p.error); setVendorTry(n => n + 1); if (p.vendor === 'add') setAddSignal(n => n + 1); } else setError(p.error);
+      setSaving(''); return;
+    }
     try {
       if (editing && amend) {
         // base_revision: the server refuses the save if someone revised the order since this form opened.
@@ -130,17 +142,18 @@ export default function POForm({ editing, duplicateFrom, prefill, onClose, onSav
         if (e) throw e;
         onSaved({ id: editing.id, po_number: editing.po_number }, false);
       } else {
-        const { data, error: e } = await supabase.rpc('create_po_with_items', { p_po: p.p_po, p_items: p.p_items });
+        const { data, error: e } = await supabase.rpc(approve ? 'create_po_approved' : 'create_po_with_items', { p_po: p.p_po, p_items: p.p_items });
         if (e) throw e;
         if (!data?.id) throw new Error('Could not create the purchase order');
-        onSaved({ id: data.id, po_number: data.po_number }, true);
+        onSaved({ id: data.id, po_number: data.po_number, approved: approve }, true);
       }
-    } catch (e) { setError(friendlyError(e)); setSaving(false); return; }
-    setSaving(false);
+    } catch (e) { setError(friendlyError(e)); setSaving(''); return; }
+    setSaving('');
   };
+  const wait: React.CSSProperties = { minHeight: 44, pointerEvents: saving ? 'none' : 'auto', opacity: saving ? 0.5 : 1 };
 
   return createPortal(
-    <div style={S.modalOverlay} onClick={onClose}>
+    <div style={S.modalOverlay} onClick={e => e.stopPropagation()}>
       {/* Flex column: head fixed, ONE scrolling body, footer always visible.
           The old inner scroller was sized with desktop maths (90vh - 130px),
           taller than the mobile bottom sheet (85dvh) - the footer got pushed
@@ -152,12 +165,12 @@ export default function POForm({ editing, duplicateFrom, prefill, onClose, onSav
         </div>
         <div style={{ padding: '16px 18px', overflowY: 'auto', WebkitOverflowScrolling: 'touch', flex: 1, minHeight: 0 }}>
           {amend && <div style={{ fontSize: 12, color: T.tx2, lineHeight: 1.5, marginBottom: 12 }}>The vendor, type and PO date stay as raised. What already arrived stays on record — a quantity can be cut only down to it. Every change is kept in the order’s history.</div>}
-          <POFormHeader amend={amend} editing={!!editing} vendor={vendor} onPickVendor={pickVendor} poType={poType} onType={changeType} poDate={poDate} onPoDate={setPoDate}
+          <POFormHeader amend={amend} editing={!!editing} vendor={vendor} onPickVendor={pickVendor} vendorError={vendorError} vendorTry={vendorTry} addSignal={addSignal} poType={poType} onType={changeType} poDate={poDate} onPoDate={setPoDate}
             expectedDate={expectedDate} onExpected={setExpectedDate} paymentTerms={paymentTerms} onTerms={setPaymentTerms}
             forPieces={forPieces} onPieces={setForPieces} lumpSum={lumpSum} onLumpSum={setLumpSum} piecesMissing={!!error && !lumpSum && !forPieces.trim()} addToast={addToast} />
 
           <label style={S.fLabel}>Items *</label>
-          <POItemRows items={items} poType={poType} forPieces={lumpSum ? '' : forPieces} onChange={setItem} onRemove={removeRow} onAdd={addRow} />
+          <POItemRows items={items} poType={poType} forPieces={lumpSum ? '' : forPieces} amend={amend} tried={!!error} onChange={setItem} onRemove={removeRow} onAdd={addRow} />
 
           <POFormCharges show={showCharges} onToggle={() => setShowCharges(s => !s)} charges={charges} onCharges={c => setCharges(prev => ({ ...prev, ...c }))}
             notes={notes} onNotes={setNotes} totals={{ subtotal, discAmt, taxAmt, other: num(charges.otherCharges), grand }} />
@@ -171,9 +184,11 @@ export default function POForm({ editing, duplicateFrom, prefill, onClose, onSav
 
           {error && <div ref={errRef} style={{ marginTop: 12, background: 'oklch(0.63 0.22 25 / .08)', border: '1px solid oklch(0.63 0.22 25 / .2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.re }}>{error}</div>}
         </div>
-        <div style={{ padding: '12px 18px', borderTop: `1px solid ${T.bd}`, display: 'flex', gap: 8, justifyContent: 'flex-end', flexShrink: 0 }}>
+        <div style={{ padding: '12px 18px', borderTop: `1px solid ${T.bd}`, display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap', flexShrink: 0 }}>
           <button onClick={onClose} style={{ ...S.btnGhost, minHeight: 44 }}>Cancel</button>
-          <button onClick={save} disabled={saving} style={{ ...S.btnPrimary, minHeight: 44, pointerEvents: saving ? 'none' : 'auto', opacity: saving ? 0.5 : 1 }}>{saving ? 'Saving…' : amend ? 'Save revision' : editing ? 'Save changes' : 'Save draft'}</button>
+          {/* A new order: "Save draft" for someone else to approve, or save and approve it in one step. */}
+          <button onClick={() => save()} disabled={!!saving} style={{ ...(canApprove && !editing ? S.btnGhost : S.btnPrimary), ...wait }}>{saving === 'save' ? 'Saving…' : amend ? 'Save revision' : editing ? 'Save changes' : 'Save draft'}</button>
+          {canApprove && !editing && <button onClick={() => save(true)} disabled={!!saving} style={{ ...S.btnPrimary, ...wait }}>{saving === 'approve' ? 'Saving…' : 'Save and approve'}</button>}
         </div>
       </div>
     </div>,

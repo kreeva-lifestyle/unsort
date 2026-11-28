@@ -172,7 +172,7 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
       {labels.length === LABEL_LIMIT && <div style={{ fontSize: 11, color: T.yl, padding: '8px 14px', background: 'oklch(0.78 0.18 75 / .06)', border: '1px solid oklch(0.78 0.18 75 / .15)', borderRadius: 6, marginTop: 8, textAlign: 'center' }}>Showing first {LABEL_LIMIT} addresses. Use search to find more.</div>}
 
       {/* Add/Edit Modal */}
-      {showAdd && createPortal(<div style={S.modalOverlay} onClick={closeModal}>
+      {showAdd && createPortal(<div style={S.modalOverlay}>
         <div className="modal-inner" style={S.modalBox} onClick={e => e.stopPropagation()}>
           <div style={S.modalHead}>
             <span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>{editingId ? 'Edit' : 'Add'} Address</span>

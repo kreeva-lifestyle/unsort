@@ -49,7 +49,7 @@ export default function QuickChipsPicker({ current, onClose, onSave }: {
   const next = () => picked.map(id => SHORTCUTS.find(s => s.id === id)).filter((s): s is Shortcut => !!s);
 
   return createPortal(
-    <div style={S.modalOverlay} onClick={onClose}>
+    <div style={S.modalOverlay}>
       <div className="modal-inner" style={{ ...S.modalBox, width: 520, display: 'flex', flexDirection: 'column', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
         <div style={S.modalHead}>
           <span style={S.modalTitle}>Quick access</span>

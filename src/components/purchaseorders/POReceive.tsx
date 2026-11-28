@@ -6,7 +6,8 @@
 // moves to "Receive a challan" (POReceiveChallan) with the number typed.
 // Before writing we re-check the server's received totals: if another user
 // recorded a receipt while this modal was open, the pre-filled quantities are
-// stale and confirming would silently double the tally.
+// stale and confirming would silently double the tally. A tap outside the
+// sheet does not close it (what was typed would be lost).
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
@@ -17,8 +18,9 @@ import { numericKeyDown } from '../../lib/numericInput';
 import DateInput from '../ui/DateInput';
 import type { PurchaseOrder, PurchaseOrderItem } from '../../types/database';
 import { useModalLock } from '../../hooks/useModalLock';
-import { itemLabel } from './poItemLabel';
+import { itemLabel, lineNote } from './poItemLabel';
 import type { ChallanStart } from './POReceiveChallan';
+import ChallanSeenNote, { useChallanSeen } from './POChallanSeen';
 
 const localToday = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 const num = (s: string) => { const n = parseFloat(s); return isNaN(n) ? 0 : n; };
@@ -45,6 +47,8 @@ export default function POReceive({ po, items: allItems, onClose, onReceived, on
   const [challan, setChallan] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  // The same challan number on this vendor's earlier receipts: a note, never a block.
+  const seen = useChallanSeen({ id: po.vendor_id, name: po.vendor_name }, challan);
 
   useModalLock();
   // The error box sits at the bottom of a long scrolling sheet; on a phone the
@@ -89,7 +93,7 @@ export default function POReceive({ po, items: allItems, onClose, onReceived, on
   };
 
   return createPortal(
-    <div style={S.modalOverlay} onClick={onClose}>
+    <div style={S.modalOverlay} onClick={e => e.stopPropagation()}>
       <div className="modal-inner" style={{ ...S.modalBox, width: 560, display: 'flex', flexDirection: 'column', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
         <div style={S.modalHead}>
           <span style={S.modalTitle}>Receive — PO #{po.po_number}</span>
@@ -105,6 +109,7 @@ export default function POReceive({ po, items: allItems, onClose, onReceived, on
                 <div key={it.id} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 10px', background: T.glass1, border: `1px solid ${T.bd}`, borderRadius: 8 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: T.tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{itemLabel(it)}</div>
+                    {lineNote(it) && <div style={{ fontSize: 11, color: T.tx2, marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lineNote(it)}</div>}
                     <div style={{ fontSize: 10, color: T.tx3, fontFamily: T.mono, marginTop: 2 }}>
                       Ordered {Number(it.quantity)}{it.unit ? ` ${it.unit}` : ''} · Received {recvd} · {over > 0
                         ? <span style={{ color: T.yl }}>+{over} extra</span>
@@ -128,6 +133,7 @@ export default function POReceive({ po, items: allItems, onClose, onReceived, on
             <div><label style={S.fLabel}>Receipt date</label><DateInput value={date} onChange={e => setDate(e.target.value)} style={{ width: '100%' }} /></div>
             <div><label style={S.fLabel}>Remarks</label><input value={remarks} onChange={e => setRemarks(e.target.value)} placeholder="Optional" style={S.fInput} /></div>
           </div>
+          <ChallanSeenNote no={challan} seen={seen} />
           <button type="button" onClick={() => onChallan({ challanNo: challan.trim(), date, remarks, qty, recvd: Object.fromEntries(items.map(it => [it.id, recvdOf(it)])) })} className="touch44"
             style={{ border: 'none', background: 'none', color: T.ac2, fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: '8px 0 0', textAlign: 'left' }}>
             This challan has other orders from {po.vendor_name} too? Receive them together →
@@ -135,8 +141,8 @@ export default function POReceive({ po, items: allItems, onClose, onReceived, on
           {error && <div ref={errRef} style={{ marginTop: 12, background: 'oklch(0.63 0.22 25 / .08)', border: '1px solid oklch(0.63 0.22 25 / .2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.re }}>{error}</div>}
         </div>
         <div style={{ padding: '12px 18px', borderTop: `1px solid ${T.bd}`, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-          <button onClick={onClose} style={S.btnGhost}>Cancel</button>
-          <button onClick={submit} disabled={saving} style={{ ...S.btnPrimary, pointerEvents: saving ? 'none' : 'auto', opacity: saving ? 0.5 : 1 }}>{saving ? 'Saving…' : 'Confirm receipt'}</button>
+          <button onClick={onClose} style={{ ...S.btnGhost, minHeight: 44 }}>Cancel</button>
+          <button onClick={submit} disabled={saving} style={{ ...S.btnPrimary, minHeight: 44, pointerEvents: saving ? 'none' : 'auto', opacity: saving ? 0.5 : 1 }}>{saving ? 'Saving…' : 'Confirm receipt'}</button>
         </div>
       </div>
     </div>,

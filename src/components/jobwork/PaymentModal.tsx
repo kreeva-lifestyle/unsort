@@ -43,7 +43,7 @@ export default function PaymentModal({ job, onClose, onSaved, addToast }: {
   };
 
   return createPortal(
-    <div style={S.modalOverlay} onClick={onClose}>
+    <div style={S.modalOverlay}>
       <div className="modal-inner" style={{ ...S.modalBox, width: 420 }} onClick={e => e.stopPropagation()}>
         <div style={S.modalHead}>
           <div style={{ minWidth: 0 }}>

@@ -6,29 +6,22 @@
 // (receive_po_challan → receive_po_items per PO), the challan number on every
 // receipt. Before writing, the received totals are re-read: if someone else
 // received on one of these orders meanwhile, the numbers refresh and the user
-// confirms again (as POReceive does).
+// confirms again (as POReceive does). Each order shows what is on it before it
+// is ticked (POChallanOrders), and a challan number this vendor's receipts
+// already carry is pointed out (POChallanSeen). A tap outside the sheet does
+// not close it — what was typed would be lost.
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
-import { numericKeyDown } from '../../lib/numericInput';
 import { useBackClose } from '../../hooks/useBackClose';
 import { useModalLock } from '../../hooks/useModalLock';
 import DateInput from '../ui/DateInput';
 import { fileDate } from '../../lib/exportName';
-import { itemLabel } from './poItemLabel';
-import { fmtQty, unitOf } from './poStats';
-import { shortDate } from './POHeaderInfo';
-import { STATUS_DOT } from './poSections';
 import POChallanVendors, { OPEN, type ChallanVendor } from './POChallanVendors';
-import type { PurchaseOrder, PurchaseOrderItem } from '../../types/database';
-
-type Line = Pick<PurchaseOrderItem, 'id' | 'item_name' | 'fabric_code' | 'sku' | 'unit' | 'quantity' | 'received_qty' | 'cancelled_at' | 'sort_order'>;
-type OpenPo = Pick<PurchaseOrder, 'id' | 'po_number' | 'po_date' | 'status' | 'vendor_id' | 'vendor_name'> & { purchase_order_items: Line[] };
-const n = (v: unknown) => Number(v || 0);
-const left = (l: Line) => Math.max(0, n(l.quantity) - n(l.received_qty));
-const live = (po: OpenPo) => po.purchase_order_items.filter(l => !l.cancelled_at).sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+import POChallanOrders, { CHALLAN_COLS, n, left, live, type OpenPo } from './POChallanOrders';
+import ChallanSeenNote, { useChallanSeen } from './POChallanSeen';
 
 /** What was typed in a PO's receive sheet before "Receive them together": it carries over
  *  (`recvd`: what each line had received when it was typed — the quantities hold only while that is unchanged). */
@@ -57,13 +50,14 @@ export default function POReceiveChallan({ vendor: given, poId, init, onClose, o
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const errRef = useRef<HTMLDivElement>(null);
+  const seen = useChallanSeen(vendor, challan);
   useModalLock();
   useBackClose(true, onClose);
   useEffect(() => { if (error) errRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }, [error]);
 
   // The vendor's open orders — matched the way the server matches them (vendor record, else the typed name).
   const loadPos = async (v: ChallanVendor): Promise<OpenPo[] | null> => {
-    let q = supabase.from('purchase_orders').select('id, po_number, po_date, status, vendor_id, vendor_name, purchase_order_items(id, item_name, fabric_code, sku, unit, quantity, received_qty, cancelled_at, sort_order)')
+    let q = supabase.from('purchase_orders').select(CHALLAN_COLS)
       .in('status', OPEN).order('po_number');
     q = v.id ? q.eq('vendor_id', v.id) : q.is('vendor_id', null).ilike('vendor_name', v.name.trim());
     const { data, error: e } = await q;
@@ -128,7 +122,7 @@ export default function POReceiveChallan({ vendor: given, poId, init, onClose, o
   };
 
   return createPortal(
-    <div style={S.modalOverlay} onClick={onClose}>
+    <div style={S.modalOverlay} onClick={e => e.stopPropagation()}>
       <div className="modal-inner" style={{ ...S.modalBox, width: 600, display: 'flex', flexDirection: 'column', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
         <div style={S.modalHead}>
           <span style={S.modalTitle}>Receive a challan{vendor ? ` · ${vendor.name}` : ''}</span>
@@ -142,39 +136,13 @@ export default function POReceiveChallan({ vendor: given, poId, init, onClose, o
                 <div><label style={S.fLabel}>Receipt date</label><DateInput value={date} onChange={e => setDate(e.target.value)} style={{ width: '100%' }} /></div>
                 <div><label style={S.fLabel}>Remarks</label><input value={remarks} onChange={e => setRemarks(e.target.value)} placeholder="Optional" style={S.fInput} /></div>
               </div>
-              <label style={S.fLabel}>Orders on this challan</label>
+              <ChallanSeenNote no={challan} seen={seen} />
+              <label style={{ ...S.fLabel, marginTop: seen.length ? 12 : 0 }}>Orders on this challan</label>
               {pos === null && (loadFailed
                 ? <div style={{ textAlign: 'center', padding: '14px 0' }}><button type="button" onClick={() => { setError(''); setReload(r => r + 1); }} style={{ ...S.btnGhost, minHeight: 44 }}>Try again</button></div>
                 : <div style={{ fontSize: 12, color: T.tx3, padding: '20px 0', textAlign: 'center' }}>Loading…</div>)}
               {pos?.length === 0 && <div style={{ fontSize: 12, color: T.tx3, padding: '20px 0', textAlign: 'center' }}>{vendor.name} has nothing still to come.</div>}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 6 }}>
-                {pos?.map(po => {
-                  const on = ticked.has(po.id), st = STATUS_DOT[po.status];
-                  const due = live(po).filter(l => left(l) > 0);
-                  const units = new Set(due.map(l => unitOf(l.unit)));
-                  return (
-                    <div key={po.id} style={{ border: `1px solid ${on ? T.ac3 : T.bd}`, borderRadius: 10, background: on ? T.glass2 : T.glass1 }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', minHeight: 44, cursor: 'pointer' }}>
-                        <input type="checkbox" checked={on} onChange={() => tick(po)} style={{ accentColor: T.ac, width: 16, height: 16, margin: 0 }} />
-                        <span style={{ fontFamily: T.mono, fontSize: 13, fontWeight: 700, color: T.tx }}>PO #{po.po_number}</span>
-                        <span style={{ fontSize: 11, color: T.tx3 }}>{shortDate(po.po_date)}</span>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, color: st.color }}><span style={{ width: 8, height: 8, borderRadius: 999, background: st.color }} />{st.label}</span>
-                        <span style={{ marginLeft: 'auto', fontSize: 11, color: T.tx3 }}>{units.size === 1 ? `${fmtQty(due.reduce((t, l) => t + left(l), 0))} ${[...units][0]} to come` : `${due.length} items to come`}</span>
-                      </label>
-                      {on && live(po).map(l => (
-                        <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderTop: `1px solid ${T.bd}` }}>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 13, color: T.tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{itemLabel(l)}</div>
-                            <div style={{ fontSize: 10, color: T.tx3, fontFamily: T.mono, marginTop: 2 }}>Ordered {fmtQty(n(l.quantity))} {unitOf(l.unit)} · Received {fmtQty(n(l.received_qty))} · <span style={{ color: left(l) > 0 ? T.yl : T.gr }}>Remaining {fmtQty(left(l))}</span></div>
-                          </div>
-                          <input value={qty[l.id] ?? ''} onChange={e => setQty(m => ({ ...m, [l.id]: e.target.value }))} onKeyDown={e => { numericKeyDown(e); if (e.key === 'Enter') submit(); }}
-                            inputMode="decimal" placeholder="0" aria-label={`Received now — ${itemLabel(l)}`} style={{ ...S.fInput, width: 84, fontFamily: T.mono, textAlign: 'right' }} />
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })}
-              </div>
+              {pos && <POChallanOrders pos={pos} ticked={ticked} qty={qty} onTick={tick} onQty={(id, v) => setQty(m => ({ ...m, [id]: v }))} onEnter={submit} />}
             </>
           )}
           {error && <div ref={errRef} style={{ marginTop: 12, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.re }}>{error}</div>}

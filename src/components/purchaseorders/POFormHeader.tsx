@@ -1,7 +1,10 @@
 // The head of the PO form: vendor, type, PO date, expected date, payment
 // terms and "for how many pcs" (with Lump sum). On a revision the vendor,
-// type and PO date are shown but locked — they stay as raised. Split out of
-// POForm so that file stays under the 200-line limit; the form owns the state.
+// type and PO date are shown but locked — they stay as raised. A save refused
+// for the vendor (not in Contacts, or no phone) says so right at the vendor
+// box and opens "Add new vendor" there. Split out of POForm so that file
+// stays under the 200-line limit; the form owns the state.
+import { useEffect, useRef } from 'react';
 import { T, S } from '../../lib/theme';
 import { numericKeyDown } from '../../lib/numericInput';
 import VendorPicker from './VendorPicker';
@@ -12,9 +15,12 @@ import type { PurchaseOrderType } from '../../types/database';
 
 type Vendor = { id: string | null; name: string; phone: string };
 
-export default function POFormHeader({ amend, editing, vendor, onPickVendor, poType, onType, poDate, onPoDate, expectedDate, onExpected, paymentTerms, onTerms, forPieces, onPieces, lumpSum, onLumpSum, piecesMissing, addToast }: {
+export default function POFormHeader({ amend, editing, vendor, onPickVendor, vendorError, vendorTry, addSignal, poType, onType, poDate, onPoDate, expectedDate, onExpected, paymentTerms, onTerms, forPieces, onPieces, lumpSum, onLumpSum, piecesMissing, addToast }: {
   amend: boolean; editing: boolean;
   vendor: Vendor; onPickVendor: (v: Vendor) => void;
+  /** Why the last save was refused for the vendor ('' when it was not); how often that happened (the box scrolls into view);
+   *  and how often for a typed name with no contact (the picker opens "Add new vendor"). */
+  vendorError: string; vendorTry: number; addSignal: number;
   poType: PurchaseOrderType | ''; onType: (t: PurchaseOrderType | '') => void;
   poDate: string; onPoDate: (v: string) => void;
   expectedDate: string; onExpected: (v: string) => void;
@@ -25,13 +31,17 @@ export default function POFormHeader({ amend, editing, vendor, onPickVendor, poT
   piecesMissing: boolean;
   addToast: (m: string, t?: string) => void;
 }) {
+  const vendorRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (vendorTry) vendorRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }); }, [vendorTry]);
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginBottom: 12 }}>
-      <div style={{ gridColumn: '1 / -1' }}>
+      <div ref={vendorRef} style={{ gridColumn: '1 / -1' }}>
         <label style={S.fLabel}>Vendor *</label>
+        {/* Above the box: the picker's list opens below it. */}
+        {vendorError && <div role="alert" style={{ fontSize: 12, color: T.re, lineHeight: 1.45, marginBottom: 6 }}>{vendorError}</div>}
         {amend
           ? <div style={{ ...S.fInput, display: 'flex', alignItems: 'center', gap: 8, color: T.tx2 }}><b style={{ color: T.tx }}>{vendor.name}</b>{vendor.phone && <span style={{ fontFamily: T.mono, fontSize: 12, color: T.tx3 }}>{vendor.phone}</span>}</div>
-          : <VendorPicker value={vendor.name} phone={vendor.phone} onPick={onPickVendor} addToast={addToast} />}
+          : <VendorPicker value={vendor.name} phone={vendor.phone} onPick={onPickVendor} addToast={addToast} addSignal={addSignal} />}
         {!editing && !vendor.name.trim() && <TopVendorChips onPick={onPickVendor} />}
       </div>
       <div>

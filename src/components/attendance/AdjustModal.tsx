@@ -49,7 +49,7 @@ export default function AdjustModal({ emp, kind, month, monthLabel, onClose, onS
   };
 
   return createPortal((
-    <div style={{ ...S.modalOverlay }} onClick={onClose}>
+    <div style={{ ...S.modalOverlay }}>
       <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 380 }} onClick={ev => ev.stopPropagation()}>
         <div style={S.modalHead}>
           <div style={S.modalTitle}>{isPen ? 'Penalty' : 'Advance'} — {emp.name}</div>

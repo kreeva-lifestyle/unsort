@@ -46,7 +46,9 @@ export function friendlyError(raw: unknown, fallback = 'Something went wrong. Pl
   if (l.includes('at least one item') || l.includes('item_name')) return 'Add at least one item with a name and quantity.';
   // Revise / cancel-an-item guards (amend_po, cancel_po_line) say what to do — show them verbatim, however long the item name.
   if (['already received', 'nothing left to cancel', 'last item on po', 'cannot be received', 'cannot be changed', 'has goods received',
-    'can be revised', 'have an item cancelled', 'is already cancelled', 'edited, not revised', 'changed since you opened it', 'receipts stay as recorded'].some(p => l.includes(p))) return msg;
+    'can be revised', 'have an item cancelled', 'is already cancelled', 'edited, not revised', 'changed since you opened it', 'receipts stay as recorded',
+    // Owner's rules of 27 Nov 2026 (po_check_vendor, cancel_po, the component on a fabric line).
+    'is not in contacts', 'has no phone number', 'say why the order', 'say what it is for'].some(p => l.includes(p))) return msg;
   // Cash-challan guards raise human guidance (which bill, what to do first)
   // under code 23514 — show it verbatim rather than the generic text below.
   if (['sealed period', 'nothing was saved', 'same customer', 'void that return first', 'credit left', 'unpay it first', 'first, then void',

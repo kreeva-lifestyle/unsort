@@ -8,7 +8,10 @@
 // nothing is written until they do. Each line takes an optional buffer in
 // its own unit (e.g. +10 Meter for wastage); it is added to the PO quantity
 // and the cost — pieces to make stay the same — and saved on the PO line
-// (buffer_qty), so the PO shows "N for 48 pcs + buffer" from then on.
+// (buffer_qty), so the PO shows "N for 48 pcs + buffer" from then on. The
+// costing's component (LEHENGA, DUPATTA …) fills the PO line's "Fabric is
+// for". A tap on the dark area outside does not close this sheet (the
+// buffers typed would be lost) — owner, 27 Nov 2026.
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../../../lib/supabase';
@@ -84,12 +87,12 @@ export default function RaisePOModal({ product, pieces, onClose, addToast, onPic
       vendor_id: v?.id ?? null, vendor_name: v?.name ?? sup, vendor_phone: v?.phone ?? null,
       po_type: rows.every(l => FABRIC_UNITS.has(l.unit)) ? 'fabric' : 'material',
       for_pieces: pieces, costing_product_id: product.id,
-      items: rows.map(l => ({ sku: product.sku, item_name: l.sub, fabric_code: l.materialCode || null, quantity: l.totalQty, buffer_qty: l.extra, unit: l.unit, rate: l.rate > 0 ? l.rate : null })),
+      items: rows.map(l => ({ sku: product.sku, item_name: l.sub, fabric_code: l.materialCode || null, component: l.component || null, quantity: l.totalQty, buffer_qty: l.extra, unit: l.unit, rate: l.rate > 0 ? l.rate : null })),
     };
   };
 
   return createPortal(
-    <div style={S.modalOverlay} onClick={onClose}>
+    <div style={S.modalOverlay} onClick={e => e.stopPropagation()}>
       <div className="modal-inner" style={{ ...S.modalBox, width: 640, display: 'flex', flexDirection: 'column', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
         <div style={S.modalHead}>
           <span style={S.modalTitle}>Raise POs — {product.sku} × {pieces} pcs</span>

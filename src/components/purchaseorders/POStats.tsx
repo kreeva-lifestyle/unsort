@@ -55,7 +55,7 @@ export default function POStats({ version, quick, onQuick, onVendor, addToast }:
   const comeLine = !s ? '' : lead
     ? `${fmtQty(lead.received)} of ${fmtQty(lead.ordered)} ${lead.unit} received (${pct}%) · ${s.linesDone} of ${plural(s.lines, 'item')} received in full`
     : 'nothing on order right now';
-  // Breached = past the due date (expected date, or PO date + 3 d when none).
+  // Breached = past the due date (expected date, or PO date + ASSUMED_LEAD_DAYS when none).
   const b = s?.breach;
   const breachLine = !s || !b ? '' : s.open === 0 ? 'no open orders'
     : [b.count ? `worst ${b.worstLate} d late` : 'every open order is within its date', b.dueToday ? `${b.dueToday} due today` : '',

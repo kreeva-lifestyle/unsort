@@ -130,7 +130,7 @@ export default function JobForm({ edit, draft = null, prefill = null, onClose, o
     <div style={{ minWidth: 0 }}><label style={S.fLabel}>{label} {req && <span style={{ color: T.re }}>*</span>}</label>{node}</div>
   );
   return createPortal(
-    <div style={S.modalOverlay} onClick={() => { if (!guard.blockOutside()) onClose(); }}>
+    <div style={S.modalOverlay}>
       <div className="modal-inner" style={{ ...S.modalBox, width: 560 }} onClick={e => e.stopPropagation()}>
         <div style={S.modalHead}>
           <span style={S.modalTitle}>{j ? `Edit JW #${j.jw_number}` : prefill ? `Jobwork from PO #${prefill.po.number}` : draftId ? 'Draft job' : 'New job'}</span>

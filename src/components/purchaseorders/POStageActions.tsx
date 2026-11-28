@@ -5,7 +5,8 @@
 // next steps swap in only when the new stage has landed on the rail
 // (waitLanded) — and every write on the sheet waits (the shared `busy`), so
 // a second tap never lands on a stale button. Receive opens the receive
-// sheet and says how much is still due.
+// sheet and says how much is still due; Close remaining and Cancel PO open
+// their own boxes, which ask why (POCloseModal, POCancelModal).
 import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { S } from '../../lib/theme';
@@ -14,20 +15,17 @@ import { pendingOf } from './POCloseModal';
 import { receivedOf } from './PORailCard';
 import { fmtQty } from './poStats';
 import { TRAVEL_MS } from './PORail';
-import type { ConfirmOptions } from '../ui/ConfirmModal';
 import type { PurchaseOrder, PurchaseOrderItem } from '../../types/database';
 
-type Step = 'approved' | 'sent' | 'cancelled' | 'reopen';
+type Step = 'approved' | 'sent' | 'reopen';
 const TEXT: Record<Step, { idle: string; busy: string; done: string }> = {
   approved: { idle: 'Approve', busy: 'Approving…', done: 'Purchase order approved' },
   sent: { idle: 'Mark sent', busy: 'Sending…', done: 'Purchase order marked sent' },
-  cancelled: { idle: 'Cancel PO', busy: 'Cancelling…', done: 'Purchase order cancelled' },
   reopen: { idle: 'Reopen', busy: 'Reopening…', done: 'Purchase order reopened' },
 };
 
-export default function POStageActions({ po: livePo, items: liveItems, canManage, ask, onChanged, waitLanded, busy: sheetBusy, holding, setBusy: setSheetBusy, onReceive, onCloseRemaining, addToast }: {
+export default function POStageActions({ po: livePo, items: liveItems, canManage, onChanged, waitLanded, busy: sheetBusy, holding, setBusy: setSheetBusy, onReceive, onCloseRemaining, onCancel, addToast }: {
   po: PurchaseOrder; items: PurchaseOrderItem[]; canManage: boolean;
-  ask: (o: ConfirmOptions) => Promise<boolean>;
   /** Re-reads the order. */
   onChanged: () => void | Promise<void>;
   /** Resolves once the rail shows the order's new stage. */
@@ -36,7 +34,7 @@ export default function POStageActions({ po: livePo, items: liveItems, canManage
   busy: string; setBusy: (b: string) => void;
   /** The sheet still shows the order as it was while the rail's light travels: its steps wait. */
   holding: boolean;
-  onReceive: () => void; onCloseRemaining: () => void;
+  onReceive: () => void; onCloseRemaining: () => void; onCancel: () => void;
   addToast: (m: string, t?: string) => void;
 }) {
   const [frozen, setFrozen] = useState<{ po: PurchaseOrder; items: PurchaseOrderItem[] } | null>(null);
@@ -46,10 +44,6 @@ export default function POStageActions({ po: livePo, items: liveItems, canManage
 
   const run = async (step: Step) => {
     if (sheetBusy || holding) return;
-    if (step === 'cancelled') {
-      const ok = await ask({ title: `Cancel PO #${po.po_number}?`, message: 'The order stays on record but is closed to further edits and receiving. This cannot be undone.', confirmLabel: 'Cancel PO', cancelLabel: 'Keep', danger: true });
-      if (!ok) return;
-    }
     setFrozen({ po: livePo, items: liveItems }); setBusy(step);
     try {
       const { error } = await supabase.rpc('set_po_status', { p_po_id: po.id, p_status: step });
@@ -88,7 +82,7 @@ export default function POStageActions({ po: livePo, items: liveItems, canManage
       {canReceive && <button type="button" onClick={onReceive} style={{ ...(canApprove ? S.btnGhost : S.btnPrimary), ...S.btnLg, ...wait }}>{receiveLabel}</button>}
       {canClose && <button type="button" onClick={onCloseRemaining} title="The rest is not coming — write off the balance" style={{ ...S.btnGhost, ...S.btnLg, ...wait }}>Close remaining</button>}
       {canReopen && btn('reopen', S.btnGhost)}
-      {canCancel && btn('cancelled', S.btnDanger)}
+      {canCancel && <button type="button" onClick={onCancel} disabled={!!busy || holding} style={{ ...S.btnDanger, ...S.btnLg, ...wait }}>Cancel PO</button>}
     </div>
   );
 }

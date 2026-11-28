@@ -82,7 +82,7 @@ export default function ApplyCreditModal({ challan: c, onClose, onDone, addToast
   };
 
   return createPortal(
-    <div style={{ ...S.modalOverlay, zIndex: 10001 }} onClick={saving ? undefined : onClose}>
+    <div style={{ ...S.modalOverlay, zIndex: 10001 }}>
       <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 440 }} onClick={e => e.stopPropagation()}>
         <div style={S.modalHead}>
           <div style={S.modalTitle}>{fromReturn ? 'Apply credit to a challan' : 'Use return credit'}</div>

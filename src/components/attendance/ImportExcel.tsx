@@ -69,7 +69,7 @@ export default function ImportExcel({ employees, onClose, onImported, addToast }
   // PWA). Deliberately NOT gated on `busy`: gating would tear the history
   // entry down the moment an import starts and navigate the app away. The
   // upsert is already batched + idempotent, so closing early is safe.
-  useBackClose(true, () => { onClose(); });
+  useBackClose(true, () => { if (result) onImported(result.month); else onClose(); });
 
   const handleFile = async (file: File) => {
     setBusy(true); setResult(null); setErr(''); setFileName(file.name);
@@ -224,11 +224,11 @@ export default function ImportExcel({ employees, onClose, onImported, addToast }
   };
 
   return createPortal((
-    <div style={{ ...S.modalOverlay }} onClick={() => !busy && onClose()}>
+    <div style={{ ...S.modalOverlay }}>
       <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 460 }} onClick={ev => ev.stopPropagation()}>
         <div style={S.modalHead}>
           <div style={S.modalTitle}>Import Timesheet (Excel)</div>
-          <button type="button" onClick={() => !busy && onClose()} style={S.modalClose} aria-label="Close">&#215;</button>
+          <button type="button" onClick={() => { if (busy) return; if (result) onImported(result.month); else onClose(); }} style={S.modalClose} aria-label="Close">&#215;</button>
         </div>
         <div style={{ padding: 16 }}>
           <div style={{ fontSize: 11, color: T.tx3, lineHeight: 1.5, marginBottom: 12 }}>

@@ -33,7 +33,7 @@ export default function CloseJobModal({ job, onClose, onSaved, addToast }: {
     onSaved();
   };
   return createPortal(
-    <div style={S.modalOverlay} onClick={onClose}>
+    <div style={S.modalOverlay}>
       <div className="modal-inner" style={{ ...S.modalBox, width: 420 }} onClick={e => e.stopPropagation()}>
         <div style={S.modalHead}>
           <span style={S.modalTitle}>Close JW #{job.jw_number}</span>

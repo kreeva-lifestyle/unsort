@@ -7,3 +7,9 @@ export const itemLabel = (it: { item_name: string; fabric_code?: string | null }
   const code = (it.fabric_code || '').trim();
   return code ? `${it.item_name} · ${code}` : it.item_name;
 };
+
+/** Under a line's label, for us only: the design and what the fabric is for — "DRS230 · for DUPATTA" (either part may be missing). */
+export const lineNote = (it: { sku?: string | null; component?: string | null }): string => {
+  const part = (it.component || '').trim();
+  return [(it.sku || '').trim(), part && `for ${part}`].filter(Boolean).join(' · ');
+};

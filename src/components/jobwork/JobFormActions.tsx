@@ -12,7 +12,7 @@ export type Busy = '' | 'job' | 'draft' | 'discard';
 
 /**
  * Leaving the form with unsaved typing. × and Cancel ask first; a tap
- * outside the form is ignored; device Back / Escape (which cannot wait for an
+ * outside the form never closes it; device Back / Escape (which cannot wait for an
  * answer) keeps a new job's or a draft's typing as a draft instead.
  */
 export function useLeaveGuard({ dirty, keepable, draftId, form, onClose, onDrafts, addToast }: {
@@ -33,7 +33,7 @@ export function useLeaveGuard({ dirty, keepable, draftId, form, onClose, onDraft
     }
     onClose();
   };
-  return { request, back, blockOutside: dirty, modalProps };
+  return { request, back, modalProps };
 }
 
 export default function JobFormActions({ mode, draftId, form, busy, setBusy, setError, onCancel, onDrafts, onSubmit, addToast }: {

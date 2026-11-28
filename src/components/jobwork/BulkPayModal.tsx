@@ -61,7 +61,7 @@ export default function BulkPayModal({ vendor, onClose, onPaid, addToast }: {
   const enter = (e: React.KeyboardEvent) => { if (e.key === 'Enter') { e.preventDefault(); submit(); } };
 
   return createPortal(
-    <div style={S.modalOverlay} onClick={onClose}>
+    <div style={S.modalOverlay}>
       <div className="modal-inner" style={{ ...S.modalBox, width: 520, display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
         <div style={S.modalHead}>
           <div style={{ minWidth: 0 }}>

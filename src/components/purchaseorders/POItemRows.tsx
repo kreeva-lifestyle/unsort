@@ -2,7 +2,8 @@
 // growing). One CARD per item — the costing-editor pattern the owner
 // approved: a fixed structure that never free-wraps at phone width.
 // Fabric POs get a "Fabric code" box next to the item name (compulsory,
-// checked again by the RPC), offering codes used on earlier POs as you type.
+// checked again by the RPC), offering codes used on earlier POs as you type,
+// and "Fabric is for" (POComponentField): the part of the design it is for.
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { T, S } from '../../lib/theme';
@@ -11,20 +12,28 @@ import { numericKeyDown } from '../../lib/numericInput';
 import SkuInput from '../ui/SkuInput';
 import SuggestInput from '../ui/SuggestInput';
 import ItemNameChips, { useRecentItemNames } from './ItemNameChips';
+import POComponentField, { cleanComponent } from './POComponentField';
+import { touchedRow, partOptional } from './poFormSave';
 import type { PurchaseOrderType } from '../../types/database';
 
 /** `id` / `received` / `ordered`: an existing line on a revision — it keeps its id, and a cut stops at what arrived on it.
- *  `buffer`: the part of the quantity ordered as buffer over the costing plan (set in Raise POs, kept on edits). */
-export type FormItem = { id?: string; received?: number; ordered?: number; buffer?: number; sku: string; item_name: string; fabric_code: string; quantity: string; unit: string; rate: string };
-export const blankItem = (): FormItem => ({ sku: '', item_name: '', fabric_code: '', quantity: '1', unit: '', rate: '' });
+ *  `buffer`: the part of the quantity ordered as buffer over the costing plan (set in Raise POs, kept on edits).
+ *  `component`: what a fabric line is for ("LEHENGA, BLOUSE"); `hadPart`: an existing line came with one (a revision may not blank it). */
+export type FormItem = { id?: string; received?: number; ordered?: number; buffer?: number; hadPart?: boolean; sku: string; item_name: string; fabric_code: string; component: string; quantity: string; unit: string; rate: string };
+// The quantity starts empty: over a pre-filled "1", typing 50 gave 150.
+export const blankItem = (): FormItem => ({ sku: '', item_name: '', fabric_code: '', component: '', quantity: '', unit: '', rate: '' });
 const UNIT_OPTIONS = ['Meter', 'Piece', 'Dozen'];
 const num = (s: string) => { const n = parseFloat(s); return isNaN(n) ? 0 : n; };
 const fmt = (n: number) => n.toLocaleString('en-IN', { maximumFractionDigits: 3 });
 
-export default function POItemRows({ items, poType, forPieces, onChange, onRemove, onAdd }: {
+export default function POItemRows({ items, poType, forPieces, amend, tried, onChange, onRemove, onAdd }: {
   items: FormItem[];
   poType: PurchaseOrderType | '';
   forPieces: string;
+  /** A revision: a line already on the order without "Fabric is for" may stay so (older orders have none). */
+  amend: boolean;
+  /** Save was tried and refused: what is still missing shows red. */
+  tried: boolean;
   onChange: (i: number, patch: Partial<FormItem>) => void;
   onRemove: (i: number) => void;
   onAdd: () => void;
@@ -72,6 +81,7 @@ export default function POItemRows({ items, poType, forPieces, onChange, onRemov
                 )}
               </div>
               {!it.item_name.trim() && <ItemNameChips names={recentNames} onPick={n => onChange(i, { item_name: n })} />}
+              {fabric && <POComponentField sku={it.sku} value={it.component} onChange={v => onChange(i, { component: v })} missing={tried && touchedRow(it, true) && !cleanComponent(it.component) && !partOptional(it, amend)} />}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
                 <input value={it.quantity} onChange={e => onChange(i, { quantity: e.target.value })} onKeyDown={e => numericKeyDown(e)} inputMode="decimal" placeholder="Qty" style={{ ...S.fInput, width: '100%', minWidth: 0, fontFamily: T.mono }} />
                 <select value={it.unit} onChange={e => onChange(i, { unit: e.target.value })} style={{ ...S.fInput, width: '100%', minWidth: 0, color: it.unit ? T.tx : T.tx3 }}>

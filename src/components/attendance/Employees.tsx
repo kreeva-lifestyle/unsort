@@ -127,7 +127,7 @@ export default function AttendanceEmployees({ employees, onChanged, addToast }: 
       </div>
 
       {showModal && createPortal((
-        <div style={{ ...S.modalOverlay }} onClick={close}>
+        <div style={{ ...S.modalOverlay }}>
           <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 400 }} onClick={ev => ev.stopPropagation()}>
             <div style={S.modalHead}>
               <div style={S.modalTitle}>{editing ? `Edit ${editing.name}` : 'Add Employee'}</div>

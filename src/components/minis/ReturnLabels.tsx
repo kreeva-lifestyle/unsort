@@ -341,7 +341,7 @@ export default function ReturnLabels({ addToast }: { addToast: (msg: string, typ
 
       {/* Add/Edit Modal */}
       {showModal && createPortal(
-        <div style={S.modalOverlay} onClick={closeModal}>
+        <div style={S.modalOverlay}>
           <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 420 }} onClick={e => e.stopPropagation()}>
             <div style={S.modalHead}>
               <h3 style={S.modalTitle}>{editId ? 'Edit Label' : 'Add QC Label'}</h3>

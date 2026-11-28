@@ -31,7 +31,7 @@ export interface PoStatsData {
   states: Record<OpenKey, number>;
   /** Open orders' lines by unit, most pending first; `lines` counts every line, `linesDone` the fully received ones. */
   byUnit: UnitPending[]; lines: number; linesDone: number;
-  /** Open orders past their due date (expected date, or PO date + 3 d when none): how many, the worst, how many are due today, how many run on the assumed date. */
+  /** Open orders past their due date (expected date, or PO date + ASSUMED_LEAD_DAYS when none): how many, the worst, how many are due today, how many run on the assumed date. */
   breach: { count: number; worstLate: number; dueToday: number; assumed: number };
   due: Record<DueKey, number>;
   /** Most open orders first; past `TOP_VENDORS` folded into `OTHERS` (which keeps their pending). */

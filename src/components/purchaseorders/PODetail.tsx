@@ -17,6 +17,7 @@ import { waLink } from '../../lib/whatsapp';
 import ConfirmModal, { useConfirm } from '../ui/ConfirmModal';
 import { useModalLock } from '../../hooks/useModalLock';
 import POCloseModal, { pendingOf } from './POCloseModal';
+import POCancelModal from './POCancelModal';
 import POLineCancelModal from './POLineCancelModal';
 import POLineTable from './POLineTable';
 import POActivity from './POActivity';
@@ -72,6 +73,7 @@ export default function PODetail({ po: livePo, items: liveItems, receipts: liveR
   // One gate for every write on this sheet: a stage change and a receipt undo never overlap.
   const [busy, setBusy] = useState('');
   const [closing, setClosing] = useState(false);
+  const [cancelPo, setCancelPo] = useState(false);
   const [cancelling, setCancelling] = useState<PurchaseOrderItem | null>(null);
   const [urgentOpen, setUrgentOpen] = useState(false);
   // Raised from a costing sheet: the list embed carries the costing's SKU.
@@ -101,6 +103,8 @@ export default function PODetail({ po: livePo, items: liveItems, receipts: liveR
     setBusy('');
   };
   const canRemoveReceipt = canManage && !['draft', 'cancelled'].includes(po.status);
+  // After a cancel or a close the sheet's buttons wait until the order has been re-read.
+  const reread = async () => { setBusy('reread'); try { await onChanged(); } finally { setBusy(''); } };
 
   const open = OPEN.includes(po.status);
   const canEdit = po.status === 'draft';
@@ -132,7 +136,7 @@ export default function PODetail({ po: livePo, items: liveItems, receipts: liveR
             {/* The hero: title, status pill, the pipeline rail (the light travels when the order moves on), the latest event and who. */}
             <PORailCard po={livePo} items={liveItems} shown={shown} audit={audit} names={names} statusColors={statusColors} onLanded={() => { land(); landRef.current?.(); }} />
             {po.is_urgent && po.urgent_reason && <div style={{ fontSize: 12, color: T.tx2, marginBottom: 12 }}><b style={{ color: T.re }}>Urgent:</b> {po.urgent_reason}</div>}
-            <POStageActions po={po} items={items} canManage={canManage} ask={ask} onChanged={onChanged} waitLanded={waitLanded} busy={busy} holding={holding} setBusy={setBusy} onReceive={onReceive} onCloseRemaining={() => setClosing(true)} addToast={addToast} />
+            <POStageActions po={po} items={items} canManage={canManage} onChanged={onChanged} waitLanded={waitLanded} busy={busy} holding={holding} setBusy={setBusy} onReceive={onReceive} onCloseRemaining={() => setClosing(true)} onCancel={() => setCancelPo(true)} addToast={addToast} />
             {rev && <POReviseNotice key={rev.id} po={po} items={items} rev={rev} onDone={() => { void onChanged(); }} addToast={addToast} />}
             <POHeaderInfo po={po} costingSku={costingSku} names={names} jobs={jw.jobs} />
 
@@ -166,13 +170,14 @@ export default function PODetail({ po: livePo, items: liveItems, receipts: liveR
             {(canEdit || canRevise) && <button onClick={onEdit} disabled={!!busy || holding} style={{ ...S.btnGhost, ...S.btnSm, opacity: busy || holding ? 0.5 : 1 }}>{canEdit ? 'Edit' : 'Revise'}</button>}
           </div>
         </div>
-        <ConfirmModal {...modalProps} />
-        {closing && <POCloseModal po={po} items={items} onClose={() => setClosing(false)} onClosed={() => { setClosing(false); onChanged(); }} addToast={addToast} />}
       </div>
-      {/* Outside the sheet's overlay: a tap on this modal's backdrop must not bubble up and close the order. */}
+      {/* Outside the sheet's overlay: a tap on one of these pop-ups' backdrop must not bubble up and close the order. */}
+      <ConfirmModal {...modalProps} />
+      {closing && <POCloseModal po={po} items={items} onClose={() => setClosing(false)} onClosed={() => { setClosing(false); void reread(); }} addToast={addToast} />}
+      {cancelPo && <POCancelModal po={po} items={items} onClose={() => setCancelPo(false)} onCancelled={() => { setCancelPo(false); void reread(); }} addToast={addToast} />}
       {jw.sheet}
       {urgentOpen && <UrgentSheet module="purchase_order" id={po.id} title={`PO #${po.po_number}`} row={po} onClose={() => setUrgentOpen(false)} onSaved={() => { void onChanged(); }} addToast={addToast} />}
-      {cancelling && <POLineCancelModal po={po} item={cancelling} onClose={() => setCancelling(null)} onDone={() => { setCancelling(null); void onChanged(); }} addToast={addToast} />}
+      {cancelling && <POLineCancelModal po={po} item={cancelling} onClose={() => setCancelling(null)} onDone={() => { setCancelling(null); void reread(); }} addToast={addToast} />}
     </>,
     document.body,
   );

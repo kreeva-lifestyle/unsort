@@ -69,7 +69,7 @@ export default function EntryModal({ kind, detail, onClose, onSaved, addToast }:
       type="number" min="0" inputMode="decimal" placeholder={ph} aria-label={label} style={{ ...S.fInput, width: '100%', height: 44, fontSize: 15 }} />
   );
   return createPortal(
-    <div style={S.modalOverlay} onClick={onClose}>
+    <div style={S.modalOverlay}>
       <div className="modal-inner" style={{ ...S.modalBox, width: 460 }} onClick={e => e.stopPropagation()}>
         <div style={S.modalHead}>
           <div style={{ minWidth: 0 }}>
