@@ -393,12 +393,16 @@ Found in the overnight check of 19 Nov; built in the next Playbook change.
 - **Purchase orders: what is left after the changes of 27 Nov.** Built and
   live: late after 5 days, Cancel asks a reason, vendor must be in Contacts
   with a phone, Save and approve, forms no longer close on a tap outside,
-  the clearer challan screen, and "Fabric is for" on every fabric line.
+  the clearer challan screen, "Fabric is for" on every fabric line, and
+  repeat orders (type a design's code: its earlier fabrics show, one tap
+  fills the line).
   Still open, say yes or no to each:
   1. Older orders without a phone. 13 older orders (4 still open) were
      raised for 5 vendor names that are not in Contacts, so "Remind vendor"
      cannot open their chat. You: add those 5 vendors in Contacts with
      their phone. Then tell Claude, who links the old orders to them.
+     Until then a repeat order for them shows the old typed name, and the
+     form asks you to add the vendor when you save.
   2. "Fabric is for" is shown only to us. Should it also be printed on the
      order the vendor gets (print and picture)?
   3. A line on Home: "Purchases: 2 late, 3 due today".
@@ -408,13 +412,6 @@ Found in the overnight check of 19 Nov; built in the next Playbook change.
      row (you said the page is used mostly on a phone).
   7. The "tap outside does not close a form" rule is in DailyWork only.
      Say "Playbook: same rule" if you want it there too.
-  Claude does by itself, right after this update is on every phone: the
-  server also refuses a fabric line without "Fabric is for" and a cancel
-  without a reason (today only the app checks these two).
-  Being built now, comes in the next update (you asked on 27 Nov):
-  type a design's code on a new order and the fabrics ordered before
-  for it show right there; one tap fills the fabric, its code, what it
-  is for and the vendor.
   Small one Claude fixes with the next challan change: in "Share Payment
   QR" the phone's Back button closes the whole challan, not just that box.
   Still to answer (they decide further tips): how an order reaches the
