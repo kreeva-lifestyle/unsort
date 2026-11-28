@@ -20,7 +20,7 @@ import POItemRows, { blankItem } from './POItemRows';
 import type { FormItem } from './POItemRows';
 import POFormCharges, { type Charges } from './POFormCharges';
 import { poPayload, num } from './poFormSave';
-import { vendorNamed } from './VendorPicker';
+import { vendorNamed, vendorById } from './VendorPicker';
 import { forgetSkuHistory } from './poSkuHistory';
 import { vendorDefaults } from './poVendorDefaults';
 import type { PurchaseOrder, PurchaseOrderItem, PurchaseOrderType } from '../../types/database';
@@ -78,6 +78,16 @@ export default function POForm({ editing, duplicateFrom, prefill, canApprove, on
   const errRef = useRef<HTMLDivElement>(null);
   useEffect(() => { if (error) errRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }, [error]);
   useBackClose(true, () => onClose());
+  // When the form opens: the earlier-orders look-up starts fresh, and a copy (Duplicate, Raise POs) takes the
+  // vendor's name and phone from Contacts as they are today — not from the old order's own copy.
+  useEffect(() => {
+    forgetSkuHistory();
+    if (editing || !src?.vendor_id) return;
+    let alive = true;
+    void vendorById(src.vendor_id).then(c => { if (alive && c) setVendor(v => (v.id === c.id ? c : v)); });
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, when the form opens
+  }, []);
 
   // Live preview — the server is authoritative, this just mirrors its formula.
   // A cancelled line keeps what arrived on it (quantity = received), and the server's total still counts it.

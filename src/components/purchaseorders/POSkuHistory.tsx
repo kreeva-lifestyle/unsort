@@ -1,100 +1,105 @@
 // Under the SKU box of a PO line: what was ordered before for that design
-// (poSkuHistory). One earlier fabric → the line fills by itself (name, code,
-// what it is for, unit — and the vendor and type when those are still empty)
-// and says which order it came from, with Clear. Several → one row each, a
-// tap fills the line; nothing is guessed. On a filled line the design's other
-// fabrics can be added as new lines, and last time's quantity is offered —
-// scaled to this order's pieces — but never typed in by itself.
+// (poSkuHistory). An empty line gets one row per earlier fabric — a tap fills
+// the line (name, code, what it is for, unit; the type and the vendor too
+// while those are still empty). Nothing is typed in by itself: on the real
+// orders the "obvious" fabric was the wrong one almost half the time. A
+// filled line says which order it matches, offers last time's quantity
+// (scaled to this order's pieces), the vendor's other fabrics of the design
+// as new lines, and Clear, which takes back exactly what the tap wrote.
 import { useEffect, useState } from 'react';
 import { T, S } from '../../lib/theme';
 import { itemLabel } from './poItemLabel';
 import { fmtQty, unitOf } from './poStats';
 import { shortDate } from './POHeaderInfo';
-import { usePoSkuHistory, pickFor, sameFabric, skuKey, suggestQty, type SkuFabric } from './poSkuHistory';
+import { usePoSkuHistory, offerFor, sameFabric, skuKey, suggestQty, type SkuFabric } from './poSkuHistory';
 import type { FormItem } from './POItemRows';
 
 const SHOW = 4;
 const note: React.CSSProperties = { fontSize: 11, color: T.tx3, lineHeight: 1.45 };
-const link: React.CSSProperties = { border: 'none', background: 'none', color: T.ac2, fontSize: 11, fontWeight: 600, cursor: 'pointer', padding: '0 4px' };
+const cut: React.CSSProperties = { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' };
+const chip: React.CSSProperties = { ...S.btnGhost, ...S.btnSm, minHeight: 30, padding: '4px 12px', fontSize: 11, borderRadius: 999 };
+const pick: React.CSSProperties = { ...S.btnGhost, display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 2, width: '100%', minHeight: 48, padding: '6px 12px', textAlign: 'left', color: T.tx, fontWeight: 400 };
+const amount = (f: SkuFabric) => `${fmtQty(Number(f.quantity))} ${unitOf(f.unit)}`;
 
-export default function POSkuHistory({ row, rows, last, vendorId, pieces, onFill, onAdd, onClear, onQty }: {
+export default function POSkuHistory({ row, rows, last, vendor, poType, pieces, onFill, onAdd, onClear, onQty }: {
   row: FormItem;
   /** Every line of the form: a fabric already on it is not offered again. */
   rows: FormItem[];
   /** The last line of the form with this code: the design's other fabrics are offered once, there. */
   last: boolean;
-  vendorId: string | null;
+  vendor: { id: string | null; name: string };
+  poType: string;
   /** The form's "for how many pcs" ('' when not typed, or a lump sum). */
   pieces: string;
   onFill: (f: SkuFabric) => void;
   onAdd: (f: SkuFabric) => void;
   onClear: () => void;
-  onQty: (q: string) => void;
+  /** The quantity, with the unit it was ordered in last time. */
+  onQty: (q: string, unit: string) => void;
 }) {
   const key = skuKey(row.sku);
   // A line already on the order (edit / revise) is its own history: nothing is looked up or offered for it.
   const history = usePoSkuHistory(row.id ? '' : row.sku);
   const [all, setAll] = useState(false);
-  const { list, auto, foreign } = pickFor(history ?? [], vendorId);
-  const empty = !row.item_name.trim() && !row.fabric_code.trim();
-  // One candidate fills the empty line by itself — once per code: a line cleared on purpose stays clear.
-  const autoKey = auto && empty && !row.id && row.autoSku !== key ? `${key}|${auto.po_number}` : '';
+  // Rows that have just appeared take no tap for a moment: they push the boxes below them down, and a finger
+  // already on its way to "Fabric name" must not pick a fabric instead.
+  const shownFor = history?.length ? key : '';
+  const [armedFor, setArmedFor] = useState('');
   useEffect(() => {
-    if (autoKey && auto) onFill(auto);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- fires once per code and candidate
-  }, [autoKey]);
+    if (!shownFor) return;
+    const t = window.setTimeout(() => setArmedFor(shownFor), 500);
+    return () => window.clearTimeout(t);
+  }, [shownFor]);
 
   if (!history?.length) return null;
-  const from = (f: SkuFabric) => [`PO #${f.po_number}`, shortDate(f.po_date), f.vendor_name].filter(Boolean).join(' · ');
-  const used = list.find(f => sameFabric(f, row)) ?? history.find(f => sameFabric(f, row));
-  const onForm = (f: SkuFabric) => rows.some(r => skuKey(r.sku) === key && sameFabric(f, r));
-  const others = list.filter(f => !onForm(f));
+  const { list, mine, foreign } = offerFor(history, vendor, poType);
+  const design = row.sku.trim().toUpperCase();
+  const onForm = (f: SkuFabric, but?: FormItem) => rows.some(r => r !== but && skuKey(r.sku) === key && sameFabric(f, r));
 
-  if (empty) {
-    if (auto && row.autoSku !== key) return null; // being filled
-    const shown = all ? list : list.slice(0, SHOW);
+  if (!row.item_name.trim() && !row.fabric_code.trim()) {
+    const offer = list.filter(f => !onForm(f, row));
+    if (!offer.length) return null;
+    const armed = armedFor === shownFor, named = foreign || (!vendor.id && !vendor.name.trim());
     return (
       <div style={{ marginBottom: 8 }}>
-        <div style={{ ...note, marginBottom: 4 }}>{foreign ? 'This vendor has not supplied this design. Ordered before from:' : `Ordered before for ${row.sku.trim().toUpperCase()} — tap to fill:`}</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {shown.map(f => (
-            <button key={`${f.item_name}|${f.fabric_code}`} type="button" onClick={() => onFill(f)}
-              style={{ ...S.btnGhost, minHeight: 44, justifyContent: 'space-between', gap: 10, textAlign: 'left', color: T.tx, background: T.glass1, borderColor: T.bd }}>
-              <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}><b style={{ fontWeight: 600 }}>{itemLabel(f)}</b>{f.component && <span style={{ color: T.tx3 }}> for {f.component}</span>}</span>
-              <span style={{ ...note, flexShrink: 0, textAlign: 'right' }}>{foreign || !vendorId ? f.vendor_name : `${fmtQty(Number(f.quantity))} ${unitOf(f.unit)}`} · {shortDate(f.po_date)}</span>
-            </button>
-          ))}
+        <div style={{ ...note, marginBottom: 4 }}>{foreign ? `No earlier order of ${design} from this vendor. Ordered before from:` : `Ordered before for ${design}. Tap one to fill this line:`}</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, opacity: armed ? 1 : 0.55, pointerEvents: armed ? 'auto' : 'none', transition: 'opacity .2s' }}>
+          {(all ? offer : offer.slice(0, SHOW)).map(f => {
+            const under = [f.component && `for ${f.component}`, named && f.vendor_name, f.orders > 1 && `ordered ${f.orders} times`].filter(Boolean).join(' · ');
+            return (
+              <button key={`${f.po_number}|${f.item_name}|${f.fabric_code}`} type="button" onClick={() => onFill(f)} style={pick}>
+                <span style={{ display: 'flex', gap: 10, alignItems: 'baseline', minWidth: 0 }}>
+                  <b style={{ ...cut, flex: 1, fontSize: 13, fontWeight: 600 }}>{itemLabel(f)}</b>
+                  <span style={{ ...note, flexShrink: 0, whiteSpace: 'nowrap' }}>{amount(f)} · {shortDate(f.po_date)}</span>
+                </span>
+                {under && <span style={{ ...note, ...cut }}>{under}</span>}
+              </button>
+            );
+          })}
         </div>
-        {list.length > SHOW && !all && <button type="button" className="touch44" onClick={() => setAll(true)} style={link}>{list.length - SHOW} more</button>}
+        {offer.length > SHOW && !all && <button type="button" className="touch44" onClick={() => setAll(true)} style={{ ...chip, marginTop: 6 }}>{offer.length - SHOW} more</button>}
       </div>
     );
   }
 
+  const mark = row.filled?.key === key ? row.filled : null;
+  const used = (mark && history.find(f => f.po_number === mark.po && sameFabric(f, row))) || mine.find(f => sameFabric(f, row)) || history.find(f => sameFabric(f, row));
+  // The chosen vendor's other fabrics of this design, once, under the design's last line.
+  const others = last && !foreign ? mine.filter(f => !onForm(f)).slice(0, SHOW) : [];
   const sug = used && !row.quantity.trim() ? suggestQty(used, pieces) : null;
   if (!used && !others.length) return null;
   return (
     <div style={{ marginBottom: 8 }}>
       {used && (
         <div style={note}>
-          {row.autoSku === key ? 'Same as' : 'Ordered before:'} {from(used)}
-          {row.autoSku === key && <button type="button" className="touch44" onClick={onClear} style={link}>Clear</button>}
+          {mark ? 'Same as' : 'Ordered before:'} {[`PO #${used.po_number}`, shortDate(used.po_date), used.vendor_name].filter(Boolean).join(' · ')} — {amount(used)}{used.lump_sum ? ' (lump sum)' : used.for_pieces ? ` for ${used.for_pieces} pcs` : ''}
         </div>
       )}
-      {sug && used && (
-        <div style={{ ...note, marginTop: 2 }}>
-          Last time {fmtQty(Number(used.quantity))} {unitOf(used.unit)}{used.for_pieces ? ` for ${used.for_pieces} pcs` : ''}
-          <button type="button" className="touch44" onClick={() => onQty(String(sug.qty))} style={link}>Use {fmtQty(sug.qty)} {unitOf(used.unit)}{sug.scaled ? ` for ${pieces} pcs` : ''}</button>
-        </div>
-      )}
-      {others.length > 0 && last && (
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginTop: 4 }}>
-          <span style={note}>Also for this design:</span>
-          {others.slice(0, SHOW).map(f => (
-            <button key={`${f.item_name}|${f.fabric_code}`} type="button" className="touch44" onClick={() => onAdd(f)}
-              style={{ ...S.btnGhost, ...S.btnSm, minHeight: 30, padding: '4px 12px', fontSize: 11, borderRadius: 999 }}>+ {itemLabel(f)}</button>
-          ))}
-        </div>
-      )}
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginTop: 2 }}>
+        {sug && used && <button type="button" className="touch44" onClick={() => onQty(String(sug.qty), used.unit ?? '')} style={chip}>Use {fmtQty(sug.qty)} {unitOf(used.unit)}{sug.scaled ? ` for ${pieces} pcs` : ''}</button>}
+        {others.map(f => <button key={`${f.po_number}|${f.item_name}|${f.fabric_code}`} type="button" className="touch44" onClick={() => onAdd(f)} style={chip}>+ {itemLabel(f)}</button>)}
+        {mark && <button type="button" className="touch44" onClick={onClear} style={{ ...chip, color: T.tx2 }}>Clear</button>}
+      </div>
     </div>
   );
 }

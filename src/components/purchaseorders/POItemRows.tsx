@@ -18,13 +18,14 @@ import POComponentField, { cleanComponent } from './POComponentField';
 import { touchedRow, partOptional } from './poFormSave';
 import POSkuHistory from './POSkuHistory';
 import { skuKey, type SkuFabric } from './poSkuHistory';
+import { lineFrom, unfill, fillStands, type FillMark } from './poSkuFill';
 import type { PurchaseOrderType } from '../../types/database';
 
 /** `id` / `received` / `ordered`: an existing line on a revision — it keeps its id, and a cut stops at what arrived on it.
  *  `buffer`: the part of the quantity ordered as buffer over the costing plan (set in Raise POs, kept on edits).
  *  `component`: what a fabric line is for ("LEHENGA, BLOUSE"); `hadPart`: an existing line came with one (a revision may not blank it).
- *  `autoSku`: the code this line was filled for from an earlier order (it is not filled a second time for the same code). */
-export type FormItem = { id?: string; received?: number; ordered?: number; buffer?: number; hadPart?: boolean; autoSku?: string; sku: string; item_name: string; fabric_code: string; component: string; quantity: string; unit: string; rate: string };
+ *  `filled`: what a tap on an earlier order's fabric wrote on this line (poSkuFill), so Clear can take exactly that back. */
+export type FormItem = { id?: string; received?: number; ordered?: number; buffer?: number; hadPart?: boolean; filled?: FillMark; sku: string; item_name: string; fabric_code: string; component: string; quantity: string; unit: string; rate: string };
 // The quantity starts empty: over a pre-filled "1", typing 50 gave 150.
 export const blankItem = (): FormItem => ({ sku: '', item_name: '', fabric_code: '', component: '', quantity: '', unit: '', rate: '' });
 const UNIT_OPTIONS = ['Meter', 'Piece', 'Dozen'];
@@ -42,7 +43,7 @@ export default function POItemRows({ items, poType, forPieces, amend, tried, ven
   /** Save was tried and refused: what is still missing shows red. */
   tried: boolean;
   /** The form's vendor and type: a line filled from an earlier order also picks these when they are still empty. */
-  vendor: Vendor; onVendor: (v: Vendor) => void; onType: (t: PurchaseOrderType) => void;
+  vendor: Vendor; onVendor: (v: Vendor) => void; onType: (t: PurchaseOrderType | '') => void;
   onChange: (i: number, patch: Partial<FormItem>) => void;
   onRemove: (i: number) => void;
   /** A new line — blank, or already holding another fabric of the same design. */
@@ -51,14 +52,24 @@ export default function POItemRows({ items, poType, forPieces, amend, tried, ven
   const fabric = poType === 'fabric';
   const skuRequired = fabric || poType === 'material';
   const recentNames = useRecentItemNames(poType);
-  // An earlier order's fabric as this form holds it; the unit a line already has is kept.
-  const asLine = (f: SkuFabric, sku: string, unit = ''): Partial<FormItem> => ({ item_name: f.item_name, fabric_code: f.fabric_code ?? '', component: f.component ?? '', unit: unit || f.unit || '', autoSku: skuKey(sku) });
+  // A tap on an earlier order's fabric fills the line — and, only while they are still empty, the form's type and
+  // vendor (the row tapped showed that vendor's name). An order without a contact gives the name alone: the save asks for the rest.
   const fill = (i: number, f: SkuFabric) => {
-    onChange(i, asLine(f, items[i].sku, items[i].unit));
+    const setsVendor = !vendor.id && !vendor.name.trim() && !!f.vendor_name.trim();
+    onChange(i, lineFrom(f, items[i], { ...(poType ? {} : { type: f.po_type }), ...(setsVendor ? { vendor: f.vendor_id ?? f.vendor_name } : {}) }));
     if (!poType) onType(f.po_type);
-    // The vendor too, when none is chosen yet and Contacts has this one with a phone.
-    if (!vendor.id && !vendor.name.trim() && f.vendor_id && (f.vendor_phone ?? '').replace(/\D/g, '').length >= 10) onVendor({ id: f.vendor_id, name: f.vendor_name, phone: f.vendor_phone ?? '' });
+    if (setsVendor) onVendor({ id: f.vendor_id, name: f.vendor_name, phone: f.vendor_id ? f.vendor_phone ?? '' : '' });
   };
+  // Clear (`all`), or the code now names another design: what the tap wrote goes, and with it the vendor and the
+  // type the same tap chose — unless another line has been built on them since.
+  const takeBack = (i: number, all: boolean, more: Partial<FormItem> = {}) => {
+    const it = items[i], m = it.filled;
+    onChange(i, { ...unfill(it, all), ...more });
+    if (!m || !(all || fillStands(it)) || items.some((x, j) => j !== i && touchedRow(x, true))) return;
+    if (m.type && poType === m.type) onType('');
+    if (m.vendor && (vendor.id ?? vendor.name) === m.vendor) onVendor({ id: null, name: '', phone: '' });
+  };
+  const changeSku = (i: number, v: string) => (items[i].filled && skuKey(v) !== items[i].filled.key ? takeBack(i, false, { sku: v }) : onChange(i, { sku: v }));
   // Previously used fabric codes, fetched once the first time the form is a
   // fabric PO (never on a job-work form). Best-effort: without the list the
   // box is still a plain text field.
@@ -87,13 +98,13 @@ export default function POItemRows({ items, poType, forPieces, amend, tried, ven
                 {/* sizes off (owner's call): POs order fabric/job work at
                     the parent-design level. */}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <SkuInput value={it.sku} onChange={v => onChange(i, { sku: v })} sizes={false} placeholder={skuRequired ? 'SKU *' : 'SKU'} style={{ ...S.fInput, width: '100%', fontFamily: T.mono }} />
+                  <SkuInput value={it.sku} onChange={v => changeSku(i, v)} sizes={false} placeholder={skuRequired ? 'SKU *' : 'SKU'} style={{ ...S.fInput, width: '100%', fontFamily: T.mono }} />
                 </div>
                 <button onClick={() => onRemove(i)} disabled={locked} title={it.received ? 'Goods already arrived on this line — cancel its balance from the order' : undefined} style={{ border: 'none', background: 'none', cursor: locked ? 'not-allowed' : 'pointer', color: T.re, opacity: locked ? 0.25 : 0.7, fontSize: 18, padding: '8px 10px', lineHeight: 1, flexShrink: 0 }} aria-label="Remove item">&times;</button>
               </div>
-              <POSkuHistory row={it} rows={items} last={items.map(x => skuKey(x.sku)).lastIndexOf(skuKey(it.sku)) === i} vendorId={vendor.id} pieces={forPieces}
-                onFill={f => fill(i, f)} onAdd={f => onAdd({ sku: it.sku, ...asLine(f, it.sku) })} onQty={q => onChange(i, { quantity: q })}
-                onClear={() => onChange(i, { item_name: '', fabric_code: '', component: '' })} />
+              <POSkuHistory row={it} rows={items} last={items.map(x => skuKey(x.sku)).lastIndexOf(skuKey(it.sku)) === i} vendor={vendor} poType={poType} pieces={forPieces}
+                onFill={f => fill(i, f)} onAdd={f => onAdd({ sku: it.sku, ...lineFrom(f, { sku: it.sku, unit: '', component: '' }) })}
+                onQty={(q, unit) => onChange(i, { quantity: q, ...(unit ? { unit } : {}) })} onClear={() => takeBack(i, true)} />
               <div style={{ display: 'grid', gridTemplateColumns: fabric ? '1fr 1fr' : '1fr', gap: 6, marginBottom: 8 }}>
                 <input value={it.item_name} onChange={e => onChange(i, { item_name: e.target.value })} placeholder={fabric ? 'Fabric name *' : 'Item name *'} style={{ ...S.fInput, width: '100%', minWidth: 0 }} />
                 {fabric && (

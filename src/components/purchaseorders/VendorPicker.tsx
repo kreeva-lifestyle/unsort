@@ -27,6 +27,13 @@ export async function vendorNamed(name: string): Promise<Picked | null> {
   return rows.length === 1 ? { id: rows[0].id, name: rows[0].name, phone: rows[0].phone || '' } : null;
 }
 
+/** The contact as it is saved today; null when it is gone or the look-up failed (the caller keeps what it has). */
+export async function vendorById(id: string): Promise<Picked | null> {
+  const { data, error } = await supabase.from('po_vendors').select('id, name, phone').eq('id', id).maybeSingle();
+  if (error) { logSwallowed('PO vendor contact', error); return null; }
+  return data ? { id: data.id, name: data.name, phone: data.phone || '' } : null;
+}
+
 export default function VendorPicker({ value, onPick, addToast, disabled, addSignal }: {
   value: string;
   phone: string; // still accepted from the parent; intentionally NOT reused on manual edits (see onChange note)
